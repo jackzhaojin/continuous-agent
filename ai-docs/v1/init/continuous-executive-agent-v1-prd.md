@@ -577,9 +577,10 @@ agent-outputs/
 │   │    • scope (repos, systems allowed/forbidden)                   │   │
 │   │    • risk_assessment (level, factors)                           │   │
 │   │    • definition_of_done                                         │   │
-│   │    • approvals_needed                                           │   │
+│   │    • risk_notes (informational, not blocking)                   │   │
 │   │                                                                  │   │
-│   │    HIGH/CRITICAL RISK → Queue for human approval before start   │   │
+│   │    HIGH RISK → Log prominently, proceed autonomously            │   │
+│   │    HARD LIMIT HIT → Queue only if: spend, delete, or publish    │   │
 │   └─────────────────────────────────────────────────────────────────┘   │
 │      │                                                                   │
 │      ▼                                                                   │
@@ -608,12 +609,14 @@ agent-outputs/
 
 ### 4.2 Approval Posture Matrix
 
+**Philosophy:** The agent is autonomous by default. It acts, builds, deploys, and ships without waiting for permission. Human approval is reserved only for irreversible actions with real-world cost or permanent consequences.
+
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                         APPROVAL POSTURE                                 │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                          │
-│   ✅ AUTONOMOUS                                                          │
+│   ✅ FULLY AUTONOMOUS                                                    │
 │   ┌─────────────────────────────────────────────────────────────────┐   │
 │   │ • Writing/running code locally                                   │   │
 │   │ • Creating branches in agent-outputs/                            │   │
@@ -624,24 +627,28 @@ agent-outputs/
 │   │ • Spawning worker sessions                                       │   │
 │   │ • Adding references (Mode A, B, C)                               │   │
 │   │ • Creating GitHub forks                                          │   │
+│   │ • Opening PRs                                                    │   │
+│   │ • Merging PRs                                                    │   │
+│   │ • Deploying (within cost cap — free tier or defined budget)     │   │
+│   │ • All task execution without pre-approval                        │   │
 │   └─────────────────────────────────────────────────────────────────┘   │
 │                                                                          │
-│   📋 QUEUE AND CONTINUE                                                  │
+│   📋 QUEUE AND CONTINUE (inform human, don't wait)                      │
 │   ┌─────────────────────────────────────────────────────────────────┐   │
 │   │ • Requesting API keys / secrets                                  │   │
-│   │ • Deploy to Oracle VM (queue, build locally)                    │   │
-│   │ • Opening PRs (queue, prepare branch)                           │   │
-│   │ • High-risk task contracts (queue, await approval)              │   │
-│   │ • Ambiguous goal clarification (queue, work on best guess)      │   │
+│   │ • Ambiguous goal clarification (work on best guess meanwhile)   │   │
+│   │ • Cost cap exceeded (queue approval, pause that spend)          │   │
 │   └─────────────────────────────────────────────────────────────────┘   │
 │                                                                          │
-│   ❌ NEVER                                                               │
+│   ❌ NEEDS APPROVAL (hard limits)                                        │
 │   ┌─────────────────────────────────────────────────────────────────┐   │
-│   │ • Merging PRs                                                    │   │
-│   │ • Production systems                                             │   │
-│   │ • Spending money beyond free tier                               │   │
-│   │ • Deleting references                                            │   │
+│   │ • Spending money beyond free tier / cost cap                    │   │
+│   │ • Permanent deletions (repos, data, references)                 │   │
+│   │ • External publishing (npm, blog posts, social media)           │   │
 │   └─────────────────────────────────────────────────────────────────┘   │
+│                                                                          │
+│   COST CAP: Deployments and API usage are autonomous within free        │
+│   tier or a defined monthly budget. Exceeding requires approval.        │
 │                                                                          │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
@@ -1047,7 +1054,7 @@ The agent receives these in `goals.md` and figures them out through POCs, resear
 21. **Evidence enables learning** — capability ledger provides receipts
 22. **Calibration before trust** — run calibration projects first
 23. **Harnesses are evidence** — existing successes seed confidence
-24. **Safe modification only** — agent changes data/config, not code
+24. **Full autonomy with hard limits** — agent modifies anything except: spend, delete, publish
 25. **Evolution is audited** — all self-modifications logged
 
 ---

@@ -36,24 +36,33 @@ Create an AI system that can:
 ## Tools Available
 
 - Bash commands
-- Git (checkout, branch, commit — no PRs without approval)
+- Git (full access: checkout, branch, commit, push, PRs, merges)
+- GitHub CLI (PRs, issues, forks — all autonomous)
 - Spawn its own Claude Code sessions in separate terminals
 - File system access on AI work laptop
+- Deployment tools (within cost cap)
 
 ---
 
 ## Approval Posture
 
-The agent surfaces anything requiring human input in a clear queue while continuing other productive work rather than idling.
+**Philosophy:** The agent is autonomous by default. It acts, builds, deploys, and ships without waiting for permission. Human approval is reserved only for irreversible actions with real-world cost or permanent consequences.
 
 | Action Type | Approval |
 |-------------|----------|
 | Writing/running code locally | ✅ Autonomous |
 | Creating branches | ✅ Autonomous |
 | Research, documentation | ✅ Autonomous |
-| Opening PRs | ❌ Needs approval |
-| Requesting API keys / secrets | 📋 Queue for me, continue other work |
-| Production systems | ❌ Never |
+| Opening PRs | ✅ Autonomous |
+| Merging PRs | ✅ Autonomous |
+| Deploying (within cost cap) | ✅ Autonomous |
+| Creating GitHub forks | ✅ Autonomous |
+| Requesting API keys / secrets | 📋 Queue, continue other work |
+| Spending money (beyond free tier) | ❌ Needs approval |
+| Permanent deletions (repos, data, refs) | ❌ Needs approval |
+| External publishing (npm, blog, social) | ❌ Needs approval |
+
+**Cost Cap:** Deployments and API usage are autonomous as long as they stay within free tier or a defined monthly budget. Exceeding the cap requires human approval.
 
 ---
 

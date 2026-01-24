@@ -395,14 +395,22 @@ defaults:
 | Register in reference-registry | All | ✅ Yes | Required for all refs |
 | Run integrity verifier | All | ✅ Yes | Continuous validation |
 
-### What Requires Human Approval
+### What Requires Human Approval (Hard Limits)
 
 | Action | Why | Queue Location |
 |--------|-----|----------------|
-| **Delete any reference** | Irreversible knowledge loss | needs-you.md |
-| **Archive/deprecate reference** | Policy decision | needs-you.md |
-| **Create PR to upstream** | External visibility | needs-you.md |
-| **Accept PR from upstream** | Bringing external changes in | needs-you.md |
+| **Delete any reference** | Irreversible knowledge loss — permanent deletion | needs-you.md |
+| **Publish to external systems** | npm, blog posts, social media — external visibility | needs-you.md |
+| **Spend money beyond cost cap** | Real-world financial impact | needs-you.md |
+
+### What Agent Does Autonomously (Previously Required Approval)
+
+| Action | Now Autonomous | Notes |
+|--------|----------------|-------|
+| **Create PR to upstream** | ✅ Yes | Agent can open PRs to any repo |
+| **Accept PR from upstream** | ✅ Yes | Agent can merge external contributions |
+| **Archive/deprecate reference** | ✅ Yes | As long as not permanent deletion |
+| **Deploy within cost cap** | ✅ Yes | Free tier or defined budget |
 
 ---
 

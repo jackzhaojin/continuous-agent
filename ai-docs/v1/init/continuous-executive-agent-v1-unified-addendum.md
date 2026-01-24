@@ -60,8 +60,8 @@ Since the model cannot change, improvement can only come from:
 | **Prompts** | ✅ Yes | ✅ Safe | Rewrite instruction text |
 | **Context Assembly Rules** | ✅ Yes | ✅ Safe | Change what info gets retrieved/included |
 | **Skill Documentation** | ✅ Yes | ✅ Safe | Update based on outcomes |
-| **Config Parameters** | ✅ Yes | ⚠️ Bounded | Adjust within defined ranges |
-| **Orchestration Code** | ⚠️ Risky | ❌ Risky | Requires human approval |
+| **Config Parameters** | ✅ Yes | ✅ Safe | Adjust as needed, log changes |
+| **Orchestration Code** | ✅ Yes | ⚠️ Audit | Modify with git versioning and testing |
 
 **Self-improvement = changing prompts, context assembly, and skill documentation over time based on verified outcomes.**
 
@@ -75,7 +75,7 @@ The agent's "policy" (what determines behavior) consists of:
 | Context retrieval rules | Config | ✅ Yes (with testing) |
 | Skill confidence levels | Data | ✅ Yes (evidence-based) |
 | Decision heuristics | Text/Config | ✅ Yes (with audit) |
-| Orchestration logic | Code | ❌ No (human only) |
+| Orchestration logic | Code | ✅ Yes (git versioned, tested) |
 
 ### 1.4 The Bootstrap Problem
 
@@ -688,31 +688,36 @@ Output: Lessons document for future similar work
 | Workspace markdown | ✅ Yes | Low | None |
 | Skill registries (YAML) | ✅ Yes | Low | Evidence-based |
 | preferences.md | ✅ Yes | Low | Human can override |
-| context-rules.yaml | ✅ Yes | Medium | Test on next task |
-| Worker prompts | ✅ Yes | Medium | A/B testing |
-| Config parameters | ⚠️ Bounded | Medium | Within defined ranges |
-| Orchestration code | ❌ No | High | Human approval only |
+| context-rules.yaml | ✅ Yes | Low | Test on next task |
+| Worker prompts | ✅ Yes | Low | A/B testing |
+| Config parameters | ✅ Yes | Low | Log changes |
+| Orchestration code | ✅ Yes | Medium | Git versioning, run tests |
+| Verifier definitions | ✅ Yes | Medium | Git versioning, run tests |
 
 ### 11.2 The Safe Modification Zone
 
-```
-IMMUTABLE (human-controlled):
-├── executive-loop.js (deterministic core)
-├── constitution.md (boundaries)
-├── approval gates
-└── verifier definitions
+**Philosophy:** The agent is autonomous by default. Almost everything is evolvable. Only irreversible actions with real-world consequences require approval.
 
+```
 EVOLVABLE (agent-controlled with audit):
+├── executive-loop.js (git versioned, tested)
+├── constitution.md (git versioned, logged)
+├── verifier definitions (git versioned, tested)
 ├── skills/*.yml (confidence, maturity, evidence)
 ├── strategies/prompts/*.md (versioned in git)
 ├── strategies/context-rules.yaml (tested incrementally)
-├── preferences.md (human can correct)
-└── config.yaml (bounded parameter ranges)
+├── preferences.md (human can override)
+└── config.yaml (all parameters adjustable)
 
 APPEND-ONLY (audit trail):
 ├── capability-ledger.jsonl
 ├── evolution-log.jsonl
 └── work-ledger.jsonl
+
+HARD LIMITS (requires human approval):
+├── Spending money beyond cost cap
+├── Permanent deletions (repos, data, references)
+└── External publishing (npm, blog, social media)
 ```
 
 ### 11.3 Evolution Log
@@ -1085,7 +1090,7 @@ Add to the original 13 principles from the main spec:
 21. **Evidence enables learning** — capability ledger provides receipts
 22. **Calibration before trust** — run calibration projects before real work
 23. **Harnesses are evidence** — existing successes seed initial confidence
-24. **Safe modification only** — agent changes data/config, not code
+24. **Full autonomy with hard limits** — agent modifies anything except: spend, delete, publish
 25. **Evolution is audited** — all self-modifications logged with rationale
 
 ---
@@ -1197,16 +1202,23 @@ When V1 is running and collecting evidence:
 
 ## Appendix B: Quick Reference — What Agent Can/Cannot Do
 
-### ✅ Agent CAN (Autonomous)
+**Philosophy:** The agent is autonomous by default. Human approval is reserved only for irreversible actions with real-world cost or permanent consequences.
+
+### ✅ Agent CAN (Fully Autonomous)
 
 - Update skill confidence based on verifier results
 - Add new gaps to skill documentation
-- Run practice tasks in approved safe locations
+- Run practice tasks in any safe location
 - Generate retrospective analyses
 - Update context-rules.yaml
 - Modify worker prompts (with git versioning)
 - Adjust config parameters within bounds
 - Append to all ledger files
+- **Create and open PRs**
+- **Merge PRs**
+- **Deploy to any environment (within cost cap)**
+- **Create GitHub forks**
+- **Execute all task types without pre-approval**
 
 ### ⚠️ Agent CAN with Audit
 
@@ -1214,16 +1226,15 @@ When V1 is running and collecting evidence:
 - Add new skills to registries (logged)
 - Modify scope includes/excludes (logged)
 - Update common_failure_modes (logged)
+- Modify executive-loop.js (logged, requires testing)
+- Change verifier definitions (logged)
 
-### ❌ Agent CANNOT (Requires Human)
+### ❌ Agent CANNOT (Hard Limits — Requires Human)
 
-- Modify executive-loop.js
-- Change verifier definitions
-- Modify approval gates
-- Change constitution.md
-- Access new credentials
-- Deploy to production
-- Create PRs (can prepare, needs approval)
+- **Spend money beyond free tier / cost cap**
+- **Permanently delete data, repos, or references**
+- **Publish externally (npm, blog posts, social media)**
+- Access new credentials (queue and continue)
 
 ---
 
