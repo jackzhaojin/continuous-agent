@@ -14,10 +14,34 @@ This document tracks the strategic objectives for the Continuous Executive Agent
 - **Dependencies:** None identified
 
 ### Notion Integration POC
-- **Status:** Pending
-- **Description:** Proof of concept for Notion integration capabilities
+- **Status:** In Progress (Step 1 of 4, 0% complete)
+- **Description:** Proof of concept for Notion integration capabilities via Notion MCP, and Claude Agent SDK to be able to write with it.
 - **Success Criteria:** TBD
 - **Dependencies:** None identified
+- **Breakdown:** Auto-generated on 2026-01-25 20:27
+
+#### Step 1: Research existing patterns and plan approach
+- **Status:** In progress
+- **Description:** Analyze requirements for "Notion Integration POC". Research best practices, existing patterns, and create a technical plan.
+- **Est. Turns:** 80
+
+#### Step 2: Initialize project structure
+- **Status:** Pending
+- **Description:** Set up project with appropriate tooling and folder structure.
+- **Dependencies:** Step 1
+- **Est. Turns:** 80
+
+#### Step 3: Integration and feature completion
+- **Status:** Pending
+- **Description:** Connect all components, ensure data flow works end-to-end. Add any missing features.
+- **Dependencies:** Step 2
+- **Est. Turns:** 100
+
+#### Step 4: Testing and quality assurance
+- **Status:** Pending
+- **Description:** Write unit tests, integration tests. Fix bugs and edge cases.
+- **Dependencies:** Step 3
+- **Est. Turns:** 100
 
 ---
 

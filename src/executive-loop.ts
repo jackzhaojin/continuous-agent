@@ -451,9 +451,12 @@ async function validateWork(item: WorkItem, result: WorkerResult | null): Promis
     return false;
   }
 
-  // Determine project path from artifacts or use current directory
-  const projectPath = process.cwd();
+  // Use the worker's output path (where the actual work was done)
+  const projectPath = result.output_path || process.cwd();
   log(`  Running verifiers on: ${projectPath}`);
+  if (!result.output_path) {
+    log('  WARNING: No output_path in result, falling back to cwd (this should not happen)');
+  }
 
   try {
     // Run all verifiers

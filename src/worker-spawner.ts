@@ -106,6 +106,14 @@ function setupProjectDirectory(projectPath: string, category: string): void {
       console.log(`[Worker] Warning: No .gitignore template found for ${category}`);
     }
   }
+
+  // Copy .env file with API keys to project directory
+  const envSource = path.join(AGENT_BASE, '.env');
+  const envDest = path.join(projectPath, '.env');
+  if (existsSync(envSource) && !existsSync(envDest)) {
+    copyFileSync(envSource, envDest);
+    console.log(`[Worker] Copied .env with API keys to project`);
+  }
 }
 
 /**
