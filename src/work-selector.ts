@@ -1,14 +1,9 @@
 import { readFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
+import type { WorkItem } from './types.js';
 
-export interface WorkItem {
-  id: string;
-  priority: 'P1' | 'P2' | 'P3';
-  title: string;
-  description: string;
-  status: string;
-}
+export type { WorkItem };
 
 interface ParsedSection {
   priority: 'P1' | 'P2' | 'P3';
@@ -89,9 +84,9 @@ function parseGoalsFile(content: string): ParsedSection[] {
       if (statusMatch) {
         const statusText = statusMatch[1].toLowerCase().trim();
         if (statusText.includes('complete') || statusText.includes('done')) {
-          currentItem.status = 'completed';
+          currentItem.status = 'complete';
         } else if (statusText.includes('progress') || statusText.includes('wip') || statusText.includes('started')) {
-          currentItem.status = 'in-progress';
+          currentItem.status = 'in_progress';
         } else if (statusText.includes('block')) {
           currentItem.status = 'blocked';
         } else {
@@ -157,7 +152,7 @@ export async function selectWork(): Promise<WorkItem | null> {
     // Find first unblocked, non-completed item from highest priority
     for (const section of sections) {
       for (const item of section.items) {
-        if (item.status !== 'completed' && item.status !== 'blocked') {
+        if (item.status !== 'complete' && item.status !== 'blocked') {
           return item;
         }
       }
