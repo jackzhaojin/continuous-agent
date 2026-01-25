@@ -1,85 +1,70 @@
 ---
 name: task-breakdown
-description: [TODO: Complete and informative explanation of what the skill does and when to use it. Include WHEN to use this skill - specific scenarios, file types, or tasks that trigger it.]
+description: Create detailed task specifications with step-by-step implementation instructions for complex features. Use after architecture documents exist, when breaking down multi-phase features into implementable tasks, defining dependencies and duration estimates, or creating detailed HOW-level instructions. Outputs to ai-docs/tasks/ directory. Triggers on "break down this feature into tasks", "create implementation tasks for...", or when detailed execution steps are needed after architectural design is complete.
 ---
 
 # Task Breakdown
 
-## Overview
+Create detailed, implementable task specifications from architectural designs.
 
-[TODO: 1-2 sentences explaining what this skill enables]
+## When to Use
 
-## Structuring This Skill
+Use this skill when:
+- Architecture document exists for a feature
+- Multi-phase feature needs breakdown into tasks
+- Detailed step-by-step instructions required
+- Dependencies and execution order must be clear
 
-[TODO: Choose the structure that best fits this skill's purpose. Common patterns:
+Do NOT use for:
+- Requirements gathering (use prd-writer)
+- High-level system design (use project-architect)
+- Simple single-file changes
 
-**1. Workflow-Based** (best for sequential processes)
-- Works well when there are clear step-by-step procedures
-- Example: DOCX skill with "Workflow Decision Tree" → "Reading" → "Creating" → "Editing"
-- Structure: ## Overview → ## Workflow Decision Tree → ## Step 1 → ## Step 2...
+## Workflow
 
-**2. Task-Based** (best for tool collections)
-- Works well when the skill offers different operations/capabilities
-- Example: PDF skill with "Quick Start" → "Merge PDFs" → "Split PDFs" → "Extract Text"
-- Structure: ## Overview → ## Quick Start → ## Task Category 1 → ## Task Category 2...
+### 1. Read Architecture
 
-**3. Reference/Guidelines** (best for standards or specifications)
-- Works well for brand guidelines, coding standards, or requirements
-- Example: Brand styling with "Brand Guidelines" → "Colors" → "Typography" → "Features"
-- Structure: ## Overview → ## Guidelines → ## Specifications → ## Usage...
+Start by reading the architecture document from `ai-docs/architect/` to understand the system design.
 
-**4. Capabilities-Based** (best for integrated systems)
-- Works well when the skill provides multiple interrelated features
-- Example: Product Management with "Core Capabilities" → numbered capability list
-- Structure: ## Overview → ## Core Capabilities → ### 1. Feature → ### 2. Feature...
+### 2. Identify Phases
 
-Patterns can be mixed and matched as needed. Most skills combine patterns (e.g., start with task-based, add workflow for complex operations).
+Break the feature into logical implementation phases:
+- **Phase 1**: Foundation/infrastructure
+- **Phase 2**: Core functionality
+- **Phase 3**: Integration and polish
 
-Delete this entire "Structuring This Skill" section when done - it's just guidance.]
+### 3. Create Task Files
 
-## [TODO: Replace with the first main section based on chosen structure]
+For each task, create `ai-docs/tasks/task-{phase}-{number}-{name}.md`:
 
-[TODO: Add content here. See examples in existing skills:
-- Code samples for technical skills
-- Decision trees for complex workflows
-- Concrete examples with realistic user requests
-- References to scripts/templates/references as needed]
+**Key sections**:
+- **Overview**: What this task accomplishes
+- **Dependencies**: Which tasks must complete first
+- **Implementation Steps**: Detailed HOW instructions
+- **Files to Modify**: Specific file paths
+- **Acceptance Criteria**: How to verify completion
+- **Estimated Duration**: Realistic time estimate
 
-## Resources
+### 4. Define Dependencies
 
-This skill includes example resource directories that demonstrate how to organize different types of bundled resources:
+Ensure tasks are ordered correctly with clear dependency chains.
 
-### scripts/
-Executable code (Python/Bash/etc.) that can be run directly to perform specific operations.
+## Best Practices
 
-**Examples from other skills:**
-- PDF skill: `fill_fillable_fields.py`, `extract_form_field_info.py` - utilities for PDF manipulation
-- DOCX skill: `document.py`, `utilities.py` - Python modules for document processing
+- **Be Specific**: Include exact file paths, function names, code patterns
+- **One Task = One PR**: Each task should be independently reviewable
+- **Test First**: Include testing steps in each task
+- **Build Incrementally**: Each task should leave the codebase in a working state
+- **Reference Architecture**: Link back to architecture decisions
 
-**Appropriate for:** Python scripts, shell scripts, or any executable code that performs automation, data processing, or specific operations.
+## Example
 
-**Note:** Scripts may be executed without loading into context, but can still be read by Claude for patching or environment adjustments.
+Input: Architecture for "real-time collaboration"
 
-### references/
-Documentation and reference material intended to be loaded into context to inform Claude's process and thinking.
+Output:
+- `task-1-1-websocket-server.md`
+- `task-1-2-client-connection.md`
+- `task-2-1-state-sync.md`
+- `task-2-2-conflict-resolution.md`
 
-**Examples from other skills:**
-- Product management: `communication.md`, `context_building.md` - detailed workflow guides
-- BigQuery: API reference documentation and query examples
-- Finance: Schema documentation, company policies
-
-**Appropriate for:** In-depth documentation, API references, database schemas, comprehensive guides, or any detailed information that Claude should reference while working.
-
-### assets/
-Files not intended to be loaded into context, but rather used within the output Claude produces.
-
-**Examples from other skills:**
-- Brand styling: PowerPoint template files (.pptx), logo files
-- Frontend builder: HTML/React boilerplate project directories
-- Typography: Font files (.ttf, .woff2)
-
-**Appropriate for:** Templates, boilerplate code, document templates, images, icons, fonts, or any files meant to be copied or used in the final output.
-
----
-
-**Any unneeded directories can be deleted.** Not every skill requires all three types of resources.
+Each with detailed steps, dependencies, and acceptance criteria.

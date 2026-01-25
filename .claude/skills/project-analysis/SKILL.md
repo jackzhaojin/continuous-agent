@@ -1,85 +1,80 @@
 ---
 name: project-analysis
-description: [TODO: Complete and informative explanation of what the skill does and when to use it. Include WHEN to use this skill - specific scenarios, file types, or tasks that trigger it.]
+description: Analyze existing codebases to document tech stack, patterns, and architecture before designing new features. Use when starting work on an unfamiliar codebase, before creating PRDs or architecture docs, when understanding existing patterns is needed, or when documenting current state for future reference. Creates analysis document in ai-docs/project-analysis.md covering tech stack, file structure, key patterns, and architectural decisions. Triggers on "analyze this codebase", "what's the tech stack?", or before major feature work in new projects.
 ---
 
 # Project Analysis
 
-## Overview
+Analyze and document existing codebases to understand patterns before building new features.
 
-[TODO: 1-2 sentences explaining what this skill enables]
+## When to Use
 
-## Structuring This Skill
+Use this skill when:
+- Starting work on an unfamiliar codebase
+- Before writing PRDs or architecture docs
+- Need to understand existing patterns and conventions
+- Documenting current state for reference
 
-[TODO: Choose the structure that best fits this skill's purpose. Common patterns:
+Do NOT use for:
+- New projects with no existing code
+- Well-understood codebases
+- Simple bug fixes
 
-**1. Workflow-Based** (best for sequential processes)
-- Works well when there are clear step-by-step procedures
-- Example: DOCX skill with "Workflow Decision Tree" → "Reading" → "Creating" → "Editing"
-- Structure: ## Overview → ## Workflow Decision Tree → ## Step 1 → ## Step 2...
+## Workflow
 
-**2. Task-Based** (best for tool collections)
-- Works well when the skill offers different operations/capabilities
-- Example: PDF skill with "Quick Start" → "Merge PDFs" → "Split PDFs" → "Extract Text"
-- Structure: ## Overview → ## Quick Start → ## Task Category 1 → ## Task Category 2...
+### 1. Explore Tech Stack
 
-**3. Reference/Guidelines** (best for standards or specifications)
-- Works well for brand guidelines, coding standards, or requirements
-- Example: Brand styling with "Brand Guidelines" → "Colors" → "Typography" → "Features"
-- Structure: ## Overview → ## Guidelines → ## Specifications → ## Usage...
+Identify:
+- **Languages**: Primary and supporting languages
+- **Frameworks**: Frontend, backend, testing frameworks
+- **Build Tools**: Package managers, bundlers, task runners
+- **Dependencies**: Key libraries and their purposes
 
-**4. Capabilities-Based** (best for integrated systems)
-- Works well when the skill provides multiple interrelated features
-- Example: Product Management with "Core Capabilities" → numbered capability list
-- Structure: ## Overview → ## Core Capabilities → ### 1. Feature → ### 2. Feature...
+### 2. Analyze Structure
 
-Patterns can be mixed and matched as needed. Most skills combine patterns (e.g., start with task-based, add workflow for complex operations).
+Document:
+- **Directory Layout**: Purpose of each major directory
+- **Entry Points**: Where execution starts
+- **Module Organization**: How code is organized and imported
+- **Configuration**: Key config files and their roles
 
-Delete this entire "Structuring This Skill" section when done - it's just guidance.]
+### 3. Identify Patterns
 
-## [TODO: Replace with the first main section based on chosen structure]
+Look for:
+- **Architectural Patterns**: MVC, layered, microservices, etc.
+- **Code Conventions**: Naming, formatting, organization
+- **Common Utilities**: Shared helpers and their usage
+- **Data Flow**: How data moves through the system
 
-[TODO: Add content here. See examples in existing skills:
-- Code samples for technical skills
-- Decision trees for complex workflows
-- Concrete examples with realistic user requests
-- References to scripts/templates/references as needed]
+### 4. Document Findings
 
-## Resources
+Create `ai-docs/project-analysis.md` with:
+- **Tech Stack Summary**: All technologies in use
+- **Architecture Overview**: High-level system design
+- **Key Files**: Important files and their purposes
+- **Patterns to Follow**: Conventions for new code
+- **Integration Points**: External systems and APIs
 
-This skill includes example resource directories that demonstrate how to organize different types of bundled resources:
+### 5. Note Gaps or Issues
 
-### scripts/
-Executable code (Python/Bash/etc.) that can be run directly to perform specific operations.
+Include:
+- Missing documentation
+- Inconsistent patterns
+- Technical debt
+- Areas needing modernization
 
-**Examples from other skills:**
-- PDF skill: `fill_fillable_fields.py`, `extract_form_field_info.py` - utilities for PDF manipulation
-- DOCX skill: `document.py`, `utilities.py` - Python modules for document processing
+## Best Practices
 
-**Appropriate for:** Python scripts, shell scripts, or any executable code that performs automation, data processing, or specific operations.
+- **Be Comprehensive**: Cover all major aspects
+- **Reference Examples**: Point to representative files
+- **Note Conventions**: Capture implicit patterns
+- **Think Forward**: How will new features fit?
+- **Stay Objective**: Document what exists, not what should be
 
-**Note:** Scripts may be executed without loading into context, but can still be read by Claude for patching or environment adjustments.
+## Example
 
-### references/
-Documentation and reference material intended to be loaded into context to inform Claude's process and thinking.
+User: "Analyze the authentication service codebase"
 
-**Examples from other skills:**
-- Product management: `communication.md`, `context_building.md` - detailed workflow guides
-- BigQuery: API reference documentation and query examples
-- Finance: Schema documentation, company policies
+You: [Explores structure, identifies Express.js + JWT, documents middleware pattern, notes database schema, creates comprehensive analysis]
 
-**Appropriate for:** In-depth documentation, API references, database schemas, comprehensive guides, or any detailed information that Claude should reference while working.
-
-### assets/
-Files not intended to be loaded into context, but rather used within the output Claude produces.
-
-**Examples from other skills:**
-- Brand styling: PowerPoint template files (.pptx), logo files
-- Frontend builder: HTML/React boilerplate project directories
-- Typography: Font files (.ttf, .woff2)
-
-**Appropriate for:** Templates, boilerplate code, document templates, images, icons, fonts, or any files meant to be copied or used in the final output.
-
----
-
-**Any unneeded directories can be deleted.** Not every skill requires all three types of resources.
+Output: `ai-docs/project-analysis.md` with complete tech stack, architecture, and patterns for building auth features.
