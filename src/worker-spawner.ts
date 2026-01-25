@@ -7,7 +7,7 @@
  */
 
 import { query, type SDKMessage, type SDKResultMessage } from '@anthropic-ai/claude-agent-sdk';
-import { mkdirSync, existsSync, copyFileSync } from 'fs';
+import { mkdirSync, existsSync, copyFileSync, createWriteStream, type WriteStream } from 'fs';
 import path from 'path';
 import type { TaskContract, WorkerResult } from './types.js';
 
@@ -17,6 +17,24 @@ const AGENT_OUTPUTS_BASE = process.env.AGENT_OUTPUTS_PATH || '/Users/jackjin/dev
 // Template directory for project setup files (lives in agent repo, not outputs)
 const AGENT_BASE = process.env.AGENT_PATH || '/Users/jackjin/dev/continuous-agent';
 const TEMPLATES_DIR = path.join(AGENT_BASE, 'templates');
+const LEDGERS_DIR = path.join(AGENT_BASE, 'ledgers');
+
+/**
+ * Create a logger for a specific worker task
+ */
+function createWorkerLogger(taskId: string): { log: (msg: string) => void; close: () => void } {
+  const logFile = path.join(LEDGERS_DIR, `worker-${taskId}.log`);
+  const stream = createWriteStream(logFile, { flags: 'a' });
+
+  return {
+    log: (msg: string) => {
+      const line = `[${new Date().toISOString()}] ${msg}`;
+      console.log(`[Worker ${taskId}] ${msg}`);
+      stream.write(line + '\n');
+    },
+    close: () => stream.end(),
+  };
+}
 
 /**
  * Detect project category from task goal
@@ -121,12 +139,27 @@ export async function spawnWorker(contract: TaskContract): Promise<WorkerResult>
   const artifacts: string[] = [];
   const errors: string[] = [];
 
+  // Create logger for this worker
+  const logger = createWorkerLogger(contract.id);
+
   // Generate project path and set up directory with .gitignore FIRST
   const { path: projectPath, category } = generateProjectPath(contract);
   setupProjectDirectory(projectPath, category);
 
   const prompt = buildWorkerPrompt(contract, projectPath);
   const model = process.env.MODEL || 'claude-sonnet-4-5-20250929';
+
+  // Log worker start with full context
+  logger.log(`=== WORKER START ===`);
+  logger.log(`Task ID: ${contract.id}`);
+  logger.log(`Project Path: ${projectPath}`);
+  logger.log(`Category: ${category}`);
+  logger.log(`Model: ${model}`);
+  logger.log(`Max Turns: ${contract.max_turns}`);
+  logger.log(`Tools: ${contract.scope.tools_allowed.join(', ')}`);
+  logger.log(`--- PROMPT ---`);
+  logger.log(prompt);
+  logger.log(`--- END PROMPT ---`);
 
   try {
     // Query Claude using the Agent SDK with project directory as cwd
@@ -141,11 +174,17 @@ export async function spawnWorker(contract: TaskContract): Promise<WorkerResult>
     });
 
     // Process the streaming response
+    let turnCount = 0;
     for await (const message of stream) {
       const msg = message as SDKMessage;
 
+      // Log all messages for traceability
+      logger.log(`[MSG] type=${msg.type} ${JSON.stringify(msg).slice(0, 500)}`);
+
       // Handle different message types
       if (msg.type === 'assistant') {
+        turnCount++;
+        logger.log(`[TURN ${turnCount}] Assistant response`);
         // Extract text content from assistant messages
         if ('content' in msg && Array.isArray(msg.content)) {
           for (const block of msg.content) {
@@ -177,6 +216,16 @@ export async function spawnWorker(contract: TaskContract): Promise<WorkerResult>
     const duration = Date.now() - startTime;
     const success = errors.length === 0;
 
+    // Log completion
+    logger.log(`=== WORKER COMPLETE ===`);
+    logger.log(`Success: ${success}`);
+    logger.log(`Duration: ${duration}ms`);
+    logger.log(`Turns: ${turnCount}`);
+    if (errors.length > 0) {
+      logger.log(`Errors: ${errors.join(', ')}`);
+    }
+    logger.close();
+
     return {
       success,
       output: outputs.join('\n\n'),
@@ -187,6 +236,14 @@ export async function spawnWorker(contract: TaskContract): Promise<WorkerResult>
   } catch (error) {
     const duration = Date.now() - startTime;
     const errorMessage = error instanceof Error ? error.message : String(error);
+    const stack = error instanceof Error ? error.stack : '';
+
+    // Log error with full stack trace
+    logger.log(`=== WORKER FAILED ===`);
+    logger.log(`Error: ${errorMessage}`);
+    logger.log(`Stack: ${stack}`);
+    logger.log(`Duration: ${duration}ms`);
+    logger.close();
 
     return {
       success: false,

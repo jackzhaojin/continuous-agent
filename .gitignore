@@ -23,9 +23,8 @@ Thumbs.db
 .idea/
 *.code-workspace
 
-# Logs
-*.log
-logs/
+# Ledgers directory is FULLY TRACKED (audit trail)
+# No log files are ignored - they are gold
 
 # Verifier run results (runtime outputs)
 verifiers/results/

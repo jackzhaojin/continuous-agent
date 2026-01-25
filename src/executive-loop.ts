@@ -13,25 +13,42 @@ import type { WorkItem } from './work-selector.js';
 config();
 
 // === LOGGING SETUP ===
-const LOGS_DIR = path.join(process.cwd(), 'logs');
-const EXECUTIVE_LOG = path.join(LOGS_DIR, 'executive.log');
+const LEDGERS_DIR = path.join(process.cwd(), 'ledgers');
 
-// Ensure logs directory exists
-if (!existsSync(LOGS_DIR)) {
-  await mkdir(LOGS_DIR, { recursive: true });
+// Ensure ledgers directory exists synchronously at startup
+import { mkdirSync } from 'fs';
+if (!existsSync(LEDGERS_DIR)) {
+  mkdirSync(LEDGERS_DIR, { recursive: true });
 }
 
-// Log stream for file output
-const logStream = createWriteStream(EXECUTIVE_LOG, { flags: 'a' });
+// Get dated log file path
+function getLogFilePath(): string {
+  const date = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  return path.join(LEDGERS_DIR, `executive-${date}.log`);
+}
+
+// Current log stream (rotates daily)
+let currentLogDate = '';
+let logStream: ReturnType<typeof createWriteStream> | null = null;
+
+function getLogStream(): ReturnType<typeof createWriteStream> {
+  const today = new Date().toISOString().split('T')[0];
+  if (today !== currentLogDate || !logStream) {
+    if (logStream) logStream.end();
+    currentLogDate = today;
+    logStream = createWriteStream(getLogFilePath(), { flags: 'a' });
+  }
+  return logStream;
+}
 
 /**
- * Write to both console and log file
+ * Write to both console and dated log file
  */
 function writeLog(level: 'INFO' | 'ERROR' | 'WARN', message: string): void {
   const timestamp = new Date().toISOString();
   const logLine = `[${timestamp}] [${level}] ${message}`;
   console.log(logLine);
-  logStream.write(logLine + '\n');
+  getLogStream().write(logLine + '\n');
 }
 
 // Global state for the executive loop
@@ -132,14 +149,14 @@ function resetBackoff(): void {
 const sleep = (ms: number): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, ms));
 
-// Timestamp logging utility
+// Logging utilities - writes to both console and file
 function log(message: string): void {
-  console.log(`[${new Date().toISOString()}] ${message}`);
+  writeLog('INFO', message);
 }
 
 function logError(message: string, error?: unknown): void {
   const errorMsg = error instanceof Error ? error.message : String(error || '');
-  console.error(`[${new Date().toISOString()}] ERROR: ${message}${errorMsg ? ` - ${errorMsg}` : ''}`);
+  writeLog('ERROR', `${message}${errorMsg ? ` - ${errorMsg}` : ''}`);
 }
 
 /**

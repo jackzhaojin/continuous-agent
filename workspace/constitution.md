@@ -167,25 +167,18 @@ agent-outputs/              # ALL worker outputs go here
 
 ALL agent activity MUST be logged. No silent execution. Every action must be traceable.
 
-**Required logs (in `continuous-agent/logs/`):**
-- `executive.log` - Main loop activity, health checks, work selection
+**Log files (in `ledgers/`):**
+- `executive-{YYYY-MM-DD}.log` - Daily executive loop activity
 - `worker-{task-id}.log` - Each worker's full execution trace
-- All logs must include ISO timestamps
+- `work-ledger.jsonl` - Structured event log (append-only)
 
-**What must be logged:**
-- Every iteration start/end
-- Health check results
-- Work selection decisions
-- Worker spawn with full prompt
-- All worker SDK messages (assistant responses, tool calls, results)
-- Errors and exceptions with stack traces
-- State updates (goals.md changes, ledger entries)
-
-**Log retention:**
-- Logs are kept indefinitely unless explicitly archived
+**Requirements:**
+- All logs include ISO timestamps
+- Logs are VERSION CONTROLLED (not gitignored)
+- Daily rotation prevents unbounded growth
 - Never auto-delete logs
 
-**Zero tolerance:** Silent failures are unacceptable. If something happens, it must be in the logs.
+**Zero tolerance:** Silent failures are unacceptable.
 
 ---
 
