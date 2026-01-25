@@ -1,5 +1,5 @@
 ---
-name: Reference Refresh
+name: reference-refresh
 description: |
   Periodically refresh external references to keep them up-to-date. Use for weekly scheduled refresh of Mode A/B references, before starting work that depends on a reference, when encountering API/documentation drift, after major upstream releases, or when reference is marked stale (>30 days behind).
 ---

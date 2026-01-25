@@ -1,5 +1,5 @@
 ---
-name: Executive Loop
+name: executive-loop
 description: |
   Central orchestrator running continuously via PM2 to select and delegate work. Use when operating as the main executive agent, running the 8-phase loop (health, inputs, selection, contract, execute, validate, update, sleep), delegating tasks to workers, managing retry logic, or enforcing constitutional limits. Entry point for continuous agent operation.
 ---

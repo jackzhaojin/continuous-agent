@@ -1,5 +1,5 @@
 ---
-name: Calibration Next.js
+name: calibration-nextjs
 description: |
   Prove `deliver.nextjs.app.basic` capability through end-to-end execution. Use when validating Next.js delivery skills before important work, establishing baseline confidence from evidence, surfacing blockers (tooling, templates), or when nextjs.build.basic confidence is untested or low.
 ---

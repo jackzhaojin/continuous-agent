@@ -1,5 +1,5 @@
 ---
-name: Work Selection
+name: work-selection
 description: |
   Select the next work item from goals queue. Use at the beginning of each executive loop iteration, when evaluating priority order (P1 > P2 > P3), filtering by status and dependencies, handling retry logic with different strategies, or determining when to idle or run practice tasks.
 ---

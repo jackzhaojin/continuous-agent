@@ -1,5 +1,5 @@
 ---
-name: Calibration EDS
+name: calibration-eds
 description: |
   Prove `deliver.eds.site` capability through end-to-end execution. Use when validating Edge Delivery Services skills before EDS work, checking aem-cli and GitHub auth availability, establishing baseline confidence, or surfacing Adobe EDS tooling blockers.
 ---

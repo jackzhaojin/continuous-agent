@@ -1,5 +1,5 @@
 ---
-name: Reference Intake
+name: reference-intake
 description: |
   Acquire external references using Mode A (Mirror), B (Patch), or C (Fork). Use when a task requires external material (SDKs, documentation, examples), cloning official documentation, annotating reference code with patches, forking templates, or registering new references in reference-registry.yaml.
 ---

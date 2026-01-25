@@ -1,5 +1,5 @@
 ---
-name: Retrospective
+name: retrospective
 description: |
   Run periodic retrospective analysis to improve agent performance. Use weekly (every Sunday), after 10+ new outcomes in ledgers, when user requests performance review, after calibration projects complete, or when identifying skill gaps and calibration adjustments.
 ---

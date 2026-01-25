@@ -1,5 +1,5 @@
 ---
-name: Validator
+name: validator
 description: |
   Independent verification agent for validating completed work. Use when a worker completes a task and needs verification, when running verifiers against Definition of Done criteria, when generating validation reports with PASS/FAIL evidence, or when updating skill confidence based on verifier results. Validator role is SEPARATE from Executor for honest, unbiased assessment.
 ---

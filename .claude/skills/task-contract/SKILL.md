@@ -1,5 +1,5 @@
 ---
-name: Task Contract
+name: task-contract
 description: |
   Create valid task contracts between Executive and Worker. Use when preparing work for execution, classifying intent (outcome_only, what_only, what_and_how), defining verifiable Definition of Done criteria, assessing risk levels, or scoping allowed operations. Rule: No work without a valid task contract.
 ---
