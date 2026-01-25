@@ -845,9 +845,21 @@ async function updateStateWithStep(
 }
 
 /**
- * Main executive loop iteration
+ * Result of an iteration - determines whether main loop should sleep
  */
-async function runIteration(): Promise<void> {
+type IterationResult = 
+  | 'work_completed'     // Task/step executed - continue immediately
+  | 'work_failed'        // Task/step failed - continue immediately (retry or next task)
+  | 'breakdown_triggered' // Task broken down - continue immediately to execute first step
+  | 'no_work'            // Queue empty - sleep before polling again
+  | 'unhealthy'          // System unhealthy - sleep before retrying
+  | 'error';             // Unexpected error - handled by caller
+
+/**
+ * Main executive loop iteration
+ * Returns result indicating whether to continue immediately or sleep
+ */
+async function runIteration(): Promise<IterationResult> {
   loopState.iteration++;
   log(`--- Starting iteration ${loopState.iteration} ---`);
 
@@ -858,7 +870,7 @@ async function runIteration(): Promise<void> {
 
   if (!isHealthyEnoughToWork(health)) {
     log('System unhealthy, skipping work execution');
-    return;
+    return 'unhealthy';
   }
 
   // Step 2: Check inputs and select work
@@ -881,7 +893,7 @@ async function runIteration(): Promise<void> {
 
   if (!selectedWork) {
     log('No work available');
-    return;
+    return 'no_work';
   }
 
   const workItem = selectedWork.task;
@@ -904,9 +916,9 @@ async function runIteration(): Promise<void> {
       const writeSuccess = await writeStepsToGoals(workItem.title, steps);
       if (writeSuccess) {
         await logBreakdownEvent(workItem.id, workItem.title, steps.length, 'auto');
-        log(`  Created ${steps.length} steps. Will execute first step in next iteration.`);
-        // Don't execute this iteration - let next iteration pick up the first step
-        return;
+        log(`  Created ${steps.length} steps. Will execute first step immediately.`);
+        // Continue immediately - next iteration picks up the first step
+        return 'breakdown_triggered';
       }
     }
   }
@@ -932,6 +944,10 @@ async function runIteration(): Promise<void> {
   await updateStateWithStep(workItem, currentStep, validationSuccess, errorInfo, outputPath, result);
 
   log('--- Iteration complete ---');
+  
+  // Return result - both success and failure continue immediately
+  // (failure triggers retry or moves to next task)
+  return validationSuccess ? 'work_completed' : 'work_failed';
 }
 
 /**
@@ -967,7 +983,10 @@ async function main(): Promise<void> {
   });
 
   // Main loop
-  const sleepInterval = parseInt(process.env.LOOP_SLEEP_SECONDS || '30', 10) * 1000;
+  // IDLE_SLEEP: Only sleep when no work available (queue empty)
+  // This enables continuous execution: complete task → immediately start next
+  const idleSleepMs = parseInt(process.env.IDLE_SLEEP_SECONDS || '30', 10) * 1000;
+  const unhealthySleepMs = parseInt(process.env.UNHEALTHY_SLEEP_SECONDS || '60', 10) * 1000;
 
   while (loopState.running) {
     // Check if in cooldown mode (rate limited / token exhausted)
@@ -978,9 +997,11 @@ async function main(): Promise<void> {
       continue;
     }
 
+    let iterationResult: IterationResult = 'error';
+    
     try {
-      await runIteration();
-      // Successful iteration - reset backoff
+      iterationResult = await runIteration();
+      // Successful iteration (even if work failed) - reset backoff
       resetBackoff();
     } catch (error) {
       logError('Iteration failed', error);
@@ -988,19 +1009,47 @@ async function main(): Promise<void> {
       // Check if this is a rate limit / token exhaustion error
       if (isRateLimitError(error)) {
         enterCooldown(error);
+        continue; // Skip sleep logic, cooldown handles timing
       } else {
         // Non-rate-limit error - short backoff
         backoffState.consecutiveErrors++;
         if (backoffState.consecutiveErrors >= 5) {
           log(`⚠️ Too many consecutive errors (${backoffState.consecutiveErrors}). Entering short cooldown.`);
           backoffState.cooldownUntil = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 min cooldown
+          continue; // Skip sleep logic, cooldown handles timing
         }
       }
     }
 
+    // Decide whether to sleep based on iteration result
     if (loopState.running && !isInCooldown()) {
-      log(`Sleeping for ${sleepInterval / 1000} seconds...`);
-      await sleep(sleepInterval);
+      switch (iterationResult) {
+        case 'work_completed':
+        case 'work_failed':
+        case 'breakdown_triggered':
+          // Continue immediately - there's work to do
+          log('Continuing immediately to next iteration...');
+          break;
+          
+        case 'no_work':
+          // Queue empty - poll periodically
+          log(`No work available. Sleeping for ${idleSleepMs / 1000} seconds...`);
+          await sleep(idleSleepMs);
+          break;
+          
+        case 'unhealthy':
+          // System unhealthy - wait before retrying
+          log(`System unhealthy. Sleeping for ${unhealthySleepMs / 1000} seconds...`);
+          await sleep(unhealthySleepMs);
+          break;
+          
+        case 'error':
+        default:
+          // Unexpected error - short sleep to avoid tight loop
+          log(`Unexpected state. Sleeping for ${idleSleepMs / 1000} seconds...`);
+          await sleep(idleSleepMs);
+          break;
+      }
     }
   }
 

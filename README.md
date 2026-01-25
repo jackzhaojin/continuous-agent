@@ -10,13 +10,18 @@ An autonomous AI agent that finds and executes work proactively without waiting 
 - **Learns from results** by updating skill confidence scores
 - **Communicates asynchronously** via `workspace/needs-you.md` when blocked
 
-The agent runs continuously in an 8-phase loop: Health Check → Check Inputs → Select Work → Create Contract → Execute → Validate → Update State → Sleep → repeat.
+The agent runs continuously in an 8-phase loop: Health Check → Check Inputs → Select Work → Create Contract → Execute → Validate → Update State → Continue/Sleep → repeat.
+
+**Continuous Execution Model:** The agent immediately picks up the next task after completing one. Sleep only occurs when the queue is empty (idle polling) or the system is unhealthy.
 
 ## Quick Start
 
 ```bash
 # Install dependencies
 npm install
+
+# Install PM2 globally (if not already installed)
+npm install -g pm2
 
 # Configure authentication (choose one)
 cp .env.example .env
@@ -29,8 +34,15 @@ npm run dev
 npm run build
 npm start
 
-# For continuous operation, use PM2
-pm2 start dist/executive-loop.js --name continuous-agent
+# For continuous operation, use PM2 with ecosystem config
+pm2 start ecosystem.config.js
+
+# PM2 management commands
+pm2 list                    # View running processes
+pm2 logs continuous-agent   # View logs
+pm2 stop continuous-agent   # Stop the agent
+pm2 restart continuous-agent # Restart the agent
+pm2 delete continuous-agent  # Remove from PM2
 ```
 
 ## Architecture
@@ -63,7 +75,7 @@ When the agent blocks after 10 retry attempts, it writes to `workspace/needs-you
 | Get API token | 401 Unauthorized... | [APPROVED] Token: sk_xyz | BLOCKING | 2026-01-25 |
 ```
 
-The agent detects responses automatically and unblocks tasks on the next loop iteration (~30s).
+The agent detects responses automatically and unblocks tasks on the next loop iteration (immediate if work is pending, or within ~30s if idle).
 
 ## Constitution (Hard Limits)
 
