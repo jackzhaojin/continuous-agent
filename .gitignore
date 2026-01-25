@@ -3,6 +3,10 @@ local-only
 output
 .playwright-mcp
 
+
+# node
+node_modules
+
 # Environment files
 .env
 .env.local

@@ -1,0 +1,44 @@
+verifier_id: files-exist
+version: "1.0"
+description: "Verifies that required files exist in the project"
+command: |
+  echo "=== File Existence Check ===" && \
+  MISSING="" && \
+  FOUND="" && \
+  for file in ${file_list}; do
+    if [ -f "$file" ]; then
+      CHECKSUM=$(md5 -q "$file" 2>/dev/null || md5sum "$file" 2>/dev/null | cut -d' ' -f1 || echo "no-checksum")
+      SIZE=$(stat -f%z "$file" 2>/dev/null || stat -c%s "$file" 2>/dev/null || echo "unknown")
+      echo "FOUND: $file (size: $SIZE, md5: $CHECKSUM)"
+      FOUND="$FOUND $file"
+    else
+      echo "MISSING: $file"
+      MISSING="$MISSING $file"
+    fi
+  done && \
+  echo "=== Summary ===" && \
+  if [ -z "$MISSING" ]; then
+    echo "All files exist"
+    exit 0
+  else
+    echo "Missing files:$MISSING"
+    exit 1
+  fi
+working_dir: "${project_root}"
+timeout_seconds: 60
+parameters:
+  file_list:
+    type: array
+    description: "List of file paths to check (space-separated when passed)"
+    required: true
+    example: "package.json src/index.ts README.md"
+success_criteria:
+  - exit_code: 0
+  - output_contains: "All files exist"
+evidence_capture:
+  - type: log
+    name: "file_checks"
+    extract: "section:=== File Existence Check ==="
+  - type: log
+    name: "summary"
+    extract: "section:=== Summary ==="

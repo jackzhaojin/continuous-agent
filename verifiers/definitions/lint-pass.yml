@@ -1,0 +1,54 @@
+verifier_id: lint-pass
+version: "1.0"
+description: "Verifies code linting passes without errors"
+command: |
+  echo "=== Pre-lint Check ===" && \
+  if [ ! -f "package.json" ]; then
+    echo "ERROR: package.json not found"
+    exit 1
+  fi && \
+  HAS_LINT_SCRIPT=$(grep -q '"lint"' package.json && echo "yes" || echo "no") && \
+  HAS_ESLINT=$([ -f ".eslintrc" ] || [ -f ".eslintrc.js" ] || [ -f ".eslintrc.json" ] || [ -f ".eslintrc.yml" ] || [ -f "eslint.config.js" ] || [ -f "eslint.config.mjs" ] && echo "yes" || echo "no") && \
+  HAS_BIOME=$([ -f "biome.json" ] && echo "yes" || echo "no") && \
+  echo "Lint script in package.json: $HAS_LINT_SCRIPT" && \
+  echo "ESLint config found: $HAS_ESLINT" && \
+  echo "Biome config found: $HAS_BIOME" && \
+  if [ "$HAS_LINT_SCRIPT" = "yes" ]; then
+    echo "=== Running npm run lint ===" && \
+    npm run lint 2>&1
+  elif [ "$HAS_ESLINT" = "yes" ]; then
+    echo "=== Running npx eslint . ===" && \
+    npx eslint . 2>&1
+  elif [ "$HAS_BIOME" = "yes" ]; then
+    echo "=== Running npx biome check ===" && \
+    npx biome check . 2>&1
+  else
+    echo "WARNING: No linting configuration found"
+    echo "Skipping lint step"
+    exit 0
+  fi && \
+  echo "=== Lint Complete ==="
+working_dir: "${project_root}"
+timeout_seconds: 120
+parameters: {}
+success_criteria:
+  - exit_code: 0
+  - output_not_contains:
+    - "error"
+    - "Error"
+evidence_capture:
+  - type: log
+    name: "lint_output"
+    extract: "full"
+  - type: artifact
+    path: ".eslintrc"
+    optional: true
+  - type: artifact
+    path: ".eslintrc.js"
+    optional: true
+  - type: artifact
+    path: ".eslintrc.json"
+    optional: true
+  - type: artifact
+    path: "eslint.config.js"
+    optional: true

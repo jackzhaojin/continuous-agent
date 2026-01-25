@@ -1,0 +1,25 @@
+verifier_id: git-status-clean
+version: "1.0"
+description: "Verifies git repository state - branch exists and working tree is clean"
+command: |
+  echo "=== Git Branch ===" && \
+  git rev-parse --abbrev-ref HEAD && \
+  echo "=== Git Status ===" && \
+  git status --porcelain
+working_dir: "${project_root}"
+timeout_seconds: 30
+parameters: {}
+success_criteria:
+  - exit_code: 0
+  - output_pattern: "^=== Git Status ===\\s*$"
+    description: "Working tree is clean (no staged/unstaged changes)"
+evidence_capture:
+  - type: log
+    name: "branch_name"
+    extract: "line_after:=== Git Branch ==="
+  - type: log
+    name: "status_output"
+    extract: "section:=== Git Status ==="
+  - type: artifact
+    path: ".git/HEAD"
+    optional: false

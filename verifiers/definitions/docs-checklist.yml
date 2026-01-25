@@ -1,0 +1,67 @@
+verifier_id: docs-checklist
+version: "1.0"
+description: "Verifies documentation exists with run instructions"
+command: |
+  echo "=== README Check ===" && \
+  README_FILE="" && \
+  if [ -f "README.md" ]; then
+    README_FILE="README.md"
+  elif [ -f "readme.md" ]; then
+    README_FILE="readme.md"
+  elif [ -f "Readme.md" ]; then
+    README_FILE="Readme.md"
+  elif [ -f "README.MD" ]; then
+    README_FILE="README.MD"
+  fi && \
+  if [ -z "$README_FILE" ]; then
+    echo "ERROR: No README.md file found"
+    exit 1
+  fi && \
+  echo "Found: $README_FILE" && \
+  echo "=== Content Check ===" && \
+  HAS_RUN=false && \
+  HAS_GETTING_STARTED=false && \
+  HAS_USAGE=false && \
+  HAS_INSTALLATION=false && \
+  if grep -qi "^## Run" "$README_FILE" || grep -qi "^# Run" "$README_FILE"; then
+    echo "FOUND: Run section"
+    HAS_RUN=true
+  fi && \
+  if grep -qi "^## Getting Started" "$README_FILE" || grep -qi "^# Getting Started" "$README_FILE"; then
+    echo "FOUND: Getting Started section"
+    HAS_GETTING_STARTED=true
+  fi && \
+  if grep -qi "^## Usage" "$README_FILE" || grep -qi "^# Usage" "$README_FILE"; then
+    echo "FOUND: Usage section"
+    HAS_USAGE=true
+  fi && \
+  if grep -qi "^## Installation" "$README_FILE" || grep -qi "^# Installation" "$README_FILE"; then
+    echo "FOUND: Installation section"
+    HAS_INSTALLATION=true
+  fi && \
+  echo "=== Summary ===" && \
+  if [ "$HAS_RUN" = true ] || [ "$HAS_GETTING_STARTED" = true ] || [ "$HAS_USAGE" = true ] || [ "$HAS_INSTALLATION" = true ]; then
+    echo "Documentation contains run/usage instructions"
+    echo "=== README Headers ===" && \
+    grep "^#" "$README_FILE" | head -20
+    exit 0
+  else
+    echo "ERROR: README missing run/usage instructions"
+    echo "Expected one of: '## Run', '## Getting Started', '## Usage', '## Installation'"
+    echo "=== Current Headers ===" && \
+    grep "^#" "$README_FILE" | head -20 || echo "No headers found"
+    exit 1
+  fi
+working_dir: "${project_root}"
+timeout_seconds: 30
+parameters: {}
+success_criteria:
+  - exit_code: 0
+  - output_contains: "Documentation contains run/usage instructions"
+evidence_capture:
+  - type: log
+    name: "readme_check"
+    extract: "full"
+  - type: artifact
+    path: "README.md"
+    optional: false

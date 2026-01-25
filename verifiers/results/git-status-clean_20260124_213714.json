@@ -1,0 +1,17 @@
+{
+  "verifier_id": "git-status-clean",
+  "version": "1.0",
+  "project_root": "/Users/jackjin/dev/continuous-agent",
+  "status": "PASS",
+  "exit_code": 0,
+  "duration_seconds": 0,
+  "started_at": "2026-01-25T02:37:14Z",
+  "completed_at": "2026-01-25T02:37:14Z",
+  "status_reason": "",
+  "log_file": "/Users/jackjin/dev/continuous-agent/verifiers/results/git-status-clean_20260124_213714.log",
+  "parameters": {},
+  "evidence": {
+    "output_lines": 4,
+    "output_bytes": 57
+  }
+}

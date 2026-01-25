@@ -1,0 +1,60 @@
+verifier_id: node-build
+version: "1.0"
+description: "Verifies npm build completes successfully"
+command: |
+  echo "=== Pre-build Check ===" && \
+  if [ ! -f "package.json" ]; then
+    echo "ERROR: package.json not found"
+    exit 1
+  fi && \
+  if ! grep -q '"build"' package.json; then
+    echo "WARNING: No build script found in package.json"
+    echo "Skipping build step"
+    exit 0
+  fi && \
+  echo "=== Running npm run build ===" && \
+  npm run build 2>&1 && \
+  echo "=== Build Output Check ===" && \
+  BUILD_DIR="" && \
+  if [ -d "dist" ]; then
+    BUILD_DIR="dist"
+  elif [ -d ".next" ]; then
+    BUILD_DIR=".next"
+  elif [ -d "build" ]; then
+    BUILD_DIR="build"
+  elif [ -d "out" ]; then
+    BUILD_DIR="out"
+  fi && \
+  if [ -n "$BUILD_DIR" ]; then
+    echo "Build output directory: $BUILD_DIR"
+    echo "Contents:"
+    ls -la "$BUILD_DIR" | head -20
+  else
+    echo "No standard build output directory found (dist/.next/build/out)"
+    echo "Build may have completed but output location is non-standard"
+  fi
+working_dir: "${project_root}"
+timeout_seconds: 300
+parameters: {}
+success_criteria:
+  - exit_code: 0
+  - output_not_contains:
+    - "error"
+    - "Error"
+    - "ERROR"
+    - "failed"
+    - "Failed"
+    - "FAILED"
+evidence_capture:
+  - type: log
+    name: "build_output"
+    extract: "full"
+  - type: artifact
+    path: "dist"
+    optional: true
+  - type: artifact
+    path: ".next"
+    optional: true
+  - type: artifact
+    path: "build"
+    optional: true

@@ -1,0 +1,56 @@
+verifier_id: node-install
+version: "1.0"
+description: "Verifies npm dependencies install successfully"
+command: |
+  echo "=== Node Version ===" && \
+  node --version && \
+  echo "=== NPM Version ===" && \
+  npm --version && \
+  echo "=== Package Lock Check ===" && \
+  if [ -f "package-lock.json" ]; then
+    echo "package-lock.json exists"
+    echo "=== Running npm ci ===" && \
+    npm ci 2>&1
+  elif [ -f "yarn.lock" ]; then
+    echo "yarn.lock exists"
+    echo "=== Running yarn install --frozen-lockfile ===" && \
+    yarn install --frozen-lockfile 2>&1
+  else
+    echo "No lock file found, running npm install"
+    echo "=== Running npm install ===" && \
+    npm install 2>&1
+  fi && \
+  echo "=== Verify node_modules ===" && \
+  if [ -d "node_modules" ]; then
+    echo "node_modules directory exists"
+    echo "Package count: $(ls -1 node_modules | wc -l | tr -d ' ')"
+  else
+    echo "ERROR: node_modules not created"
+    exit 1
+  fi
+working_dir: "${project_root}"
+timeout_seconds: 300
+parameters: {}
+success_criteria:
+  - exit_code: 0
+  - output_contains: "node_modules directory exists"
+  - output_not_contains:
+    - "npm ERR!"
+    - "ERESOLVE"
+    - "peer dep missing"
+evidence_capture:
+  - type: log
+    name: "node_version"
+    extract: "line_after:=== Node Version ==="
+  - type: log
+    name: "npm_version"
+    extract: "line_after:=== NPM Version ==="
+  - type: log
+    name: "install_output"
+    extract: "full"
+  - type: artifact
+    path: "package-lock.json"
+    optional: true
+  - type: artifact
+    path: "yarn.lock"
+    optional: true

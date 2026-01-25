@@ -1,0 +1,55 @@
+verifier_id: node-test
+version: "1.0"
+description: "Verifies npm tests pass successfully"
+command: |
+  echo "=== Pre-test Check ===" && \
+  if [ ! -f "package.json" ]; then
+    echo "ERROR: package.json not found"
+    exit 1
+  fi && \
+  if ! grep -q '"test"' package.json; then
+    echo "WARNING: No test script found in package.json"
+    echo "Skipping test step"
+    exit 0
+  fi && \
+  TEST_SCRIPT=$(node -e "console.log(require('./package.json').scripts?.test || '')") && \
+  if [ "$TEST_SCRIPT" = "echo \"Error: no test specified\" && exit 1" ]; then
+    echo "WARNING: Default placeholder test script detected"
+    echo "Skipping test step"
+    exit 0
+  fi && \
+  echo "=== Running npm test ===" && \
+  npm test 2>&1 && \
+  echo "=== Test Complete ===" && \
+  echo "=== Coverage Check ===" && \
+  if [ -d "coverage" ]; then
+    echo "Coverage directory found"
+    if [ -f "coverage/lcov-report/index.html" ]; then
+      echo "LCOV report available"
+    fi
+    if [ -f "coverage/coverage-summary.json" ]; then
+      echo "Coverage summary:"
+      cat coverage/coverage-summary.json 2>/dev/null | head -20 || echo "Could not read summary"
+    fi
+  else
+    echo "No coverage directory found"
+  fi
+working_dir: "${project_root}"
+timeout_seconds: 120
+parameters: {}
+success_criteria:
+  - exit_code: 0
+  - output_not_contains:
+    - "FAIL"
+    - "failed"
+    - "Error:"
+evidence_capture:
+  - type: log
+    name: "test_output"
+    extract: "full"
+  - type: artifact
+    path: "coverage/coverage-summary.json"
+    optional: true
+  - type: artifact
+    path: "coverage/lcov.info"
+    optional: true

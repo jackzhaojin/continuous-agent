@@ -1,0 +1,27 @@
+verifier_id: commit-exists
+version: "1.0"
+description: "Verifies that commits exist on the current branch"
+command: |
+  echo "=== Current Branch ===" && \
+  git rev-parse --abbrev-ref HEAD && \
+  echo "=== Recent Commits ===" && \
+  git log --oneline -n 5 && \
+  echo "=== Commit Count ===" && \
+  git rev-list --count HEAD
+working_dir: "${project_root}"
+timeout_seconds: 30
+parameters: {}
+success_criteria:
+  - exit_code: 0
+  - output_not_empty: true
+    description: "At least one commit must exist"
+evidence_capture:
+  - type: log
+    name: "branch_name"
+    extract: "line_after:=== Current Branch ==="
+  - type: log
+    name: "recent_commits"
+    extract: "section:=== Recent Commits ==="
+  - type: log
+    name: "commit_count"
+    extract: "line_after:=== Commit Count ==="

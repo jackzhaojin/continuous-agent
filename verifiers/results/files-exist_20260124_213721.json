@@ -1,0 +1,17 @@
+{
+  "verifier_id": "files-exist",
+  "version": "1.0",
+  "project_root": "/Users/jackjin/dev/continuous-agent",
+  "status": "FAIL",
+  "exit_code": 1,
+  "duration_seconds": 0,
+  "started_at": "2026-01-25T02:37:21Z",
+  "completed_at": "2026-01-25T02:37:21Z",
+  "status_reason": "Exit code was 1 (expected 0)",
+  "log_file": "/Users/jackjin/dev/continuous-agent/verifiers/results/files-exist_20260124_213721.log",
+  "parameters": {"file_list":"package.json README.md"},
+  "evidence": {
+    "output_lines": 5,
+    "output_bytes": 124
+  }
+}
