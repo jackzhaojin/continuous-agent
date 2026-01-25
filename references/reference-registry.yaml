@@ -2,14 +2,14 @@
 # This file tracks external references, documents, and resources used by the agent system.
 
 schema_version: "1.0"
-last_updated: null
+last_updated: "2026-01-24"
 
 # References are organized by category
 references:
   # Example entry format:
   # - id: unique-identifier
   #   name: Human readable name
-  #   type: document|url|api|file
+  #   type: document|url|api|file|codebase
   #   location: path or URL
   #   description: What this reference contains
   #   added: ISO8601 date
@@ -17,10 +17,58 @@ references:
   #   status: active|archived|deprecated
 
 categories:
+  # Foundational POCs that informed the agent's design
+  foundational:
+    - id: agent-sdk-chat-cli
+      name: "Claude Agent SDK - Chat CLI"
+      type: codebase
+      location: /Users/jackjin/dev/azure-da-mcp/agent-claude-sdk/chat-cli
+      description: |
+        Interactive CLI demonstrating Claude Agent SDK patterns.
+        KEY LEARNINGS:
+        - How to use query() from @anthropic-ai/claude-agent-sdk
+        - Streaming message handling (for await of stream)
+        - Message type handling (system, assistant, user, result)
+        - SDKResultMessage processing (success/error subtypes)
+        - Authentication patterns (CLAUDE_CODE_OAUTH_TOKEN, ANTHROPIC_API_KEY)
+        - Configuration options (model, maxTurns, cwd, allowedTools, settingSources)
+      key_files:
+        - src/index.ts    # Main entry point with SDK usage patterns
+        - package.json    # Dependencies
+        - .env            # Auth configuration (copied to our .env)
+      added: "2026-01-24"
+      tags: [agent-sdk, typescript, patterns, authentication]
+      status: active
+
+    - id: agent-sdk-skills-poc
+      name: "Claude Agent SDK - Skills POC"
+      type: codebase
+      location: /Users/jackjin/dev/azure-da-mcp/agent-claude-sdk/agent-sdk-skills-poc
+      description: |
+        POC testing Claude Code skills integration with Agent SDK.
+        KEY LEARNINGS:
+        - settingSources: ['user', 'project'] is REQUIRED for skills
+        - allowedTools must include 'Skill' for skill invocation
+        - cwd must point to project root for .claude/skills/ discovery
+        - Skills are loaded from ~/.claude/skills/ (user) and .claude/skills/ (project)
+        - SKILL.md format with frontmatter and instructions
+        - Skill invocation via Skill tool in agent responses
+      key_files:
+        - src/index.ts           # Experiment runner
+        - src/experiments/       # Different config combinations tested
+        - FINDINGS.md            # Results and conclusions
+      added: "2026-01-24"
+      tags: [agent-sdk, skills, configuration, experiments]
+      status: active
+
   documentation: []
+
   specifications: []
+
   apis: []
+
   templates: []
+
   external: []
 
 # Notes on usage:
@@ -28,3 +76,4 @@ categories:
 # - Update last_updated when modifying
 # - Mark deprecated references rather than removing them
 # - Use tags for cross-cutting categorization
+# - Foundational references document critical learnings for agent design
