@@ -1,0 +1,93 @@
+{
+  "task_id": "work-2",
+  "task_title": "Notion Integration POC",
+  "ts": "2026-01-25T20:45:56.564Z",
+  "iteration": 2,
+  "overall": "PARTIAL",
+  "pass_count": 6,
+  "fail_count": 1,
+  "results": [
+    {
+      "verifier_id": "git_status_clean",
+      "result": "FAIL",
+      "message": "5 uncommitted changes",
+      "evidence": {
+        "clean": false,
+        "changed_files": [
+          "M ledgers/capability-ledger.jsonl",
+          " M ledgers/executive-2026-01-25.log",
+          " M ledgers/work-ledger.jsonl",
+          " M workspace/goals.md",
+          "?? ledgers/2026-01-25/worker-task-d4b38657.log"
+        ]
+      },
+      "duration_ms": 12
+    },
+    {
+      "verifier_id": "files_exist",
+      "result": "PASS",
+      "message": "All 2 required files exist",
+      "evidence": {
+        "files_checked": {
+          "package.json": true,
+          "README.md": true
+        },
+        "missing": []
+      },
+      "duration_ms": 0
+    },
+    {
+      "verifier_id": "node_install",
+      "result": "PASS",
+      "message": "npm install succeeded",
+      "evidence": {
+        "stdout": "\nadded 17 packages, and audited 18 packages in 1s\n\n6 packages are looking for funding\n  run `npm fund` for details\n\nfound 0 vulnerabilities\n",
+        "stderr": ""
+      },
+      "duration_ms": 1287
+    },
+    {
+      "verifier_id": "node_build",
+      "result": "PASS",
+      "message": "Build succeeded",
+      "evidence": {
+        "stdout": "\n> continuous-executive-agent@1.0.0 build\n> tsc\n\n",
+        "stderr": ""
+      },
+      "duration_ms": 833
+    },
+    {
+      "verifier_id": "node_test",
+      "result": "PASS",
+      "message": "No test script configured (acceptable for MVP)",
+      "evidence": {
+        "has_test_script": false,
+        "note": "No tests to run"
+      },
+      "duration_ms": 0
+    },
+    {
+      "verifier_id": "lint_pass",
+      "result": "PASS",
+      "message": "No lint script configured",
+      "evidence": {
+        "has_lint_script": false
+      },
+      "duration_ms": 0
+    },
+    {
+      "verifier_id": "docs_checklist",
+      "result": "PASS",
+      "message": "Documentation checklist passed",
+      "evidence": {
+        "checks": {
+          "readme_exists": true,
+          "readme_has_content": true,
+          "has_run_instructions": true
+        },
+        "issues": []
+      },
+      "duration_ms": 0
+    }
+  ]
+}

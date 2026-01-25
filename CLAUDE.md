@@ -54,7 +54,7 @@ This separation is enforced by **Constitution Article I, Section 6** (zero toler
 5. **Execute** - Spawn Agent SDK worker with intelligent prompting
 6. **Validate** - Run verifiers, collect PASS/FAIL evidence
 7. **Update State** - Update goals.md, needs-you.md, ledgers
-8. **Sleep** - 30s default, then loop back to 1
+8. **Continue or Sleep** - Immediately continue if work exists, sleep only when idle
 
 ### Key Modules
 
@@ -212,7 +212,12 @@ ANTHROPIC_API_KEY=          # Option 2: API key
 # Optional configuration
 MODEL=claude-sonnet-4-5-20250929
 MAX_TURNS=250               # Max turns per worker session (250 for complex coding tasks)
-LOOP_SLEEP_SECONDS=30       # Sleep between iterations
+
+# Loop timing (continuous execution by default)
+# Agent continues immediately after completing work - no sleep between tasks
+# Sleep only occurs when idle (queue empty) or unhealthy
+IDLE_SLEEP_SECONDS=30       # Sleep when no work available (polling interval)
+UNHEALTHY_SLEEP_SECONDS=60  # Sleep when system unhealthy before retrying
 ```
 
 ## Code Modification Guidelines
