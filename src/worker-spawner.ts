@@ -7,7 +7,7 @@
  */
 
 import { query, type SDKMessage, type SDKResultMessage } from '@anthropic-ai/claude-agent-sdk';
-import { mkdirSync, existsSync, copyFileSync, createWriteStream, type WriteStream } from 'fs';
+import { mkdirSync, existsSync, copyFileSync, createWriteStream } from 'fs';
 import path from 'path';
 import type { TaskContract, WorkerResult, WorkItem } from './types.js';
 import { buildIntelligentPrompt, buildSimplePrompt } from './intelligence/prompt-builder.js';

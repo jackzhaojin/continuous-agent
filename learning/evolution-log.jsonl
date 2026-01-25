@@ -1,0 +1,14 @@
+# Evolution Log (JSONL Format)
+# Tracks all self-modifications for audit
+# Schema:
+# {
+#   "id": "evo-XXX",
+#   "ts": "ISO8601 datetime",
+#   "trigger": "validation_result|gap_discovered|retrospective|practice",
+#   "file": "path to modified file",
+#   "change": "description of change",
+#   "skill": "skill_id if applicable",
+#   "evidence": ["list of evidence pointers"],
+#   "rationale": "why this change was made"
+# }
+{"id":"evo-001","ts":"2026-01-25T12:00:00.000Z","trigger":"bootstrap","file":"learning/evolution-log.jsonl","change":"Initialized evolution log","evidence":["system-init"],"rationale":"PRD requires audit of all self-modifications"}

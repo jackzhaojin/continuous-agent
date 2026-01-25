@@ -19,3 +19,13 @@ export {
   type VerifierResult,
   type VerifierConfig,
 } from './core-verifiers.js';
+
+export {
+  runIntegrityVerifier,
+  checkNoOrphanSources,
+  checkNoOrphanPatches,
+  checkNoOrphanForks,
+  checkNoMissingFolders,
+  type IntegrityCheckResult,
+  type IntegrityReport,
+} from './reference-integrity.js';
