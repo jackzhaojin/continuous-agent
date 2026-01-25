@@ -224,6 +224,7 @@ LOOP_SLEEP_SECONDS=30       # Sleep between iterations
 3. **Intelligence layer:** Changes to prompts/strategies affect all future tasks
 4. **Workspace files:** Never auto-modify `constitution.md` (human-only)
 5. **Ledgers:** Append-only JSONL, never truncate or modify existing entries
+6. **Ad-hoc testing:** Create test files in `tests/adhoc/yyyy-mm-dd-purpose/` directory structure
 
 **TypeScript notes:**
 - ES modules (`type: "module"` in package.json)

@@ -2760,3 +2760,69 @@ I've successfully created a comprehensive proof of concept for Notion API integr
 [2026-01-25T19:07:08.238Z] [INFO]     Goal: ## Task: Notion Integration POC...
 [2026-01-25T19:07:08.238Z] [INFO]     DoD items: 4
 [2026-01-25T19:07:08.238Z] [INFO]   Capabilities exercised: general.task_execution
+[2026-01-25T19:12:13.981Z] [INFO]   Worker completed in 305742ms
+[2026-01-25T19:12:13.981Z] [INFO]   Success: true
+[2026-01-25T19:12:13.981Z] [INFO]   Output: Excellent! Everything is working perfectly. Let me create one final execution summary:
+
+---
+
+## 🎉 TASK COMPLETE: Notion Integration POC
+
+### Summary of Changes
+
+I successfully completed the Notion Integration POC by taking a **different approach** from the previous attempt. The key difference: **I added automated validation** that proves the POC works without requiring live Notion credentials.
+
+### What Was Done
+
+#### Files Created (This Attempt)
+1. **`test-poc.js`** - Automated validation scri...
+[2026-01-25T19:12:13.981Z] [INFO] Validating work item: work-2
+[2026-01-25T19:12:13.981Z] [INFO]   Running verifiers on: /Users/jackjin/dev/continuous-agent
+[2026-01-25T19:12:16.078Z] [INFO]   Verifier results: 6/7 verifiers passed
+[2026-01-25T19:12:16.078Z] [INFO]   Overall: PARTIAL
+[2026-01-25T19:12:16.078Z] [INFO]     [-] git_status_clean: 2 uncommitted changes
+[2026-01-25T19:12:16.078Z] [INFO]     [+] files_exist: All 2 required files exist
+[2026-01-25T19:12:16.078Z] [INFO]     [+] node_install: npm install succeeded
+[2026-01-25T19:12:16.078Z] [INFO]     [+] node_build: Build succeeded
+[2026-01-25T19:12:16.078Z] [INFO]     [+] node_test: No test script configured (acceptable for MVP)
+[2026-01-25T19:12:16.078Z] [INFO]     [+] lint_pass: No lint script configured
+[2026-01-25T19:12:16.078Z] [INFO]     [+] docs_checklist: Documentation checklist passed
+[2026-01-25T19:12:16.078Z] [INFO]   Validation report saved: /Users/jackjin/dev/continuous-agent/reports/validation/validation-work-2-1769368336078.json
+[2026-01-25T19:12:16.079Z] [INFO]   Updating capability confidence from verifier results...
+[2026-01-25T19:12:16.087Z] [INFO] Updating state for work item: work-2
+[2026-01-25T19:12:16.087Z] [INFO]   Success: false
+[2026-01-25T19:12:16.087Z] [INFO]   Output path: /Users/jackjin/dev/agent-outputs/projects/misc/2026-01-25/4ce82b77
+[2026-01-25T19:12:16.087Z] [INFO]   Attempt 2/10 failed for "Notion Integration POC"
+[2026-01-25T19:12:16.087Z] [INFO]   Error: Unknown error
+[2026-01-25T19:12:16.088Z] [INFO]   Will retry. 8 attempts remaining.
+[2026-01-25T19:12:16.088Z] [INFO] --- Iteration complete ---
+[2026-01-25T19:12:16.088Z] [INFO] Sleeping for 600 seconds...
+[2026-01-25T19:22:16.089Z] [INFO] --- Starting iteration 3 ---
+[2026-01-25T19:22:16.089Z] [INFO] Running health checks...
+[2026-01-25T19:22:16.513Z] [INFO] Health check: DEGRADED
+[2026-01-25T19:22:16.513Z] [INFO]   [+] github-cli: GitHub CLI authenticated
+[2026-01-25T19:22:16.513Z] [INFO]   [+] disk-space: Disk usage: 60% used, 176Gi available
+[2026-01-25T19:22:16.513Z] [INFO]   [+] node-version: Node.js v20.19.5
+[2026-01-25T19:22:16.513Z] [INFO]   [-] reference-integrity: Reference integrity issues: 2 missing
+[2026-01-25T19:22:16.513Z] [INFO] Checking for human inputs...
+[2026-01-25T19:22:16.514Z] [INFO] Selecting work...
+[2026-01-25T19:22:16.514Z] [INFO] Selected work: [P1] Notion Integration POC
+[2026-01-25T19:22:16.514Z] [INFO]   Previous attempts: 2/10
+[2026-01-25T19:22:16.514Z] [INFO] Executing work item: work-2
+[2026-01-25T19:22:16.514Z] [INFO]   Title: Notion Integration POC
+[2026-01-25T19:22:16.514Z] [INFO]   Priority: P1
+[2026-01-25T19:22:16.515Z] [INFO]   Description: Proof of concept for Notion integration capabilities
+[2026-01-25T19:22:16.515Z] [INFO]   Status: in_progress
+[2026-01-25T19:22:16.515Z] [INFO]   Intent: what_only (confidence: 50%)
+[2026-01-25T19:22:16.515Z] [INFO]   Research phase: REQUIRED
+[2026-01-25T19:22:16.515Z] [INFO]   Strategy: research-examples
+[2026-01-25T19:22:16.515Z] [INFO]   Task Contract ID: task-670dcf4a
+[2026-01-25T19:22:16.515Z] [INFO]   Max Turns: 250
+[2026-01-25T19:22:16.515Z] [INFO]   Tools Allowed: Read, Write, Edit, Bash, Glob, Grep, WebFetch, WebSearch
+[2026-01-25T19:22:16.515Z] [INFO]   Retry Context: Attempt 3/10
+[2026-01-25T19:22:16.515Z] [INFO]   Previous strategies: research-docs-first, research-examples
+[2026-01-25T19:22:16.515Z] [INFO]   Spawning worker agent...
+[2026-01-25T19:22:16.515Z] [INFO]     Goal: ## Task: Notion Integration POC...
+[2026-01-25T19:22:16.515Z] [INFO]     DoD items: 4
+[2026-01-25T19:22:16.515Z] [INFO]   Capabilities exercised: general.task_execution
+[2026-01-25T19:28:00.030Z] [INFO] Received SIGTERM, shutting down gracefully...
