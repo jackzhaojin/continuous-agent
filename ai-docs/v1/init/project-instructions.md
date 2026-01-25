@@ -94,16 +94,21 @@ Things the agent might autonomously identify and execute:
 
 ## Project Context Files
 
-Four specification documents provide the complete design:
+Six specification documents provide the complete design:
 
 | Document | Purpose |
 |----------|---------|
 | **`constitution.md`** | **⚠️ SUPREME AUTHORITY** — 5 immutable hard limits. Human-only modification. **READ FIRST, ALWAYS.** |
-| `continuous-executive-agent-v1-prd.md` | Primary implementation guide — architecture, workflows, schemas, roadmap |
-| `continuous-executive-agent-v1-unified-addendum.md` | Reference material — first-principles reasoning, detailed YAML schemas, retrospective process |
-| `continuous-executive-agent-v1-reference-management-addendum.md` | External dependency management — three-mode system (Clone/Patches/Fork), integrity verification |
+| `project-plan.md` | **WHEN** — Build phases, tasks, exit criteria. Static during build. |
+| `progress.md` | **LIVE STATUS** — Updated during build. Current phase, blockers, completed work. |
+| `continuous-executive-agent-v1-prd.md` | **WHY/WHAT/HOW** — Architecture, workflows, schemas |
+| `continuous-executive-agent-v1-unified-addendum.md` | Reference — first-principles, YAML schemas, retrospective |
+| `continuous-executive-agent-v1-reference-management-addendum.md` | Reference — external dependency management |
 
-**When building:** Start with `constitution.md` (hard limits are non-negotiable), then the PRD.
+**When building:**
+1. `constitution.md` — hard limits are non-negotiable
+2. `project-plan.md` — what to build and in what order
+3. `progress.md` — update as you work
 
 ---
 
