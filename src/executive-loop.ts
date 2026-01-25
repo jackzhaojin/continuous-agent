@@ -59,6 +59,18 @@ const loopState: LoopState = {
   current_task: null,
 };
 
+// Retry tracker - tracks attempts per task
+// Key: task title, Value: { attempts: number, lastError: string, strategies: string[] }
+interface RetryState {
+  attempts: number;
+  lastError: string;
+  strategies: string[];
+  lastAttemptAt: string;
+}
+const retryTracker: Map<string, RetryState> = new Map();
+
+const MAX_RETRIES = 10; // Per constitution: 10 retries before blocking
+
 // Backoff state for rate limiting / token exhaustion
 interface BackoffState {
   consecutiveErrors: number;
@@ -261,49 +273,149 @@ async function validateWork(item: WorkItem, result: WorkerResult | null): Promis
 
 /**
  * Update state after work completion
+ * IMPORTANT: Does NOT mark Blocked on first failure - uses retry tracking
  */
-async function updateState(item: WorkItem, success: boolean): Promise<void> {
+async function updateState(item: WorkItem, success: boolean, errorInfo?: string): Promise<void> {
   log(`Updating state for work item: ${item.id}`);
   log(`  Success: ${success}`);
 
   // Update loop state
   loopState.current_task = null;
+
+  const ledgerPath = path.join(process.cwd(), 'ledgers', 'work-ledger.jsonl');
+  const goalsPath = path.join(process.cwd(), 'workspace', 'goals.md');
+
   if (success) {
+    // SUCCESS - mark complete and clear retry tracker
     loopState.last_work_at = new Date().toISOString();
+    retryTracker.delete(item.title);
+
+    try {
+      const content = await readFile(goalsPath, 'utf-8');
+      const titlePattern = new RegExp(`(###\\s+${escapeRegex(item.title)}[\\s\\S]*?- \\*\\*Status:\\*\\*)\\s*[^\\n]+`, 'i');
+      if (titlePattern.test(content)) {
+        const updatedContent = content.replace(titlePattern, `$1 Complete`);
+        await writeFile(goalsPath, updatedContent, 'utf-8');
+        log(`  ✓ Updated goals.md: "${item.title}" → Complete`);
+      }
+
+      const ledgerEntry = JSON.stringify({
+        event: 'TASK_COMPLETED',
+        ts: new Date().toISOString(),
+        task_id: item.id,
+        title: item.title,
+        priority: item.priority,
+        iteration: loopState.iteration,
+      });
+      await appendFile(ledgerPath, ledgerEntry + '\n', 'utf-8');
+    } catch (error) {
+      logError('Failed to update state', error);
+    }
+    return;
   }
 
-  try {
-    // Update goals.md to reflect new status
-    const goalsPath = path.join(process.cwd(), 'workspace', 'goals.md');
-    const content = await readFile(goalsPath, 'utf-8');
+  // FAILURE - track retry, only block after MAX_RETRIES
+  let retry = retryTracker.get(item.title);
+  if (!retry) {
+    retry = { attempts: 0, lastError: '', strategies: [], lastAttemptAt: '' };
+  }
+  retry.attempts++;
+  retry.lastError = errorInfo || 'Unknown error';
+  retry.lastAttemptAt = new Date().toISOString();
+  retryTracker.set(item.title, retry);
 
-    // Find and update the status for this task
-    const newStatus = success ? 'Complete' : 'Blocked';
-    const titlePattern = new RegExp(`(###\\s+${escapeRegex(item.title)}[\\s\\S]*?- \\*\\*Status:\\*\\*)\\s*[^\\n]+`, 'i');
+  log(`  Attempt ${retry.attempts}/${MAX_RETRIES} failed for "${item.title}"`);
+  log(`  Error: ${retry.lastError.slice(0, 200)}`);
 
-    if (titlePattern.test(content)) {
-      const updatedContent = content.replace(titlePattern, `$1 ${newStatus}`);
-      await writeFile(goalsPath, updatedContent, 'utf-8');
-      log(`  Updated goals.md: "${item.title}" → ${newStatus}`);
-    } else {
-      log(`  Warning: Could not find task "${item.title}" in goals.md to update`);
+  // Log attempt to ledger
+  const attemptEntry = JSON.stringify({
+    event: 'TASK_ATTEMPT_FAILED',
+    ts: new Date().toISOString(),
+    task_id: item.id,
+    title: item.title,
+    attempt: retry.attempts,
+    max_retries: MAX_RETRIES,
+    error: retry.lastError.slice(0, 500),
+  });
+  await appendFile(ledgerPath, attemptEntry + '\n', 'utf-8');
+
+  if (retry.attempts >= MAX_RETRIES) {
+    // TRULY BLOCKED - mark as blocked AND write to needs-you.md
+    log(`  ⚠️ Max retries (${MAX_RETRIES}) reached. Marking as Blocked.`);
+
+    try {
+      // Update goals.md to Blocked
+      const content = await readFile(goalsPath, 'utf-8');
+      const titlePattern = new RegExp(`(###\\s+${escapeRegex(item.title)}[\\s\\S]*?- \\*\\*Status:\\*\\*)\\s*[^\\n]+`, 'i');
+      if (titlePattern.test(content)) {
+        const updatedContent = content.replace(titlePattern, `$1 Blocked`);
+        await writeFile(goalsPath, updatedContent, 'utf-8');
+      }
+
+      // MUST write to needs-you.md (per constitution)
+      await writeToNeedsYou(item, retry);
+
+      // Log final block
+      const blockEntry = JSON.stringify({
+        event: 'TASK_BLOCKED',
+        ts: new Date().toISOString(),
+        task_id: item.id,
+        title: item.title,
+        total_attempts: retry.attempts,
+        last_error: retry.lastError.slice(0, 500),
+      });
+      await appendFile(ledgerPath, blockEntry + '\n', 'utf-8');
+
+      // Clear tracker since we've officially blocked
+      retryTracker.delete(item.title);
+
+    } catch (error) {
+      logError('Failed to update blocked state', error);
     }
+  } else {
+    // Still have retries left - keep status as "In Progress", will retry
+    log(`  Will retry. ${MAX_RETRIES - retry.attempts} attempts remaining.`);
 
-    // Log to work ledger
-    const ledgerPath = path.join(process.cwd(), 'ledgers', 'work-ledger.jsonl');
-    const ledgerEntry = JSON.stringify({
-      event: success ? 'TASK_COMPLETED' : 'TASK_FAILED',
-      ts: new Date().toISOString(),
-      task_id: item.id,
-      title: item.title,
-      priority: item.priority,
-      iteration: loopState.iteration,
-    });
-    await appendFile(ledgerPath, ledgerEntry + '\n', 'utf-8');
-    log(`  Logged to work-ledger.jsonl`);
+    try {
+      const content = await readFile(goalsPath, 'utf-8');
+      const titlePattern = new RegExp(`(###\\s+${escapeRegex(item.title)}[\\s\\S]*?- \\*\\*Status:\\*\\*)\\s*[^\\n]+`, 'i');
+      if (titlePattern.test(content)) {
+        const updatedContent = content.replace(titlePattern, `$1 In Progress (retry ${retry.attempts}/${MAX_RETRIES})`);
+        await writeFile(goalsPath, updatedContent, 'utf-8');
+      }
+    } catch (error) {
+      logError('Failed to update retry state', error);
+    }
+  }
+}
 
+/**
+ * Write blocked task to needs-you.md (REQUIRED by constitution)
+ */
+async function writeToNeedsYou(item: WorkItem, retry: RetryState): Promise<void> {
+  const needsYouPath = path.join(process.cwd(), 'workspace', 'needs-you.md');
+
+  try {
+    let content = await readFile(needsYouPath, 'utf-8');
+
+    const today = new Date().toISOString().split('T')[0];
+    const newEntry = `| ${item.title} | Failed after ${retry.attempts} attempts. Last error: ${retry.lastError.slice(0, 100)}... | BLOCKING | ${today} |`;
+
+    // Insert after the "Actions Needed" table header
+    const actionsTable = /(\| Action \| Why Agent Can't Do It \| Blocking \| Since \|\n\|[-|]+\|)/;
+    if (actionsTable.test(content)) {
+      content = content.replace(actionsTable, `$1\n${newEntry}`);
+
+      // Remove the *None* placeholder if present
+      content = content.replace(/\| \*None\* \| \| \| \|/, '');
+
+      await writeFile(needsYouPath, content, 'utf-8');
+      log(`  📝 Added to needs-you.md: "${item.title}"`);
+    } else {
+      log(`  Warning: Could not find Actions Needed table in needs-you.md`);
+    }
   } catch (error) {
-    logError('Failed to update state', error);
+    logError('Failed to write to needs-you.md', error);
   }
 }
 
@@ -342,14 +454,21 @@ async function runIteration(): Promise<void> {
 
   log(`Selected work: [${workItem.priority}] ${workItem.title}`);
 
+  // Check retry state
+  const retryState = retryTracker.get(workItem.title);
+  if (retryState) {
+    log(`  Previous attempts: ${retryState.attempts}/${MAX_RETRIES}`);
+  }
+
   // Step 3: Execute work
   const result = await executeWork(workItem);
 
   // Step 4: Validate work
   const validationSuccess = await validateWork(workItem, result);
 
-  // Step 5: Update state
-  await updateState(workItem, validationSuccess);
+  // Step 5: Update state with error info if failed
+  const errorInfo = result?.errors?.join('; ') || (result?.success === false ? 'Worker reported failure' : undefined);
+  await updateState(workItem, validationSuccess, errorInfo);
 
   log('--- Iteration complete ---');
 }
