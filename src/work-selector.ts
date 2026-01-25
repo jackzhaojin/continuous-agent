@@ -33,16 +33,28 @@ function parseGoalsFile(content: string): ParsedSection[] {
 
     // Check for priority section headers (## P1, ## P2, ## P3)
     if (trimmedLine.match(/^#{1,2}\s*P1\b/i)) {
+      // Save current item before switching sections
+      if (currentItem && currentItem.title && currentPriority) {
+        saveItem(sections, currentItem as WorkItem, currentPriority);
+      }
       currentPriority = 'P1';
       currentItem = null;
       continue;
     }
     if (trimmedLine.match(/^#{1,2}\s*P2\b/i)) {
+      // Save current item before switching sections
+      if (currentItem && currentItem.title && currentPriority) {
+        saveItem(sections, currentItem as WorkItem, currentPriority);
+      }
       currentPriority = 'P2';
       currentItem = null;
       continue;
     }
     if (trimmedLine.match(/^#{1,2}\s*P3\b/i)) {
+      // Save current item before switching sections
+      if (currentItem && currentItem.title && currentPriority) {
+        saveItem(sections, currentItem as WorkItem, currentPriority);
+      }
       currentPriority = 'P3';
       currentItem = null;
       continue;
@@ -50,6 +62,10 @@ function parseGoalsFile(content: string): ParsedSection[] {
 
     // Check for Archive or other non-priority sections - stop parsing
     if (trimmedLine.match(/^#{1,2}\s*(Archive|Completed|Done)\b/i)) {
+      // Save current item before entering archive section
+      if (currentItem && currentItem.title && currentPriority) {
+        saveItem(sections, currentItem as WorkItem, currentPriority);
+      }
       currentPriority = null;
       currentItem = null;
       continue;
@@ -85,10 +101,12 @@ function parseGoalsFile(content: string): ParsedSection[] {
         const statusText = statusMatch[1].toLowerCase().trim();
         if (statusText.includes('complete') || statusText.includes('done')) {
           currentItem.status = 'complete';
-        } else if (statusText.includes('progress') || statusText.includes('wip') || statusText.includes('started')) {
-          currentItem.status = 'in_progress';
         } else if (statusText.includes('block')) {
           currentItem.status = 'blocked';
+        } else if (statusText.includes('not started') || statusText === 'pending') {
+          currentItem.status = 'pending';
+        } else if (statusText.includes('in progress') || statusText.includes('wip')) {
+          currentItem.status = 'in_progress';
         } else {
           currentItem.status = 'pending';
         }

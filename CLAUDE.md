@@ -159,8 +159,9 @@ The agent automatically detects responses in Phase 2, unblocks tasks in `goals.m
 
 **Retry Tracker** (in-memory Map):
 - Tracks attempts per task (max 10 per Constitution)
+- **Persists output_path** from first attempt so retries continue working on the SAME project
 - After each failure, `strategy-selector.ts` picks a DIFFERENT approach
-- Retry context passed to worker includes: attempts, strategies tried, last error
+- Retry context passed to worker includes: attempts, strategies tried, last error, existing project path
 
 **Strategy Selection:**
 - Simplify scope → Research first → Break into subtasks → Different tools
@@ -210,7 +211,7 @@ ANTHROPIC_API_KEY=          # Option 2: API key
 
 # Optional configuration
 MODEL=claude-sonnet-4-5-20250929
-MAX_TURNS=20                # Max turns per worker session
+MAX_TURNS=250               # Max turns per worker session (250 for complex coding tasks)
 LOOP_SLEEP_SECONDS=30       # Sleep between iterations
 ```
 
@@ -258,15 +259,17 @@ Complex features should follow a **WHY → WHAT → HOW → WHEN** progression. 
    - **HOW (high-level)**: Technology choices, integration patterns
    - Output: `ai-docs/architect/{feature-name}-architecture.md`
 
-3. **Task Breakdown** (`.claude/skills/task-breakdown.md`) - Creates detailed task specifications
+3. **Task Breakdown** (`.claude/skills/task-breakdown/`) - Creates detailed task specifications
    - **HOW (detailed)**: Step-by-step implementation instructions
    - **WHEN**: Dependencies, duration estimates, phases
    - Output: `ai-docs/tasks/task-{phase}-{number}-{feature-name}.md`
+   - Status: Incomplete skill (needs finalization)
 
-4. **Project Analysis** (`.claude/skills/project-analysis.md`) - Analyzes existing codebases
+4. **Project Analysis** (`.claude/skills/project-analysis/`) - Analyzes existing codebases
    - Documents tech stack, patterns, architecture
    - Used before designing new features to understand existing patterns
    - Output: `ai-docs/project-analysis.md`
+   - Status: Incomplete skill (needs finalization)
 
 **Workflow for Complex Features:**
 ```
