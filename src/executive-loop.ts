@@ -55,8 +55,9 @@ function isHealthyEnoughToWork(health: HealthStatus): boolean {
  */
 async function executeWork(item: WorkItem): Promise<WorkerResult | null> {
   log(`Executing work item: ${item.id}`);
+  log(`  Title: ${item.title}`);
   log(`  Priority: ${item.priority}`);
-  log(`  Description: ${item.description}`);
+  log(`  Description: ${item.description || '(none)'}`);
   log(`  Status: ${item.status}`);
 
   // Create task contract from work item
@@ -175,7 +176,7 @@ async function runIteration(): Promise<void> {
     return;
   }
 
-  log(`Selected work: [${workItem.priority}] ${workItem.description}`);
+  log(`Selected work: [${workItem.priority}] ${workItem.title}`);
 
   // Step 3: Execute work
   const result = await executeWork(workItem);

@@ -26,6 +26,7 @@ export interface HealthStatus {
 export interface WorkItem {
   id: string;
   priority: 'P1' | 'P2' | 'P3';
+  title: string;
   description: string;
   status: 'pending' | 'in_progress' | 'blocked' | 'complete';
 }

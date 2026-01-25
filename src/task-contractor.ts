@@ -34,34 +34,38 @@ const EXTENDED_TOOLS = [
  * Determine the appropriate max_turns based on task complexity
  */
 function estimateMaxTurns(workItem: WorkItem): number {
-  const description = workItem.description.toLowerCase();
+  // Use both title and description for keyword analysis
+  const text = `${workItem.title} ${workItem.description}`.toLowerCase();
 
   // Simple tasks: 10 turns
   if (
-    description.includes('fix typo') ||
-    description.includes('update version') ||
-    description.includes('add comment') ||
-    description.includes('rename')
+    text.includes('fix typo') ||
+    text.includes('update version') ||
+    text.includes('add comment') ||
+    text.includes('rename')
   ) {
     return 10;
   }
 
   // Medium complexity: 20 turns
   if (
-    description.includes('refactor') ||
-    description.includes('add test') ||
-    description.includes('update config') ||
-    description.includes('implement feature')
+    text.includes('refactor') ||
+    text.includes('add test') ||
+    text.includes('update config') ||
+    text.includes('implement feature')
   ) {
     return 20;
   }
 
   // Complex tasks: 30 turns
   if (
-    description.includes('migrate') ||
-    description.includes('rewrite') ||
-    description.includes('architect') ||
-    description.includes('design')
+    text.includes('migrate') ||
+    text.includes('rewrite') ||
+    text.includes('architect') ||
+    text.includes('design') ||
+    text.includes('build') ||
+    text.includes('app') ||
+    text.includes('integration')
   ) {
     return 30;
   }
@@ -83,7 +87,8 @@ function estimateMaxTurns(workItem: WorkItem): number {
  * Generate definition of done based on work type
  */
 function generateDefinitionOfDone(workItem: WorkItem): string[] {
-  const description = workItem.description.toLowerCase();
+  // Use both title and description for keyword analysis
+  const text = `${workItem.title} ${workItem.description}`.toLowerCase();
   const dod: string[] = [];
 
   // Common requirements
@@ -91,30 +96,30 @@ function generateDefinitionOfDone(workItem: WorkItem): string[] {
   dod.push('No new linting warnings introduced');
 
   // Task-specific requirements
-  if (description.includes('test')) {
+  if (text.includes('test')) {
     dod.push('All tests pass');
     dod.push('Test coverage maintained or improved');
   }
 
-  if (description.includes('fix') || description.includes('bug')) {
+  if (text.includes('fix') || text.includes('bug')) {
     dod.push('Bug is reproducible before fix');
     dod.push('Bug is resolved after fix');
     dod.push('Regression test added if applicable');
   }
 
-  if (description.includes('feature') || description.includes('implement')) {
+  if (text.includes('feature') || text.includes('implement')) {
     dod.push('Feature works as described');
     dod.push('Edge cases handled');
     dod.push('Documentation updated if needed');
   }
 
-  if (description.includes('refactor')) {
+  if (text.includes('refactor')) {
     dod.push('Behavior unchanged');
     dod.push('Code is cleaner/more maintainable');
     dod.push('Existing tests still pass');
   }
 
-  if (description.includes('config') || description.includes('setup')) {
+  if (text.includes('config') || text.includes('setup')) {
     dod.push('Configuration is valid');
     dod.push('System works with new configuration');
   }
@@ -132,15 +137,18 @@ function generateDefinitionOfDone(workItem: WorkItem): string[] {
  * Determine which tools to allow based on task type
  */
 function determineAllowedTools(workItem: WorkItem): string[] {
-  const description = workItem.description.toLowerCase();
+  // Use both title and description for keyword analysis
+  const text = `${workItem.title} ${workItem.description}`.toLowerCase();
 
   // Tasks that might need web access
   if (
-    description.includes('research') ||
-    description.includes('docs') ||
-    description.includes('documentation') ||
-    description.includes('api') ||
-    description.includes('dependency')
+    text.includes('research') ||
+    text.includes('docs') ||
+    text.includes('documentation') ||
+    text.includes('api') ||
+    text.includes('dependency') ||
+    text.includes('integration') ||
+    text.includes('poc')
   ) {
     return EXTENDED_TOOLS;
   }
@@ -178,11 +186,15 @@ export function createTaskContract(
  * Build a clear goal prompt from the work item
  */
 function buildGoalPrompt(workItem: WorkItem): string {
+  const descriptionSection = workItem.description
+    ? `\n**Description:** ${workItem.description}`
+    : '';
+
   return `
-## Task: ${workItem.description}
+## Task: ${workItem.title}
 
 **Priority:** ${workItem.priority}
-**Work Item ID:** ${workItem.id}
+**Work Item ID:** ${workItem.id}${descriptionSection}
 
 ### Instructions:
 Complete the task described above. Focus on:

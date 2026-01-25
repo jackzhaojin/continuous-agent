@@ -5,6 +5,7 @@ import path from 'path';
 export interface WorkItem {
   id: string;
   priority: 'P1' | 'P2' | 'P3';
+  title: string;
   description: string;
   status: string;
 }
@@ -16,66 +17,101 @@ interface ParsedSection {
 
 /**
  * Parse a goals.md file and extract work items by priority
+ *
+ * Expected format:
+ * ## P1 - Critical Priority
+ * ### Goal Title Here
+ * - **Status:** Not Started
+ * - **Description:** What to do
  */
 function parseGoalsFile(content: string): ParsedSection[] {
   const sections: ParsedSection[] = [];
   const lines = content.split('\n');
 
   let currentPriority: 'P1' | 'P2' | 'P3' | null = null;
+  let currentItem: Partial<WorkItem> | null = null;
   let itemCounter = 0;
 
-  for (const line of lines) {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
     const trimmedLine = line.trim();
 
-    // Check for priority section headers
-    if (trimmedLine.match(/^#+\s*P1\b/i) || trimmedLine.match(/^P1\s*[-:]/i)) {
+    // Check for priority section headers (## P1, ## P2, ## P3)
+    if (trimmedLine.match(/^#{1,2}\s*P1\b/i)) {
       currentPriority = 'P1';
+      currentItem = null;
       continue;
     }
-    if (trimmedLine.match(/^#+\s*P2\b/i) || trimmedLine.match(/^P2\s*[-:]/i)) {
+    if (trimmedLine.match(/^#{1,2}\s*P2\b/i)) {
       currentPriority = 'P2';
+      currentItem = null;
       continue;
     }
-    if (trimmedLine.match(/^#+\s*P3\b/i) || trimmedLine.match(/^P3\s*[-:]/i)) {
+    if (trimmedLine.match(/^#{1,2}\s*P3\b/i)) {
       currentPriority = 'P3';
+      currentItem = null;
+      continue;
+    }
+
+    // Check for Archive or other non-priority sections - stop parsing
+    if (trimmedLine.match(/^#{1,2}\s*(Archive|Completed|Done)\b/i)) {
+      currentPriority = null;
+      currentItem = null;
       continue;
     }
 
     // Skip if not in a priority section
     if (!currentPriority) continue;
 
-    // Parse list items (- [ ] or - [x] or just -)
-    const listMatch = trimmedLine.match(/^[-*]\s*(\[[ x]\])?\s*(.+)$/i);
-    if (listMatch) {
-      const checkbox = listMatch[1] || '';
-      const description = listMatch[2].trim();
-
-      // Determine status from checkbox
-      let status = 'pending';
-      if (checkbox.toLowerCase() === '[x]') {
-        status = 'completed';
-      } else if (description.toLowerCase().includes('blocked')) {
-        status = 'blocked';
-      } else if (description.toLowerCase().includes('in progress') || description.toLowerCase().includes('wip')) {
-        status = 'in-progress';
+    // Check for goal headers (### Goal Title)
+    const goalMatch = trimmedLine.match(/^###\s+(.+)$/);
+    if (goalMatch) {
+      // Save previous item if exists
+      if (currentItem && currentItem.title) {
+        saveItem(sections, currentItem as WorkItem, currentPriority);
       }
 
       itemCounter++;
-
-      // Find or create section for this priority
-      let section = sections.find(s => s.priority === currentPriority);
-      if (!section) {
-        section = { priority: currentPriority, items: [] };
-        sections.push(section);
-      }
-
-      section.items.push({
+      currentItem = {
         id: `work-${itemCounter}`,
         priority: currentPriority,
-        description,
-        status
-      });
+        title: goalMatch[1].trim(),
+        description: '',
+        status: 'pending'
+      };
+      continue;
     }
+
+    // Parse metadata lines under a goal
+    if (currentItem) {
+      // Status line: - **Status:** Not Started
+      const statusMatch = trimmedLine.match(/^[-*]\s*\*\*Status:\*\*\s*(.+)$/i);
+      if (statusMatch) {
+        const statusText = statusMatch[1].toLowerCase().trim();
+        if (statusText.includes('complete') || statusText.includes('done')) {
+          currentItem.status = 'completed';
+        } else if (statusText.includes('progress') || statusText.includes('wip') || statusText.includes('started')) {
+          currentItem.status = 'in-progress';
+        } else if (statusText.includes('block')) {
+          currentItem.status = 'blocked';
+        } else {
+          currentItem.status = 'pending';
+        }
+        continue;
+      }
+
+      // Description line: - **Description:** What to do
+      const descMatch = trimmedLine.match(/^[-*]\s*\*\*Description:\*\*\s*(.+)$/i);
+      if (descMatch) {
+        currentItem.description = descMatch[1].trim();
+        continue;
+      }
+    }
+  }
+
+  // Don't forget the last item
+  if (currentItem && currentItem.title && currentPriority) {
+    saveItem(sections, currentItem as WorkItem, currentPriority);
   }
 
   // Sort sections by priority (P1 first, then P2, then P3)
@@ -85,6 +121,15 @@ function parseGoalsFile(content: string): ParsedSection[] {
   });
 
   return sections;
+}
+
+function saveItem(sections: ParsedSection[], item: WorkItem, priority: 'P1' | 'P2' | 'P3'): void {
+  let section = sections.find(s => s.priority === priority);
+  if (!section) {
+    section = { priority, items: [] };
+    sections.push(section);
+  }
+  section.items.push(item);
 }
 
 /**
