@@ -82,6 +82,7 @@ export interface WorkerResult {
   errors: string[];
   duration_ms: number;
   output_path?: string; // Target folder in agent-outputs where work was done
+  exit_code?: number; // Exit code from worker process (1 = failure, 0 = success)
 }
 
 /**

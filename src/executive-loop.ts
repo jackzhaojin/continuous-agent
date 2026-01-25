@@ -761,8 +761,9 @@ async function updateStateWithStep(
 
   // STEP FAILURE - check if re-breakdown is needed
   const turnsUsed = result?.duration_ms ? Math.round(result.duration_ms / 60000) : 0;
-  
-  if (shouldReBreakdown(step, turnsUsed)) {
+  const exitedWithError = result?.exit_code === 1;
+
+  if (exitedWithError && shouldReBreakdown(step, turnsUsed)) {
     // Step is too complex, trigger re-breakdown
     log(`  Step appears too complex (${turnsUsed}+ turns used), triggering re-breakdown...`);
     
@@ -773,9 +774,24 @@ async function updateStateWithStep(
 
     if (subSteps.length > 0) {
       await logBreakdownEvent(item.id, item.title, subSteps.length, 're-breakdown');
-      log(`  Created ${subSteps.length} sub-steps. Will execute in next iteration.`);
-      // Note: In full implementation, would need to update goals.md with sub-steps
-      // For now, log and retry will happen with existing logic
+      log(`  Created ${subSteps.length} sub-steps. Writing to goals.md...`);
+
+      // Replace failed step with sub-steps in the item
+      if (item.steps && step) {
+        const stepIndex = item.steps.findIndex(s => s.step_number === step.step_number);
+        if (stepIndex >= 0) {
+          // Remove the failed step and insert sub-steps
+          item.steps.splice(stepIndex, 1, ...subSteps);
+
+          // Write updated steps to goals.md
+          const written = await writeStepsToGoals(item.title, item.steps);
+          if (written) {
+            log(`  ✓ Sub-steps written to goals.md. Next iteration will execute first sub-step.`);
+          } else {
+            log(`  ⚠ Failed to write sub-steps to goals.md`);
+          }
+        }
+      }
     } else {
       log(`  Re-breakdown limit reached. Step will be marked as blocked.`);
     }

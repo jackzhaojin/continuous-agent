@@ -34,6 +34,14 @@ export interface BreakdownResult {
 export function estimateComplexity(item: WorkItem): number {
   const text = `${item.title} ${item.description || ''}`.toLowerCase();
 
+  // Check for simple task patterns first (override everything else)
+  if (/add (unit )?test(s)?|write test(s)?/i.test(text)) {
+    return 70; // Simple test tasks are quick
+  }
+  if (/fix|bug|typo/i.test(text)) {
+    return 50; // Fixes are quick
+  }
+
   // Base complexity by priority
   let baseTurns = item.priority === 'P1' ? 100 :
                   item.priority === 'P2' ? 75 :
@@ -46,15 +54,14 @@ export function estimateComplexity(item: WorkItem): number {
     { pattern: /multi[- ]?tenant|scalab(le|ility)/i, multiplier: 2.0 },
     { pattern: /integrat(e|ion)|migrat(e|ion)/i, multiplier: 1.8 },
     { pattern: /authentication|authorization|security/i, multiplier: 1.6 },
-    
+
     // Medium complexity (1.3-1.5x)
     { pattern: /api|endpoint|crud/i, multiplier: 1.4 },
     { pattern: /database|schema|model/i, multiplier: 1.3 },
-    { pattern: /test(s|ing)|coverage/i, multiplier: 1.3 },
     { pattern: /deploy(ment)?|ci\/cd/i, multiplier: 1.3 },
-    
-    // Lower complexity (0.5-0.8x)
-    { pattern: /fix|bug|typo/i, multiplier: 0.5 },
+    { pattern: /test(s|ing)|coverage/i, multiplier: 1.2 },
+
+    // Lower complexity (0.6-0.8x)
     { pattern: /update|config(ure)?/i, multiplier: 0.6 },
     { pattern: /document(ation)?|readme/i, multiplier: 0.7 },
     { pattern: /refactor|clean(up)?/i, multiplier: 0.8 },

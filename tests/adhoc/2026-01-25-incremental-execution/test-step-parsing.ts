@@ -9,7 +9,7 @@
 
 import { readFile } from 'fs/promises';
 import path from 'path';
-import type { WorkItem, WorkStep } from '../../src/types.js';
+import type { WorkItem, WorkStep } from '../../../src/types.js';
 
 // ANSI colors
 const GREEN = '\x1b[32m';
@@ -281,7 +281,7 @@ async function runTests() {
   
   section('Loading Test Goals File');
   
-  const testFilePath = path.join(process.cwd(), 'tests/adhoc/test-goals-with-steps.md');
+  const testFilePath = path.join(process.cwd(), 'tests/adhoc/2026-01-25-incremental-execution/test-goals-with-steps.md');
   const content = await readFile(testFilePath, 'utf-8');
   info(`Loaded ${content.length} bytes from test file`);
   

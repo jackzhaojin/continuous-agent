@@ -10,10 +10,10 @@
  * 4. Priority re-evaluation logic
  */
 
-import { selectWork, selectWorkWithSteps, getAllWorkItems } from '../../src/work-selector.js';
-import { needsBreakdown, estimateComplexity, generateStaticBreakdown } from '../../src/task-breakdown.js';
-import { createTaskContract } from '../../src/task-contractor.js';
-import type { WorkItem, WorkStep } from '../../src/types.js';
+import { selectWork, selectWorkWithSteps, getAllWorkItems } from '../../../src/work-selector.js';
+import { needsBreakdown, estimateComplexity, generateStaticBreakdown } from '../../../src/task-breakdown.js';
+import { createTaskContract } from '../../../src/task-contractor.js';
+import type { WorkItem, WorkStep } from '../../../src/types.js';
 
 // ANSI colors for output
 const GREEN = '\x1b[32m';
