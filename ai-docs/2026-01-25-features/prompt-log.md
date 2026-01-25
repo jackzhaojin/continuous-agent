@@ -64,3 +64,68 @@
 - Constitution compliant (Article I, Section 8)
 
 Build verified: ✅ TypeScript compiles with no errors
+
+---
+
+## Session 2: Production Deployment & Traceability (Jan 25, 2026)
+
+### Prompt 5: Start Agent in Background (11:05 AM)
+
+> OK let's start the executive agent in the background, and remind me where we're outputting all the logs
+
+→ Response: Started agent in background, user confirmed seeing logs in ledgers/.
+→ Action: Background task b0883a5 running npm run dev. ✅
+
+---
+
+### Prompt 6: Date-Based Worker Logs (11:06 AM)
+
+> Let's add a note to CLAUDE.md that ledgers are version controlled '/Users/jackjin/dev/continuous-agent/ledgers', also i think uhmm.. we need a way to have worker tasks be yyyy-mm-dd driven so it's not all in the root folder, this will require a code change, but do not restart the agent
+
+→ Response: Updated CLAUDE.md with ledgers note, modified worker-spawner.ts for date subdirectories.
+→ Action: Updated CLAUDE.md, worker-spawner.ts (date-based ledgers/{yyyy-mm-dd}/), rebuilt TypeScript. ✅
+
+---
+
+### Prompt 7: Increase MAX_TURNS (11:07 AM)
+
+> OK - i think we don't have enough max turns, we need to REALLY extend our max turns to like, something super high like 200 or 300, we're doing agentic coding tasks., do this, clean up '/Users/jackjin/dev/agent-outputs/projects' kill the current run first
+
+→ Response: Set MAX_TURNS=250, cleaned outputs, archived old logs, started fresh agent run.
+→ Action: Updated .env, .env.example, cleaned agent-outputs, archived ledgers, restarted agent. ✅
+
+---
+
+### Prompt 8: MAX_TURNS Still Shows 30 (11:08 AM)
+
+> Why do i still see turn 30?
+
+→ Response: Discovered task-contractor.ts had hardcoded max turns, completely ignoring env variable.
+→ Action: Fixed estimateMaxTurns() to respect MAX_TURNS env, rebuilt, verified agent now shows 250. ✅
+
+---
+
+### Prompt 9: Assess First Failure (11:09 AM)
+
+> Can you assess why did we 'fail' the first try?
+
+→ Response: Worker actually SUCCEEDED - built Next.js app in 124 turns. "Failure" was Agent SDK exit code 1 bug.
+→ Action: Analyzed worker logs, found success evidence, identified false negative. ⚠️
+
+---
+
+### Prompt 10: Link Work Ledger to Worker Logs (11:10 AM)
+
+> Also is there a mapping of worker-task to actual ledger? i like worker task being separately documented which is amazing, but uhmm... is there a link so it's clear?
+
+→ Response: Added contract_id field to all work ledger events linking to worker logs.
+→ Action: Updated executive-loop.ts (6 event types), work-ledger.jsonl schema, CLAUDE.md tracing instructions. ✅
+
+---
+
+### Prompt 11: Log This Session (11:11 AM)
+
+> /conversation-logger to '/Users/jackjin/dev/continuous-agent/ai-docs/2026-01-25-features' when above task is done
+
+→ Response: Logging Session 2 covering agent deployment, MAX_TURNS fix, and traceability improvements.
+→ Action: Updated prompt-log.md with 7 new prompts. ✅

@@ -87,10 +87,22 @@ This separation is enforced by **Constitution Article I, Section 6** (zero toler
 
 **Append-only ledgers (JSONL):**
 - `ledgers/work-ledger.jsonl` - Task events (STARTED, COMPLETED, BLOCKED)
+  - Each entry includes `contract_id` linking to worker log
 - `ledgers/capability-ledger.jsonl` - Capability attempts and results
-- `ledgers/inputs-log.jsonl` - Human input audit trail
+  - Each entry includes `contract_id` linking to worker log
+- `ledgers/inputs-log.jsonl` - Human input audit trail (legacy, not currently used)
 - `ledgers/executive-{date}.log` - Daily executive loop logs
-- `ledgers/{yyyy-mm-dd}/worker-{task-id}.log` - Worker execution logs (organized by date)
+- `ledgers/{yyyy-mm-dd}/worker-{contract_id}.log` - Worker execution logs (organized by date)
+
+**Tracing tasks to worker logs:**
+```bash
+# Find contract_id for a task in work ledger
+grep "Build Next.js" ledgers/work-ledger.jsonl | jq -r '.contract_id'
+# Output: task-b25db16e
+
+# View detailed worker log
+cat ledgers/2026-01-25/worker-task-b25db16e.log
+```
 
 **IMPORTANT:** The `ledgers/` directory is **version controlled** and committed to git for full audit traceability.
 
@@ -231,6 +243,49 @@ description: |
   When to use this skill...
 ---
 ```
+
+### Project Documentation Skills
+
+Complex features should follow a **WHY → WHAT → HOW → WHEN** progression. Use these skills for multi-day features requiring architectural planning:
+
+1. **PRD Writer** (`.claude/skills/prd-writer.md`) - Creates Product Requirements Documents
+   - **WHY**: Define the problem and business value
+   - **WHAT**: Specify functional requirements, success criteria, user outcomes
+   - Output: `ai-docs/prd-{feature-name}.md`
+
+2. **Project Architect** (`.claude/skills/project-architect.md`) - Creates architectural documentation
+   - **WHAT**: System design, components, data flow
+   - **HOW (high-level)**: Technology choices, integration patterns
+   - Output: `ai-docs/architect/{feature-name}-architecture.md`
+
+3. **Task Breakdown** (`.claude/skills/task-breakdown.md`) - Creates detailed task specifications
+   - **HOW (detailed)**: Step-by-step implementation instructions
+   - **WHEN**: Dependencies, duration estimates, phases
+   - Output: `ai-docs/tasks/task-{phase}-{number}-{feature-name}.md`
+
+4. **Project Analysis** (`.claude/skills/project-analysis.md`) - Analyzes existing codebases
+   - Documents tech stack, patterns, architecture
+   - Used before designing new features to understand existing patterns
+   - Output: `ai-docs/project-analysis.md`
+
+**Workflow for Complex Features:**
+```
+User describes need
+  ↓
+PRD Writer (define WHY/WHAT)
+  ↓
+Project Architect (design system)
+  ↓
+Task Breakdown (detail HOW)
+  ↓
+Implementation (workers execute tasks)
+```
+
+**When NOT to use these skills:**
+- Simple bug fixes or single-file changes
+- Features under 1 day of work
+- Minor refactors or updates
+- Quick prototypes or experiments
 
 **Agent SDK Integration:**
 - Worker spawning: `worker-spawner.ts` calls `@anthropic-ai/claude-agent-sdk`

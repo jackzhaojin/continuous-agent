@@ -78,6 +78,7 @@ interface RetryState {
   strategies: string[]; // Strategy IDs that have been tried
   lastAttemptAt: string;
   currentStrategyId: string | null;
+  output_path?: string; // Persist project path across retries to continue same work
 }
 const retryTracker: Map<string, RetryState> = new Map();
 
@@ -111,6 +112,7 @@ function buildRetryContext(item: WorkItem): WorkerRetryContext | undefined {
     maxRetries: MAX_RETRIES,
     triedStrategies: retry.strategies,
     lastError: retry.lastError,
+    existingProjectPath: retry.output_path, // Reuse same project path across retries
   };
 }
 
@@ -385,6 +387,7 @@ async function logCapabilityAttempt(item: WorkItem, capabilities: string[]): Pro
     event: 'CAPABILITY_ATTEMPT',
     ts: new Date().toISOString(),
     task_id: item.id,
+    contract_id: loopState.current_task, // Link to worker log: ledgers/{date}/worker-{contract_id}.log
     task_title: item.title,
     capabilities_exercised: capabilities,
     iteration: loopState.iteration,
@@ -405,6 +408,7 @@ async function logCapabilityResult(
     event: 'CAPABILITY_RESULT',
     ts: new Date().toISOString(),
     task_id: item.id,
+    contract_id: loopState.current_task, // Link to worker log: ledgers/{date}/worker-{contract_id}.log
     task_title: item.title,
     overall_result: overallResult,
     verifier_count: verifierResults.length,
@@ -522,6 +526,7 @@ async function updateState(item: WorkItem, success: boolean, errorInfo?: string,
         event: 'TASK_COMPLETED',
         ts: new Date().toISOString(),
         task_id: item.id,
+        contract_id: loopState.current_task, // Link to worker log: ledgers/{date}/worker-{contract_id}.log
         title: item.title,
         priority: item.priority,
         iteration: loopState.iteration,
@@ -537,11 +542,17 @@ async function updateState(item: WorkItem, success: boolean, errorInfo?: string,
   // FAILURE - track retry, only block after MAX_RETRIES
   let retry = retryTracker.get(item.title);
   if (!retry) {
-    retry = { attempts: 0, lastError: '', strategies: [], lastAttemptAt: '', currentStrategyId: null };
+    retry = { attempts: 0, lastError: '', strategies: [], lastAttemptAt: '', currentStrategyId: null, output_path: undefined };
   }
   retry.attempts++;
   retry.lastError = errorInfo || 'Unknown error';
   retry.lastAttemptAt = new Date().toISOString();
+
+  // Store output_path from first attempt for subsequent retries to continue same work
+  if (outputPath && !retry.output_path) {
+    retry.output_path = outputPath;
+    log(`  Storing output path for retries: ${outputPath}`);
+  }
 
   // Record the strategy that was tried (if any)
   if (retry.currentStrategyId && !retry.strategies.includes(retry.currentStrategyId)) {
@@ -559,6 +570,7 @@ async function updateState(item: WorkItem, success: boolean, errorInfo?: string,
     event: 'TASK_ATTEMPT_FAILED',
     ts: new Date().toISOString(),
     task_id: item.id,
+    contract_id: loopState.current_task, // Link to worker log: ledgers/{date}/worker-{contract_id}.log
     title: item.title,
     attempt: retry.attempts,
     max_retries: MAX_RETRIES,
@@ -589,6 +601,7 @@ async function updateState(item: WorkItem, success: boolean, errorInfo?: string,
         event: 'TASK_BLOCKED',
         ts: new Date().toISOString(),
         task_id: item.id,
+        contract_id: loopState.current_task, // Link to worker log: ledgers/{date}/worker-{contract_id}.log
         title: item.title,
         total_attempts: retry.attempts,
         last_error: retry.lastError.slice(0, 500),

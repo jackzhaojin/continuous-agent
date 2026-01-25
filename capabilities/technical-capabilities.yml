@@ -1,69 +1,60 @@
-# Technical Capabilities Registry
-# Tool operation capabilities for the Continuous Executive Agent
-# Version: 1.0.0
-# Last Updated: 2026-01-24
-
 metadata:
   category: technical
-  description: "Tool operation and technical execution capabilities"
-  version: "1.0.0"
-
+  description: Tool operation and technical execution capabilities
+  version: 1.0.0
 capabilities:
-  # =============================================================================
-  # Git Operations
-  # =============================================================================
   - id: git.branch_commit
-    name: "Git Branch and Commit"
-    description: "Create branches, stage changes, and commit with proper messages"
-    confidence: 90
-    maturity: Reliable
+    name: Git Branch and Commit
+    description: Create branches, stage changes, and commit with proper messages
+    confidence: 0
+    maturity: Demonstrated
     scope:
       includes:
-        - "Creating and switching branches"
-        - "Staging files with git add"
-        - "Creating commits with descriptive messages"
-        - "Viewing git status and diff"
-        - "Basic branch management"
+        - Creating and switching branches
+        - Staging files with git add
+        - Creating commits with descriptive messages
+        - Viewing git status and diff
+        - Basic branch management
       excludes:
-        - "Complex merge conflict resolution"
-        - "Interactive rebase"
-        - "Git submodules"
-        - "Git LFS operations"
+        - Complex merge conflict resolution
+        - Interactive rebase
+        - Git submodules
+        - Git LFS operations
     prerequisites:
       - tool: git
-        min_version: "2.0"
+        min_version: '2.0'
     verifiers:
       - git_status_check
       - commit_exists
     evidence:
       successes: 0
-      failures: 0
+      failures: 14
       last_success: null
       last_failure: null
+      last_validated: '2026-01-25'
     common_failure_modes:
-      - "Attempting to commit without staging"
-      - "Branch name conflicts"
-      - "Detached HEAD state confusion"
+      - Attempting to commit without staging
+      - Branch name conflicts
+      - Detached HEAD state confusion
     last_validated: null
     last_used: null
-
   - id: git.merge.simple
-    name: "Git Simple Merge"
-    description: "Merge branches when no conflicts are expected"
+    name: Git Simple Merge
+    description: Merge branches when no conflicts are expected
     confidence: 85
     maturity: Demonstrated
     scope:
       includes:
-        - "Fast-forward merges"
-        - "Simple non-conflicting merges"
-        - "Merge commit creation"
+        - Fast-forward merges
+        - Simple non-conflicting merges
+        - Merge commit creation
       excludes:
-        - "Complex conflict resolution"
-        - "Three-way merges with significant conflicts"
-        - "Octopus merges"
+        - Complex conflict resolution
+        - Three-way merges with significant conflicts
+        - Octopus merges
     prerequisites:
       - tool: git
-        min_version: "2.0"
+        min_version: '2.0'
     verifiers:
       - merge_success_check
       - no_conflict_markers
@@ -73,33 +64,29 @@ capabilities:
       last_success: null
       last_failure: null
     common_failure_modes:
-      - "Unexpected merge conflicts"
-      - "Merging wrong branch"
-      - "Losing uncommitted changes"
+      - Unexpected merge conflicts
+      - Merging wrong branch
+      - Losing uncommitted changes
     last_validated: null
     last_used: null
-
-  # =============================================================================
-  # GitHub Operations
-  # =============================================================================
   - id: github.pr.create
-    name: "GitHub Pull Request Creation"
-    description: "Create pull requests with proper title, description, and metadata"
+    name: GitHub Pull Request Creation
+    description: Create pull requests with proper title, description, and metadata
     confidence: 90
     maturity: Reliable
     scope:
       includes:
-        - "Creating PRs via gh CLI"
-        - "Setting PR title and body"
-        - "Adding reviewers and labels"
-        - "Draft PR creation"
+        - Creating PRs via gh CLI
+        - Setting PR title and body
+        - Adding reviewers and labels
+        - Draft PR creation
       excludes:
-        - "Complex PR templates"
-        - "GitHub Actions integration"
-        - "PR automation rules"
+        - Complex PR templates
+        - GitHub Actions integration
+        - PR automation rules
     prerequisites:
       - tool: gh
-        min_version: "2.0"
+        min_version: '2.0'
       - tool: git
     verifiers:
       - pr_url_returned
@@ -110,30 +97,29 @@ capabilities:
       last_success: null
       last_failure: null
     common_failure_modes:
-      - "Authentication failures"
-      - "Branch not pushed to remote"
-      - "Invalid base branch specification"
+      - Authentication failures
+      - Branch not pushed to remote
+      - Invalid base branch specification
     last_validated: null
     last_used: null
-
   - id: github.issues.read
-    name: "GitHub Issues Reading"
-    description: "Read and parse GitHub issues for task understanding"
+    name: GitHub Issues Reading
+    description: Read and parse GitHub issues for task understanding
     confidence: 85
     maturity: Demonstrated
     scope:
       includes:
-        - "Listing issues via gh CLI"
-        - "Reading issue details"
-        - "Parsing issue comments"
-        - "Filtering by labels and state"
+        - Listing issues via gh CLI
+        - Reading issue details
+        - Parsing issue comments
+        - Filtering by labels and state
       excludes:
-        - "Complex issue search queries"
-        - "Issue automation"
-        - "Project board integration"
+        - Complex issue search queries
+        - Issue automation
+        - Project board integration
     prerequisites:
       - tool: gh
-        min_version: "2.0"
+        min_version: '2.0'
     verifiers:
       - issues_list_returned
       - issue_content_parsed
@@ -143,65 +129,61 @@ capabilities:
       last_success: null
       last_failure: null
     common_failure_modes:
-      - "Repository access denied"
-      - "Rate limiting"
-      - "Malformed query syntax"
+      - Repository access denied
+      - Rate limiting
+      - Malformed query syntax
     last_validated: null
     last_used: null
-
-  # =============================================================================
-  # Node.js / NPM Operations
-  # =============================================================================
   - id: node.npm.install
-    name: "NPM Package Installation"
-    description: "Install npm packages and manage dependencies"
-    confidence: 88
+    name: NPM Package Installation
+    description: Install npm packages and manage dependencies
+    confidence: 100
     maturity: Reliable
     scope:
       includes:
-        - "npm install for all dependencies"
-        - "Installing specific packages"
-        - "Dev dependency installation"
-        - "Package version specification"
+        - npm install for all dependencies
+        - Installing specific packages
+        - Dev dependency installation
+        - Package version specification
       excludes:
-        - "Complex peer dependency resolution"
-        - "Private registry configuration"
-        - "npm link workflows"
+        - Complex peer dependency resolution
+        - Private registry configuration
+        - npm link workflows
     prerequisites:
       - tool: node
-        min_version: "16.0"
+        min_version: '16.0'
       - tool: npm
-        min_version: "7.0"
+        min_version: '7.0'
     verifiers:
       - node_modules_exists
       - package_lock_updated
     evidence:
-      successes: 0
+      successes: 14
       failures: 0
       last_success: null
       last_failure: null
+      last_validated: '2026-01-25'
     common_failure_modes:
-      - "Network connectivity issues"
-      - "Peer dependency conflicts"
-      - "Node version incompatibility"
-      - "Disk space exhaustion"
+      - Network connectivity issues
+      - Peer dependency conflicts
+      - Node version incompatibility
+      - Disk space exhaustion
     last_validated: null
     last_used: null
-
   - id: node.npm.run_script
-    name: "NPM Script Execution"
-    description: "Run npm scripts defined in package.json"
-    confidence: 85
-    maturity: Demonstrated
+    name: NPM Script Execution
+    description: Run npm scripts defined in package.json
+    confidence: 100
+    maturity: Reliable
     scope:
       includes:
-        - "Running predefined scripts"
-        - "Passing arguments to scripts"
-        - "Understanding script output"
+        - Running predefined scripts
+        - Passing arguments to scripts
+        - Understanding script output
       excludes:
-        - "Complex script chaining"
-        - "Cross-platform script issues"
-        - "Environment variable injection"
+        - Complex script chaining
+        - Cross-platform script issues
+        - Environment variable injection
     prerequisites:
       - tool: node
       - tool: npm
@@ -210,77 +192,74 @@ capabilities:
       - script_exit_code
       - expected_output_patterns
     evidence:
-      successes: 0
+      successes: 42
       failures: 0
       last_success: null
       last_failure: null
+      last_validated: '2026-01-25'
     common_failure_modes:
-      - "Missing dependencies"
-      - "Script not found in package.json"
-      - "Port already in use"
-      - "Build errors in underlying tools"
+      - Missing dependencies
+      - Script not found in package.json
+      - Port already in use
+      - Build errors in underlying tools
     last_validated: null
     last_used: null
-
-  # =============================================================================
-  # Next.js Operations
-  # =============================================================================
   - id: nextjs.build.basic
-    name: "Next.js Basic Build"
-    description: "Build Next.js applications for production"
-    confidence: 75
-    maturity: Demonstrated
+    name: Next.js Basic Build
+    description: Build Next.js applications for production
+    confidence: 100
+    maturity: Reliable
     scope:
       includes:
-        - "Running next build"
-        - "Understanding build output"
-        - "Basic build configuration"
+        - Running next build
+        - Understanding build output
+        - Basic build configuration
       excludes:
-        - "Custom webpack configuration"
-        - "ISR/SSG complex setups"
-        - "Edge runtime configuration"
+        - Custom webpack configuration
+        - ISR/SSG complex setups
+        - Edge runtime configuration
     prerequisites:
       - tool: node
-        min_version: "18.0"
+        min_version: '18.0'
       - tool: npm
       - framework: nextjs
     verifiers:
       - build_success
       - dot_next_directory_exists
     evidence:
-      successes: 0
+      successes: 14
       failures: 0
       last_success: null
       last_failure: null
+      last_validated: '2026-01-25'
     common_failure_modes:
-      - "TypeScript type errors"
-      - "ESLint errors blocking build"
-      - "Missing environment variables"
-      - "Import resolution failures"
+      - TypeScript type errors
+      - ESLint errors blocking build
+      - Missing environment variables
+      - Import resolution failures
     last_validated: null
     last_used: null
-
   - id: nextjs.routing.app_router
-    name: "Next.js App Router"
-    description: "Work with Next.js 13+ App Router conventions"
+    name: Next.js App Router
+    description: Work with Next.js 13+ App Router conventions
     confidence: 60
     maturity: Declared
     scope:
       includes:
-        - "Creating route segments"
-        - "Layout and page components"
-        - "Basic data fetching"
-        - "Route groups"
+        - Creating route segments
+        - Layout and page components
+        - Basic data fetching
+        - Route groups
       excludes:
-        - "Parallel routes"
-        - "Intercepting routes"
-        - "Complex middleware"
-        - "Streaming and Suspense"
+        - Parallel routes
+        - Intercepting routes
+        - Complex middleware
+        - Streaming and Suspense
     prerequisites:
       - tool: node
-        min_version: "18.0"
+        min_version: '18.0'
       - framework: nextjs
-        min_version: "13.0"
+        min_version: '13.0'
     verifiers:
       - route_accessible
       - component_renders
@@ -290,30 +269,26 @@ capabilities:
       last_success: null
       last_failure: null
     common_failure_modes:
-      - "Server/client component confusion"
-      - "Incorrect file naming conventions"
-      - "Missing 'use client' directive"
-      - "Data fetching in wrong context"
+      - Server/client component confusion
+      - Incorrect file naming conventions
+      - Missing 'use client' directive
+      - Data fetching in wrong context
     last_validated: null
     last_used: null
-
-  # =============================================================================
-  # Adobe EDS Operations
-  # =============================================================================
   - id: eds.scaffold.basic
-    name: "Adobe EDS Basic Scaffolding"
-    description: "Create basic Adobe Edge Delivery Services site structure"
+    name: Adobe EDS Basic Scaffolding
+    description: Create basic Adobe Edge Delivery Services site structure
     confidence: 40
     maturity: Declared
     scope:
       includes:
-        - "Basic project structure creation"
-        - "Block scaffolding"
-        - "Simple content modeling"
+        - Basic project structure creation
+        - Block scaffolding
+        - Simple content modeling
       excludes:
-        - "Complex block development"
-        - "Custom indexing"
-        - "Advanced sidekick integration"
+        - Complex block development
+        - Custom indexing
+        - Advanced sidekick integration
     prerequisites:
       - tool: node
       - tool: aem-cli
@@ -326,33 +301,29 @@ capabilities:
       last_success: null
       last_failure: null
     common_failure_modes:
-      - "Incorrect block structure"
-      - "Missing required metadata"
-      - "Content source configuration errors"
+      - Incorrect block structure
+      - Missing required metadata
+      - Content source configuration errors
     last_validated: null
     last_used: null
-
-  # =============================================================================
-  # Cloud / Deployment Operations
-  # =============================================================================
   - id: azure.deploy
-    name: "Azure Deployment"
-    description: "Deploy applications to Azure services"
+    name: Azure Deployment
+    description: Deploy applications to Azure services
     confidence: 30
     maturity: Declared
     scope:
       includes:
-        - "Basic Azure CLI operations"
-        - "Static web app deployment"
-        - "App Service deployment"
+        - Basic Azure CLI operations
+        - Static web app deployment
+        - App Service deployment
       excludes:
-        - "Complex infrastructure as code"
-        - "Azure DevOps pipelines"
-        - "Kubernetes on AKS"
-        - "Custom networking"
+        - Complex infrastructure as code
+        - Azure DevOps pipelines
+        - Kubernetes on AKS
+        - Custom networking
     prerequisites:
       - tool: az
-        min_version: "2.0"
+        min_version: '2.0'
       - auth: azure_subscription
     verifiers:
       - deployment_successful
@@ -363,31 +334,30 @@ capabilities:
       last_success: null
       last_failure: null
     common_failure_modes:
-      - "Authentication/authorization failures"
-      - "Resource quota exceeded"
-      - "Region availability issues"
-      - "Configuration drift"
+      - Authentication/authorization failures
+      - Resource quota exceeded
+      - Region availability issues
+      - Configuration drift
     last_validated: null
     last_used: null
-
   - id: docker.build
-    name: "Docker Image Build"
-    description: "Build Docker images from Dockerfiles"
+    name: Docker Image Build
+    description: Build Docker images from Dockerfiles
     confidence: 50
     maturity: Declared
     scope:
       includes:
-        - "Basic Dockerfile creation"
-        - "docker build command"
-        - "Image tagging"
-        - "Multi-stage builds (simple)"
+        - Basic Dockerfile creation
+        - docker build command
+        - Image tagging
+        - Multi-stage builds (simple)
       excludes:
-        - "Complex multi-arch builds"
-        - "BuildKit advanced features"
-        - "Docker Compose orchestration"
+        - Complex multi-arch builds
+        - BuildKit advanced features
+        - Docker Compose orchestration
     prerequisites:
       - tool: docker
-        min_version: "20.0"
+        min_version: '20.0'
     verifiers:
       - image_built
       - image_runs
@@ -397,30 +367,26 @@ capabilities:
       last_success: null
       last_failure: null
     common_failure_modes:
-      - "Base image not found"
-      - "Build context too large"
-      - "Layer caching issues"
-      - "Permission denied errors"
+      - Base image not found
+      - Build context too large
+      - Layer caching issues
+      - Permission denied errors
     last_validated: null
     last_used: null
-
-  # =============================================================================
-  # System Operations
-  # =============================================================================
   - id: ssh.remote_command
-    name: "SSH Remote Command Execution"
-    description: "Execute commands on remote systems via SSH"
+    name: SSH Remote Command Execution
+    description: Execute commands on remote systems via SSH
     confidence: 40
     maturity: Declared
     scope:
       includes:
-        - "Single command execution"
-        - "Basic file transfer with scp"
-        - "Key-based authentication"
+        - Single command execution
+        - Basic file transfer with scp
+        - Key-based authentication
       excludes:
-        - "SSH tunneling"
-        - "Complex session management"
-        - "Jump host configurations"
+        - SSH tunneling
+        - Complex session management
+        - Jump host configurations
     prerequisites:
       - tool: ssh
       - auth: ssh_key
@@ -433,29 +399,28 @@ capabilities:
       last_success: null
       last_failure: null
     common_failure_modes:
-      - "Connection refused"
-      - "Key authentication failures"
-      - "Host key verification failed"
-      - "Timeout on slow networks"
+      - Connection refused
+      - Key authentication failures
+      - Host key verification failed
+      - Timeout on slow networks
     last_validated: null
     last_used: null
-
   - id: bash.script_execution
-    name: "Bash Script Execution"
-    description: "Execute bash commands and scripts"
+    name: Bash Script Execution
+    description: Execute bash commands and scripts
     confidence: 90
     maturity: Reliable
     scope:
       includes:
-        - "Single command execution"
-        - "Command chaining with && and ||"
-        - "Environment variable usage"
-        - "Basic scripting patterns"
-        - "File operations"
+        - Single command execution
+        - Command chaining with && and ||
+        - Environment variable usage
+        - Basic scripting patterns
+        - File operations
       excludes:
-        - "Complex shell scripting"
-        - "Process management"
-        - "Signal handling"
+        - Complex shell scripting
+        - Process management
+        - Signal handling
     prerequisites:
       - tool: bash
     verifiers:
@@ -467,31 +432,27 @@ capabilities:
       last_success: null
       last_failure: null
     common_failure_modes:
-      - "Command not found"
-      - "Permission denied"
-      - "Incorrect quoting"
-      - "Path issues"
+      - Command not found
+      - Permission denied
+      - Incorrect quoting
+      - Path issues
     last_validated: null
     last_used: null
-
-  # =============================================================================
-  # TypeScript / Build Operations
-  # =============================================================================
   - id: typescript.build
-    name: "TypeScript Compilation"
-    description: "Compile TypeScript projects"
+    name: TypeScript Compilation
+    description: Compile TypeScript projects
     confidence: 80
     maturity: Demonstrated
     scope:
       includes:
-        - "Running tsc"
-        - "Basic tsconfig.json understanding"
-        - "Type error interpretation"
-        - "Declaration file generation"
+        - Running tsc
+        - Basic tsconfig.json understanding
+        - Type error interpretation
+        - Declaration file generation
       excludes:
-        - "Complex type gymnastics"
-        - "Custom transformers"
-        - "Project references at scale"
+        - Complex type gymnastics
+        - Custom transformers
+        - Project references at scale
     prerequisites:
       - tool: node
       - tool: typescript
@@ -504,32 +465,28 @@ capabilities:
       last_success: null
       last_failure: null
     common_failure_modes:
-      - "Type errors in source"
-      - "Missing type declarations"
-      - "tsconfig.json misconfiguration"
-      - "Module resolution failures"
+      - Type errors in source
+      - Missing type declarations
+      - tsconfig.json misconfiguration
+      - Module resolution failures
     last_validated: null
     last_used: null
-
-  # =============================================================================
-  # File Operations
-  # =============================================================================
   - id: file.read_write
-    name: "File Read/Write Operations"
-    description: "Read and write files on the filesystem"
+    name: File Read/Write Operations
+    description: Read and write files on the filesystem
     confidence: 95
     maturity: Reliable
     scope:
       includes:
-        - "Reading file contents"
-        - "Writing new files"
-        - "Editing existing files"
-        - "File existence checks"
-        - "Directory operations"
+        - Reading file contents
+        - Writing new files
+        - Editing existing files
+        - File existence checks
+        - Directory operations
       excludes:
-        - "Binary file manipulation"
-        - "Large file streaming"
-        - "File system watching"
+        - Binary file manipulation
+        - Large file streaming
+        - File system watching
     prerequisites: []
     verifiers:
       - file_exists
@@ -540,30 +497,26 @@ capabilities:
       last_success: null
       last_failure: null
     common_failure_modes:
-      - "Permission denied"
-      - "File not found"
-      - "Disk space exhausted"
-      - "Encoding issues"
+      - Permission denied
+      - File not found
+      - Disk space exhausted
+      - Encoding issues
     last_validated: null
     last_used: null
-
-  # =============================================================================
-  # Additional Technical Capabilities
-  # =============================================================================
   - id: json.parse_manipulate
-    name: "JSON Parsing and Manipulation"
-    description: "Parse, validate, and manipulate JSON data structures"
+    name: JSON Parsing and Manipulation
+    description: Parse, validate, and manipulate JSON data structures
     confidence: 92
     maturity: Reliable
     scope:
       includes:
-        - "JSON parsing and validation"
-        - "Object/array manipulation"
-        - "Schema validation"
-        - "JSON file editing"
+        - JSON parsing and validation
+        - Object/array manipulation
+        - Schema validation
+        - JSON file editing
       excludes:
-        - "JSON streaming for large files"
-        - "Complex JSONPath queries"
+        - JSON streaming for large files
+        - Complex JSONPath queries
     prerequisites: []
     verifiers:
       - json_valid
@@ -574,25 +527,24 @@ capabilities:
       last_success: null
       last_failure: null
     common_failure_modes:
-      - "Invalid JSON syntax"
-      - "Unexpected data types"
-      - "Circular references"
+      - Invalid JSON syntax
+      - Unexpected data types
+      - Circular references
     last_validated: null
     last_used: null
-
   - id: yaml.parse_manipulate
-    name: "YAML Parsing and Manipulation"
-    description: "Parse and manipulate YAML configuration files"
+    name: YAML Parsing and Manipulation
+    description: Parse and manipulate YAML configuration files
     confidence: 88
     maturity: Reliable
     scope:
       includes:
-        - "YAML parsing"
-        - "Configuration file editing"
-        - "Multi-document YAML"
+        - YAML parsing
+        - Configuration file editing
+        - Multi-document YAML
       excludes:
-        - "YAML anchors and aliases (complex)"
-        - "Custom YAML tags"
+        - YAML anchors and aliases (complex)
+        - Custom YAML tags
     prerequisites: []
     verifiers:
       - yaml_valid
@@ -603,27 +555,26 @@ capabilities:
       last_success: null
       last_failure: null
     common_failure_modes:
-      - "Indentation errors"
-      - "Invalid syntax"
-      - "Type coercion issues"
+      - Indentation errors
+      - Invalid syntax
+      - Type coercion issues
     last_validated: null
     last_used: null
-
   - id: regex.pattern_matching
-    name: "Regex Pattern Matching"
-    description: "Use regular expressions for text search and manipulation"
+    name: Regex Pattern Matching
+    description: Use regular expressions for text search and manipulation
     confidence: 82
     maturity: Demonstrated
     scope:
       includes:
-        - "Basic pattern matching"
-        - "Capture groups"
-        - "Search and replace"
-        - "Input validation"
+        - Basic pattern matching
+        - Capture groups
+        - Search and replace
+        - Input validation
       excludes:
-        - "Complex lookaheads/lookbehinds"
-        - "Recursive patterns"
-        - "Performance optimization"
+        - Complex lookaheads/lookbehinds
+        - Recursive patterns
+        - Performance optimization
     prerequisites: []
     verifiers:
       - pattern_matches
@@ -634,8 +585,8 @@ capabilities:
       last_success: null
       last_failure: null
     common_failure_modes:
-      - "Catastrophic backtracking"
-      - "Incorrect escaping"
-      - "Greedy vs lazy matching"
+      - Catastrophic backtracking
+      - Incorrect escaping
+      - Greedy vs lazy matching
     last_validated: null
     last_used: null

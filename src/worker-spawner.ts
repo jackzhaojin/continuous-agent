@@ -116,6 +116,7 @@ export interface WorkerRetryContext {
   maxRetries: number;
   triedStrategies: string[];
   lastError?: string;
+  existingProjectPath?: string; // Reuse same project path across retries
 }
 
 /**
@@ -166,9 +167,22 @@ export async function spawnWorker(
   // Create logger for this worker
   const logger = createWorkerLogger(contract.id);
 
-  // Generate project path and set up directory with .gitignore FIRST
-  const { path: projectPath, category } = generateProjectPath(contract);
-  setupProjectDirectory(projectPath, category);
+  // For retries, reuse existing project path to continue work on same project
+  // For first attempt, generate new project path
+  let projectPath: string;
+  let category: string;
+
+  if (retryContext?.existingProjectPath) {
+    projectPath = retryContext.existingProjectPath;
+    category = detectCategory(contract.goal);
+    logger.log(`RETRY: Reusing existing project path: ${projectPath}`);
+  } else {
+    // Generate project path and set up directory with .gitignore FIRST
+    const generated = generateProjectPath(contract);
+    projectPath = generated.path;
+    category = generated.category;
+    setupProjectDirectory(projectPath, category);
+  }
 
   const prompt = buildWorkerPrompt(contract, projectPath, workItem, retryContext);
 
