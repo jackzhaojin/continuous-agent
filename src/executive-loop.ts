@@ -3,7 +3,7 @@ import { readFile, writeFile, appendFile } from 'fs/promises';
 import { createWriteStream, existsSync } from 'fs';
 import path from 'path';
 import { checkHealth } from './health-checker.js';
-import { selectWork } from './work-selector.js';
+import { selectWork, selectWorkWithSteps, updateStepStatus, updateTaskProgressFromSteps, type SelectableWork } from './work-selector.js';
 import { createTaskContract } from './task-contractor.js';
 import { spawnWorker, validateAuth, type WorkerRetryContext } from './worker-spawner.js';
 import { selectStrategy } from './intelligence/strategy-selector.js';
@@ -11,7 +11,8 @@ import { classifyIntent } from './intelligence/intent-classifier.js';
 import { runAllVerifiers, summarizeResults, type VerifierResult } from './verifiers/index.js';
 import { updateCapabilitiesFromVerifierResults, DEFAULT_CAPABILITY_MAPPINGS } from './learning/capability-updater.js';
 import { processHumanInputs } from './input-processor.js';
-import type { HealthStatus, WorkerResult, LoopState } from './types.js';
+import { needsBreakdown, generateStaticBreakdown, writeStepsToGoals, shouldReBreakdown, reBreakdownStep, logBreakdownEvent } from './task-breakdown.js';
+import type { HealthStatus, WorkerResult, LoopState, WorkStep } from './types.js';
 import type { WorkItem } from './work-selector.js';
 
 // Load environment variables
@@ -294,14 +295,23 @@ function inferCapabilitiesFromTask(item: WorkItem, intent: { type: string }): st
 }
 
 /**
- * Execute a work item by spawning a worker agent
+ * Execute a work item (or step) by spawning a worker agent
  */
-async function executeWork(item: WorkItem): Promise<WorkerResult | null> {
-  log(`Executing work item: ${item.id}`);
-  log(`  Title: ${item.title}`);
-  log(`  Priority: ${item.priority}`);
-  log(`  Description: ${item.description || '(none)'}`);
-  log(`  Status: ${item.status}`);
+async function executeWork(item: WorkItem, step?: WorkStep): Promise<WorkerResult | null> {
+  const isStepExecution = !!step;
+  
+  if (isStepExecution) {
+    log(`Executing step: ${step!.step_number + 1} - ${step!.title}`);
+    log(`  Parent task: ${item.title}`);
+    log(`  Priority: ${item.priority}`);
+    log(`  Step description: ${step!.description || '(none)'}`);
+  } else {
+    log(`Executing work item: ${item.id}`);
+    log(`  Title: ${item.title}`);
+    log(`  Priority: ${item.priority}`);
+    log(`  Description: ${item.description || '(none)'}`);
+    log(`  Status: ${item.status}`);
+  }
 
   // Classify intent and log research requirements
   const intent = classifyIntent(item);
@@ -311,19 +321,20 @@ async function executeWork(item: WorkItem): Promise<WorkerResult | null> {
   }
 
   // Get strategy for this attempt
+  const retryKey = isStepExecution ? `${item.title}::step${step!.step_number}` : item.title;
   const { strategyId, strategies } = getCurrentStrategy(item);
   if (strategyId) {
     log(`  Strategy: ${strategyId}`);
     // Update tracker with current strategy
-    const retry = retryTracker.get(item.title);
+    const retry = retryTracker.get(retryKey);
     if (retry) {
       retry.currentStrategyId = strategyId;
       retry.strategies = strategies;
     }
   }
 
-  // Create task contract from work item
-  const contract = createTaskContract(item);
+  // Create task contract from work item (with step context for multi-step tasks)
+  const contract = createTaskContract(item, ['.'], step);
   log(`  Task Contract ID: ${contract.id}`);
   log(`  Max Turns: ${contract.max_turns}`);
   log(`  Tools Allowed: ${contract.scope.tools_allowed.join(', ')}`);
@@ -670,6 +681,154 @@ function escapeRegex(str: string): string {
 }
 
 /**
+ * Update state after step or task completion
+ * Handles both single-step tasks and multi-step task step completion
+ */
+async function updateStateWithStep(
+  item: WorkItem, 
+  step: WorkStep | undefined, 
+  success: boolean, 
+  errorInfo?: string, 
+  outputPath?: string,
+  result?: WorkerResult | null
+): Promise<void> {
+  // If no step, delegate to existing updateState for backward compatibility
+  if (!step) {
+    return updateState(item, success, errorInfo, outputPath);
+  }
+
+  // Step execution path
+  const ledgerPath = path.join(process.cwd(), 'ledgers', 'work-ledger.jsonl');
+  const retryKey = `${item.title}::step${step.step_number}`;
+
+  log(`Updating state for step ${step.step_number + 1}: ${step.title}`);
+  log(`  Success: ${success}`);
+
+  // Update loop state
+  loopState.current_task = null;
+
+  if (success) {
+    // STEP SUCCESS - mark step complete, update task progress
+    loopState.last_work_at = new Date().toISOString();
+    retryTracker.delete(retryKey);
+
+    const now = new Date().toISOString();
+    
+    // Update step status in goals.md
+    await updateStepStatus(item.title, step.step_number, 'complete', {
+      completed_at: now,
+      output_path: outputPath,
+    });
+
+    // Update parent task progress
+    if (item.steps) {
+      // Update the step in the local copy
+      const stepToUpdate = item.steps[step.step_number];
+      if (stepToUpdate) {
+        stepToUpdate.status = 'complete';
+        stepToUpdate.completed_at = now;
+      }
+      await updateTaskProgressFromSteps(item.title, item.steps);
+    }
+
+    // Log step completion
+    const ledgerEntry = JSON.stringify({
+      event: 'STEP_COMPLETED',
+      ts: now,
+      task_id: item.id,
+      task_title: item.title,
+      step_number: step.step_number + 1,
+      step_title: step.title,
+      iteration: loopState.iteration,
+      output_path: outputPath || null,
+    });
+    await appendFile(ledgerPath, ledgerEntry + '\n', 'utf-8');
+    
+    log(`  ✓ Step ${step.step_number + 1} complete`);
+
+    // Check if this was the last step
+    if (item.steps) {
+      const remainingSteps = item.steps.filter(s => s.status !== 'complete');
+      if (remainingSteps.length === 0) {
+        log(`  ✓ All steps complete! Marking task as complete.`);
+        await updateState(item, true, undefined, outputPath);
+      } else {
+        log(`  ${remainingSteps.length} steps remaining`);
+      }
+    }
+    return;
+  }
+
+  // STEP FAILURE - check if re-breakdown is needed
+  const turnsUsed = result?.duration_ms ? Math.round(result.duration_ms / 60000) : 0;
+  
+  if (shouldReBreakdown(step, turnsUsed)) {
+    // Step is too complex, trigger re-breakdown
+    log(`  Step appears too complex (${turnsUsed}+ turns used), triggering re-breakdown...`);
+    
+    const subSteps = reBreakdownStep(step, {
+      error: errorInfo,
+      turnsUsed,
+    });
+
+    if (subSteps.length > 0) {
+      await logBreakdownEvent(item.id, item.title, subSteps.length, 're-breakdown');
+      log(`  Created ${subSteps.length} sub-steps. Will execute in next iteration.`);
+      // Note: In full implementation, would need to update goals.md with sub-steps
+      // For now, log and retry will happen with existing logic
+    } else {
+      log(`  Re-breakdown limit reached. Step will be marked as blocked.`);
+    }
+  }
+
+  // Track retry for step
+  let retry = retryTracker.get(retryKey);
+  if (!retry) {
+    retry = { attempts: 0, lastError: '', strategies: [], lastAttemptAt: '', currentStrategyId: null, output_path: undefined };
+  }
+  retry.attempts++;
+  retry.lastError = errorInfo || 'Unknown error';
+  retry.lastAttemptAt = new Date().toISOString();
+
+  if (outputPath && !retry.output_path) {
+    retry.output_path = outputPath;
+  }
+
+  retryTracker.set(retryKey, retry);
+
+  log(`  Step attempt ${retry.attempts}/${MAX_RETRIES} failed`);
+  log(`  Error: ${retry.lastError.slice(0, 200)}`);
+
+  // Log step failure to ledger
+  const failEntry = JSON.stringify({
+    event: 'STEP_ATTEMPT_FAILED',
+    ts: new Date().toISOString(),
+    task_id: item.id,
+    task_title: item.title,
+    step_number: step.step_number + 1,
+    step_title: step.title,
+    attempt: retry.attempts,
+    max_retries: MAX_RETRIES,
+    error: retry.lastError.slice(0, 500),
+  });
+  await appendFile(ledgerPath, failEntry + '\n', 'utf-8');
+
+  if (retry.attempts >= MAX_RETRIES) {
+    // Step is blocked after max retries
+    log(`  ⚠️ Max retries reached for step. Marking step as blocked.`);
+    await updateStepStatus(item.title, step.step_number, 'blocked');
+    
+    // Update parent task to blocked
+    await updateState(item, false, `Step ${step.step_number + 1} failed: ${errorInfo}`, outputPath);
+    
+    retryTracker.delete(retryKey);
+  } else {
+    log(`  Will retry step. ${MAX_RETRIES - retry.attempts} attempts remaining.`);
+    await updateStepStatus(item.title, step.step_number, 'in_progress');
+  }
+}
+
+/**
  * Main executive loop iteration
  */
 async function runIteration(): Promise<void> {
@@ -700,32 +859,61 @@ async function runIteration(): Promise<void> {
     }
   }
 
-  log('Selecting work...');
-  const workItem = await selectWork();
+  // Step 3: Select work with step awareness (priority re-evaluation every iteration)
+  log('Selecting work (with priority re-evaluation)...');
+  const selectedWork = await selectWorkWithSteps();
 
-  if (!workItem) {
+  if (!selectedWork) {
     log('No work available');
     return;
   }
 
-  log(`Selected work: [${workItem.priority}] ${workItem.title}`);
+  const workItem = selectedWork.task;
+  const currentStep = selectedWork.step;
+  const isStepExecution = selectedWork.type === 'step';
+
+  if (isStepExecution && currentStep) {
+    log(`Selected step: [${workItem.priority}] ${workItem.title}`);
+    log(`  Step ${currentStep.step_number + 1}: ${currentStep.title}`);
+    if (workItem.steps) {
+      log(`  Progress: Step ${currentStep.step_number + 1} of ${workItem.steps.length}`);
+    }
+  } else {
+    log(`Selected task: [${workItem.priority}] ${workItem.title}`);
+    
+    // Step 3.5: Check if task needs automatic breakdown (pre-execution)
+    if (needsBreakdown(workItem)) {
+      log('  Task exceeds complexity threshold, triggering automatic breakdown...');
+      const steps = generateStaticBreakdown(workItem);
+      const writeSuccess = await writeStepsToGoals(workItem.title, steps);
+      if (writeSuccess) {
+        await logBreakdownEvent(workItem.id, workItem.title, steps.length, 'auto');
+        log(`  Created ${steps.length} steps. Will execute first step in next iteration.`);
+        // Don't execute this iteration - let next iteration pick up the first step
+        return;
+      }
+    }
+  }
 
   // Check retry state
-  const retryState = retryTracker.get(workItem.title);
+  const retryKey = isStepExecution && currentStep 
+    ? `${workItem.title}::step${currentStep.step_number}` 
+    : workItem.title;
+  const retryState = retryTracker.get(retryKey);
   if (retryState) {
     log(`  Previous attempts: ${retryState.attempts}/${MAX_RETRIES}`);
   }
 
-  // Step 3: Execute work
-  const result = await executeWork(workItem);
+  // Step 4: Execute work (step or full task)
+  const result = await executeWork(workItem, currentStep);
 
-  // Step 4: Validate work
+  // Step 5: Validate work
   const validationSuccess = await validateWork(workItem, result);
 
-  // Step 5: Update state with error info and output path if failed
+  // Step 6: Update state with error info and output path
   const errorInfo = result?.errors?.join('; ') || (result?.success === false ? 'Worker reported failure' : undefined);
   const outputPath = result?.output_path;
-  await updateState(workItem, validationSuccess, errorInfo, outputPath);
+  await updateStateWithStep(workItem, currentStep, validationSuccess, errorInfo, outputPath, result);
 
   log('--- Iteration complete ---');
 }

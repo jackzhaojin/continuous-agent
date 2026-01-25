@@ -1,13 +1,177 @@
-import { readFile } from 'fs/promises';
+import { readFile, writeFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
-import type { WorkItem } from './types.js';
+import type { WorkItem, WorkStep } from './types.js';
 
 export type { WorkItem };
+export type { WorkStep };
+
+/**
+ * Selectable work - either a full task or a step within a task
+ */
+export interface SelectableWork {
+  type: 'task' | 'step';
+  task: WorkItem;
+  step?: WorkStep;
+  priority: 'P1' | 'P2' | 'P3';
+}
 
 interface ParsedSection {
   priority: 'P1' | 'P2' | 'P3';
   items: WorkItem[];
+}
+
+/**
+ * Parse step status from various formats
+ */
+function parseStepStatus(statusText: string): WorkStep['status'] {
+  const lower = statusText.toLowerCase().trim();
+  if (lower.includes('complete') || lower.includes('done')) {
+    return 'complete';
+  } else if (lower.includes('block')) {
+    return 'blocked';
+  } else if (lower.includes('in progress') || lower.includes('wip')) {
+    return 'in_progress';
+  }
+  return 'pending';
+}
+
+/**
+ * Parse dependencies string like "Step 1,2,3" or "1, 2, 3"
+ */
+function parseDependencies(depsText: string): number[] {
+  const deps: number[] = [];
+  const matches = depsText.match(/\d+/g);
+  if (matches) {
+    for (const m of matches) {
+      deps.push(parseInt(m, 10) - 1); // Convert to 0-based index
+    }
+  }
+  return deps;
+}
+
+/**
+ * Parse estimated turns from formats like "100-120" or "100"
+ */
+function parseEstimatedTurns(turnsText: string): number | undefined {
+  const rangeMatch = turnsText.match(/(\d+)\s*[-–]\s*(\d+)/);
+  if (rangeMatch) {
+    // Take average of range
+    return Math.round((parseInt(rangeMatch[1], 10) + parseInt(rangeMatch[2], 10)) / 2);
+  }
+  const singleMatch = turnsText.match(/(\d+)/);
+  if (singleMatch) {
+    return parseInt(singleMatch[1], 10);
+  }
+  return undefined;
+}
+
+/**
+ * Parse steps (#### headings) under a task (### heading)
+ */
+function parseSteps(lines: string[], startIndex: number): { steps: WorkStep[]; endIndex: number } {
+  const steps: WorkStep[] = [];
+  let i = startIndex;
+  let stepNumber = 0;
+  let currentStep: Partial<WorkStep> | null = null;
+
+  while (i < lines.length) {
+    const line = lines[i];
+    const trimmedLine = line.trim();
+
+    // Stop if we hit another task (###) or priority section (##)
+    if (trimmedLine.match(/^#{1,3}\s+(?!Step\b|step\b)/i) && !trimmedLine.match(/^####/)) {
+      break;
+    }
+
+    // Check for step headers (#### Step N: Title)
+    const stepMatch = trimmedLine.match(/^####\s+(?:Step\s+)?(\d+[a-z]?)[:.]?\s*(.+)$/i);
+    if (stepMatch) {
+      // Save previous step
+      if (currentStep && currentStep.title) {
+        steps.push(currentStep as WorkStep);
+      }
+
+      stepNumber++;
+      currentStep = {
+        step_number: stepNumber - 1, // 0-based
+        title: stepMatch[2].trim(),
+        description: '',
+        status: 'pending',
+        dependencies: [],
+      };
+      i++;
+      continue;
+    }
+
+    // Parse step metadata
+    if (currentStep) {
+      // Status line
+      const statusMatch = trimmedLine.match(/^[-*]\s*\*\*Status:\*\*\s*(.+)$/i);
+      if (statusMatch) {
+        currentStep.status = parseStepStatus(statusMatch[1]);
+        i++;
+        continue;
+      }
+
+      // Description line
+      const descMatch = trimmedLine.match(/^[-*]\s*\*\*Description:\*\*\s*(.+)$/i);
+      if (descMatch) {
+        currentStep.description = descMatch[1].trim();
+        i++;
+        continue;
+      }
+
+      // Dependencies line
+      const depsMatch = trimmedLine.match(/^[-*]\s*\*\*Dependencies?:\*\*\s*(.+)$/i);
+      if (depsMatch) {
+        currentStep.dependencies = parseDependencies(depsMatch[1]);
+        i++;
+        continue;
+      }
+
+      // Estimated turns
+      const turnsMatch = trimmedLine.match(/^[-*]\s*\*\*Est\.?\s*(?:Turns|Duration):\*\*\s*(.+)$/i);
+      if (turnsMatch) {
+        currentStep.estimated_turns = parseEstimatedTurns(turnsMatch[1]);
+        i++;
+        continue;
+      }
+
+      // Output path
+      const outputMatch = trimmedLine.match(/^[-*]\s*\*\*Output:\*\*\s*(.+)$/i);
+      if (outputMatch) {
+        currentStep.output_path = outputMatch[1].trim();
+        i++;
+        continue;
+      }
+
+      // Completed timestamp
+      const completedMatch = trimmedLine.match(/^[-*]\s*\*\*Completed:\*\*\s*(.+)$/i);
+      if (completedMatch) {
+        currentStep.completed_at = completedMatch[1].trim();
+        i++;
+        continue;
+      }
+
+      // Started timestamp
+      const startedMatch = trimmedLine.match(/^[-*]\s*\*\*Started:\*\*\s*(.+)$/i);
+      if (startedMatch) {
+        currentStep.started_at = startedMatch[1].trim();
+        i++;
+        continue;
+      }
+    }
+
+    i++;
+  }
+
+  // Save last step
+  if (currentStep && currentStep.title) {
+    steps.push(currentStep as WorkStep);
+  }
+
+  return { steps, endIndex: i };
 }
 
 /**
@@ -90,6 +254,19 @@ function parseGoalsFile(content: string): ParsedSection[] {
         description: '',
         status: 'pending'
       };
+
+      // Look ahead to parse steps if any exist
+      const { steps, endIndex } = parseSteps(lines, i + 1);
+      if (steps.length > 0) {
+        currentItem.steps = steps;
+        // Calculate current step and progress
+        const completedSteps = steps.filter(s => s.status === 'complete').length;
+        const firstIncomplete = steps.findIndex(s => s.status !== 'complete' && s.status !== 'blocked');
+        currentItem.current_step = firstIncomplete >= 0 ? firstIncomplete : undefined;
+        currentItem.progress_pct = Math.round((completedSteps / steps.length) * 100);
+        // Adjust loop index to skip step lines we've already processed
+        i = endIndex - 1; // -1 because the loop will increment
+      }
       continue;
     }
 
@@ -146,13 +323,33 @@ function saveItem(sections: ParsedSection[], item: WorkItem, priority: 'P1' | 'P
 }
 
 /**
- * Select the next work item to execute
- * Returns the first unblocked item from the highest priority section
+ * Get priority value for sorting (lower = higher priority)
  */
-export async function selectWork(): Promise<WorkItem | null> {
+function priorityValue(priority: 'P1' | 'P2' | 'P3'): number {
+  const order = { P1: 1, P2: 2, P3: 3 };
+  return order[priority];
+}
+
+/**
+ * Check if step dependencies are met
+ */
+function areStepDependenciesMet(step: WorkStep, allSteps: WorkStep[]): boolean {
+  if (!step.dependencies || step.dependencies.length === 0) {
+    return true;
+  }
+  return step.dependencies.every(depIndex => {
+    const depStep = allSteps[depIndex];
+    return depStep && depStep.status === 'complete';
+  });
+}
+
+/**
+ * Select the next work with step awareness
+ * Returns both the task and the specific step to execute (if multi-step)
+ */
+export async function selectWorkWithSteps(): Promise<SelectableWork | null> {
   const goalsPath = path.join(process.cwd(), 'workspace', 'goals.md');
 
-  // Check if goals file exists
   if (!existsSync(goalsPath)) {
     console.log(`[${new Date().toISOString()}] No goals.md found at ${goalsPath}`);
     return null;
@@ -167,21 +364,77 @@ export async function selectWork(): Promise<WorkItem | null> {
       return null;
     }
 
-    // Find first unblocked, non-completed item from highest priority
+    // Collect all selectable work (tasks and steps)
+    const allSelectableWork: SelectableWork[] = [];
+
     for (const section of sections) {
-      for (const item of section.items) {
-        if (item.status !== 'complete' && item.status !== 'blocked') {
-          return item;
+      for (const task of section.items) {
+        // Skip completed or blocked tasks
+        if (task.status === 'complete' || task.status === 'blocked') {
+          continue;
+        }
+
+        if (task.steps && task.steps.length > 0) {
+          // Multi-step task: find the next available step
+          for (const step of task.steps) {
+            // Skip completed or blocked steps
+            if (step.status === 'complete' || step.status === 'blocked') {
+              continue;
+            }
+
+            // Check if dependencies are met
+            if (areStepDependenciesMet(step, task.steps)) {
+              allSelectableWork.push({
+                type: 'step',
+                task: task,
+                step: step,
+                priority: task.priority,
+              });
+              // Only add the first available step per task
+              break;
+            }
+          }
+        } else {
+          // Single-step task: add the whole task
+          allSelectableWork.push({
+            type: 'task',
+            task: task,
+            priority: task.priority,
+          });
         }
       }
     }
 
-    console.log(`[${new Date().toISOString()}] All work items are either completed or blocked`);
-    return null;
+    if (allSelectableWork.length === 0) {
+      console.log(`[${new Date().toISOString()}] All work items are either completed or blocked`);
+      return null;
+    }
+
+    // Sort by priority (P1 > P2 > P3)
+    allSelectableWork.sort((a, b) => priorityValue(a.priority) - priorityValue(b.priority));
+
+    // Return highest priority work
+    const selected = allSelectableWork[0];
+    if (selected.type === 'step') {
+      console.log(`[${new Date().toISOString()}] Selected step: [${selected.priority}] ${selected.task.title} - Step ${selected.step!.step_number + 1}: ${selected.step!.title}`);
+    } else {
+      console.log(`[${new Date().toISOString()}] Selected task: [${selected.priority}] ${selected.task.title}`);
+    }
+
+    return selected;
   } catch (error) {
     console.error(`[${new Date().toISOString()}] Error reading goals.md:`, error instanceof Error ? error.message : error);
     return null;
   }
+}
+
+/**
+ * Select the next work item to execute (backward compatible)
+ * Returns the first unblocked item from the highest priority section
+ */
+export async function selectWork(): Promise<WorkItem | null> {
+  const result = await selectWorkWithSteps();
+  return result?.task || null;
 }
 
 /**
@@ -201,4 +454,118 @@ export async function getAllWorkItems(): Promise<WorkItem[]> {
   } catch {
     return [];
   }
+}
+
+/**
+ * Update goals.md with step progress
+ * Updates status for a specific step within a task
+ */
+export async function updateStepStatus(
+  taskTitle: string,
+  stepNumber: number,
+  newStatus: WorkStep['status'],
+  additionalData?: {
+    actual_turns?: number;
+    output_path?: string;
+    completed_at?: string;
+    started_at?: string;
+  }
+): Promise<boolean> {
+  const goalsPath = path.join(process.cwd(), 'workspace', 'goals.md');
+
+  try {
+    let content = await readFile(goalsPath, 'utf-8');
+
+    // Find the step and update its status
+    // Pattern: #### Step N: Title followed by - **Status:** ...
+    const stepHeaderPattern = new RegExp(
+      `(####\\s+(?:Step\\s+)?${stepNumber + 1}[a-z]?[:.]?\\s+[^\\n]+\\n(?:.*?\\n)*?)(- \\*\\*Status:\\*\\*)\\s*[^\\n]+`,
+      'i'
+    );
+
+    if (stepHeaderPattern.test(content)) {
+      // Format status text
+      let statusText = newStatus.charAt(0).toUpperCase() + newStatus.slice(1).replace('_', ' ');
+      
+      content = content.replace(stepHeaderPattern, `$1$2 ${statusText}`);
+
+      // Add additional data if provided
+      if (additionalData?.completed_at && newStatus === 'complete') {
+        // Add completed timestamp if not already present
+        const completedPattern = new RegExp(
+          `(####\\s+(?:Step\\s+)?${stepNumber + 1}[^\\n]+\\n(?:.*?\\n)*?)(- \\*\\*Completed:\\*\\*)`,
+          'i'
+        );
+        if (!completedPattern.test(content)) {
+          // Add completed line after status
+          const statusLine = new RegExp(
+            `(####\\s+(?:Step\\s+)?${stepNumber + 1}[^\\n]+\\n(?:.*?\\n)*?- \\*\\*Status:\\*\\*[^\\n]+)`,
+            'i'
+          );
+          content = content.replace(statusLine, `$1\n- **Completed:** ${additionalData.completed_at}`);
+        }
+      }
+
+      await writeFile(goalsPath, content, 'utf-8');
+      console.log(`[${new Date().toISOString()}] Updated step ${stepNumber + 1} status to: ${statusText}`);
+      return true;
+    }
+
+    console.log(`[${new Date().toISOString()}] Could not find step ${stepNumber + 1} in goals.md`);
+    return false;
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error updating step status:`, error instanceof Error ? error.message : error);
+    return false;
+  }
+}
+
+/**
+ * Update parent task status based on step completion
+ */
+export async function updateTaskProgressFromSteps(taskTitle: string, steps: WorkStep[]): Promise<boolean> {
+  const goalsPath = path.join(process.cwd(), 'workspace', 'goals.md');
+
+  try {
+    let content = await readFile(goalsPath, 'utf-8');
+
+    const completedSteps = steps.filter(s => s.status === 'complete').length;
+    const totalSteps = steps.length;
+    const progressPct = Math.round((completedSteps / totalSteps) * 100);
+    const currentStepNum = steps.findIndex(s => s.status === 'in_progress') + 1 || completedSteps + 1;
+
+    // Build status text
+    let statusText: string;
+    if (progressPct === 100) {
+      statusText = 'Complete';
+    } else if (steps.some(s => s.status === 'blocked')) {
+      statusText = `Blocked (Step ${currentStepNum} of ${totalSteps}, ${progressPct}% complete)`;
+    } else {
+      statusText = `In Progress (Step ${currentStepNum} of ${totalSteps}, ${progressPct}% complete)`;
+    }
+
+    // Update the task status
+    const titlePattern = new RegExp(
+      `(###\\s+${escapeRegex(taskTitle)}[\\s\\S]*?- \\*\\*Status:\\*\\*)\\s*[^\\n]+`,
+      'i'
+    );
+
+    if (titlePattern.test(content)) {
+      content = content.replace(titlePattern, `$1 ${statusText}`);
+      await writeFile(goalsPath, content, 'utf-8');
+      console.log(`[${new Date().toISOString()}] Updated task "${taskTitle}" status to: ${statusText}`);
+      return true;
+    }
+
+    return false;
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error updating task progress:`, error instanceof Error ? error.message : error);
+    return false;
+  }
+}
+
+/**
+ * Escape special regex characters in a string
+ */
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

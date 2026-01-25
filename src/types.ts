@@ -21,7 +21,26 @@ export interface HealthStatus {
 }
 
 /**
+ * Individual step within a multi-step task
+ * Steps are tracked inline in goals.md under parent tasks
+ */
+export interface WorkStep {
+  step_number: number;
+  title: string;
+  description: string;
+  status: 'pending' | 'in_progress' | 'complete' | 'blocked';
+  dependencies?: number[];  // Step numbers this depends on (0-based)
+  estimated_turns?: number;
+  actual_turns?: number;
+  output_path?: string;
+  completed_at?: string;
+  started_at?: string;
+  re_breakdown_count?: number; // Track re-breakdowns for exit code 1 handling
+}
+
+/**
  * Work item from goals.md
+ * Enhanced with step tracking for incremental execution
  */
 export interface WorkItem {
   id: string;
@@ -29,6 +48,12 @@ export interface WorkItem {
   title: string;
   description: string;
   status: 'pending' | 'in_progress' | 'blocked' | 'complete';
+  
+  // Step tracking for multi-step tasks
+  steps?: WorkStep[];
+  current_step?: number;    // Index of current step (0-based)
+  progress_pct?: number;    // Calculated from completed steps
+  breakdown_generated_at?: string; // When auto-breakdown was performed
 }
 
 /**
