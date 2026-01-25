@@ -1,107 +1,48 @@
-# Calibration Project: EDS Hello
+---
+name: Calibration EDS
+description: |
+  Prove `deliver.eds.site` capability through end-to-end execution. Use when validating Edge Delivery Services skills before EDS work, checking aem-cli and GitHub auth availability, establishing baseline confidence, or surfacing Adobe EDS tooling blockers.
+---
 
-Prove the `deliver.eds.site` capability through end-to-end execution.
+# Calibration: EDS
 
-## Purpose
-
-Before trusting the agent with EDS site work:
-1. Validate EDS tooling is available
-2. Surface blockers (aem-cli, GitHub auth)
-3. Establish baseline confidence
-4. Document any required fixes
+Prove `deliver.eds.site` capability through end-to-end execution.
 
 ## Prerequisites
 
-### Check aem-cli
+Check tooling:
 ```bash
-which aem || echo "aem-cli not found"
-aem --version
+which aem || echo "aem-cli not found"  # Blocker if missing
+gh auth status  # Blocker if not authenticated
 ```
 
-If not found, this is a blocker. Document in needs-you.md.
+If missing, document in needs-you.md and stop.
 
-### Check GitHub CLI
-```bash
-gh auth status
-```
+## Steps
 
-If not authenticated, document as blocker.
+1. **Scaffold** - Create minimal EDS structure:
+   - `head.html`
+   - `scripts/scripts.js`
+   - `styles/styles.css`
 
-## Calibration Steps
+2. **Add content** - Create `index.html` or `index.md` with one block
 
-### Step 1: Scaffold
-```bash
-cd ~/dev/agent-outputs/projects/calibration
-mkdir calibration-eds-hello
-cd calibration-eds-hello
-```
+3. **Preview** - Run `aem up` (if available) or validate structure manually
 
-Create minimal EDS structure:
-- `head.html`
-- `scripts/scripts.js`
-- `styles/styles.css`
-- Block structure (if templates available)
+4. **Document** - README with setup and run instructions
 
-### Step 2: Add Content
-Create simple test page:
-- `index.html` or `index.md`
-- One block demonstration
+5. **Validate** - Run verifiers: `git_status_clean`, `files_exist`, `docs_checklist`
 
-### Step 3: Preview (if aem available)
-```bash
-aem up
-```
-
-Or validate structure manually.
-
-### Step 4: Document
-Create README.md with:
-- What this is
-- How to run locally
-- Structure explanation
-
-### Step 5: Validate
-Run applicable verifiers:
-- git_status_clean
-- files_exist (EDS required files)
-- docs_checklist
-
-### Step 6: Record Evidence
-Log to capability-ledger.jsonl:
-```json
-{
-  "event": "CALIBRATION_COMPLETE",
-  "project": "calibration-eds-hello",
-  "skill": "deliver.eds.site",
-  "result": "PASS|FAIL|PARTIAL",
-  "blockers": [...]
-}
-```
-
-## Success Criteria
-
-- [ ] EDS structure created correctly
-- [ ] At least one page renders (or structure valid)
-- [ ] README with instructions
-- [ ] All files committed
+6. **Record** - Log to capability-ledger.jsonl
 
 ## Known Blockers
 
-### aem-cli Not Installed
-- Resolution: Human installs aem-cli
-- Add to needs-you.md
+| Blocker | Resolution |
+|---------|------------|
+| aem-cli not installed | Human installs aem-cli |
+| GitHub auth missing | Human runs `gh auth login` |
+| Template unavailable | Use minimal hand-built structure |
 
-### GitHub Auth Missing
-- Resolution: Human runs `gh auth login`
-- Add to needs-you.md
+## Success Criteria
 
-### Template Not Available
-- Resolution: Use minimal hand-built structure
-- Document in calibration record
-
-## Expected Outcome
-
-After successful calibration:
-- `eds.scaffold.basic` confidence adjusted
-- `deliver.eds.site` maturity: Declared -> Demonstrated
-- Known blockers documented for future reference
+EDS structure valid, README exists, all files committed. On success: maturity -> Demonstrated.

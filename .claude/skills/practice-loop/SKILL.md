@@ -1,151 +1,55 @@
-# Practice Loop Skill
+---
+name: Practice Loop
+description: |
+  Run practice tasks when idle to improve skill confidence. Use when no primary work items are available, waiting for human input, in rate limit cooldown, skills blocking P1 goals have low confidence, skills have maturity=Declared, or skills unused >30 days.
+---
 
-Instructions for running practice tasks when idle.
+# Practice Loop
 
-## Purpose
-
-When idle or blocked on primary work:
-1. Identify highest-impact unproven skill needed by P1 goals
-2. Generate a practice task to exercise that skill safely
-3. Execute → Validate → Record evidence
-4. Update confidence/maturity
+Run practice tasks when idle to improve skill confidence.
 
 ## When to Practice
 
-Practice when:
 - No work items available (all Complete or Blocked)
 - Waiting for human input
 - Rate limited / in cooldown
-- Scheduled practice time
 
-## Practice Priority Order
+## Priority Order
 
-1. **Skills blocking P1 goals** - Unblock critical path first
-2. **Skills with confidence < 50%** - Most uncertain capabilities
-3. **Skills with maturity = Declared** - Never tested
-4. **Skills with high failure rate** - Need stabilization
-5. **Skills unused > 30 days** - Prevent decay
+1. Skills blocking P1 goals
+2. Skills with confidence < 50%
+3. Skills with maturity = Declared (never tested)
+4. Skills with high failure rate
+5. Skills unused > 30 days
 
-## Identifying Practice Targets
+## Workflow
 
-### Step 1: Scan Goals
-Read goals.md and identify required skills:
-```
-P1 Goal: "Build Next.js transactional app"
-Required skills:
-- nextjs.build.basic (confidence: 60%)
-- nextjs.routing.app_router (confidence: 40%) ← LOW
-- node.npm.install (confidence: 90%)
-```
+1. **Identify target** - Scan goals.md for required skills, find lowest confidence skill needed by highest priority goal
 
-### Step 2: Check Skill Registry
-For each required skill, check:
-- Confidence level
-- Maturity level
-- Last validated date
+2. **Create practice task** - Use safe location `~/dev/agent-outputs/practice/`
 
-### Step 3: Select Target
-Pick the skill that is:
-- Required by highest priority goal
-- Has lowest confidence
-- Has maturity = Declared
+3. **Execute** - Run the practice task in isolation
 
-## Practice Task Templates
+4. **Validate** - Run applicable verifiers
 
-### For git.branch_commit
-```yaml
-task: Practice git operations
-location: ~/dev/agent-outputs/practice/git-practice
-steps:
-  1. Create test repo (or use existing)
-  2. Create branch
-  3. Make 3 commits with meaningful messages
-  4. Verify branch and commits exist
-verifiers: [git_status_clean, commit_exists]
-```
+5. **Update** - Adjust confidence: +10 PASS, -15 FAIL
 
-### For nextjs.build.basic
-```yaml
-task: Practice Next.js scaffold
-location: ~/dev/agent-outputs/practice/nextjs-practice-{date}
-steps:
-  1. Run create-next-app
-  2. Modify one component
-  3. Run npm run build
-  4. Verify build succeeds
-verifiers: [node_install, node_build, docs_checklist]
-```
+6. **Log** - Record to capability-ledger.jsonl:
+   ```json
+   {"event": "PRACTICE_TASK_COMPLETE", "skill_id": "...", "result": "PASS"}
+   ```
 
-### For reason.debugging
-```yaml
-task: Practice debugging discipline
-location: ~/dev/agent-outputs/practice/debug-practice
-steps:
-  1. Create intentionally broken code
-  2. Follow debugging protocol:
-     - Reproduce
-     - Isolate
-     - Hypothesize
-     - Fix
-     - Verify
-  3. Document the process
-verifiers: [files_exist, node_build]
-```
+## Practice Task Examples
 
-## Practice Execution
-
-### Step 1: Create Practice Task
-```yaml
-practice_task:
-  id: "practice-{skill_id}-{date}"
-  target_skill: "nextjs.build.basic"
-  reason: "Confidence 60%, blocking P1 goal"
-  location: "~/dev/agent-outputs/practice/..."
-  steps: [...]
-  verifiers: [...]
-```
-
-### Step 2: Execute in Safe Location
-- Use designated practice directory
-- Don't affect real projects
-- Create fresh environment
-
-### Step 3: Run Verifiers
-Execute all specified verifiers.
-Record PASS/FAIL for each.
-
-### Step 4: Update Skills
-Based on results:
-- PASS: confidence += 10
-- FAIL: confidence -= 15
-- Update maturity if applicable
-
-### Step 5: Log to Ledger
-```json
-{
-  "event": "PRACTICE_TASK_COMPLETE",
-  "skill_id": "nextjs.build.basic",
-  "result": "PASS",
-  "confidence_delta": "+10",
-  "location": "...",
-  "duration_ms": 12345
-}
-```
-
-## Practice vs Real Work
-
-Practice tasks:
-- Use designated practice directories
-- Don't count toward goal completion
-- Are explicitly logged as practice
-- Update skill confidence same as real work
-- Can be discarded after learning
+| Skill | Task |
+|-------|------|
+| git.branch_commit | Create branch, make 3 commits in test repo |
+| nextjs.build.basic | Scaffold app, modify component, verify build |
+| reason.debugging | Create broken code, debug systematically |
 
 ## Anti-Patterns
 
-DO NOT:
 - Practice when real work is available
 - Practice in production directories
 - Skip validation after practice
 - Practice skills already at 90%+
-- Forget to log practice results

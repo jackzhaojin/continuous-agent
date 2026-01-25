@@ -1,5 +1,6 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { runIntegrityVerifier } from './verifiers/index.js';
 
 const execAsync = promisify(exec);
 
@@ -100,6 +101,44 @@ function checkNodeVersion(): HealthCheck {
 }
 
 /**
+ * Check reference integrity (registry and filesystem consistency)
+ */
+async function checkReferenceIntegrity(): Promise<HealthCheck> {
+  try {
+    const report = await runIntegrityVerifier();
+
+    if (report.overall === 'PASS') {
+      return {
+        name: 'reference-integrity',
+        status: 'pass',
+        message: 'Reference registry and filesystem are consistent'
+      };
+    }
+
+    // Collect issues
+    const issues: string[] = [];
+    if (report.orphans.length > 0) {
+      issues.push(`${report.orphans.length} orphan(s)`);
+    }
+    if (report.missing.length > 0) {
+      issues.push(`${report.missing.length} missing`);
+    }
+
+    return {
+      name: 'reference-integrity',
+      status: 'fail',
+      message: `Reference integrity issues: ${issues.join(', ')}`
+    };
+  } catch (error) {
+    return {
+      name: 'reference-integrity',
+      status: 'fail',
+      message: error instanceof Error ? error.message : 'Reference integrity check failed'
+    };
+  }
+}
+
+/**
  * Run all health checks and return overall status
  */
 export async function checkHealth(): Promise<HealthStatus> {
@@ -109,6 +148,7 @@ export async function checkHealth(): Promise<HealthStatus> {
   checks.push(await checkGitHubCLI());
   checks.push(await checkDiskSpace());
   checks.push(checkNodeVersion());
+  checks.push(await checkReferenceIntegrity());
 
   // Determine overall status
   const failCount = checks.filter(c => c.status === 'fail').length;
