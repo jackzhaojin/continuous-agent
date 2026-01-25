@@ -1,0 +1,161 @@
+# Delivery Skills Registry
+# End-to-end outcome capabilities
+# These compose multiple technical skills
+# Confidence: 0-100 (evidence-weighted)
+# Maturity: Declared → Demonstrated → Reliable
+
+skills:
+  - id: deliver.nextjs.app.basic
+    name: "Deliver Basic Next.js App"
+    description: "End-to-end: scaffold, build, run locally"
+    confidence: 40
+    maturity: Declared
+    scope:
+      includes:
+        - "scaffold app"
+        - "basic routing"
+        - "build passes"
+        - "runs locally"
+      excludes:
+        - "authentication"
+        - "database"
+        - "deployment"
+        - "complex state"
+    requires_skills:
+      technical:
+        - nextjs.build.basic
+        - node.npm.install
+        - git.branch_commit
+      functional:
+        - reason.decomposition
+        - comm.documentation
+    verifiers:
+      - node_install
+      - node_build
+      - docs_checklist
+    dod_template:
+      - "npm install succeeds"
+      - "npm run build succeeds"
+      - "App runs locally with npm run dev"
+      - "README with run instructions"
+      - "All code committed"
+    evidence:
+      successes: 0
+      failures: 3
+      last_validated: null
+
+  - id: deliver.nextjs.app.transactional
+    name: "Deliver Transactional Next.js App"
+    description: "Full-stack CRUD app with data persistence"
+    confidence: 20
+    maturity: Declared
+    scope:
+      includes:
+        - "CRUD operations"
+        - "API routes"
+        - "Form handling"
+        - "Data persistence (mock/file)"
+      excludes:
+        - "Real database"
+        - "Authentication"
+        - "Production deployment"
+    requires_skills:
+      technical:
+        - nextjs.build.basic
+        - nextjs.routing.app_router
+        - node.npm.install
+        - git.branch_commit
+      functional:
+        - reason.decomposition
+        - reason.debugging.discipline
+        - comm.documentation
+    verifiers:
+      - node_install
+      - node_build
+      - node_test
+      - docs_checklist
+    dod_template:
+      - "App scaffolded with Next.js"
+      - "CRUD API routes implemented"
+      - "Mock database working"
+      - "UI displays data, allows CRUD"
+      - "npm run build passes"
+      - "README with run instructions"
+    evidence:
+      successes: 0
+      failures: 0
+      last_validated: null
+
+  - id: deliver.site.static
+    name: "Deliver Static Site"
+    description: "Create a static HTML/CSS website"
+    confidence: 80
+    maturity: Demonstrated
+    scope:
+      includes:
+        - "HTML structure"
+        - "CSS styling"
+        - "Multiple pages"
+        - "Responsive design"
+      excludes:
+        - "JavaScript frameworks"
+        - "Build tools"
+    verifiers:
+      - files_exist
+      - docs_checklist
+    evidence:
+      successes: 5
+      failures: 1
+      last_validated: null
+
+  - id: deliver.poc.integration
+    name: "Deliver Integration POC"
+    description: "Proof of concept for API/service integration"
+    confidence: 30
+    maturity: Declared
+    scope:
+      includes:
+        - "Research integration patterns"
+        - "Create minimal working example"
+        - "Document findings"
+      excludes:
+        - "Production-ready code"
+        - "Error handling"
+        - "Full test coverage"
+    requires_skills:
+      technical:
+        - node.npm.install
+        - bash.commands
+        - files.read_write
+      functional:
+        - reason.research.synthesis
+        - comm.documentation
+    evidence:
+      successes: 0
+      failures: 0
+      last_validated: null
+
+  - id: deliver.documentation
+    name: "Deliver Documentation"
+    description: "Create comprehensive documentation"
+    confidence: 75
+    maturity: Demonstrated
+    scope:
+      includes:
+        - "README files"
+        - "Code comments"
+        - "API documentation"
+        - "Setup instructions"
+    verifiers:
+      - docs_checklist
+    evidence:
+      successes: 10
+      failures: 2
+      last_validated: null
+
+# Skill Categories
+categories:
+  apps: [deliver.nextjs.app.basic, deliver.nextjs.app.transactional]
+  sites: [deliver.site.static]
+  research: [deliver.poc.integration]
+  docs: [deliver.documentation]

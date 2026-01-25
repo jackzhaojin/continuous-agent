@@ -1,0 +1,14 @@
+# Work Ledger (JSONL Format)
+# Each line is a JSON object representing a work event
+# Schema:
+# {
+#   "timestamp": "ISO8601 datetime",
+#   "event_type": "task_started|task_completed|task_blocked|progress_update",
+#   "task_id": "unique task identifier",
+#   "description": "what was done or attempted",
+#   "outcome": "success|failure|blocked|partial",
+#   "related_goal": "optional goal reference",
+#   "duration_ms": "optional execution time",
+#   "metadata": {}
+# }
+{"event":"SYSTEM_UPGRADE","ts":"2026-01-25T12:00:00.000Z","description":"Intelligence layer implemented: intent-classifier, strategy-selector, prompt-builder, verifiers, skill-registry"}

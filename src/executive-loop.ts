@@ -5,7 +5,9 @@ import path from 'path';
 import { checkHealth } from './health-checker.js';
 import { selectWork } from './work-selector.js';
 import { createTaskContract } from './task-contractor.js';
-import { spawnWorker, validateAuth } from './worker-spawner.js';
+import { spawnWorker, validateAuth, type WorkerRetryContext } from './worker-spawner.js';
+import { selectStrategy } from './intelligence/strategy-selector.js';
+import { classifyIntent } from './intelligence/intent-classifier.js';
 import type { HealthStatus, WorkerResult, LoopState } from './types.js';
 import type { WorkItem } from './work-selector.js';
 
@@ -59,15 +61,49 @@ const loopState: LoopState = {
   current_task: null,
 };
 
-// Retry tracker - tracks attempts per task
-// Key: task title, Value: { attempts: number, lastError: string, strategies: string[] }
+// Retry tracker - tracks attempts per task with strategy info
+// Key: task title, Value: retry state including strategies tried
 interface RetryState {
   attempts: number;
   lastError: string;
-  strategies: string[];
+  strategies: string[]; // Strategy IDs that have been tried
   lastAttemptAt: string;
+  currentStrategyId: string | null;
 }
 const retryTracker: Map<string, RetryState> = new Map();
+
+/**
+ * Get the current strategy for a work item based on retry state
+ */
+function getCurrentStrategy(item: WorkItem): { strategyId: string | null; strategies: string[] } {
+  const retry = retryTracker.get(item.title);
+  const triedStrategies = retry?.strategies || [];
+
+  const selection = selectStrategy(item, triedStrategies);
+  if (selection) {
+    return {
+      strategyId: selection.strategy.id,
+      strategies: [...triedStrategies, selection.strategy.id],
+    };
+  }
+
+  return { strategyId: null, strategies: triedStrategies };
+}
+
+/**
+ * Build retry context for worker
+ */
+function buildRetryContext(item: WorkItem): WorkerRetryContext | undefined {
+  const retry = retryTracker.get(item.title);
+  if (!retry) return undefined;
+
+  return {
+    attempts: retry.attempts,
+    maxRetries: MAX_RETRIES,
+    triedStrategies: retry.strategies,
+    lastError: retry.lastError,
+  };
+}
 
 const MAX_RETRIES = 10; // Per constitution: 10 retries before blocking
 
@@ -200,6 +236,25 @@ async function executeWork(item: WorkItem): Promise<WorkerResult | null> {
   log(`  Description: ${item.description || '(none)'}`);
   log(`  Status: ${item.status}`);
 
+  // Classify intent and log research requirements
+  const intent = classifyIntent(item);
+  log(`  Intent: ${intent.type} (confidence: ${intent.confidence}%)`);
+  if (intent.research_required) {
+    log(`  Research phase: REQUIRED`);
+  }
+
+  // Get strategy for this attempt
+  const { strategyId, strategies } = getCurrentStrategy(item);
+  if (strategyId) {
+    log(`  Strategy: ${strategyId}`);
+    // Update tracker with current strategy
+    const retry = retryTracker.get(item.title);
+    if (retry) {
+      retry.currentStrategyId = strategyId;
+      retry.strategies = strategies;
+    }
+  }
+
   // Create task contract from work item
   const contract = createTaskContract(item);
   log(`  Task Contract ID: ${contract.id}`);
@@ -209,12 +264,20 @@ async function executeWork(item: WorkItem): Promise<WorkerResult | null> {
   // Update loop state
   loopState.current_task = contract.id;
 
+  // Build retry context
+  const retryContext = buildRetryContext(item);
+  if (retryContext) {
+    log(`  Retry Context: Attempt ${retryContext.attempts + 1}/${retryContext.maxRetries}`);
+    log(`  Previous strategies: ${retryContext.triedStrategies.join(', ') || 'none'}`);
+  }
+
   log(`  Spawning worker agent...`);
   log(`    Goal: ${contract.goal.split('\n')[0]}...`);
   log(`    DoD items: ${contract.definition_of_done.length}`);
 
   try {
-    const result = await spawnWorker(contract);
+    // Pass work item and retry context for intelligent prompting
+    const result = await spawnWorker(contract, item, retryContext);
     log(`  Worker completed in ${result.duration_ms}ms`);
     log(`  Success: ${result.success}`);
     if (result.errors.length > 0) {
@@ -317,17 +380,24 @@ async function updateState(item: WorkItem, success: boolean, errorInfo?: string)
   // FAILURE - track retry, only block after MAX_RETRIES
   let retry = retryTracker.get(item.title);
   if (!retry) {
-    retry = { attempts: 0, lastError: '', strategies: [], lastAttemptAt: '' };
+    retry = { attempts: 0, lastError: '', strategies: [], lastAttemptAt: '', currentStrategyId: null };
   }
   retry.attempts++;
   retry.lastError = errorInfo || 'Unknown error';
   retry.lastAttemptAt = new Date().toISOString();
+
+  // Record the strategy that was tried (if any)
+  if (retry.currentStrategyId && !retry.strategies.includes(retry.currentStrategyId)) {
+    retry.strategies.push(retry.currentStrategyId);
+  }
+  retry.currentStrategyId = null; // Clear for next attempt
+
   retryTracker.set(item.title, retry);
 
   log(`  Attempt ${retry.attempts}/${MAX_RETRIES} failed for "${item.title}"`);
   log(`  Error: ${retry.lastError.slice(0, 200)}`);
 
-  // Log attempt to ledger
+  // Log attempt to ledger with strategy info
   const attemptEntry = JSON.stringify({
     event: 'TASK_ATTEMPT_FAILED',
     ts: new Date().toISOString(),
@@ -335,6 +405,7 @@ async function updateState(item: WorkItem, success: boolean, errorInfo?: string)
     title: item.title,
     attempt: retry.attempts,
     max_retries: MAX_RETRIES,
+    strategies_tried: retry.strategies,
     error: retry.lastError.slice(0, 500),
   });
   await appendFile(ledgerPath, attemptEntry + '\n', 'utf-8');

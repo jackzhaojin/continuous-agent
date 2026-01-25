@@ -1,0 +1,14 @@
+# Inputs Log (JSONL Format) - IMMUTABLE
+# Every input to the agent is logged here for audit trail
+# This file is APPEND-ONLY. Never modify or delete entries.
+# Schema:
+# {
+#   "ts": "ISO8601 datetime",
+#   "source": "goals.md|human|queue.md",
+#   "raw_input": "exact text received",
+#   "priority": "P1|P2|P3",
+#   "intent_type": "outcome_only|what_only|what_and_how",
+#   "scope_allowed": ["repos", "tools"],
+#   "hash": "sha256 of raw_input"
+# }
+{"ts":"2026-01-25T12:00:00.000Z","source":"system","raw_input":"Agent initialized with goals.md","intent_type":"system","hash":"init"}

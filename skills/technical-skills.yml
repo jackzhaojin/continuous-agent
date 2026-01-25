@@ -1,0 +1,178 @@
+# Technical Skills Registry
+# Tool/interface operation capabilities
+# Confidence: 0-100 (evidence-weighted)
+# Maturity: Declared → Demonstrated → Reliable
+
+skills:
+  # Git Operations
+  - id: git.branch_commit
+    name: "Git Branch and Commit"
+    description: "Create branches, make commits, manage history"
+    confidence: 85
+    maturity: Demonstrated
+    scope:
+      includes:
+        - "create branches"
+        - "make commits"
+        - "view history"
+        - "merge (simple)"
+      excludes:
+        - "rebase (complex)"
+        - "conflict resolution"
+    verifiers:
+      - git_status_clean
+      - commit_exists
+    evidence:
+      successes: 10
+      failures: 1
+      last_validated: null
+
+  - id: github.pr.create
+    name: "GitHub Pull Request"
+    description: "Create and manage pull requests via gh CLI"
+    confidence: 80
+    maturity: Demonstrated
+    scope:
+      includes:
+        - "create PR"
+        - "add description"
+        - "request review"
+      excludes:
+        - "merge conflicts"
+        - "complex reviews"
+    verifiers:
+      - git_status_clean
+    evidence:
+      successes: 5
+      failures: 0
+      last_validated: null
+
+  # Node.js Operations
+  - id: node.npm.install
+    name: "NPM Install"
+    description: "Install npm dependencies"
+    confidence: 90
+    maturity: Reliable
+    scope:
+      includes:
+        - "npm install"
+        - "npm ci"
+        - "add dependencies"
+    verifiers:
+      - node_install
+    evidence:
+      successes: 20
+      failures: 2
+      last_validated: null
+
+  - id: node.npm.run_script
+    name: "NPM Run Script"
+    description: "Execute package.json scripts"
+    confidence: 85
+    maturity: Demonstrated
+    scope:
+      includes:
+        - "npm run build"
+        - "npm run test"
+        - "npm run dev"
+    verifiers:
+      - node_build
+      - node_test
+    evidence:
+      successes: 15
+      failures: 3
+      last_validated: null
+
+  # Next.js Operations
+  - id: nextjs.build.basic
+    name: "Next.js Basic Build"
+    description: "Scaffold and build a basic Next.js app"
+    confidence: 60
+    maturity: Declared
+    scope:
+      includes:
+        - "create-next-app"
+        - "basic pages"
+        - "simple components"
+        - "npm run build"
+      excludes:
+        - "complex routing"
+        - "authentication"
+        - "database integration"
+        - "deployment"
+    prerequisites:
+      - tool: node
+        min_version: "18.0.0"
+    verifiers:
+      - node_install
+      - node_build
+      - files_exist
+    common_failure_modes:
+      - "TypeScript configuration issues"
+      - "Missing dependencies"
+      - "Import path errors"
+    evidence:
+      successes: 1
+      failures: 3
+      last_validated: null
+
+  - id: nextjs.routing.app_router
+    name: "Next.js App Router"
+    description: "Advanced routing with layouts and server components"
+    confidence: 40
+    maturity: Declared
+    scope:
+      includes:
+        - "layouts"
+        - "nested routes"
+        - "server components"
+      excludes:
+        - "parallel routes"
+        - "intercepting routes"
+        - "middleware"
+    evidence:
+      successes: 0
+      failures: 2
+      last_validated: null
+
+  # File Operations
+  - id: files.read_write
+    name: "File Read/Write"
+    description: "Read and write files to filesystem"
+    confidence: 95
+    maturity: Reliable
+    scope:
+      includes:
+        - "read files"
+        - "write files"
+        - "edit files"
+        - "create directories"
+    evidence:
+      successes: 100
+      failures: 1
+      last_validated: null
+
+  - id: bash.commands
+    name: "Bash Commands"
+    description: "Execute bash/shell commands"
+    confidence: 90
+    maturity: Reliable
+    scope:
+      includes:
+        - "run commands"
+        - "check output"
+        - "chain commands"
+      excludes:
+        - "interactive commands"
+        - "long-running processes"
+    evidence:
+      successes: 50
+      failures: 5
+      last_validated: null
+
+# Skill Categories for quick reference
+categories:
+  git: [git.branch_commit, github.pr.create]
+  node: [node.npm.install, node.npm.run_script]
+  nextjs: [nextjs.build.basic, nextjs.routing.app_router]
+  core: [files.read_write, bash.commands]

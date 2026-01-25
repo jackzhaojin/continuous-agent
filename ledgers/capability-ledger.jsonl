@@ -1,0 +1,13 @@
+# Capability Ledger (JSONL Format)
+# Tracks skill attempts and results for evidence-weighted confidence
+# Schema:
+# {
+#   "ts": "ISO8601 datetime",
+#   "event": "SKILL_ATTEMPT|SKILL_RESULT|VERIFIER_RUN|CONFIDENCE_UPDATE",
+#   "skill_id": "technical or delivery skill ID",
+#   "task_id": "related task",
+#   "result": "PASS|FAIL|PARTIAL",
+#   "evidence": {},
+#   "confidence_delta": "+5|-10|0"
+# }
+{"ts":"2026-01-25T12:00:00.000Z","event":"LEDGER_INIT","description":"Capability ledger initialized"}

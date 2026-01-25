@@ -1,0 +1,207 @@
+# Functional Skills Registry
+# Cross-cutting reasoning, discipline, and communication capabilities
+# These apply across all project types
+# Confidence: 0-100 (evidence-weighted from rubric evaluation)
+# Maturity: Declared → Demonstrated → Reliable
+
+skills:
+  # Reasoning Skills
+  - id: reason.decomposition
+    name: "Task Decomposition"
+    description: "Breaking goals into actionable, verifiable steps"
+    confidence: 70
+    maturity: Demonstrated
+    rubric:
+      pass_conditions:
+        - "Identifies clear sub-tasks"
+        - "Orders tasks by dependency"
+        - "Each sub-task is achievable in one sitting"
+        - "Verification criteria for each step"
+      fail_indicators:
+        - "Jumps straight to coding without planning"
+        - "Tasks too large or vague"
+        - "Missing dependencies between tasks"
+    improvement_strategies:
+      - "Always write out steps before executing"
+      - "Ask: 'What's the smallest thing I can verify?'"
+    evidence:
+      successes: 8
+      failures: 4
+      last_validated: null
+
+  - id: reason.debugging.discipline
+    name: "Debugging Discipline"
+    description: "Systematic approach: reproduce → isolate → fix → verify"
+    confidence: 65
+    maturity: Demonstrated
+    rubric:
+      pass_conditions:
+        - "Writes explicit reproduction steps"
+        - "Identifies likely root cause with evidence"
+        - "Fixes without introducing new issues"
+        - "Runs verification after fix"
+        - "Documents fix for future reference"
+      fail_indicators:
+        - "Random changes without hypothesis"
+        - "Declares fixed without verification"
+        - "Same error recurs after 'fix'"
+        - "Introduces new bugs while fixing"
+    improvement_strategies:
+      - "Include debugging checklist in context"
+      - "Require hypothesis before each fix attempt"
+    evidence:
+      successes: 6
+      failures: 4
+      last_validated: null
+
+  - id: reason.risk_assessment
+    name: "Risk Assessment"
+    description: "Identifying and mitigating potential risks"
+    confidence: 60
+    maturity: Declared
+    rubric:
+      pass_conditions:
+        - "Lists potential failure modes"
+        - "Prioritizes by impact and likelihood"
+        - "Proposes mitigations"
+        - "Checks against constitution limits"
+      fail_indicators:
+        - "No mention of risks"
+        - "Proceeds despite obvious red flags"
+        - "Violates constitution unknowingly"
+    evidence:
+      successes: 3
+      failures: 2
+      last_validated: null
+
+  - id: reason.research.synthesis
+    name: "Research Synthesis"
+    description: "Gathering, evaluating, and synthesizing information"
+    confidence: 70
+    maturity: Demonstrated
+    rubric:
+      pass_conditions:
+        - "Consults multiple sources"
+        - "Evaluates source reliability"
+        - "Extracts relevant patterns"
+        - "Documents findings clearly"
+        - "Identifies gaps in knowledge"
+      fail_indicators:
+        - "Uses first result without verification"
+        - "Ignores contradicting information"
+        - "No documentation of research"
+    evidence:
+      successes: 5
+      failures: 1
+      last_validated: null
+
+  # Execution Skills
+  - id: exec.strategy_switching
+    name: "Strategy Switching"
+    description: "Changing approach when current strategy isn't working"
+    confidence: 45
+    maturity: Declared
+    rubric:
+      pass_conditions:
+        - "Recognizes when approach is failing"
+        - "Identifies alternative approaches"
+        - "Switches to different strategy"
+        - "Documents why switch was made"
+      fail_indicators:
+        - "Repeats same failing approach"
+        - "Gives up without trying alternatives"
+        - "Escalates too quickly"
+    improvement_strategies:
+      - "Track strategies tried per task"
+      - "Force different approach on each retry"
+    evidence:
+      successes: 2
+      failures: 5
+      last_validated: null
+
+  - id: exec.persistence
+    name: "Persistence"
+    description: "Continuing to try when facing obstacles"
+    confidence: 50
+    maturity: Declared
+    rubric:
+      pass_conditions:
+        - "Tries multiple approaches"
+        - "Breaks down blockers into smaller problems"
+        - "Seeks help only after genuine attempts"
+        - "Documents what was tried"
+      fail_indicators:
+        - "Gives up after 1-2 attempts"
+        - "Marks blocked without trying alternatives"
+        - "Empty needs-you.md with blocked tasks"
+    evidence:
+      successes: 3
+      failures: 6
+      last_validated: null
+
+  - id: exec.prioritization
+    name: "Prioritization"
+    description: "Selecting highest-value work and staying focused"
+    confidence: 75
+    maturity: Demonstrated
+    rubric:
+      pass_conditions:
+        - "Works on P1 before P2, P2 before P3"
+        - "Doesn't get distracted by tangents"
+        - "Returns to high-priority work after blocks"
+      fail_indicators:
+        - "Works on low-priority while high-priority waits"
+        - "Scope creep"
+        - "Gold-plating simple tasks"
+    evidence:
+      successes: 8
+      failures: 2
+      last_validated: null
+
+  # Communication Skills
+  - id: comm.needs_you.quality
+    name: "Needs-You Quality"
+    description: "Clear, actionable escalations to human"
+    confidence: 55
+    maturity: Declared
+    rubric:
+      pass_conditions:
+        - "Clear description of what's needed"
+        - "Explains why agent can't do it"
+        - "Specifies what will unblock"
+        - "Prioritized appropriately"
+      fail_indicators:
+        - "Vague requests"
+        - "Missing context"
+        - "Escalates things agent could handle"
+        - "Empty needs-you.md when tasks blocked"
+    evidence:
+      successes: 3
+      failures: 4
+      last_validated: null
+
+  - id: comm.documentation
+    name: "Documentation"
+    description: "Self-documenting work and decisions"
+    confidence: 70
+    maturity: Demonstrated
+    rubric:
+      pass_conditions:
+        - "README with clear instructions"
+        - "Comments on non-obvious code"
+        - "Commit messages explain why"
+        - "Logs decisions and rationale"
+      fail_indicators:
+        - "No README"
+        - "Unclear commit messages"
+        - "No explanation of approach"
+    evidence:
+      successes: 7
+      failures: 3
+      last_validated: null
+
+# Skill Categories
+categories:
+  reasoning: [reason.decomposition, reason.debugging.discipline, reason.risk_assessment, reason.research.synthesis]
+  execution: [exec.strategy_switching, exec.persistence, exec.prioritization]
+  communication: [comm.needs_you.quality, comm.documentation]
