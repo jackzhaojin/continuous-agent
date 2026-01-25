@@ -1,4 +1,6 @@
 import { config } from 'dotenv';
+import { readFile, writeFile, appendFile } from 'fs/promises';
+import path from 'path';
 import { checkHealth } from './health-checker.js';
 import { selectWork } from './work-selector.js';
 import { createTaskContract } from './task-contractor.js';
@@ -16,6 +18,92 @@ const loopState: LoopState = {
   last_work_at: null,
   current_task: null,
 };
+
+// Backoff state for rate limiting / token exhaustion
+interface BackoffState {
+  consecutiveErrors: number;
+  lastErrorAt: string | null;
+  cooldownUntil: string | null;
+  reason: string | null;
+}
+
+const backoffState: BackoffState = {
+  consecutiveErrors: 0,
+  lastErrorAt: null,
+  cooldownUntil: null,
+  reason: null,
+};
+
+// Token/rate limit error patterns
+const RATE_LIMIT_PATTERNS = [
+  'rate limit',
+  'rate_limit',
+  'too many requests',
+  'quota exceeded',
+  'token limit',
+  'tokens exhausted',
+  'overloaded',
+  '429',
+  '529',
+];
+
+/**
+ * Check if error is a rate limit / token exhaustion error
+ */
+function isRateLimitError(error: unknown): boolean {
+  const errorStr = String(error).toLowerCase();
+  return RATE_LIMIT_PATTERNS.some(pattern => errorStr.includes(pattern));
+}
+
+/**
+ * Calculate backoff duration based on consecutive errors
+ * Uses exponential backoff: 1min, 2min, 4min, 8min, 16min, max 30min
+ */
+function calculateBackoffMs(consecutiveErrors: number): number {
+  const baseMs = 60 * 1000; // 1 minute
+  const maxMs = 30 * 60 * 1000; // 30 minutes
+  const backoffMs = Math.min(baseMs * Math.pow(2, consecutiveErrors - 1), maxMs);
+  return backoffMs;
+}
+
+/**
+ * Check if we're in cooldown mode
+ */
+function isInCooldown(): boolean {
+  if (!backoffState.cooldownUntil) return false;
+  return new Date() < new Date(backoffState.cooldownUntil);
+}
+
+/**
+ * Enter cooldown mode after rate limit error
+ */
+function enterCooldown(error: unknown): void {
+  backoffState.consecutiveErrors++;
+  backoffState.lastErrorAt = new Date().toISOString();
+  backoffState.reason = String(error).slice(0, 200);
+
+  const backoffMs = calculateBackoffMs(backoffState.consecutiveErrors);
+  const cooldownUntil = new Date(Date.now() + backoffMs);
+  backoffState.cooldownUntil = cooldownUntil.toISOString();
+
+  log(`⚠️ Rate limit detected. Entering cooldown mode.`);
+  log(`  Consecutive errors: ${backoffState.consecutiveErrors}`);
+  log(`  Cooldown until: ${backoffState.cooldownUntil}`);
+  log(`  Backoff duration: ${Math.round(backoffMs / 1000 / 60)} minutes`);
+}
+
+/**
+ * Reset backoff state after successful operation
+ */
+function resetBackoff(): void {
+  if (backoffState.consecutiveErrors > 0) {
+    log(`✓ Recovered from rate limit. Resetting backoff state.`);
+  }
+  backoffState.consecutiveErrors = 0;
+  backoffState.lastErrorAt = null;
+  backoffState.cooldownUntil = null;
+  backoffState.reason = null;
+}
 
 // Sleep utility
 const sleep = (ms: number): Promise<void> =>
@@ -69,35 +157,36 @@ async function executeWork(item: WorkItem): Promise<WorkerResult | null> {
   // Update loop state
   loopState.current_task = contract.id;
 
-  // TODO: Enable worker spawning when ready for production
-  // For now, log that we would spawn a worker
-  log(`  [STUB] Would spawn worker with contract:`);
+  log(`  Spawning worker agent...`);
   log(`    Goal: ${contract.goal.split('\n')[0]}...`);
   log(`    DoD items: ${contract.definition_of_done.length}`);
 
-  // Uncomment below to enable actual worker spawning:
-  // try {
-  //   log('  Spawning worker agent...');
-  //   const result = await spawnWorker(contract);
-  //   log(`  Worker completed in ${result.duration_ms}ms`);
-  //   log(`  Success: ${result.success}`);
-  //   if (result.errors.length > 0) {
-  //     log(`  Errors: ${result.errors.join(', ')}`);
-  //   }
-  //   return result;
-  // } catch (error) {
-  //   logError('Worker execution failed', error);
-  //   return null;
-  // }
-
-  // Stub result for now
-  return {
-    success: true,
-    output: '[STUB] Work execution not yet implemented',
-    artifacts: [],
-    errors: [],
-    duration_ms: 0,
-  };
+  try {
+    const result = await spawnWorker(contract);
+    log(`  Worker completed in ${result.duration_ms}ms`);
+    log(`  Success: ${result.success}`);
+    if (result.errors.length > 0) {
+      log(`  Errors: ${result.errors.join(', ')}`);
+    }
+    if (result.output) {
+      // Log first 500 chars of output
+      log(`  Output: ${result.output.slice(0, 500)}${result.output.length > 500 ? '...' : ''}`);
+    }
+    return result;
+  } catch (error) {
+    logError('Worker execution failed', error);
+    // Check if it's a rate limit error and propagate for backoff handling
+    if (isRateLimitError(error)) {
+      throw error; // Let the main loop handle backoff
+    }
+    return {
+      success: false,
+      output: '',
+      artifacts: [],
+      errors: [error instanceof Error ? error.message : String(error)],
+      duration_ms: 0,
+    };
+  }
 }
 
 /**
@@ -143,11 +232,46 @@ async function updateState(item: WorkItem, success: boolean): Promise<void> {
     loopState.last_work_at = new Date().toISOString();
   }
 
-  // TODO: Implement state update
-  // - Update goals.md to mark item as completed
-  // - Update state.json with execution history
-  // - Log to audit trail
-  log('  [STUB] State update not yet implemented');
+  try {
+    // Update goals.md to reflect new status
+    const goalsPath = path.join(process.cwd(), 'workspace', 'goals.md');
+    const content = await readFile(goalsPath, 'utf-8');
+
+    // Find and update the status for this task
+    const newStatus = success ? 'Complete' : 'Blocked';
+    const titlePattern = new RegExp(`(###\\s+${escapeRegex(item.title)}[\\s\\S]*?- \\*\\*Status:\\*\\*)\\s*[^\\n]+`, 'i');
+
+    if (titlePattern.test(content)) {
+      const updatedContent = content.replace(titlePattern, `$1 ${newStatus}`);
+      await writeFile(goalsPath, updatedContent, 'utf-8');
+      log(`  Updated goals.md: "${item.title}" → ${newStatus}`);
+    } else {
+      log(`  Warning: Could not find task "${item.title}" in goals.md to update`);
+    }
+
+    // Log to work ledger
+    const ledgerPath = path.join(process.cwd(), 'ledgers', 'work-ledger.jsonl');
+    const ledgerEntry = JSON.stringify({
+      event: success ? 'TASK_COMPLETED' : 'TASK_FAILED',
+      ts: new Date().toISOString(),
+      task_id: item.id,
+      title: item.title,
+      priority: item.priority,
+      iteration: loopState.iteration,
+    });
+    await appendFile(ledgerPath, ledgerEntry + '\n', 'utf-8');
+    log(`  Logged to work-ledger.jsonl`);
+
+  } catch (error) {
+    logError('Failed to update state', error);
+  }
+}
+
+/**
+ * Escape special regex characters in a string
+ */
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 /**
@@ -226,13 +350,35 @@ async function main(): Promise<void> {
   const sleepInterval = parseInt(process.env.LOOP_SLEEP_SECONDS || '30', 10) * 1000;
 
   while (loopState.running) {
-    try {
-      await runIteration();
-    } catch (error) {
-      logError('Iteration failed', error);
+    // Check if in cooldown mode (rate limited / token exhausted)
+    if (isInCooldown()) {
+      const remaining = Math.round((new Date(backoffState.cooldownUntil!).getTime() - Date.now()) / 1000 / 60);
+      log(`⏸️ In cooldown mode. ${remaining} minutes remaining. Reason: ${backoffState.reason?.slice(0, 50)}...`);
+      await sleep(60 * 1000); // Check every minute during cooldown
+      continue;
     }
 
-    if (loopState.running) {
+    try {
+      await runIteration();
+      // Successful iteration - reset backoff
+      resetBackoff();
+    } catch (error) {
+      logError('Iteration failed', error);
+
+      // Check if this is a rate limit / token exhaustion error
+      if (isRateLimitError(error)) {
+        enterCooldown(error);
+      } else {
+        // Non-rate-limit error - short backoff
+        backoffState.consecutiveErrors++;
+        if (backoffState.consecutiveErrors >= 5) {
+          log(`⚠️ Too many consecutive errors (${backoffState.consecutiveErrors}). Entering short cooldown.`);
+          backoffState.cooldownUntil = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 min cooldown
+        }
+      }
+    }
+
+    if (loopState.running && !isInCooldown()) {
       log(`Sleeping for ${sleepInterval / 1000} seconds...`);
       await sleep(sleepInterval);
     }

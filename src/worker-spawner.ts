@@ -7,12 +7,81 @@
  */
 
 import { query, type SDKMessage, type SDKResultMessage } from '@anthropic-ai/claude-agent-sdk';
+import { mkdirSync, existsSync, copyFileSync } from 'fs';
+import path from 'path';
 import type { TaskContract, WorkerResult } from './types.js';
+
+// Agent outputs directory - where workers create their projects
+const AGENT_OUTPUTS_BASE = process.env.AGENT_OUTPUTS_PATH || '/Users/jackjin/dev/agent-outputs';
+
+// Template directory for project setup files (lives in agent repo, not outputs)
+const AGENT_BASE = process.env.AGENT_PATH || '/Users/jackjin/dev/continuous-agent';
+const TEMPLATES_DIR = path.join(AGENT_BASE, 'templates');
+
+/**
+ * Detect project category from task goal
+ */
+function detectCategory(goal: string): string {
+  const goalLower = goal.toLowerCase();
+  if (goalLower.includes('next.js') || goalLower.includes('nextjs')) {
+    return 'nextjs';
+  } else if (goalLower.includes('react')) {
+    return 'react';
+  } else if (goalLower.includes('node')) {
+    return 'node';
+  } else if (goalLower.includes('python')) {
+    return 'python';
+  }
+  return 'misc';
+}
+
+/**
+ * Generate a project directory path based on task metadata
+ * Structure: projects/{category}/{date}/{slug}
+ */
+function generateProjectPath(contract: TaskContract): { path: string; category: string } {
+  const today = new Date().toISOString().split('T')[0]; // 2025-01-25
+  const category = detectCategory(contract.goal);
+  const slug = contract.id.replace('task-', '');
+
+  return {
+    path: path.join(AGENT_OUTPUTS_BASE, 'projects', category, today, slug),
+    category,
+  };
+}
+
+/**
+ * Set up project directory with appropriate .gitignore
+ * This MUST happen before the worker starts to prevent committing junk
+ */
+function setupProjectDirectory(projectPath: string, category: string): void {
+  // Create directory if needed
+  if (!existsSync(projectPath)) {
+    mkdirSync(projectPath, { recursive: true });
+    console.log(`[Worker] Created project directory: ${projectPath}`);
+  }
+
+  // Copy appropriate .gitignore template
+  const gitignoreDest = path.join(projectPath, '.gitignore');
+  if (!existsSync(gitignoreDest)) {
+    const templateFile = path.join(TEMPLATES_DIR, `gitignore-${category}`);
+    const fallbackFile = path.join(TEMPLATES_DIR, 'gitignore-misc');
+
+    const sourceFile = existsSync(templateFile) ? templateFile : fallbackFile;
+
+    if (existsSync(sourceFile)) {
+      copyFileSync(sourceFile, gitignoreDest);
+      console.log(`[Worker] Created .gitignore from ${category} template`);
+    } else {
+      console.log(`[Worker] Warning: No .gitignore template found for ${category}`);
+    }
+  }
+}
 
 /**
  * Build the system prompt for a worker agent
  */
-function buildWorkerPrompt(contract: TaskContract): string {
+function buildWorkerPrompt(contract: TaskContract, projectPath: string): string {
   const dodList = contract.definition_of_done
     .map((item, i) => `${i + 1}. ${item}`)
     .join('\n');
@@ -20,15 +89,21 @@ function buildWorkerPrompt(contract: TaskContract): string {
   return `
 ${contract.goal}
 
+## Project Directory:
+You are working in: ${projectPath}
+This is your isolated workspace. All files you create should be here.
+Do NOT modify files outside this directory.
+
 ## Definition of Done:
 ${dodList}
 
 ## Scope:
-- Repositories: ${contract.scope.repos_allowed.join(', ')}
+- Working directory: ${projectPath}
 - Available tools: ${contract.scope.tools_allowed.join(', ')}
 
 ## Important:
 - Complete the task within ${contract.max_turns} turns
+- All code and files go in your project directory
 - Report your progress clearly
 - If you cannot complete the task, explain why
 `.trim();
@@ -46,17 +121,21 @@ export async function spawnWorker(contract: TaskContract): Promise<WorkerResult>
   const artifacts: string[] = [];
   const errors: string[] = [];
 
-  const prompt = buildWorkerPrompt(contract);
+  // Generate project path and set up directory with .gitignore FIRST
+  const { path: projectPath, category } = generateProjectPath(contract);
+  setupProjectDirectory(projectPath, category);
+
+  const prompt = buildWorkerPrompt(contract, projectPath);
   const model = process.env.MODEL || 'claude-sonnet-4-5-20250929';
 
   try {
-    // Query Claude using the Agent SDK
+    // Query Claude using the Agent SDK with project directory as cwd
     const stream = query({
       prompt,
       options: {
         model,
         maxTurns: contract.max_turns,
-        cwd: process.cwd(),
+        cwd: projectPath,  // Worker operates in isolated project directory
         allowedTools: contract.scope.tools_allowed,
       },
     });

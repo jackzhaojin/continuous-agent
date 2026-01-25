@@ -1,0 +1,46 @@
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+ENV/
+
+# Build outputs
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+
+# Byte-compiled / optimized
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment
+.env
+.env.local
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Misc
+*.log
+*.pid
