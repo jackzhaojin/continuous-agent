@@ -1,0 +1,81 @@
+verifier_id: reference-integrity
+version: "1.0"
+description: "Registry <-> filesystem consistency check per PRD Reference Management Addendum"
+command: |
+  echo "=== Reference Integrity Check ===" && \
+  echo "Checking for orphan sources..." && \
+  ORPHANS="" && \
+  if [ -d "references/sources" ]; then
+    for dir in references/sources/*/; do
+      if [ -d "$dir" ]; then
+        id=$(basename "$dir")
+        if ! grep -q "id: $id" references/reference-registry.yaml 2>/dev/null; then
+          ORPHANS="$ORPHANS $id"
+        fi
+      fi
+    done
+  fi && \
+  echo "Checking for orphan patches..." && \
+  if [ -d "references/patches" ]; then
+    for dir in references/patches/*/; do
+      if [ -d "$dir" ]; then
+        id=$(basename "$dir")
+        # Mode B references have patches - check if registered as Mode B
+        if ! grep -A5 "id: $id" references/reference-registry.yaml 2>/dev/null | grep -q "mode: B"; then
+          ORPHANS="$ORPHANS patches/$id"
+        fi
+      fi
+    done
+  fi && \
+  echo "Checking for orphan forks..." && \
+  if [ -d "references/forks" ]; then
+    for dir in references/forks/*/; do
+      if [ -d "$dir" ]; then
+        id=$(basename "$dir")
+        # Mode C references are forks - check if registered as Mode C
+        if ! grep -A5 "id: $id" references/reference-registry.yaml 2>/dev/null | grep -q "mode: C"; then
+          ORPHANS="$ORPHANS forks/$id"
+        fi
+      fi
+    done
+  fi && \
+  if [ -z "$ORPHANS" ]; then
+    echo "PASS: No orphan directories found"
+  else
+    echo "FAIL: Orphan directories found:$ORPHANS"
+    exit 1
+  fi
+working_dir: "${project_root}"
+timeout_seconds: 60
+parameters: {}
+success_criteria:
+  - exit_code: 0
+  - output_contains: "PASS"
+evidence_capture:
+  - type: log
+    name: "integrity_output"
+    extract: "full"
+
+# Run triggers
+run_triggers:
+  - after_any_reference_operation
+  - periodic_daily
+  - on_agent_startup
+
+# Failure response
+failure_response:
+  orphan_folder:
+    action: "Queue cleanup decision in needs-you.md"
+    severity: warning
+    block_operations: false
+
+  missing_folder:
+    action: "Attempt recovery (re-clone if upstream known)"
+    severity: error
+    block_operations: true
+    fallback: "Queue in needs-you.md if recovery fails"
+
+  patch_file_missing:
+    action: "Downgrade to Mode A, log patch loss"
+    severity: error
+    block_operations: false

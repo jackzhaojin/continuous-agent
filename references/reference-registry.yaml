@@ -1,65 +1,98 @@
 # Reference Registry
-# This file tracks external references, documents, and resources used by the agent system.
+# Single source of truth for all external references
+# Per PRD Reference Management Addendum
 
-schema_version: "1.0"
-last_updated: "2026-01-24"
+version: "1.0"
+last_verified: "2026-01-25T12:00:00Z"
 
-# References are organized by category
 references:
-  # Example entry format:
-  # - id: unique-identifier
-  #   name: Human readable name
-  #   type: document|url|api|file|codebase
-  #   location: path or URL
-  #   description: What this reference contains
-  #   added: ISO8601 date
-  #   tags: [list, of, tags]
-  #   status: active|archived|deprecated
+  # ===================================================================
+  # MODE A: Pinned Clone (read-only reference, ~70-80% of references)
+  # ===================================================================
 
-categories:
   # Foundational POCs that informed the agent's design
-  foundational:
-    - id: agent-sdk-chat-cli
-      name: "Claude Agent SDK - Chat CLI"
-      type: codebase
-      location: /Users/jackjin/dev/azure-da-mcp/agent-claude-sdk/chat-cli
-      description: |
-        Interactive CLI demonstrating Claude Agent SDK patterns.
-        KEY LEARNINGS:
-        - How to use query() from @anthropic-ai/claude-agent-sdk
-        - Streaming message handling (for await of stream)
-        - Message type handling (system, assistant, user, result)
-        - SDKResultMessage processing (success/error subtypes)
-        - Authentication patterns (CLAUDE_CODE_OAUTH_TOKEN, ANTHROPIC_API_KEY)
-        - Configuration options (model, maxTurns, cwd, allowedTools, settingSources)
-      key_files:
-        - src/index.ts    # Main entry point with SDK usage patterns
-        - package.json    # Dependencies
-        - .env            # Auth configuration (copied to our .env)
-      added: "2026-01-24"
-      tags: [agent-sdk, typescript, patterns, authentication]
-      status: active
+  - id: agent-sdk-chat-cli
+    mode: A
 
-    - id: agent-sdk-skills-poc
-      name: "Claude Agent SDK - Skills POC"
-      type: codebase
-      location: /Users/jackjin/dev/azure-da-mcp/agent-claude-sdk/agent-sdk-skills-poc
-      description: |
-        POC testing Claude Code skills integration with Agent SDK.
-        KEY LEARNINGS:
-        - settingSources: ['user', 'project'] is REQUIRED for skills
-        - allowedTools must include 'Skill' for skill invocation
-        - cwd must point to project root for .claude/skills/ discovery
-        - Skills are loaded from ~/.claude/skills/ (user) and .claude/skills/ (project)
-        - SKILL.md format with frontmatter and instructions
-        - Skill invocation via Skill tool in agent responses
-      key_files:
-        - src/index.ts           # Experiment runner
-        - src/experiments/       # Different config combinations tested
-        - FINDINGS.md            # Results and conclusions
-      added: "2026-01-24"
-      tags: [agent-sdk, skills, configuration, experiments]
-      status: active
+    # Location
+    source_path: null  # External reference, not cloned locally
+
+    # Provenance
+    upstream: /Users/jackjin/dev/azure-da-mcp/agent-claude-sdk/chat-cli
+    pinned_commit: null
+    license: Private
+
+    # Lifecycle
+    acquired_at: "2026-01-24T00:00:00Z"
+    last_refresh: "2026-01-24T00:00:00Z"
+    refresh_policy: manual
+
+    # Purpose
+    purpose: |
+      Interactive CLI demonstrating Claude Agent SDK patterns.
+      KEY LEARNINGS:
+      - How to use query() from @anthropic-ai/claude-agent-sdk
+      - Streaming message handling (for await of stream)
+      - Message type handling (system, assistant, user, result)
+      - SDKResultMessage processing (success/error subtypes)
+      - Authentication patterns (CLAUDE_CODE_OAUTH_TOKEN, ANTHROPIC_API_KEY)
+      - Configuration options (model, maxTurns, cwd, allowedTools, settingSources)
+    skills_using:
+      - node.npm.install
+      - node.npm.run_script
+
+    # Mode A has no patches
+    patches: []
+    wrappers: []
+
+  - id: agent-sdk-skills-poc
+    mode: A
+
+    # Location
+    source_path: null  # External reference
+
+    # Provenance
+    upstream: /Users/jackjin/dev/azure-da-mcp/agent-claude-sdk/agent-sdk-skills-poc
+    pinned_commit: null
+    license: Private
+
+    # Lifecycle
+    acquired_at: "2026-01-24T00:00:00Z"
+    last_refresh: "2026-01-24T00:00:00Z"
+    refresh_policy: manual
+
+    # Purpose
+    purpose: |
+      POC testing Claude Code skills integration with Agent SDK.
+      KEY LEARNINGS:
+      - settingSources: ['user', 'project'] is REQUIRED for skills
+      - allowedTools must include 'Skill' for skill invocation
+      - cwd must point to project root for .claude/skills/ discovery
+      - Skills are loaded from ~/.claude/skills/ (user) and .claude/skills/ (project)
+      - SKILL.md format with frontmatter and instructions
+    skills_using:
+      - node.npm.install
+
+    patches: []
+    wrappers: []
+
+  # ===================================================================
+  # MODE B: Pinned Clone + Patches (~15-25% of references)
+  # ===================================================================
+
+  # No Mode B references yet - will be added when patches are needed
+
+  # ===================================================================
+  # MODE C: Fork (active dependencies, < 5% of references)
+  # ===================================================================
+
+  # No Mode C references yet - forks only when truly needed
+
+# Categories for organization
+categories:
+  foundational:
+    - agent-sdk-chat-cli
+    - agent-sdk-skills-poc
 
   documentation: []
 
@@ -71,9 +104,19 @@ categories:
 
   external: []
 
+# Decision tree reference (see strategies/reference-intake-policy.yaml)
+decision_tree_summary: |
+  1. Just reading/searching? -> Mode A: Pinned Clone
+  2. Can fix at runtime (wrapper)? -> Mode A + Wrapper
+  3. Small source fix needed (< 3 patches)? -> Mode B: Clone + Patches
+  4. Multi-project dependency or ongoing changes? -> Mode C: Fork
+
+  DEFAULT: Always start with Mode A, upgrade only when evidence requires
+
 # Notes on usage:
 # - Add new references with unique IDs
-# - Update last_updated when modifying
+# - Update last_verified when modifying
 # - Mark deprecated references rather than removing them
-# - Use tags for cross-cutting categorization
-# - Foundational references document critical learnings for agent design
+# - Every folder in sources/ must have a registry entry (no orphans)
+# - Patches are stored in patches/<id>/ directory
+# - Wrappers are stored in wrappers/ directory

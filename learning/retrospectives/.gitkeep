@@ -1,0 +1,26 @@
+# Retrospectives Directory
+#
+# Per PRD Part 13: Retrospective Process
+#
+# This directory stores periodic retrospective analyses.
+# Each retrospective creates a file:
+#
+#   retrospectives/
+#     weekly-YYYY-WW.md           # Weekly retrospectives
+#     monthly-YYYY-MM.md          # Monthly retrospectives
+#     post-calibration-*.md       # After calibration projects
+#
+# Retrospective Schedule:
+# - Weekly: Every Sunday (scheduled)
+# - Threshold: After 10+ new outcomes
+# - On-demand: "Analyze my recent work"
+# - Post-calibration: After calibration projects complete
+#
+# Each retrospective contains:
+# - Skill Performance analysis
+# - Gaps Discovered
+# - Verification Quality assessment
+# - Context Effectiveness review
+# - Pattern Recognition
+# - Changes Made with rationale
+# - Recommendations

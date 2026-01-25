@@ -1,0 +1,128 @@
+# Reference Intake Policy
+# Per PRD Reference Management Addendum Part 5
+
+decision_tree:
+  # Step 1: Do we need it at all?
+  - question: "Do I need to READ or SEARCH this repository?"
+    no: "Don't acquire. Use web search for one-off lookups."
+    yes: "Continue to Step 2"
+
+  # Step 2: What kind of access?
+  - question: "Do I need to make LOCAL CHANGES to make it work?"
+    options:
+      - answer: "No changes needed"
+        action: "Mode A: Pinned clone in sources/"
+
+      - answer: "Only environment/wrapper changes (paths, shell, config)"
+        action: "Mode A + wrapper script. Keep source pristine."
+
+      - answer: "Code changes needed, but small (1-2 patches)"
+        action: "Mode B: Pinned clone + patches/"
+
+      - answer: "Code changes needed, 3+ patches or ongoing"
+        action: "Evaluate for Mode C (see Step 3)"
+
+  # Step 3: Fork evaluation
+  - question: "Should this be a fork (Mode C)?"
+    fork_if_any_true:
+      - "Will use in multiple projects as a base"
+      - "Need CI/build changes specific to our stack"
+      - "Expect ongoing feature development on top"
+      - "Want to contribute improvements upstream"
+      - "Patches exceed 3 or require frequent updates"
+    otherwise: "Stay Mode B with patches"
+
+# Defaults
+defaults:
+  new_reference: A  # Always start minimal
+  auto_upgrade_threshold: "3+ patches"
+  prefer_wrappers_over_patches: true
+
+# Mode descriptions
+modes:
+  A:
+    name: "Pinned Clone"
+    description: "Read-only reference, minimal upkeep"
+    use_case: "70-80% of references"
+    operations:
+      - "Clone to sources/"
+      - "Pin to specific commit"
+      - "Sparse checkout if large"
+      - "Periodic refresh"
+    maintenance: "Minimal"
+    github_fork: false
+
+  B:
+    name: "Pinned Clone + Patches"
+    description: "Small local fixes without fork overhead"
+    use_case: "15-25% of references"
+    operations:
+      - "Clone to sources/ (pristine)"
+      - "Store patches in patches/<id>/"
+      - "Reapply patches after refresh"
+    maintenance: "Low"
+    github_fork: false
+
+  C:
+    name: "Fork"
+    description: "Active dependency requiring ongoing maintenance"
+    use_case: "< 5% of references"
+    operations:
+      - "Create GitHub fork"
+      - "Clone to forks/"
+      - "Merge upstream periodically"
+      - "Push changes to fork"
+    maintenance: "Higher"
+    github_fork: true
+
+# Refresh policies
+refresh_policies:
+  daily:
+    interval: "24h"
+    auto_apply: true
+    for: "Critical documentation"
+
+  weekly:
+    interval: "7d"
+    auto_apply: true
+    for: "Most references (default)"
+
+  monthly:
+    interval: "30d"
+    auto_apply: false
+    for: "Stable forks"
+
+  manual:
+    interval: null
+    auto_apply: false
+    for: "Local/private references"
+
+# Actions by mode
+autonomous_actions:
+  mode_a:
+    - "Clone new repo to sources/"
+    - "Pin to specific commit"
+    - "Sparse checkout setup"
+    - "Fetch from upstream"
+    - "Register in reference-registry"
+
+  mode_b:
+    all_of_mode_a: true
+    additional:
+      - "Create patch file"
+      - "Apply patches after refresh"
+      - "Upgrade from Mode A"
+
+  mode_c:
+    all_of_mode_b: true
+    additional:
+      - "Create GitHub fork"
+      - "Clone fork locally"
+      - "Commit to fork"
+      - "Push to fork"
+      - "Merge upstream into fork"
+      - "Upgrade from Mode B"
+
+requires_approval:
+  - "Delete any reference (constitutional limit)"
+  - "Publish to external systems (constitutional limit)"

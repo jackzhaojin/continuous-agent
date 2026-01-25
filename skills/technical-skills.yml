@@ -170,9 +170,278 @@ skills:
       failures: 5
       last_validated: null
 
+  # GitHub Operations (beyond PRs)
+  - id: github.issues.read
+    name: "GitHub Issues Read"
+    description: "Read and analyze GitHub issues via gh CLI"
+    confidence: 75
+    maturity: Demonstrated
+    scope:
+      includes:
+        - "list issues"
+        - "read issue details"
+        - "filter by labels"
+      excludes:
+        - "complex queries"
+    prerequisites:
+      - tool: gh
+    verifiers:
+      - git_status_clean
+    evidence:
+      successes: 3
+      failures: 0
+      last_validated: null
+      pointers: []
+
+  - id: github.issues.write
+    name: "GitHub Issues Write"
+    description: "Create and update GitHub issues via gh CLI"
+    confidence: 60
+    maturity: Declared
+    scope:
+      includes:
+        - "create issue"
+        - "add comments"
+        - "update labels"
+      excludes:
+        - "bulk operations"
+    prerequisites:
+      - tool: gh
+    evidence:
+      successes: 1
+      failures: 0
+      last_validated: null
+      pointers: []
+
+  # EDS Operations
+  - id: eds.scaffold.basic
+    name: "EDS Basic Scaffold"
+    description: "Create basic EDS project structure"
+    confidence: 30
+    maturity: Declared
+    scope:
+      includes:
+        - "basic project structure"
+        - "initial blocks"
+        - "helix config"
+      excludes:
+        - "complex blocks"
+        - "custom sidekick"
+        - "advanced auth"
+    prerequisites:
+      - tool: node
+        min_version: "18.0.0"
+      - tool: aem-cli
+    verifiers:
+      - files_exist
+      - docs_checklist
+    common_failure_modes:
+      - "aem-cli version mismatch"
+      - "GitHub auth required"
+      - "Missing template files"
+    evidence:
+      successes: 0
+      failures: 0
+      last_validated: null
+      pointers: []
+
+  - id: eds.preview
+    name: "EDS Local Preview"
+    description: "Run EDS local development preview"
+    confidence: 25
+    maturity: Declared
+    scope:
+      includes:
+        - "start local server"
+        - "preview content"
+      excludes:
+        - "production deploy"
+    prerequisites:
+      - tool: aem-cli
+    verifiers:
+      - files_exist
+    evidence:
+      successes: 0
+      failures: 0
+      last_validated: null
+      pointers: []
+
+  # Azure Operations
+  - id: azure.login
+    name: "Azure CLI Login"
+    description: "Authenticate with Azure via az CLI"
+    confidence: 20
+    maturity: Declared
+    scope:
+      includes:
+        - "service principal auth"
+        - "check subscription"
+      excludes:
+        - "interactive login"
+    prerequisites:
+      - tool: az
+    evidence:
+      successes: 0
+      failures: 0
+      last_validated: null
+      pointers: []
+
+  - id: azure.containerapps.deploy
+    name: "Azure Container Apps Deploy"
+    description: "Deploy to Azure Container Apps"
+    confidence: 15
+    maturity: Declared
+    scope:
+      includes:
+        - "create container app"
+        - "update deployment"
+      excludes:
+        - "VNet integration"
+        - "custom domains"
+        - "advanced networking"
+    prerequisites:
+      - tool: az
+      - skill: azure.login
+    common_failure_modes:
+      - "Authentication expired"
+      - "Quota exceeded"
+      - "Image pull errors"
+    evidence:
+      successes: 0
+      failures: 0
+      last_validated: null
+      pointers: []
+
+  # SSH Operations
+  - id: ssh.remote_command
+    name: "SSH Remote Command"
+    description: "Execute commands on remote hosts via SSH"
+    confidence: 30
+    maturity: Declared
+    scope:
+      includes:
+        - "single commands"
+        - "file transfer (scp)"
+      excludes:
+        - "interactive sessions"
+        - "tunneling"
+    prerequisites:
+      - tool: ssh
+    common_failure_modes:
+      - "Key authentication failed"
+      - "Connection timeout"
+      - "Permission denied"
+    evidence:
+      successes: 0
+      failures: 0
+      last_validated: null
+      pointers: []
+
+  # Docker Operations
+  - id: docker.build
+    name: "Docker Build"
+    description: "Build Docker images from Dockerfiles"
+    confidence: 40
+    maturity: Declared
+    scope:
+      includes:
+        - "build image"
+        - "tag image"
+        - "multi-stage builds"
+      excludes:
+        - "buildx advanced"
+        - "remote builders"
+    prerequisites:
+      - tool: docker
+    verifiers:
+      - files_exist
+    common_failure_modes:
+      - "Missing Dockerfile"
+      - "Base image not found"
+      - "Build context too large"
+    evidence:
+      successes: 0
+      failures: 0
+      last_validated: null
+      pointers: []
+
+  - id: docker.compose.up
+    name: "Docker Compose Up"
+    description: "Start services with docker-compose"
+    confidence: 35
+    maturity: Declared
+    scope:
+      includes:
+        - "start services"
+        - "rebuild containers"
+        - "view logs"
+      excludes:
+        - "swarm mode"
+        - "complex networking"
+    prerequisites:
+      - tool: docker
+    common_failure_modes:
+      - "Port already in use"
+      - "Volume permission issues"
+      - "Service dependency failures"
+    evidence:
+      successes: 0
+      failures: 0
+      last_validated: null
+      pointers: []
+
+  # Next.js Data/API
+  - id: nextjs.data.api_routes
+    name: "Next.js API Routes"
+    description: "Create and manage Next.js API routes"
+    confidence: 35
+    maturity: Declared
+    scope:
+      includes:
+        - "basic API routes"
+        - "GET/POST handlers"
+        - "JSON responses"
+      excludes:
+        - "middleware"
+        - "authentication"
+        - "database connections"
+    prerequisites:
+      - skill: nextjs.build.basic
+    verifiers:
+      - node_build
+    evidence:
+      successes: 0
+      failures: 0
+      last_validated: null
+      pointers: []
+
+  - id: nextjs.data.fetching.ssr
+    name: "Next.js Server-Side Data Fetching"
+    description: "Server-side rendering with data fetching"
+    confidence: 30
+    maturity: Declared
+    scope:
+      includes:
+        - "getServerSideProps"
+        - "server components fetch"
+      excludes:
+        - "complex caching"
+        - "ISR"
+    prerequisites:
+      - skill: nextjs.routing.app_router
+    evidence:
+      successes: 0
+      failures: 0
+      last_validated: null
+      pointers: []
+
 # Skill Categories for quick reference
 categories:
-  git: [git.branch_commit, github.pr.create]
+  git: [git.branch_commit, github.pr.create, github.issues.read, github.issues.write]
   node: [node.npm.install, node.npm.run_script]
-  nextjs: [nextjs.build.basic, nextjs.routing.app_router]
+  nextjs: [nextjs.build.basic, nextjs.routing.app_router, nextjs.data.api_routes, nextjs.data.fetching.ssr]
+  eds: [eds.scaffold.basic, eds.preview]
+  azure: [azure.login, azure.containerapps.deploy]
+  ssh: [ssh.remote_command]
+  docker: [docker.build, docker.compose.up]
   core: [files.read_write, bash.commands]

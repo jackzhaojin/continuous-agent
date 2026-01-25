@@ -21,7 +21,7 @@ export interface HealthStatus {
  */
 async function checkGitHubCLI(): Promise<HealthCheck> {
   try {
-    const { stdout } = await execAsync('gh auth status 2>&1');
+    await execAsync('gh auth status 2>&1');
     return {
       name: 'github-cli',
       status: 'pass',

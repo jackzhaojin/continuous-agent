@@ -1,5 +1,5 @@
 import { config } from 'dotenv';
-import { readFile, writeFile, appendFile, mkdir } from 'fs/promises';
+import { readFile, writeFile, appendFile } from 'fs/promises';
 import { createWriteStream, existsSync } from 'fs';
 import path from 'path';
 import { checkHealth } from './health-checker.js';

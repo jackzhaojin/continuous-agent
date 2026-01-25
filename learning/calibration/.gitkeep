@@ -1,0 +1,21 @@
+# Calibration Records Directory
+#
+# Per PRD Part 9: Calibration Projects
+#
+# This directory stores records of calibration project runs.
+# Each calibration project creates a subdirectory with:
+#
+#   calibration/
+#     nextjs-hello-YYYYMMDD/
+#       config.yaml          # Calibration project config
+#       results.json         # Verifier results
+#       skills-before.json   # Skill confidence before
+#       skills-after.json    # Skill confidence after
+#       blockers.md          # Any blockers discovered
+#       summary.md           # Human-readable summary
+#
+# Calibration projects are run:
+# - Before trusting agent with real goals
+# - After significant environment changes
+# - When skill confidence seems uncalibrated
+# - Periodically (monthly) to prevent drift
