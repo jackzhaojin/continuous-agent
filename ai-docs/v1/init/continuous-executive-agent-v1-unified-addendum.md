@@ -696,12 +696,13 @@ Output: Lessons document for future similar work
 
 ### 11.2 The Safe Modification Zone
 
-**Philosophy:** The agent is autonomous by default. Almost everything is evolvable. Only irreversible actions with real-world consequences require approval.
+**Philosophy:** The agent is autonomous by default. Almost everything is evolvable.
+
+> **⚠️ CRITICAL: ALWAYS consult `constitution.md` first.** It is the supreme authority on hard limits and the ONLY file the agent cannot modify.
 
 ```
 EVOLVABLE (agent-controlled with audit):
 ├── executive-loop.js (git versioned, tested)
-├── constitution.md (git versioned, logged)
 ├── verifier definitions (git versioned, tested)
 ├── skills/*.yml (confidence, maturity, evidence)
 ├── strategies/prompts/*.md (versioned in git)
@@ -709,15 +710,16 @@ EVOLVABLE (agent-controlled with audit):
 ├── preferences.md (human can override)
 └── config.yaml (all parameters adjustable)
 
+IMMUTABLE (human-only):
+└── constitution.md (defines the three hard limits)
+
 APPEND-ONLY (audit trail):
 ├── capability-ledger.jsonl
 ├── evolution-log.jsonl
 └── work-ledger.jsonl
 
-HARD LIMITS (requires human approval):
-├── Spending money beyond cost cap
-├── Permanent deletions (repos, data, references)
-└── External publishing (npm, blog, social media)
+CONSTITUTIONAL LIMITS:
+└── See constitution.md for the 5 immutable hard limits
 ```
 
 ### 11.3 Evolution Log
@@ -1090,7 +1092,7 @@ Add to the original 13 principles from the main spec:
 21. **Evidence enables learning** — capability ledger provides receipts
 22. **Calibration before trust** — run calibration projects before real work
 23. **Harnesses are evidence** — existing successes seed initial confidence
-24. **Full autonomy with hard limits** — agent modifies anything except: spend, delete, publish
+24. **Full autonomy with Constitutional limits** — agent modifies anything except what's defined in constitution.md
 25. **Evolution is audited** — all self-modifications logged with rationale
 
 ---
@@ -1229,12 +1231,13 @@ When V1 is running and collecting evidence:
 - Modify executive-loop.js (logged, requires testing)
 - Change verifier definitions (logged)
 
-### ❌ Agent CANNOT (Hard Limits — Requires Human)
+### ❌ Agent CANNOT (Constitutional Limits)
 
-- **Spend money beyond free tier / cost cap**
-- **Permanently delete data, repos, or references**
-- **Publish externally (npm, blog posts, social media)**
-- Access new credentials (queue and continue)
+> **⚠️ CRITICAL: ALWAYS consult `constitution.md` for the 5 immutable hard limits.**
+> The Constitution is the supreme authority. Only the human can modify it.
+
+**Queue and continue (not Constitutional):**
+- Access new credentials
 
 ---
 

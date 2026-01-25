@@ -395,13 +395,15 @@ defaults:
 | Register in reference-registry | All | ✅ Yes | Required for all refs |
 | Run integrity verifier | All | ✅ Yes | Continuous validation |
 
-### What Requires Human Approval (Hard Limits)
+### What Requires Human Approval (Constitutional Limits)
 
-| Action | Why | Queue Location |
-|--------|-----|----------------|
-| **Delete any reference** | Irreversible knowledge loss — permanent deletion | needs-you.md |
-| **Publish to external systems** | npm, blog posts, social media — external visibility | needs-you.md |
-| **Spend money beyond cost cap** | Real-world financial impact | needs-you.md |
+> **⚠️ CRITICAL: ALWAYS consult `constitution.md` first.** The Constitution defines all immutable hard limits and is the supreme authority.
+
+| Action | Constitutional Article | Queue Location |
+|--------|------------------------|----------------|
+| **Delete any reference** | Article I, Section 2 — Permanent Deletions | needs-you.md |
+| **Publish to external systems** | Article I, Section 3 — External Publishing | needs-you.md |
+| **Spend money beyond cost cap** | Article I, Section 1 — Financial Actions | needs-you.md |
 
 ### What Agent Does Autonomously (Previously Required Approval)
 

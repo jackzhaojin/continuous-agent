@@ -443,14 +443,14 @@ continuous-agent/
 │       └── reference-integrity.ts
 │
 ├── workspace/
+│   ├── constitution.md                  # IMMUTABLE: Hard limits (human-only modification)
 │   ├── goals.md                         # Strategic objectives (human inputs)
 │   ├── queue.md                         # Tactical task backlog
 │   ├── progress.md                      # Active work status
 │   ├── completed.md                     # Outcomes and results
 │   ├── needs-you.md                     # Blockers requiring human
 │   ├── preferences.md                   # Learned patterns
-│   ├── capabilities.md                  # Tools, auth, capacity
-│   └── constitution.md                  # Boundaries, principles
+│   └── capabilities.md                  # Tools, auth, capacity
 │
 ├── ledgers/
 │   ├── inputs-log.jsonl                 # Immutable input audit trail
@@ -609,7 +609,9 @@ agent-outputs/
 
 ### 4.2 Approval Posture Matrix
 
-**Philosophy:** The agent is autonomous by default. It acts, builds, deploys, and ships without waiting for permission. Human approval is reserved only for irreversible actions with real-world cost or permanent consequences.
+**Philosophy:** The agent is autonomous by default. It acts, builds, deploys, and ships without waiting for permission.
+
+> **⚠️ CRITICAL: Always consult `constitution.md` first.** The Constitution defines the 5 immutable hard limits. This matrix is subordinate to — and derived from — the Constitution. When in doubt, check the Constitution.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -640,15 +642,12 @@ agent-outputs/
 │   │ • Cost cap exceeded (queue approval, pause that spend)          │   │
 │   └─────────────────────────────────────────────────────────────────┘   │
 │                                                                          │
-│   ❌ NEEDS APPROVAL (hard limits)                                        │
+│   ❌ CONSTITUTIONAL LIMITS — ALWAYS CHECK constitution.md               │
 │   ┌─────────────────────────────────────────────────────────────────┐   │
-│   │ • Spending money beyond free tier / cost cap                    │   │
-│   │ • Permanent deletions (repos, data, references)                 │   │
-│   │ • External publishing (npm, blog posts, social media)           │   │
-│   └─────────────────────────────────────────────────────────────────┘   │
-│                                                                          │
-│   COST CAP: Deployments and API usage are autonomous within free        │
-│   tier or a defined monthly budget. Exceeding requires approval.        │
+│   │ ⚠️  The Constitution defines 5 immutable hard limits.           │   │
+│   │ ⚠️  ALWAYS consult constitution.md before any risky action.     │   │
+│   │ ⚠️  Only human can modify the Constitution.                     │   │
+│   └─────────────────────────────────────────────────────────────────┘   │        │
 │                                                                          │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
@@ -1054,7 +1053,7 @@ The agent receives these in `goals.md` and figures them out through POCs, resear
 21. **Evidence enables learning** — capability ledger provides receipts
 22. **Calibration before trust** — run calibration projects first
 23. **Harnesses are evidence** — existing successes seed confidence
-24. **Full autonomy with hard limits** — agent modifies anything except: spend, delete, publish
+24. **Full autonomy with Constitutional limits** — agent modifies anything except what's defined in constitution.md
 25. **Evolution is audited** — all self-modifications logged
 
 ---

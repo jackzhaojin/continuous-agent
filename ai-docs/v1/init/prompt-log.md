@@ -40,3 +40,39 @@
 → Action: Updated 4 references in unified-addendum.md. ✅
 
 ---
+
+### Prompt 4: Create Constitution (12:15 PM)
+
+> Reread all the files here... After that, we need to have an agent constitution.md where a set of hard limits does not break. We already mentioned a set of hard limits in terms of what you shouldn't do. You shouldn't exceed budget. You shouldn't go beyond free care. You shouldn't make social media posts. You shouldn't do quite a few things. Let's have that be more formalized in the documentation. Let's call it constitution.md. Similar to the Constitution of the US. That thing should not be evaluated and should only be changed, right? Only if I can change it.
+
+→ Response: Created `constitution.md` as the immutable foundation document defining the 3 hard limits.
+→ Action:
+  - Created `constitution.md` with Articles I-V defining hard limits
+  - Updated `project-instructions.md` to reference constitution as supreme authority
+  - Updated `continuous-executive-agent-v1-prd.md` (approval matrix, directory structure, design principle 24)
+  - Updated `continuous-executive-agent-v1-unified-addendum.md` (safe modification zone, cannot section, design principle 24)
+  - Updated `continuous-executive-agent-v1-reference-management-addendum.md` (approval section now references Constitutional articles)
+  - ✅
+
+---
+
+### Prompt 5: Constitution Feedback (12:30 PM)
+
+> Three feedback items:
+> 1. Missing hard limit — Credential Exposure
+> 2. Missing hard limit — Visibility/Access Changes
+> 3. Cost Cap needs concrete definition ($20/service, ask when in doubt)
+>
+> Let's have the other documents just refer to constitution.md, don't duplicate markdown and tokens, but make it VERY important, ALWAYS constitution.md
+
+→ Response: Added 2 new Constitutional sections, defined concrete cost cap, simplified references across all docs.
+→ Action:
+  - Added Article I Section 4: Credential Handling (never expose in logs/commits/outputs)
+  - Added Article I Section 5: Access Control Changes (no private→public expansion)
+  - Updated Section 1 with concrete cost cap: $20/month per service, ask when uncertain
+  - Updated Article V: Now 5 hard limits (was 3)
+  - Simplified all other docs to just reference constitution.md with emphatic "⚠️ CRITICAL: ALWAYS consult constitution.md"
+  - Reduced duplication across PRD, unified addendum, reference addendum
+  - ✅
+
+---

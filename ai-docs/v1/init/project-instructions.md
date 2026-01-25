@@ -46,7 +46,9 @@ Create an AI system that can:
 
 ## Approval Posture
 
-**Philosophy:** The agent is autonomous by default. It acts, builds, deploys, and ships without waiting for permission. Human approval is reserved only for irreversible actions with real-world cost or permanent consequences.
+**Philosophy:** The agent is autonomous by default. It acts, builds, deploys, and ships without waiting for permission.
+
+> **⚠️ CRITICAL: Always consult `constitution.md` first.** It defines the 5 immutable hard limits that can never be violated. The Constitution is the supreme authority.
 
 | Action Type | Approval |
 |-------------|----------|
@@ -58,11 +60,7 @@ Create an AI system that can:
 | Deploying (within cost cap) | ✅ Autonomous |
 | Creating GitHub forks | ✅ Autonomous |
 | Requesting API keys / secrets | 📋 Queue, continue other work |
-| Spending money (beyond free tier) | ❌ Needs approval |
-| Permanent deletions (repos, data, refs) | ❌ Needs approval |
-| External publishing (npm, blog, social) | ❌ Needs approval |
-
-**Cost Cap:** Deployments and API usage are autonomous as long as they stay within free tier or a defined monthly budget. Exceeding the cap requires human approval.
+| **Constitutional limits** | ❌ **ALWAYS see `constitution.md`** |
 
 ---
 
@@ -96,15 +94,16 @@ Things the agent might autonomously identify and execute:
 
 ## Project Context Files
 
-Three specification documents provide the complete design:
+Four specification documents provide the complete design:
 
 | Document | Purpose |
 |----------|---------|
-| `continuous-executive-agent-v1-prd.md` | **Primary implementation guide** — architecture, workflows, schemas, roadmap |
-| `continuous-executive-agent-v1-unified-addendum.md` | **Reference material** — first-principles reasoning, detailed YAML schemas, retrospective process |
-| `continuous-executive-agent-v1-reference-management-addendum.md` | **External dependency management** — three-mode system (Clone/Patches/Fork), integrity verification |
+| **`constitution.md`** | **⚠️ SUPREME AUTHORITY** — 5 immutable hard limits. Human-only modification. **READ FIRST, ALWAYS.** |
+| `continuous-executive-agent-v1-prd.md` | Primary implementation guide — architecture, workflows, schemas, roadmap |
+| `continuous-executive-agent-v1-unified-addendum.md` | Reference material — first-principles reasoning, detailed YAML schemas, retrospective process |
+| `continuous-executive-agent-v1-reference-management-addendum.md` | External dependency management — three-mode system (Clone/Patches/Fork), integrity verification |
 
-**When building:** Start with the PRD. Consult addenda for edge cases and deeper understanding.
+**When building:** Start with `constitution.md` (hard limits are non-negotiable), then the PRD.
 
 ---
 
