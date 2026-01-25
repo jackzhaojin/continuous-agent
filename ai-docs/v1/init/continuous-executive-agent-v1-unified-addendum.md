@@ -12,7 +12,7 @@
 This unified addendum extends the V1 specification with a practical, minimal framework for:
 
 1. **Building real things** — Next.js apps, EDS sites, deployments — end-to-end
-2. **Proving capabilities** — deterministic verifiers produce evidence, not self-reports
+2. **Proving capabilities** — verifiers (triggered deterministically, evaluated agentically) produce evidence, not self-reports
 3. **Tracking confidence as a spectrum** — 0-100 scores + maturity levels, not binary
 4. **Separating skill categories** — Technical, Delivery, and Functional skills
 5. **Enabling self-improvement** — gaps become practice tasks, outcomes inform confidence
@@ -100,7 +100,7 @@ But steps 1-4 require the same capabilities being improved. If the agent reasons
 | Verifier PASS/FAIL | Objective criteria | Only as good as verifier design |
 | Human satisfaction | Ultimate goal | Hard to measure, delayed signal |
 
-**Core insight:** Signal is sparse and delayed. The solution is deterministic verifiers that provide immediate, objective feedback without requiring human judgment for every task.
+**Core insight:** Signal is sparse and delayed. The solution is verifiers that are triggered deterministically but evaluated agentically — providing immediate feedback without requiring human judgment for every task.
 
 ### 1.6 The Context Window Constraint
 
@@ -352,7 +352,7 @@ scope:
 
 ### 5.1 Core Concept
 
-A **Verifier** is a deterministic check that produces:
+A **Verifier** is a validation step that is triggered deterministically but evaluated agentically. It produces:
 - **Result:** PASS / FAIL
 - **Logs pointer:** Where to find execution logs
 - **Evidence pointers:** Commit hashes, artifacts, screenshots
@@ -1186,7 +1186,7 @@ When V1 is running and collecting evidence:
 | **Functional Skill** | Reasoning/discipline/communication capability |
 | **Confidence** | 0-100 estimate of success likelihood for a skill |
 | **Maturity** | Declared → Demonstrated → Reliable progression |
-| **Verifier** | Deterministic check producing PASS/FAIL + evidence |
+| **Verifier** | Validation step (triggered deterministically, evaluated agentically) producing PASS/FAIL + evidence |
 | **Validator** | Role that runs verifiers and produces validation reports |
 | **Executor** | Role that builds/changes things |
 | **Proof Bundle** | Evidence artifacts backing a skill claim |
