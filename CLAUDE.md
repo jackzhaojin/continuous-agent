@@ -1,0 +1,316 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+This is a **continuously-running autonomous agent** that finds and executes work proactively without waiting for human prompts. The agent operates in an 8-phase executive loop, spawns workers via the Claude Agent SDK, validates work through verifiers, and communicates with humans asynchronously through markdown files.
+
+**Key Philosophy:** The agent is autonomous by default. It acts, builds, and ships without waiting for permission, except when hitting constitutional hard limits. Human interaction happens asynchronously via `workspace/needs-you.md`.
+
+## Build & Run Commands
+
+```bash
+# Build TypeScript to dist/
+npm run build
+
+# Type checking without emitting files
+npm run typecheck
+
+# Run in development (uses tsx, no build needed)
+npm run dev
+
+# Run in production (requires build first)
+npm run build && npm start
+```
+
+**Production deployment:** Use PM2 to run `dist/executive-loop.js` continuously.
+
+## Two-Repository Architecture
+
+**CRITICAL SEPARATION:**
+
+- **`continuous-agent/`** (this repo) - Agent infrastructure ONLY
+  - Executive loop, worker spawner, verifiers, skills, workspace files
+  - NO application code, NO project outputs
+
+- **`agent-outputs/`** (sibling directory) - ALL worker outputs
+  - Isolated project directories: `agent-outputs/projects/{category}/{date}/{task-slug}/`
+  - Real codebases with their own git history
+  - Workers NEVER write to the agent codebase
+
+This separation is enforced by **Constitution Article I, Section 6** (zero tolerance violation).
+
+## Core Architecture
+
+### Executive Loop (8 Phases)
+
+`src/executive-loop.ts` runs continuously in PM2:
+
+1. **Health Check** - GitHub auth, disk space, dependencies
+2. **Check Inputs** - Process human responses from `needs-you.md`
+3. **Select Work** - Priority-based selection from `goals.md` (P1 > P2 > P3)
+4. **Create Task Contract** - Scope, risk level, Definition of Done
+5. **Execute** - Spawn Agent SDK worker with intelligent prompting
+6. **Validate** - Run verifiers, collect PASS/FAIL evidence
+7. **Update State** - Update goals.md, needs-you.md, ledgers
+8. **Sleep** - 30s default, then loop back to 1
+
+### Key Modules
+
+**Work Selection & Execution:**
+- `work-selector.ts` - Parses goals.md, returns highest priority unblocked task
+- `task-contractor.ts` - Creates task contracts with DoD and constraints
+- `worker-spawner.ts` - Spawns Claude Agent SDK sessions with prompts
+- `input-processor.ts` - Parses human responses from needs-you.md
+
+**Intelligence Layer:**
+- `intelligence/intent-classifier.ts` - Classifies tasks as outcome_only vs what_and_how
+- `intelligence/strategy-selector.ts` - Chooses different strategies per retry
+- `intelligence/prompt-builder.ts` - Builds context-rich prompts with retry history
+
+**Verification & Learning:**
+- `verifiers/` - Deterministic checks (git-clean, node-build, docs-complete, etc.)
+- `learning/skill-updater.ts` - Updates skill confidence: +10 on PASS, -15 on FAIL
+
+**State Management:**
+- `health-checker.ts` - Validates auth, tools, disk space
+- `types.ts` - Shared TypeScript interfaces
+
+### Workspace Files (Markdown + JSONL)
+
+**Human-editable markdown:**
+- `workspace/constitution.md` - **IMMUTABLE** hard limits (human-only modification)
+- `workspace/goals.md` - P1/P2/P3 prioritized work items with status
+- `workspace/needs-you.md` - Human-agent interaction interface
+- `workspace/queue.md`, `progress.md`, `completed.md` - State tracking
+
+**Append-only ledgers (JSONL):**
+- `ledgers/work-ledger.jsonl` - Task events (STARTED, COMPLETED, BLOCKED)
+- `ledgers/capability-ledger.jsonl` - Skill attempts and results
+- `ledgers/inputs-log.jsonl` - Human input audit trail
+- `ledgers/executive-{date}.log` - Daily execution logs
+
+**Skill registries (YAML):**
+- `skills/technical-skills.yml` - Tool operation skills (git, npm, ssh, docker)
+- `skills/delivery-skills.yml` - End-to-end outcomes (nextjs app, EDS site)
+- `skills/functional-skills.yml` - Cross-cutting skills (debugging, research)
+- `skills/sdk-registry.yml` - Agent SDK capability mappings
+
+## Constitution (Hard Limits)
+
+**Location:** `workspace/constitution.md`
+
+The agent CANNOT modify this file. It defines 8 absolute boundaries:
+
+1. **No spending beyond $20/month per service** (ask when uncertain)
+2. **No permanent deletions** (archive/soft-delete only)
+3. **No external publishing** (npm publish, blog posts require approval)
+4. **No credential exposure** (never log, commit, or transmit credentials)
+5. **No access control expansion** (no making private things public)
+6. **No output in agent codebase** (all output → agent-outputs/)
+7. **All activity must be logged** (no silent execution)
+8. **10 retries minimum before BLOCKED** (needs-you.md entry required)
+
+If you encounter a constitutional limit, stop and document the blocker in `needs-you.md`.
+
+## Human Interaction via needs-you.md
+
+When the agent blocks after 10 retries, it writes to `workspace/needs-you.md`:
+
+```markdown
+| Action | Why Agent Can't Do It | Response | Blocking | Since |
+|--------|----------------------|----------|----------|-------|
+| Get API token | 401 Unauthorized... | | BLOCKING | 2026-01-25 |
+```
+
+**Human responds by adding to the Response column:**
+
+```markdown
+| Action | Why Agent Can't Do It | Response | Blocking | Since |
+|--------|----------------------|----------|----------|-------|
+| Get API token | 401 Unauthorized... | [APPROVED] Token: sk_xyz | BLOCKING | 2026-01-25 |
+```
+
+**Response tags:**
+- `[APPROVED]` - Grant permission with optional details
+- `[DECISION]` - Provide a choice/direction
+- `[INFO]` - Supply requested information
+- `[SKIP]` - Cancel this task entirely
+
+The agent automatically detects responses in Phase 2, unblocks tasks in `goals.md`, resets retry counters, and logs interactions to `work-ledger.jsonl`.
+
+## Retry & Strategy System
+
+**Retry Tracker** (in-memory Map):
+- Tracks attempts per task (max 10 per Constitution)
+- After each failure, `strategy-selector.ts` picks a DIFFERENT approach
+- Retry context passed to worker includes: attempts, strategies tried, last error
+
+**Strategy Selection:**
+- Simplify scope → Research first → Break into subtasks → Different tools
+- Each retry MUST try something different (same approach twice = wasted retry)
+
+**Blocking Logic:**
+```typescript
+if (retry.attempts >= 10) {
+  // Mark as Blocked in goals.md
+  // Write to needs-you.md with error context
+  // Clear retry tracker
+  // Continue other work (don't wait for human)
+}
+```
+
+## Verifier System
+
+**Philosophy:** Deterministically triggered, agentically evaluated.
+
+Verifiers run after each task and return structured evidence:
+
+```typescript
+{
+  verifier_id: 'git-clean',
+  result: 'PASS' | 'FAIL',
+  message: 'No uncommitted changes',
+  evidence: { /* structured data */ }
+}
+```
+
+**Core verifiers:**
+- `git-clean` - No uncommitted changes
+- `node-build` - TypeScript compiles, tests pass
+- `docs-checklist` - README/CLAUDE.md present
+- `reference-integrity` - Reference registry valid
+
+Verifier results update skill confidence scores: +10 on PASS, -15 on FAIL.
+
+## Environment Variables
+
+Create `.env` from `.env.example`:
+
+```bash
+# Required: ONE of these for Claude Agent SDK
+CLAUDE_CODE_OAUTH_TOKEN=    # Option 1: OAuth (Claude Pro/Max)
+ANTHROPIC_API_KEY=          # Option 2: API key
+
+# Optional configuration
+MODEL=claude-sonnet-4-5-20250929
+MAX_TURNS=20                # Max turns per worker session
+LOOP_SLEEP_SECONDS=30       # Sleep between iterations
+```
+
+## Code Modification Guidelines
+
+**When modifying the agent codebase:**
+
+1. **Executive loop changes:** Test with `npm run dev` before deploying to PM2
+2. **Verifiers:** Must return `VerifierResult` interface with PASS/FAIL + evidence
+3. **Intelligence layer:** Changes to prompts/strategies affect all future tasks
+4. **Workspace files:** Never auto-modify `constitution.md` (human-only)
+5. **Ledgers:** Append-only JSONL, never truncate or modify existing entries
+
+**TypeScript notes:**
+- ES modules (`type: "module"` in package.json)
+- Target ES2022, strict mode enabled
+- Import paths need `.js` extension (e.g., `'./types.js'` even for `.ts` files)
+
+## Skills & Claude Agent SDK
+
+**Skill Documentation:** `.claude/skills/{skill-name}/SKILL.md`
+
+Each skill must have:
+```yaml
+---
+name: Skill Name
+description: |
+  When to use this skill...
+---
+```
+
+**Agent SDK Integration:**
+- Worker spawning: `worker-spawner.ts` calls `@anthropic-ai/claude-agent-sdk`
+- Workers get isolated project directories in `agent-outputs/`
+- Prompts built via `prompt-builder.ts` include Constitution, retry context, strategies
+
+## File Structure Reference
+
+```
+continuous-agent/
+├── src/                        # TypeScript source (compiles to dist/)
+│   ├── executive-loop.ts       # Main 8-phase loop
+│   ├── work-selector.ts        # Parses goals.md
+│   ├── task-contractor.ts      # Creates task contracts
+│   ├── worker-spawner.ts       # Agent SDK integration
+│   ├── input-processor.ts      # Parses needs-you.md responses
+│   ├── health-checker.ts       # System health validation
+│   ├── intelligence/           # Intent classification, strategy selection
+│   ├── verifiers/              # Deterministic validation
+│   ├── learning/               # Skill confidence updates
+│   └── types.ts                # Shared interfaces
+│
+├── workspace/                  # Human-editable state
+│   ├── constitution.md         # **IMMUTABLE** hard limits
+│   ├── goals.md                # P1/P2/P3 work items
+│   ├── needs-you.md            # Human interaction interface
+│   └── {queue,progress,completed}.md
+│
+├── ledgers/                    # Append-only logs
+│   ├── work-ledger.jsonl       # Task events
+│   ├── capability-ledger.jsonl # Skill results
+│   └── executive-{date}.log    # Daily execution logs
+│
+├── skills/                     # YAML skill registries
+│   ├── technical-skills.yml    # Tool skills
+│   ├── delivery-skills.yml     # End-to-end outcomes
+│   └── functional-skills.yml   # Cross-cutting skills
+│
+├── .claude/skills/             # Skill documentation (SKILL.md)
+├── verifiers/definitions/      # Verifier YAML configs
+├── strategies/prompts/         # Prompt templates
+└── ai-docs/                    # PRDs, specs, feature docs
+```
+
+## Important Distinctions
+
+**Agent vs Worker:**
+- **Agent** = This codebase (executive loop, orchestration)
+- **Worker** = Spawned Agent SDK session for a specific task
+
+**Skill Types:**
+- **Technical** = Tool operation (git.commit, npm.install)
+- **Delivery** = End-to-end outcomes (deliver.nextjs.app)
+- **Functional** = Cross-cutting abilities (reason.debugging)
+
+**Status Values in goals.md:**
+- `Pending` - Not started, eligible for selection
+- `In Progress` - Currently being worked on (or retrying)
+- `Blocked` - Failed 10x, needs human input (entry in needs-you.md)
+- `Complete` - Verified via verifiers
+
+## Debugging
+
+**Check agent health:**
+```bash
+# View recent logs
+tail -f ledgers/executive-$(date +%Y-%m-%d).log
+
+# Check current state
+cat workspace/goals.md
+cat workspace/needs-you.md
+
+# View event history
+tail -20 ledgers/work-ledger.jsonl
+```
+
+**Common issues:**
+- Worker fails immediately → Check auth tokens in `.env`
+- Task marked Blocked → Check `needs-you.md` for details, add human response
+- Build fails → Run `npm run typecheck` for detailed errors
+- Retry loops → Check `strategy-selector.ts` is picking different strategies
+
+## Documentation Locations
+
+- **PRD:** `ai-docs/v1/init/continuous-executive-agent-v1-prd.md`
+- **Constitution:** `workspace/constitution.md`
+- **Features:** `ai-docs/features/` (human-interaction, etc.)
+- **Skills:** `.claude/skills/{skill-name}/SKILL.md`

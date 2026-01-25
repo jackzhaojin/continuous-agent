@@ -10,6 +10,7 @@ import { selectStrategy } from './intelligence/strategy-selector.js';
 import { classifyIntent } from './intelligence/intent-classifier.js';
 import { runAllVerifiers, summarizeResults, type VerifierResult } from './verifiers/index.js';
 import { updateSkillsFromVerifierResults, DEFAULT_SKILL_MAPPINGS } from './learning/skill-updater.js';
+import { processHumanInputs } from './input-processor.js';
 import type { HealthStatus, WorkerResult, LoopState } from './types.js';
 import type { WorkItem } from './work-selector.js';
 
@@ -622,15 +623,15 @@ async function writeToNeedsYou(item: WorkItem, retry: RetryState): Promise<void>
     let content = await readFile(needsYouPath, 'utf-8');
 
     const today = new Date().toISOString().split('T')[0];
-    const newEntry = `| ${item.title} | Failed after ${retry.attempts} attempts. Last error: ${retry.lastError.slice(0, 100)}... | BLOCKING | ${today} |`;
+    const newEntry = `| ${item.title} | Failed after ${retry.attempts} attempts. Last error: ${retry.lastError.slice(0, 100)}... | | BLOCKING | ${today} |`;
 
-    // Insert after the "Actions Needed" table header
-    const actionsTable = /(\| Action \| Why Agent Can't Do It \| Blocking \| Since \|\n\|[-|]+\|)/;
+    // Insert after the "Actions Needed" table header (now includes Response column)
+    const actionsTable = /(\| Action \| Why Agent Can't Do It \| Response \| Blocking \| Since \|\n\|[-|]+\|)/;
     if (actionsTable.test(content)) {
       content = content.replace(actionsTable, `$1\n${newEntry}`);
 
-      // Remove the *None* placeholder if present
-      content = content.replace(/\| \*None\* \| \| \| \|/, '');
+      // Remove the *None* placeholder if present (now 5 columns)
+      content = content.replace(/\| \*None\* \| \| \| \| \|/, '');
 
       await writeFile(needsYouPath, content, 'utf-8');
       log(`  📝 Added to needs-you.md: "${item.title}"`);
@@ -667,6 +668,19 @@ async function runIteration(): Promise<void> {
   }
 
   // Step 2: Check inputs and select work
+  log('Checking for human inputs...');
+  const inputsProcessed = await processHumanInputs();
+  if (inputsProcessed.responsesFound > 0) {
+    log(`  Processed ${inputsProcessed.responsesFound} human response(s)`);
+    log(`  Unblocked tasks: ${inputsProcessed.tasksUnblocked.join(', ') || 'none'}`);
+
+    // Reset retry tracker for unblocked tasks (give them fresh attempts)
+    for (const taskTitle of inputsProcessed.tasksUnblocked) {
+      retryTracker.delete(taskTitle);
+      log(`  Reset retry counter for: "${taskTitle}"`);
+    }
+  }
+
   log('Selecting work...');
   const workItem = await selectWork();
 

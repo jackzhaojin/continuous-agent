@@ -18,9 +18,15 @@ This document tracks items requiring human attention, decisions, or actions.
 
 *Tasks that require human execution (authentication, approvals, etc.).*
 
-| Action | Why Agent Can't Do It | Blocking | Since |
-|--------|----------------------|----------|-------|
-| *None* | | | |
+**How to respond:** Add your response in the "Response" column using these formats:
+- `[APPROVED] optional details` - Approve with optional context
+- `[DECISION] your choice` - Provide a decision
+- `[INFO] the information` - Provide requested information
+- `[SKIP]` - Skip this task entirely
+
+| Action | Why Agent Can't Do It | Response | Blocking | Since |
+|--------|----------------------|----------|----------|-------|
+| *None* | | | | |
 
 ---
 
