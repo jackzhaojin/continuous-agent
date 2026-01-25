@@ -8,6 +8,7 @@
 
 import { query, type SDKMessage, type SDKResultMessage } from '@anthropic-ai/claude-agent-sdk';
 import { mkdirSync, existsSync, copyFileSync, createWriteStream } from 'fs';
+import { execSync } from 'child_process';
 import os from 'os';
 import path from 'path';
 import type { TaskContract, WorkerResult, WorkItem } from './types.js';
@@ -114,6 +115,32 @@ function setupProjectDirectory(projectPath: string, category: string): void {
   if (existsSync(envSource) && !existsSync(envDest)) {
     copyFileSync(envSource, envDest);
     console.log(`[Worker] Copied .env with API keys to project`);
+  }
+
+  // CRITICAL: Ensure git is clean before starting new work
+  // This prevents verifier failures due to uncommitted changes from previous work
+  try {
+    const gitRoot = execSync('git rev-parse --show-toplevel', {
+      cwd: projectPath,
+      encoding: 'utf-8'
+    }).trim();
+
+    const gitStatus = execSync('git status --porcelain', {
+      cwd: gitRoot,
+      encoding: 'utf-8'
+    }).trim();
+
+    if (gitStatus) {
+      console.log(`[Worker] Auto-committing existing work in ${gitRoot} before starting new task...`);
+      execSync('git add -A', { cwd: gitRoot, stdio: 'inherit' });
+      execSync(`git commit -m "Auto-commit: Clean workspace before new task\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"`, {
+        cwd: gitRoot,
+        stdio: 'inherit'
+      });
+      console.log(`[Worker] Git workspace is now clean`);
+    }
+  } catch (error) {
+    console.log(`[Worker] Warning: Could not auto-commit git changes: ${error}`);
   }
 }
 

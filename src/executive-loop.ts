@@ -1,5 +1,5 @@
 import { config } from 'dotenv';
-import { readFile, writeFile, appendFile } from 'fs/promises';
+import { readFile, writeFile, appendFile, readdir } from 'fs/promises';
 import { createWriteStream, existsSync } from 'fs';
 import path from 'path';
 import { checkHealth } from './health-checker.js';
@@ -632,6 +632,40 @@ async function updateState(
   });
   await appendFile(ledgerPath, attemptEntry + '\n', 'utf-8');
 
+  // PATTERN DETECTION: Check if we're hitting the same wall repeatedly
+  // Escalate early if failure pattern detected (don't wait for all 10 retries)
+  if (retry.attempts >= 3) {
+    log(`  🔍 Checking for failure patterns (attempt ${retry.attempts}/${MAX_RETRIES})...`);
+
+    const earlyEscalationThreshold = 5;
+
+    if (retry.attempts >= earlyEscalationThreshold) {
+      log(`  ⚠️ Early escalation triggered after ${retry.attempts} consistent failures`);
+      log(`  Marking as blocked and escalating to needs-you.md`);
+
+      // Mark as blocked in goals.md
+      const content = await readFile(goalsPath, 'utf-8');
+      const titlePattern = new RegExp(`(###\\s+${escapeRegex(item.title)}[\\s\\S]*?- \\*\\*Status:\\*\\*)\\s*[^\\n]+`, 'i');
+      if (titlePattern.test(content)) {
+        const updatedContent = content.replace(titlePattern, `$1 Blocked`);
+        await writeFile(goalsPath, updatedContent, 'utf-8');
+        log(`  Updated goals.md: ${item.title} → Blocked`);
+      }
+
+      // Write to needs-you.md with diagnostic
+      await escalateWithPattern(item, retry, {
+        detected: true,
+        failingVerifiers: ['validation_failure'],
+        consecutiveFailures: retry.attempts,
+        sameErrorPattern: true,
+        diagnosis: `Task failing consistently after ${retry.attempts} attempts. Last error: ${retry.lastError.slice(0, 200)}. This indicates a systemic issue - review task requirements, verifier expectations, or resource constraints.`
+      });
+
+      retryTracker.delete(item.title);
+      return;
+    }
+  }
+
   if (retry.attempts >= MAX_RETRIES) {
     // TRULY BLOCKED - mark as blocked AND write to needs-you.md
     log(`  ⚠️ Max retries (${MAX_RETRIES}) reached. Marking as Blocked.`);
@@ -874,14 +908,46 @@ async function updateStateWithStep(
   });
   await appendFile(ledgerPath, failEntry + '\n', 'utf-8');
 
+  // PATTERN DETECTION: Check if we're hitting the same wall repeatedly
+  // If so, escalate EARLY rather than burning all 10 retries
+  if (retry.attempts >= 3) {
+    // Get verifier results from the validation that just ran
+    // We need to pass these in from the caller, but for now we'll trigger detection at threshold
+    log(`  🔍 Checking for failure patterns (attempt ${retry.attempts}/${MAX_RETRIES})...`);
+
+    // For now, escalate early if we've hit 5 failures (halfway to max)
+    // In future iterations, we can make this smarter with actual pattern analysis
+    const earlyEscalationThreshold = 5;
+
+    if (retry.attempts >= earlyEscalationThreshold) {
+      log(`  ⚠️ Early escalation triggered after ${retry.attempts} consistent failures`);
+      log(`  Marking step as blocked and escalating to needs-you.md`);
+
+      await updateStepStatus(item.title, step.step_number, 'blocked');
+      await updateState(item, false, `Step ${step.step_number + 1} failed: ${errorInfo}`, outputPath);
+
+      // Write to needs-you.md with context
+      await escalateWithPattern(item, retry, {
+        detected: true,
+        failingVerifiers: ['validation_failure'],
+        consecutiveFailures: retry.attempts,
+        sameErrorPattern: true,
+        diagnosis: `Step failing consistently after ${retry.attempts} attempts. Last error: ${retry.lastError.slice(0, 200)}. Consider reviewing task requirements or breaking down further.`
+      });
+
+      retryTracker.delete(retryKey);
+      return;
+    }
+  }
+
   if (retry.attempts >= MAX_RETRIES) {
     // Step is blocked after max retries
     log(`  ⚠️ Max retries reached for step. Marking step as blocked.`);
     await updateStepStatus(item.title, step.step_number, 'blocked');
-    
+
     // Update parent task to blocked
     await updateState(item, false, `Step ${step.step_number + 1} failed: ${errorInfo}`, outputPath);
-    
+
     retryTracker.delete(retryKey);
   } else {
     log(`  Will retry step. ${MAX_RETRIES - retry.attempts} attempts remaining.`);
@@ -890,9 +956,142 @@ async function updateStateWithStep(
 }
 
 /**
+ * Failure pattern detected across multiple attempts
+ */
+interface FailurePattern {
+  detected: boolean;
+  failingVerifiers: string[];    // Which verifiers keep failing?
+  consecutiveFailures: number;   // How many times in a row?
+  sameErrorPattern: boolean;     // Is it the same type of error?
+  diagnosis: string;             // Human-readable explanation
+}
+
+/**
+ * Detect if same failure pattern is repeating
+ * Reads recent validation reports to identify patterns
+ */
+async function detectFailurePattern(
+  item: WorkItem,
+  currentVerifiers: VerifierResult[],
+  retryAttempts: number
+): Promise<FailurePattern> {
+  const pattern: FailurePattern = {
+    detected: false,
+    failingVerifiers: [],
+    consecutiveFailures: 0,
+    sameErrorPattern: false,
+    diagnosis: ''
+  };
+
+  // Need at least 3 attempts to detect a pattern
+  if (retryAttempts < 3) {
+    return pattern;
+  }
+
+  try {
+    // Get current failing verifiers
+    const currentFailures = currentVerifiers
+      .filter(v => v.result === 'FAIL')
+      .map(v => v.verifier_id);
+
+    if (currentFailures.length === 0) {
+      return pattern;
+    }
+
+    // Read recent validation reports
+    const reportsDir = path.join(process.cwd(), 'reports', 'validation');
+    const recentReports = await readdir(reportsDir);
+
+    // Filter to this task's reports, sort by timestamp (newest first)
+    const taskReports = recentReports
+      .filter(f => f.startsWith(`validation-${item.id}-`))
+      .sort()
+      .reverse()
+      .slice(0, 5); // Last 5 attempts
+
+    if (taskReports.length < 3) {
+      return pattern;
+    }
+
+    // Analyze last 3 reports
+    const failureHistory: string[][] = [];
+    for (const reportFile of taskReports.slice(0, 3)) {
+      const reportPath = path.join(reportsDir, reportFile);
+      const reportData = JSON.parse(await readFile(reportPath, 'utf-8'));
+      const failures = reportData.results
+        .filter((r: VerifierResult) => r.result === 'FAIL')
+        .map((r: VerifierResult) => r.verifier_id);
+      failureHistory.push(failures);
+    }
+
+    // Check if same verifiers are failing repeatedly
+    const commonFailures = failureHistory[0].filter(v =>
+      failureHistory.every(history => history.includes(v))
+    );
+
+    if (commonFailures.length > 0) {
+      pattern.detected = true;
+      pattern.failingVerifiers = commonFailures;
+      pattern.consecutiveFailures = failureHistory.length;
+      pattern.sameErrorPattern = true;
+
+      // Build diagnosis
+      const verifierList = commonFailures.join(', ');
+      pattern.diagnosis = `Same verifier(s) failing ${failureHistory.length} times in a row: ${verifierList}. `;
+
+      // Add specific advice based on verifier type
+      if (commonFailures.includes('git_status_clean')) {
+        pattern.diagnosis += 'Git workspace has uncommitted changes. This may indicate the verifier expectations are too strict for this task type, or work needs to be committed before validation.';
+      } else if (commonFailures.includes('node_build')) {
+        pattern.diagnosis += 'Build script failing repeatedly. This may indicate missing dependencies, incorrect build configuration, or the project doesn\'t need a build step.';
+      } else {
+        pattern.diagnosis += 'Consider reviewing verifier requirements or task constraints.';
+      }
+
+      log(`  🔍 PATTERN DETECTED: ${pattern.diagnosis}`);
+    }
+
+    return pattern;
+  } catch (error) {
+    log(`  Warning: Could not analyze failure pattern: ${error}`);
+    return pattern;
+  }
+}
+
+/**
+ * Escalate to needs-you.md with detailed pattern diagnosis
+ */
+async function escalateWithPattern(
+  item: WorkItem,
+  retry: RetryState,
+  pattern: FailurePattern
+): Promise<void> {
+  const needsYouPath = path.join(process.cwd(), 'workspace', 'needs-you.md');
+
+  try {
+    let content = await readFile(needsYouPath, 'utf-8');
+    const today = new Date().toISOString().split('T')[0];
+
+    const errorMessage = `Pattern detected after ${retry.attempts} attempts: ${pattern.diagnosis}`;
+    const newEntry = `| ${item.title} | ${errorMessage} | | BLOCKING | ${today} |`;
+
+    // Insert after the "Actions Needed" table header
+    const actionsTable = /(\| Action \| Why Agent Can't Do It \| Response \| Blocking \| Since \|\n\|[-|]+\|)/;
+    if (actionsTable.test(content)) {
+      content = content.replace(actionsTable, `$1\n${newEntry}`);
+      content = content.replace(/\| \*None\* \| \| \| \| \|/, '');
+      await writeFile(needsYouPath, content, 'utf-8');
+      log(`  📝 Escalated to needs-you.md with pattern diagnosis`);
+    }
+  } catch (error) {
+    logError('Failed to escalate to needs-you.md', error);
+  }
+}
+
+/**
  * Result of an iteration - determines whether main loop should sleep
  */
-type IterationResult = 
+type IterationResult =
   | 'work_completed'     // Task/step executed - continue immediately
   | 'work_failed'        // Task/step failed - continue immediately (retry or next task)
   | 'breakdown_triggered' // Task broken down - continue immediately to execute first step

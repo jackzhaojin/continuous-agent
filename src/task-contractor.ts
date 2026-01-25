@@ -136,7 +136,10 @@ export function createTaskContract(
   reposAllowed: string[] = ['.'],
   step?: WorkStep
 ): TaskContract {
-  const taskId = `task-${randomUUID().slice(0, 8)}`;
+  // ISO 8601 timestamp for chronological sorting: YYYY-MM-DD-HH-MM-SS
+  const now = new Date();
+  const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  const taskId = `task-${timestamp}-${randomUUID().slice(0, 4)}`;
 
   return {
     id: taskId,

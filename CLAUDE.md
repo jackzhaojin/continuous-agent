@@ -24,7 +24,25 @@ npm run dev
 npm run build && npm start
 ```
 
-**Production deployment:** Use PM2 to run `dist/executive-loop.js` continuously.
+**Production deployment:** Use PM2 to run continuously:
+
+```bash
+# Start with PM2
+pm2 start ecosystem.config.cjs
+
+# Monitor and manage
+pm2 list                   # View processes
+pm2 logs executive-loop    # Stream logs
+pm2 monit                  # Interactive monitoring
+pm2 restart executive-loop # Restart agent
+pm2 stop executive-loop    # Stop agent
+```
+
+**IMPORTANT:** When making code changes, **rebuild but don't restart PM2** unless explicitly needed. The agent should not be interrupted mid-task:
+
+```bash
+npm run build  # Rebuild only - changes take effect on next natural restart
+```
 
 ## Two-Repository Architecture
 
@@ -38,6 +56,7 @@ npm run build && npm start
   - Isolated project directories: `agent-outputs/projects/{category}/{date}/{task-slug}/`
   - Real codebases with their own git history
   - Workers NEVER write to the agent codebase
+  - **API keys are copied:** Each worker gets a copy of `.env` from agent repo
 
 This separation is enforced by **Constitution Article I, Section 6** (zero tolerance violation).
 
@@ -49,19 +68,45 @@ This separation is enforced by **Constitution Article I, Section 6** (zero toler
 
 1. **Health Check** - GitHub auth, disk space, dependencies
 2. **Check Inputs** - Process human responses from `needs-you.md`
-3. **Select Work** - Priority-based selection from `goals.md` (P1 > P2 > P3)
+3. **Select Work** - Priority-based selection from `goals.md` (P1 > P2 > P3), with step awareness
 4. **Create Task Contract** - Scope, risk level, Definition of Done
 5. **Execute** - Spawn Agent SDK worker with intelligent prompting
-6. **Validate** - Run verifiers, collect PASS/FAIL evidence
+6. **Validate** - Run verifiers on worker's output directory (NOT agent infrastructure)
 7. **Update State** - Update goals.md, needs-you.md, ledgers
 8. **Continue or Sleep** - Immediately continue if work exists, sleep only when idle
+
+### Incremental Execution (Multi-Step Tasks)
+
+Complex tasks (>100 estimated turns) are automatically broken down into steps:
+
+- **Automatic Breakdown:** `task-breakdown.ts` generates 2-4 steps when `estimateComplexity()` exceeds threshold
+- **Step Execution:** Each step is executed independently with max 100 turns per step
+- **Progress Tracking:** Steps tracked in `goals.md` with status (pending/in-progress/complete/blocked)
+- **Shared Output:** All steps for a task write to the SAME project directory
+- **Configuration:**
+  - `BREAKDOWN_THRESHOLD_TURNS=100` - Trigger breakdown if estimated > 100 turns
+  - `MAX_TURNS_PER_STEP=100` - Max turns per step (MINIMUM 100)
+  - `AUTO_BREAKDOWN_ENABLED=true` - Enable/disable auto-breakdown
+
+**Step statuses in goals.md:**
+```markdown
+### Task Title
+- **Status:** In Progress (Step 2 of 4, 50% complete)
+#### Step 1: Research and planning
+- **Status:** complete
+#### Step 2: Implementation
+- **Status:** in-progress
+#### Step 3: Testing
+- **Status:** pending
+```
 
 ### Key Modules
 
 **Work Selection & Execution:**
 - `work-selector.ts` - Parses goals.md, returns highest priority unblocked task
+- `task-breakdown.ts` - Automatic breakdown of complex tasks into steps
 - `task-contractor.ts` - Creates task contracts with DoD and constraints
-- `worker-spawner.ts` - Spawns Claude Agent SDK sessions with prompts
+- `worker-spawner.ts` - Spawns Claude Agent SDK sessions with prompts, copies `.env` to worker directory
 - `input-processor.ts` - Parses human responses from needs-you.md
 
 **Intelligence Layer:**
@@ -81,12 +126,12 @@ This separation is enforced by **Constitution Article I, Section 6** (zero toler
 
 **Human-editable markdown:**
 - `workspace/constitution.md` - **IMMUTABLE** hard limits (human-only modification)
-- `workspace/goals.md` - P1/P2/P3 prioritized work items with status
+- `workspace/goals.md` - P1/P2/P3 prioritized work items with status and steps
 - `workspace/needs-you.md` - Human-agent interaction interface
 - `workspace/queue.md`, `progress.md`, `completed.md` - State tracking
 
 **Append-only ledgers (JSONL):**
-- `ledgers/work-ledger.jsonl` - Task events (STARTED, COMPLETED, BLOCKED)
+- `ledgers/work-ledger.jsonl` - Task events (STARTED, COMPLETED, BLOCKED, STEP_STARTED, STEP_COMPLETED)
   - Each entry includes `contract_id` linking to worker log
 - `ledgers/capability-ledger.jsonl` - Capability attempts and results
   - Each entry includes `contract_id` linking to worker log
@@ -181,6 +226,8 @@ if (retry.attempts >= 10) {
 
 **Philosophy:** Deterministically triggered, agentically evaluated.
 
+**CRITICAL:** Verifiers run in the **worker's output directory** (`result.output_path`), NOT the agent infrastructure directory. This was a bug that was fixed - verifiers must check the actual work output in `agent-outputs/`.
+
 Verifiers run after each task and return structured evidence:
 
 ```typescript
@@ -193,10 +240,10 @@ Verifiers run after each task and return structured evidence:
 ```
 
 **Core verifiers:**
-- `git-clean` - No uncommitted changes
-- `node-build` - TypeScript compiles, tests pass
-- `docs-checklist` - README/CLAUDE.md present
-- `reference-integrity` - Reference registry valid
+- `git_status_clean` - No uncommitted changes in worker's project
+- `node_build` - TypeScript compiles, tests pass in worker's project
+- `docs_checklist` - README/CLAUDE.md present
+- `reference_integrity` - Reference registry valid
 
 Verifier results update capability confidence scores: +10 on PASS, -15 on FAIL.
 
@@ -211,14 +258,24 @@ ANTHROPIC_API_KEY=          # Option 2: API key
 
 # Optional configuration
 MODEL=claude-sonnet-4-5-20250929
-MAX_TURNS=250               # Max turns per worker session (250 for complex coding tasks)
+MAX_TURNS=250               # Max turns per worker session for single-step tasks
+MAX_TURNS_PER_STEP=100      # Max turns per step for multi-step tasks (MINIMUM 100)
 
 # Loop timing (continuous execution by default)
 # Agent continues immediately after completing work - no sleep between tasks
 # Sleep only occurs when idle (queue empty) or unhealthy
 IDLE_SLEEP_SECONDS=30       # Sleep when no work available (polling interval)
 UNHEALTHY_SLEEP_SECONDS=60  # Sleep when system unhealthy before retrying
+
+# Incremental execution
+BREAKDOWN_THRESHOLD_TURNS=100  # Trigger breakdown if estimated > 100 turns
+AUTO_BREAKDOWN_ENABLED=true    # Enable automatic task breakdown
+
+# Third-party API keys (copied to each worker's .env)
+NOTION_API_KEY=                # Notion integration key
 ```
+
+**API Key Management:** The `.env` file is automatically copied to each worker's project directory by `worker-spawner.ts`. This allows workers to access third-party APIs without exposing credentials in git.
 
 ## Code Modification Guidelines
 
@@ -226,15 +283,17 @@ UNHEALTHY_SLEEP_SECONDS=60  # Sleep when system unhealthy before retrying
 
 1. **Executive loop changes:** Test with `npm run dev` before deploying to PM2
 2. **Verifiers:** Must return `VerifierResult` interface with PASS/FAIL + evidence
+   - **CRITICAL:** Verifiers must check `result.output_path` (worker's directory), NOT `process.cwd()` (agent infrastructure)
 3. **Intelligence layer:** Changes to prompts/strategies affect all future tasks
 4. **Workspace files:** Never auto-modify `constitution.md` (human-only)
 5. **Ledgers:** Append-only JSONL, never truncate or modify existing entries
-6. **Ad-hoc testing:** Create test files in `tests/adhoc/yyyy-mm-dd-purpose/` directory structure
+6. **PM2 restarts:** After rebuilding, only restart PM2 if explicitly needed - avoid interrupting running tasks
 
 **TypeScript notes:**
 - ES modules (`type: "module"` in package.json)
 - Target ES2022, strict mode enabled
 - Import paths need `.js` extension (e.g., `'./types.js'` even for `.ts` files)
+- Run `npm install` to ensure `@types/node` is installed (required for TypeScript)
 
 ## Capabilities & Claude Agent SDK
 
@@ -269,13 +328,11 @@ Complex features should follow a **WHY → WHAT → HOW → WHEN** progression. 
    - **HOW (detailed)**: Step-by-step implementation instructions
    - **WHEN**: Dependencies, duration estimates, phases
    - Output: `ai-docs/tasks/task-{phase}-{number}-{feature-name}.md`
-   - Status: Incomplete skill (needs finalization)
 
 4. **Project Analysis** (`.claude/skills/project-analysis/`) - Analyzes existing codebases
    - Documents tech stack, patterns, architecture
    - Used before designing new features to understand existing patterns
    - Output: `ai-docs/project-analysis.md`
-   - Status: Incomplete skill (needs finalization)
 
 **Workflow for Complex Features:**
 ```
@@ -300,6 +357,7 @@ Implementation (workers execute tasks)
 - Worker spawning: `worker-spawner.ts` calls `@anthropic-ai/claude-agent-sdk`
 - Workers get isolated project directories in `agent-outputs/`
 - Prompts built via `prompt-builder.ts` include Constitution, retry context, strategies
+- Each worker includes 'Skill' tool for accessing Claude Code skills
 
 ## File Structure Reference
 
@@ -307,33 +365,34 @@ Implementation (workers execute tasks)
 continuous-agent/
 ├── src/                        # TypeScript source (compiles to dist/)
 │   ├── executive-loop.ts       # Main 8-phase loop
-│   ├── work-selector.ts        # Parses goals.md
+│   ├── work-selector.ts        # Parses goals.md with step awareness
+│   ├── task-breakdown.ts       # Automatic breakdown of complex tasks
 │   ├── task-contractor.ts      # Creates task contracts
-│   ├── worker-spawner.ts       # Agent SDK integration
+│   ├── worker-spawner.ts       # Agent SDK integration, .env copying
 │   ├── input-processor.ts      # Parses needs-you.md responses
 │   ├── health-checker.ts       # System health validation
 │   ├── intelligence/           # Intent classification, strategy selection
 │   ├── verifiers/              # Deterministic validation
 │   ├── learning/               # Capability confidence updates
 │   └── types.ts                # Shared interfaces
-│
+
 ├── workspace/                  # Human-editable state
 │   ├── constitution.md         # **IMMUTABLE** hard limits
-│   ├── goals.md                # P1/P2/P3 work items
+│   ├── goals.md                # P1/P2/P3 work items with steps
 │   ├── needs-you.md            # Human interaction interface
 │   └── {queue,progress,completed}.md
-│
-├── ledgers/                    # Append-only logs
+
+├── ledgers/                    # Append-only logs (version controlled)
 │   ├── work-ledger.jsonl       # Task events
 │   ├── capability-ledger.jsonl # Capability results
 │   └── executive-{date}.log    # Daily execution logs
-│
+
 ├── capabilities/               # YAML capability registries
 │   ├── technical-capabilities.yml    # Tool capabilities
 │   ├── delivery-capabilities.yml     # End-to-end outcomes
 │   └── functional-capabilities.yml   # Cross-cutting capabilities
-│
-├── .claude/skills/             # Claude Code skill documentation (SKILL.md)
+
+├── .claude/skills/             # Claude Code skill documentation
 ├── verifiers/definitions/      # Verifier YAML configs
 ├── strategies/prompts/         # Prompt templates
 └── ai-docs/                    # PRDs, specs, feature docs
@@ -356,12 +415,21 @@ continuous-agent/
 - `Blocked` - Failed 10x, needs human input (entry in needs-you.md)
 - `Complete` - Verified via verifiers
 
+**Step Status Values:**
+- `pending` - Not started
+- `in-progress` - Currently executing
+- `complete` - Successfully completed
+- `blocked` - Failed after retries
+
 ## Debugging
 
 **Check agent health:**
 ```bash
 # View recent logs
 tail -f ledgers/executive-$(date +%Y-%m-%d).log
+
+# Check PM2 logs
+pm2 logs executive-loop
 
 # Check current state
 cat workspace/goals.md
@@ -376,6 +444,8 @@ tail -20 ledgers/work-ledger.jsonl
 - Task marked Blocked → Check `needs-you.md` for details, add human response
 - Build fails → Run `npm run typecheck` for detailed errors
 - Retry loops → Check `strategy-selector.ts` is picking different strategies
+- Verifiers checking wrong directory → Ensure verifiers use `result.output_path`, not `process.cwd()`
+- TypeScript errors → Run `npm install` to ensure `@types/node` is installed
 
 ## Documentation Locations
 

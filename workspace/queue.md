@@ -6,6 +6,7 @@ This document contains the backlog of tasks to be executed by the agent system.
 
 ## Ready to Start
 
+- *None*
 *Tasks that are unblocked and ready for execution.*
 
 ---
