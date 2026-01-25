@@ -7,13 +7,77 @@
 
 ---
 
+## Quick Reference
+
+### Configuration (User Approved)
+
+```bash
+# Turn budgets
+MAX_TURNS=250                       # Single-step tasks (UNCHANGED)
+MAX_TURNS_PER_STEP=100              # Multi-step tasks (MINIMUM 100)
+
+# Iteration control
+LOOP_SLEEP_SECONDS=600              # 10 minutes between iterations
+
+# Breakdown control
+BREAKDOWN_THRESHOLD_TURNS=100       # Trigger breakdown if est. > 100 turns
+AUTO_BREAKDOWN_ENABLED=true         # Enable automatic task breakdown
+```
+
+### Key Decisions
+
+| Parameter | Value | Rule |
+|-----------|-------|------|
+| **Step Budget** | 100-150 turns | Sufficient for meaningful work |
+| **Single-Task Budget** | 250 turns | Keep high, proven to work |
+| **Priority Switching** | ALWAYS | No threshold, immediate switch |
+| **Step Storage** | goals.md inline | Refactor later if needed |
+| **Exit Code 1** | Auto re-breakdown | Research + split into sub-steps |
+| **Re-breakdown Limit** | 2 max | Prevent infinite loops |
+
+### Step Sizing Guidelines
+
+- **Small step**: 50-100 turns (~1 hour)
+- **Medium step**: 100-150 turns (~1-2 hours)
+- **Large step**: 150+ turns → Break down further
+- **50-hour task** = ~30-50 steps (not 150)
+
+### Critical Rules
+
+✅ **DO**:
+- Keep MAX_TURNS at 250 for single-step tasks
+- Set MAX_TURNS_PER_STEP to at least 100
+- Always switch to higher priority (no stickiness)
+- Auto re-breakdown on exit code 1
+
+❌ **DON'T**:
+- Reduce MAX_TURNS below 250
+- Reduce MAX_TURNS_PER_STEP below 100
+- Add priority switching thresholds (keep simple)
+- Allow >2 re-breakdowns per step
+
+---
+
 ## Executive Summary
 
-Transform the executive loop from "one task per iteration" to "one step per iteration" with automatic priority re-evaluation between steps. This enables the agent to:
-- Work on large tasks spanning 50+ agent hours (100+ iterations)
-- Switch to higher priority work when it becomes available
-- Respond to human input within one iteration (10 minutes)
-- Show incremental progress instead of "In Progress" for days
+Transform the executive loop from "one task per iteration" to "one step per iteration" with automatic priority re-evaluation between steps.
+
+**Key Parameters** (User Approved):
+- **Step Budget**: 100-150 turns per step (sufficient to complete meaningful work)
+- **MAX_TURNS**: 250 for single-step tasks (unchanged, proven to work)
+- **MAX_TURNS_PER_STEP**: 100 minimum for multi-step tasks
+- **Priority Switching**: ALWAYS switch to higher priority (no stickiness)
+- **Step Storage**: Inline in goals.md (refactor later if needed)
+- **Breakdown Timing**: Pre-execution (before first step)
+- **Exit Code 1 Handling**: Auto-research and re-breakdown failed steps
+
+**Enables**:
+- Work on large tasks spanning 50+ agent hours (30-50 steps at 1-2 hours/step)
+- Switch to higher priority work within 1-2 hours (next iteration)
+- Respond to human input within 10 minutes to 2 hours
+- Show incremental progress every 1-2 hours
+- Validate and test after each meaningful increment
+- Auto-recovery from complexity failures via re-breakdown
 
 ---
 
@@ -161,21 +225,43 @@ function selectWork(): WorkItem | WorkStep | null {
 
 ### FR4: Iteration Duration Control
 
-**Requirement**: Each iteration should complete in reasonable time (~10-60 minutes) to enable frequent priority checks.
+**Requirement**: Each **step** of multi-step tasks should have sufficient turns to complete meaningful work.
 
 **Acceptance Criteria**:
-- Configurable MAX_TURNS_PER_ITERATION (default: 50-100 turns)
-- Worker sessions limited to iteration budget
+- Multi-step tasks: MAX_TURNS_PER_STEP = 100-150 (sufficient budget per step)
+- Single-step tasks: MAX_TURNS = 250 (KEEP HIGH - proven to work)
+- Worker sessions limited by task type (step vs whole task)
+- Each step must be evaluatable/testable independently
 - If step incomplete after max turns, mark as "partial progress" and resume next time
-- Sleep interval configurable (default: 10 minutes)
+- Sleep interval = 10 minutes between iterations
 
 **Configuration**:
 ```bash
 # .env
 LOOP_SLEEP_SECONDS=600              # 10 minutes between iterations
-MAX_TURNS_PER_ITERATION=100         # Limit per step execution
-MAX_TURNS_TOTAL=250                 # Limit per worker session (for non-step tasks)
+MAX_TURNS=250                       # For single-step tasks (DON'T REDUCE!)
+MAX_TURNS_PER_STEP=100              # For steps of multi-step tasks (minimum 100)
 ```
+
+**Turn Budget Logic**:
+```typescript
+function getMaxTurns(item: WorkItem, step?: WorkStep): number {
+  if (item.steps && item.steps.length > 0) {
+    // Multi-step task: limit per step
+    return step?.estimated_turns || MAX_TURNS_PER_STEP; // 100-150 turns
+  } else {
+    // Single-step task: full budget
+    return MAX_TURNS; // 250 turns
+  }
+}
+```
+
+**Step Sizing Guidelines** (for multi-step tasks only):
+- Small step: 50-100 turns (~1 hour) - e.g., "Implement API endpoint"
+- Medium step: 100-150 turns (~1-2 hours) - e.g., "Build auth system"
+- Large step: 150+ turns (>2 hours) - **should be broken down further**
+
+**If step exceeds estimated turns**: Worker continues until step complete or max turns reached, then resumes in next iteration.
 
 ### FR5: Step Resumption
 
@@ -196,6 +282,89 @@ MAX_TURNS_TOTAL=250                 # Limit per worker session (for non-step tas
 - Percentage complete calculated from steps (e.g., "3 of 8 steps = 37%")
 - Last update timestamp per step
 - Estimated time remaining (based on avg iteration duration)
+
+### FR7: Exit Code 1 Handling (Research & Re-breakdown)
+
+**Requirement**: When worker exits with code 1 (failure), automatically trigger research and step re-breakdown.
+
+**Acceptance Criteria**:
+- Detect exit code 1 from worker process
+- Classify failure type:
+  - Scope too large → Break current step into smaller sub-steps
+  - Unclear requirements → Research phase required
+  - Technical blocker → Document in needs-you.md
+- Automatic re-breakdown:
+  - Spawn research worker to analyze failed step
+  - Generate N smaller sub-steps (each 50-100 turns)
+  - Update goals.md with refined breakdown
+  - Retry with first sub-step in next iteration
+- Log re-breakdown events to work-ledger.jsonl
+
+**Exit Code 1 Response Flow**:
+```typescript
+async function handleWorkerFailure(result: WorkerResult, step: WorkStep): Promise<void> {
+  if (result.exit_code === 1) {
+    log(`Step failed with exit code 1: ${step.title}`);
+
+    // Detect if step is too complex
+    if (result.turns_used >= MAX_TURNS_PER_STEP * 0.8) {
+      log('Step appears too complex, triggering re-breakdown...');
+
+      // Spawn research worker to analyze and break down
+      const breakdown = await researchAndBreakdown(step);
+
+      // Replace current step with N sub-steps
+      replaceStepWithSubSteps(item, step, breakdown.subSteps);
+
+      log(`Step broken into ${breakdown.subSteps.length} sub-steps`);
+
+      // Next iteration will pick up first sub-step
+      return;
+    }
+
+    // Otherwise handle as normal retry
+    handleRetry(item, step, result);
+  }
+}
+```
+
+**Research Worker Prompt** (for re-breakdown):
+```
+The following step failed after ${turns} turns:
+
+Step: ${step.title}
+Description: ${step.description}
+Error: ${result.error}
+Context: ${result.last_actions}
+
+Your task:
+1. Analyze why this step failed
+2. Break it into 3-5 smaller sub-steps (each 50-100 turns)
+3. Each sub-step must be:
+   - Independently testable
+   - Clear definition of done
+   - Scoped to avoid same failure
+4. Return breakdown as JSON
+
+Output format:
+{
+  "analysis": "Why did this fail?",
+  "sub_steps": [
+    {
+      "title": "Sub-step 1 title",
+      "description": "What to do",
+      "estimated_turns": 75,
+      "validation": "How to verify success"
+    },
+    ...
+  ]
+}
+```
+
+**Re-breakdown Limits**:
+- Maximum 2 re-breakdowns per step (prevent infinite recursion)
+- If 2nd re-breakdown still fails → Mark as blocked, write to needs-you.md
+- Log all re-breakdown attempts to audit trail
 
 ---
 
@@ -515,13 +684,24 @@ async function updateStateAfterStep(item: WorkItem, result: WorkerResult): Promi
 
 # Iteration control
 LOOP_SLEEP_SECONDS=600              # 10 minutes between iterations
-MAX_TURNS_PER_ITERATION=100         # Worker turns per step (default)
-MAX_TURNS_TOTAL=250                 # Max for non-step tasks or large steps
+MAX_TURNS=250                       # KEEP HIGH - for single-step tasks (DON'T REDUCE)
+MAX_TURNS_PER_STEP=100              # For individual steps of multi-step tasks (min 100)
 
 # Breakdown control
-BREAKDOWN_THRESHOLD_TURNS=150       # Trigger breakdown if est. > this
+BREAKDOWN_THRESHOLD_TURNS=100       # Trigger breakdown if est. > 100 turns
 AUTO_BREAKDOWN_ENABLED=true         # Enable automatic task breakdown
+
+# Step sizing
+STEP_MIN_TURNS=100                  # Minimum turns per step (don't go below this)
+STEP_TARGET_TURNS=100               # Target turns per step
+STEP_MAX_TURNS=150                  # Maximum turns before suggesting further breakdown
 ```
+
+**CRITICAL DISTINCTIONS**:
+- **MAX_TURNS=250**: For tasks NOT broken into steps (simple tasks, keep high!)
+- **MAX_TURNS_PER_STEP=100**: For individual steps of multi-step tasks (MINIMUM 100)
+- Never reduce MAX_TURNS below 250 - proven to work
+- Never reduce MAX_TURNS_PER_STEP below 100 - insufficient budget causes failures
 
 ### goals.md Format Enhancement
 
@@ -541,26 +721,30 @@ AUTO_BREAKDOWN_ENABLED=true         # Enable automatic task breakdown
 
 #### Step 1: Initialize Next.js project with TypeScript
 - **Status:** Complete
-- **Duration:** 1 iteration, 28 turns
+- **Duration:** 1 iteration, 95 turns (1.5 hours)
 - **Output:** /agent-outputs/.../nextjs-app
-- **Completed:** 2026-01-25 16:45
+- **Completed:** 2026-01-25 18:15
 
-#### Step 2: Implement user authentication
+#### Step 2: Implement user authentication (JWT + session)
 - **Status:** In Progress
 - **Dependencies:** Step 1
-- **Est. Turns:** 80-120
+- **Est. Turns:** 100-120
+- **Started:** 2026-01-25 18:35
 
-#### Step 3: Build transaction API endpoints
+#### Step 3: Build transaction API endpoints (CRUD)
 - **Status:** Pending
 - **Dependencies:** Step 2
+- **Est. Turns:** 110-130
 
-#### Step 4: Create transaction UI components
+#### Step 4: Create transaction UI components (React)
 - **Status:** Pending
 - **Dependencies:** Step 3
+- **Est. Turns:** 120-150
 
 #### Step 5: End-to-end testing and deployment
 - **Status:** Pending
 - **Dependencies:** Step 1,2,3,4
+- **Est. Turns:** 80-100
 ```
 
 ---
@@ -643,89 +827,176 @@ AUTO_BREAKDOWN_ENABLED=true         # Enable automatic task breakdown
 
 ---
 
-## Open Questions
+## Design Decisions (User Approved)
 
-1. **Step Granularity**: What's the ideal number of steps for a 50-hour task?
-   - 5-10 large steps (each 5-10 hours)?
-   - 20-50 small steps (each 1-2 hours)?
-   - Dynamic based on task type?
+### 1. Step Granularity ✅
+**Decision**: Each step should be **evaluatable/testable** with sufficient turn budget.
 
-2. **Breakdown Timing**: When should breakdown happen?
-   - Before first execution (research phase)?
-   - Lazily (just-in-time before each step)?
-   - Upfront with user approval?
+**Implications**:
+- Step budget: **≥100 turns per step** (gives worker room to complete work)
+- 50-hour task = ~30-50 steps (reasonable breakdown, not too granular)
+- Frequent "look up" points (every ~1-2 hours)
+- High responsiveness to priority changes
+- MAX_TURNS_PER_STEP = 100-150 (configurable)
 
-3. **Step Storage**: Where should steps live?
-   - Inline in goals.md (readable but verbose)?
-   - Separate file per task (clean but fragmented)?
-   - Database/JSON (flexible but loses markdown simplicity)?
+**Benefits**:
+- Sufficient turns to complete meaningful work
+- Testable, validatable increments
+- Avoids premature failures from turn exhaustion
+- Balance between granularity and practicality
 
-4. **Priority Switching**: How aggressive should switching be?
-   - Always switch to higher priority (may thrash)?
-   - Only switch if priority delta > 1 (P3→P1 yes, P2→P1 maybe)?
-   - Require user confirmation for switches?
+### 2. Priority Switching ✅
+**Decision**: **ALWAYS switch to higher priority** on next iteration (no stickiness).
 
-5. **Iteration Budget**: Should all steps use same MAX_TURNS_PER_ITERATION?
-   - Fixed budget (e.g., 100 turns per step)?
-   - Variable based on step complexity?
-   - Worker decides when step is "complete enough"?
+**Rule**:
+```
+if (highestPriorityWork.priority > currentWork.priority) {
+  switchTo(highestPriorityWork);
+}
+```
+
+**Implications**:
+- P1 unblocks while working on P2? Switch immediately (next iteration).
+- P2 unblocks while working on P3? Switch immediately.
+- No complex heuristics or thresholds.
+- Simple, predictable behavior.
+
+**Benefits**:
+- Critical work always takes priority
+- Human answers addressed within one iteration
+- No "priority inversion" (low priority blocking high priority)
+
+### 3. Step Storage ✅
+**Decision**: Keep steps **inline in goals.md** for now. Refactor later if needed.
+
+**Format**:
+```markdown
+### Parent Task
+- **Status:** In Progress (Step 3 of 8, 37% complete)
+- **Description:** ...
+
+#### Step 1: Title
+- **Status:** Complete
+- **Output:** path
+
+#### Step 2: Title
+- **Status:** Complete
+
+#### Step 3: Title
+- **Status:** In Progress
+```
+
+**Benefits**:
+- Single source of truth
+- Easy to read and edit manually
+- No file fragmentation
+- Can optimize later if goals.md gets too large
+
+### 4. Breakdown Timing
+**Decision**: Break down **before first execution** (pre-execution, Option A).
+
+**Why**: Simpler implementation, clearer planning phase, all steps visible upfront.
+
+### 5. Iteration Budget
+**Decision**:
+- **MAX_TURNS_PER_STEP = 100-150** (for steps of multi-step tasks)
+- **MAX_TURNS = 250** (for single-step tasks - UNCHANGED)
+
+**Rationale**:
+- Multi-step tasks: Give sufficient turns to complete meaningful work (100+ turns)
+- Single-step tasks: Keep existing 250-turn limit (proven to work)
+- 100 turns = ~1-2 hours of work per step (practical granularity)
+- Never reduce below 100 - workers need room to complete steps properly
+
+**⚠️ CRITICAL**:
+- Do NOT reduce MAX_TURNS from 250 for single-step tasks
+- Do NOT reduce MAX_TURNS_PER_STEP below 100 - insufficient budget causes failures
+- Previous failures occurred when turn budget was too low
 
 ---
 
 ## Appendix: Example Execution Timeline
 
-**Task**: Build Multi-Tenant SaaS Platform (est. 50 hours)
+**Task**: Build Multi-Tenant SaaS Platform (est. 50 hours = ~40 steps at 1-2 hours each)
 
-**Timeline**:
+**Timeline** (showing first 6 iterations):
 ```
 Jan 25, 16:00 - Iteration 1
-  Select: "SaaS Platform - Step 1: Research"
-  Execute: Worker researches existing patterns (45 turns, 30 min)
-  Validate: Research doc created ✓
-  Update: Step 1 complete, progress = 12.5% (1/8 steps)
+  Select: "SaaS Platform - Step 1: Research & design auth system"
+  Execute: Worker researches patterns, designs approach (95 turns, 1.5 hours)
+  Validate: Design doc created, approach documented ✓
+  Update: Step 1 complete, progress = 2.5% (1/40 steps)
   Sleep: 10 minutes
 
-Jan 25, 16:40 - Iteration 2
-  Check Inputs: Human approved API choice in needs-you.md ✓
-  Select: "SaaS Platform - Step 2: Design Schema"
-  Execute: Worker designs database schema (67 turns, 45 min)
-  Validate: Schema valid, migrations created ✓
-  Update: Step 2 complete, progress = 25% (2/8 steps)
+Jan 25, 17:40 - Iteration 2
+  Check Inputs: Human approved auth approach in needs-you.md ✓
+  Select: "SaaS Platform - Step 2: Implement user model & DB schema"
+  Execute: Worker creates models, migrations, tests (110 turns, 2 hours)
+  Validate: Schema valid, migrations run, tests pass ✓
+  Update: Step 2 complete, progress = 5% (2/40 steps)
   Sleep: 10 minutes
 
-Jan 25, 17:35 - Iteration 3
+Jan 25, 19:50 - Iteration 3
   Check Inputs: No new responses
-  Select: "Notion Integration POC" ← NEW P1 TASK UNBLOCKED!
-  Execute: Worker sets up Notion API (82 turns, 1 hour)
-  Validate: Notion connection works ✓
-  Update: Notion task complete
+  Select: "SaaS Platform - Step 3: Implement JWT auth endpoints"
+  Execute: Worker builds login/logout/refresh (88 turns, 1.5 hours)
+  Validate: Auth endpoints work, tokens valid ✓
+  Update: Step 3 complete, progress = 7.5% (3/40 steps)
   Sleep: 10 minutes
 
-Jan 25, 18:45 - Iteration 4
+Jan 25, 21:30 - Iteration 4
   Check Inputs: No new responses
-  Select: "SaaS Platform - Step 3: Auth System" ← RESUME ORIGINAL TASK
-  Execute: Worker implements auth (105 turns, 1.5 hours)
-  Validate: Auth tests pass ✓
-  Update: Step 3 complete, progress = 37.5% (3/8 steps)
+  Select: "Notion Integration POC - Step 1: Setup & test API" ← NEW P1 TASK!
+  Execute: Worker creates client, tests CRUD (105 turns, 1.75 hours)
+  Validate: Notion connection works, CRUD tested ✓
+  Update: Notion POC COMPLETE (1 step total)
   Sleep: 10 minutes
 
-... (50+ more iterations over 2-3 days)
+Jan 25, 23:15 - Iteration 5
+  Check Inputs: No new responses
+  Select: "SaaS Platform - Step 4: Build tenant isolation middleware" ← RESUME P2
+  Execute: Worker implements multi-tenancy (120 turns, 2 hours)
+  Result: EXIT CODE 1 - Scope too large ❌
+  Action: Trigger re-breakdown research
+  Sleep: 10 minutes
 
-Jan 27, 14:00 - Iteration 55
-  Select: "SaaS Platform - Step 8: E2E Tests"
-  Execute: Final tests and deployment (98 turns)
+Jan 26, 01:25 - Iteration 6
+  Check Inputs: Re-breakdown complete
+  Select: "SaaS Platform - Step 4a: Create tenant context middleware" ← SUB-STEP
+  Execute: Worker creates tenant context (65 turns, 1 hour)
+  Validate: Middleware extracts tenant ID correctly ✓
+  Update: Step 4a complete, Step 4 broken into 4a-4c
+  Sleep: 10 minutes
+
+Jan 26, 02:35 - Iteration 7
+  Check Inputs: No new responses
+  Select: "SaaS Platform - Step 4b: Add tenant scoping to queries" ← SUB-STEP
+  Execute: Worker adds query scoping (78 turns, 1.3 hours)
+  Validate: All queries properly scoped ✓
+  Update: Step 4b complete, progress = 12.5% (5/40 steps)
+  Sleep: 10 minutes
+
+... (30+ more iterations over 2-3 days)
+
+Jan 28, 14:00 - Iteration 40
+  Select: "SaaS Platform - Step 40: Final E2E tests & deploy"
+  Execute: Worker runs full test suite, deploys (92 turns, 1.5 hours)
   Validate: All verifiers pass ✓
-  Update: Step 8 complete, task COMPLETE, progress = 100%
+  Update: Step 40 complete, task COMPLETE, progress = 100%
   Archive: Move to completed.md with full audit trail
 ```
 
 **Key Observations**:
-- Task spans 55 iterations over 2+ days
-- Priority switch at iteration 3 (Notion became P1)
-- Resumed SaaS Platform at iteration 4
-- Each step validated independently
-- Incremental progress visible throughout
-- Human can intervene at any iteration boundary
+- Task spans ~40 iterations over 2-3 days (at 1-2 hours/step + 10 min sleep)
+- **Priority switch at iteration 4**: Notion (P1) unblocked, SaaS (P2) paused
+- **Resumed SaaS at iteration 5**: After Notion complete
+- **Exit code 1 at iteration 5**: Step too complex, auto re-breakdown triggered
+- **Sub-steps created**: Step 4 split into 4a, 4b, 4c (iterations 6-7)
+- Each step 100+ turns: sufficient budget for meaningful work
+- "Look up" points every 1-2 hours (practical frequency)
+- Human can intervene within 1-2 hours of posting to needs-you.md
+- Incremental progress: 2.5% → 5% → 7.5% (every 1-2 hours)
+- 100-turn budget = less risk of premature failures
 
 ---
 

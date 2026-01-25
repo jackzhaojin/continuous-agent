@@ -1,11 +1,11 @@
-# Executive Loop Triage Analysis
+# Parser Bugs: Triage & Resolution
 
 **Date**: 2026-01-25
-**Status**: Critical Issues Identified
+**Status**: Resolved ✅
 
 ---
 
-## Issues Identified
+## Issues Identified & Fixed
 
 ### 1. **CRITICAL: work-selector.ts Parser Bug - Tasks Lost at Priority Boundaries**
 
@@ -179,3 +179,90 @@ After fixes:
 2. `.env` - Update LOOP_SLEEP_SECONDS
 3. `workspace/goals.md` - Manual update to mark Next.js Complete
 4. `src/executive-loop.ts` - Add multi-task support (P1)
+
+---
+
+## Resolution (2026-01-25 18:45 UTC)
+
+### All Critical Issues Fixed ✅
+
+**1. Parser Bug - Tasks Lost at Priority Boundaries** ✅
+
+**File**: `src/work-selector.ts` (lines 35-57)
+
+**Fix Applied**: Added save logic before clearing currentItem when switching priority sections:
+```typescript
+if (trimmedLine.match(/^#{1,2}\s*P2\b/i)) {
+  // Save current item before switching sections
+  if (currentItem && currentItem.title && currentPriority) {
+    saveItem(sections, currentItem as WorkItem, currentPriority);
+  }
+  currentPriority = 'P2';
+  currentItem = null;
+  continue;
+}
+```
+
+**Verification**: Test confirms all 4 tasks now parsed correctly.
+
+---
+
+**2. Status Parsing Bug - "Not Started" → "in_progress"** ✅
+
+**File**: `src/work-selector.ts` (lines 82-97)
+
+**Fix Applied**: Reordered status checks to handle "not started" explicitly first:
+```typescript
+if (statusText.includes('not started') || statusText === 'pending') {
+  currentItem.status = 'pending';
+} else if (statusText.includes('in progress') || statusText.includes('wip')) {
+  currentItem.status = 'in_progress';
+```
+
+**Verification**: "Not Started" now correctly parsed as "pending".
+
+---
+
+**3. Updated goals.md Status Values** ✅
+
+**Changes**:
+- Build Next.js: "Blocked" → "Complete" (succeeded in 101 turns)
+- Notion Integration: "Not Started" → "Pending"
+- Self-Enhance: "Not Started" → "Pending"
+- POC New Capabilities: "Not Started" → "Pending"
+
+---
+
+**4. Loop Sleep Interval** ✅
+
+**Change**: Added `LOOP_SLEEP_SECONDS=600` (10 minutes) to `.env`
+
+---
+
+### Test Results
+
+```bash
+$ node tests/adhoc/2026-01-25-parser-fix/test.js
+
+✓ Total work items parsed: 4
+✓ Build Next.js Transactional App: status="complete"
+✓ Notion Integration POC: status="pending"
+✓ Self-Enhance Human Interface: status="pending"
+✓ POC New Capabilities: status="pending"
+✓ Selected work item: Notion Integration POC (P1, pending)
+✓ All tests passed!
+```
+
+---
+
+### Agent Restarted Successfully
+
+```
+✓ Agent running (PID 53573)
+✓ Selected work: "Notion Integration POC" (P1, pending)
+✓ Worker spawned: task-4ce82b77
+✓ Max turns: 250
+✓ Sleep interval: 10 minutes
+```
+
+**Status**: Agent operational and working on Notion Integration POC.

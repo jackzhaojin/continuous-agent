@@ -2732,3 +2732,31 @@ I've successfully created a comprehensive proof of concept for Notion API integr
 [2026-01-25T18:57:07.807Z] [INFO]   Will retry. 9 attempts remaining.
 [2026-01-25T18:57:07.808Z] [INFO] --- Iteration complete ---
 [2026-01-25T18:57:07.808Z] [INFO] Sleeping for 600 seconds...
+[2026-01-25T19:07:07.807Z] [INFO] --- Starting iteration 2 ---
+[2026-01-25T19:07:07.807Z] [INFO] Running health checks...
+[2026-01-25T19:07:08.237Z] [INFO] Health check: DEGRADED
+[2026-01-25T19:07:08.237Z] [INFO]   [+] github-cli: GitHub CLI authenticated
+[2026-01-25T19:07:08.237Z] [INFO]   [+] disk-space: Disk usage: 60% used, 176Gi available
+[2026-01-25T19:07:08.237Z] [INFO]   [+] node-version: Node.js v20.19.5
+[2026-01-25T19:07:08.237Z] [INFO]   [-] reference-integrity: Reference integrity issues: 2 missing
+[2026-01-25T19:07:08.237Z] [INFO] Checking for human inputs...
+[2026-01-25T19:07:08.238Z] [INFO] Selecting work...
+[2026-01-25T19:07:08.238Z] [INFO] Selected work: [P1] Notion Integration POC
+[2026-01-25T19:07:08.238Z] [INFO]   Previous attempts: 1/10
+[2026-01-25T19:07:08.238Z] [INFO] Executing work item: work-2
+[2026-01-25T19:07:08.238Z] [INFO]   Title: Notion Integration POC
+[2026-01-25T19:07:08.238Z] [INFO]   Priority: P1
+[2026-01-25T19:07:08.238Z] [INFO]   Description: Proof of concept for Notion integration capabilities
+[2026-01-25T19:07:08.238Z] [INFO]   Status: in_progress
+[2026-01-25T19:07:08.238Z] [INFO]   Intent: what_only (confidence: 50%)
+[2026-01-25T19:07:08.238Z] [INFO]   Research phase: REQUIRED
+[2026-01-25T19:07:08.238Z] [INFO]   Strategy: research-docs-first
+[2026-01-25T19:07:08.238Z] [INFO]   Task Contract ID: task-670bef05
+[2026-01-25T19:07:08.238Z] [INFO]   Max Turns: 250
+[2026-01-25T19:07:08.238Z] [INFO]   Tools Allowed: Read, Write, Edit, Bash, Glob, Grep, WebFetch, WebSearch
+[2026-01-25T19:07:08.238Z] [INFO]   Retry Context: Attempt 2/10
+[2026-01-25T19:07:08.238Z] [INFO]   Previous strategies: research-docs-first
+[2026-01-25T19:07:08.238Z] [INFO]   Spawning worker agent...
+[2026-01-25T19:07:08.238Z] [INFO]     Goal: ## Task: Notion Integration POC...
+[2026-01-25T19:07:08.238Z] [INFO]     DoD items: 4
+[2026-01-25T19:07:08.238Z] [INFO]   Capabilities exercised: general.task_execution
