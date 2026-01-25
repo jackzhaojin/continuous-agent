@@ -28,7 +28,7 @@ capabilities:
       - commit_exists
     evidence:
       successes: 0
-      failures: 14
+      failures: 15
       last_success: null
       last_failure: null
       last_validated: '2026-01-25'
@@ -158,7 +158,7 @@ capabilities:
       - node_modules_exists
       - package_lock_updated
     evidence:
-      successes: 14
+      successes: 15
       failures: 0
       last_success: null
       last_failure: null
@@ -192,7 +192,7 @@ capabilities:
       - script_exit_code
       - expected_output_patterns
     evidence:
-      successes: 42
+      successes: 45
       failures: 0
       last_success: null
       last_failure: null
@@ -227,7 +227,7 @@ capabilities:
       - build_success
       - dot_next_directory_exists
     evidence:
-      successes: 14
+      successes: 15
       failures: 0
       last_success: null
       last_failure: null

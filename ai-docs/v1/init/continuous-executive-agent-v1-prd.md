@@ -222,6 +222,125 @@ The agent's job is to do POCs, figure things out, and self-enhance. We don't pre
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
+### 1.4 Incremental Execution Model
+
+**CRITICAL ARCHITECTURAL PRINCIPLE:** The executive loop is designed for **step-by-step execution with frequent priority re-evaluation**, NOT completing entire tasks in one iteration.
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    INCREMENTAL EXECUTION MODEL                           │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│   TASK LIFECYCLE (may span 50+ iterations)                              │
+│                                                                          │
+│   ┌─────────────────────────────────────────────────────────────────┐   │
+│   │  P1 TASK: "Build Multi-Tenant SaaS Platform"                    │   │
+│   │  Expected Duration: ~50 agent hours (100+ iterations)            │   │
+│   └─────────────────────────────────────────────────────────────────┘   │
+│      │                                                                   │
+│      ▼                                                                   │
+│   ┌─────────────────────────────────────────────────────────────────┐   │
+│   │  AUTOMATIC BREAKDOWN (by task-breakdown skill or worker)         │   │
+│   │    Step 1: Research existing patterns (research phase)           │   │
+│   │    Step 2: Design database schema                                │   │
+│   │    Step 3: Implement auth system                                 │   │
+│   │    Step 4: Build tenant isolation                                │   │
+│   │    ... (20+ more steps)                                          │   │
+│   └─────────────────────────────────────────────────────────────────┘   │
+│      │                                                                   │
+│      ▼                                                                   │
+│   ITERATION 1 (Execute Step 1)                                          │
+│   ┌─────────────────────────────────────────────────────────────────┐   │
+│   │  Health → Inputs → Select Work → Contract → Execute Step 1       │   │
+│   │  → Validate → Update (mark Step 1 complete) → Sleep              │   │
+│   └─────────────────────────────────────────────────────────────────┘   │
+│      │                                                                   │
+│      ▼                                                                   │
+│   ITERATION 2 (Re-evaluate priorities)                                  │
+│   ┌─────────────────────────────────────────────────────────────────┐   │
+│   │  Health → Check needs-you.md responses ← HUMAN MAY HAVE REPLIED  │   │
+│   │  Select Work ← CHECK FOR HIGHER PRIORITY TASKS                   │   │
+│   │                                                                   │   │
+│   │  Options:                                                         │   │
+│   │    A) Continue Step 2 (if still highest priority)                │   │
+│   │    B) Switch to new P1 task (if unblocked)                       │   │
+│   │    C) Answer urgent question from needs-you.md                   │   │
+│   └─────────────────────────────────────────────────────────────────┘   │
+│      │                                                                   │
+│      ▼                                                                   │
+│   ITERATION 3-100 (Continue until task complete)                        │
+│   ┌─────────────────────────────────────────────────────────────────┐   │
+│   │  Each iteration:                                                  │   │
+│   │    • Completes ONE step (not entire task)                         │   │
+│   │    • Re-evaluates priorities before selecting next work           │   │
+│   │    • Switches tasks if higher priority work appears               │   │
+│   │    • Checks for human responses in needs-you.md                  │   │
+│   └─────────────────────────────────────────────────────────────────┘   │
+│                                                                          │
+│   KEY METRICS PER ITERATION                                             │
+│   ┌─────────────────────────────────────────────────────────────────┐   │
+│   │  • Duration: ~10 minutes (configurable sleep interval)            │   │
+│   │  • Worker Turns: Configurable per step (50-250 turns)            │   │
+│   │  • Output: One step completed, validated, logged                 │   │
+│   │  • Decision Point: "Look up" to check priorities before next step│   │
+│   └─────────────────────────────────────────────────────────────────┘   │
+│                                                                          │
+│   WHY INCREMENTAL EXECUTION?                                             │
+│   ┌─────────────────────────────────────────────────────────────────┐   │
+│   │  1. **Responsiveness**: If critical task unblocks mid-project,   │   │
+│   │     agent can switch immediately (within one iteration)          │   │
+│   │                                                                   │   │
+│   │  2. **Human Feedback**: Frequent "look up" points to check       │   │
+│   │     needs-you.md for answers, approvals, course corrections      │   │
+│   │                                                                   │   │
+│   │  3. **Risk Management**: Small steps = easier to validate,       │   │
+│   │     rollback, or adjust course                                   │   │
+│   │                                                                   │   │
+│   │  4. **Progress Visibility**: Regular state updates show          │   │
+│   │     incremental progress, not just "in progress" for days        │   │
+│   │                                                                   │   │
+│   │  5. **Failure Recovery**: If step N fails, steps 1-(N-1) are     │   │
+│   │     already complete and validated                               │   │
+│   └─────────────────────────────────────────────────────────────────┘   │
+│                                                                          │
+│   ANTI-PATTERN (what NOT to do)                                         │
+│   ┌─────────────────────────────────────────────────────────────────┐   │
+│   │  ❌ One iteration = one complete task                            │   │
+│   │  ❌ Worker runs for hours without re-evaluating priorities       │   │
+│   │  ❌ "In Progress" status spans multiple days                     │   │
+│   │  ❌ No ability to switch to critical work mid-execution          │   │
+│   └─────────────────────────────────────────────────────────────────┘   │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Implementation Requirements**:
+
+1. **Task Breakdown**:
+   - Large tasks (est. >2 hours) MUST be broken into steps/phases
+   - Breakdown can happen via:
+     - `.claude/skills/task-breakdown/` skill (manual)
+     - Worker-generated breakdown (research phase)
+     - Automatic chunking by executive (fallback)
+
+2. **Step Representation**:
+   - Each step is a separate entry in goals.md with dependencies
+   - OR single task with phase tracking in progress.md
+   - Must track: which step is current, which are complete, which are pending
+
+3. **Priority Re-evaluation**:
+   - Phase 3 (Select Work) runs EVERY iteration
+   - Checks for:
+     - New human responses in needs-you.md
+     - Newly unblocked tasks
+     - Priority changes in goals.md
+   - Selects highest priority available work (even if different from last iteration)
+
+4. **Step Granularity**:
+   - Target: ~10-60 minutes per step (configurable)
+   - Worker turns per step: 50-250 (based on complexity)
+   - One step = one verifiable increment of progress
+
 ---
 
 ## Part 2: Skills Architecture
