@@ -35,7 +35,7 @@ npm run build
 npm start
 
 # For continuous operation, use PM2 with ecosystem config
-pm2 start ecosystem.config.js
+pm2 start ecosystem.config.cjs
 
 # PM2 management commands
 pm2 list                    # View running processes

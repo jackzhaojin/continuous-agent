@@ -1,6 +1,6 @@
 // PM2 Ecosystem Configuration
 // Per PRD: Executive loop runs continuously via PM2
-// Start: pm2 start ecosystem.config.js
+// Start: pm2 start ecosystem.config.cjs
 // Monitor: pm2 monit
 // Logs: pm2 logs executive-loop
 
