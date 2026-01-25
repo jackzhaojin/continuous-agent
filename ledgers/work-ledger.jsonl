@@ -12,3 +12,6 @@
 #   "metadata": {}
 # }
 {"event":"SYSTEM_UPGRADE","ts":"2026-01-25T12:00:00.000Z","description":"Intelligence layer implemented: intent-classifier, strategy-selector, prompt-builder, verifiers, skill-registry"}
+{"event":"HUMAN_INPUT_RECEIVED","ts":"2026-01-25T15:38:02.898Z","action":"--------","response_type":"OTHER","response":"----------","blocking_level":"----------"}
+{"event":"TASK_ATTEMPT_FAILED","ts":"2026-01-25T15:40:52.045Z","task_id":"work-1","title":"Build Next.js Transactional App","attempt":1,"max_retries":10,"strategies_tried":[],"error":"Worker failed with: error_max_turns"}
+{"event":"TASK_ATTEMPT_FAILED","ts":"2026-01-25T15:41:40.865Z","task_id":"work-1","title":"Build Next.js Transactional App","attempt":1,"max_retries":10,"strategies_tried":[],"error":"Worker failed with: error_max_turns"}

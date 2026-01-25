@@ -25,7 +25,6 @@ This document tracks items requiring human attention, decisions, or actions.
 - `[SKIP]` - Skip this task entirely
 
 | Action | Why Agent Can't Do It | Response | Blocking | Since |
-|--------|----------------------|----------|----------|-------|
 | *None* | | | | |
 
 ---
@@ -46,7 +45,7 @@ This document tracks items requiring human attention, decisions, or actions.
 
 | Item | Resolution | Resolved Date |
 |------|------------|---------------|
-| *None* | | |
+| -------- | ---------- | 2026-01-25 |
 
 ---
 

@@ -89,7 +89,10 @@ This separation is enforced by **Constitution Article I, Section 6** (zero toler
 - `ledgers/work-ledger.jsonl` - Task events (STARTED, COMPLETED, BLOCKED)
 - `ledgers/capability-ledger.jsonl` - Skill attempts and results
 - `ledgers/inputs-log.jsonl` - Human input audit trail
-- `ledgers/executive-{date}.log` - Daily execution logs
+- `ledgers/executive-{date}.log` - Daily executive loop logs
+- `ledgers/{yyyy-mm-dd}/worker-{task-id}.log` - Worker execution logs (organized by date)
+
+**IMPORTANT:** The `ledgers/` directory is **version controlled** and committed to git for full audit traceability.
 
 **Skill registries (YAML):**
 - `skills/technical-skills.yml` - Tool operation skills (git, npm, ssh, docker)

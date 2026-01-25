@@ -24,9 +24,18 @@ const LEDGERS_DIR = path.join(AGENT_BASE, 'ledgers');
 
 /**
  * Create a logger for a specific worker task
+ * Logs are organized by date: ledgers/{yyyy-mm-dd}/worker-{task-id}.log
  */
 function createWorkerLogger(taskId: string): { log: (msg: string) => void; close: () => void } {
-  const logFile = path.join(LEDGERS_DIR, `worker-${taskId}.log`);
+  // Create date-based subdirectory
+  const today = new Date().toISOString().split('T')[0]; // yyyy-mm-dd
+  const dateDir = path.join(LEDGERS_DIR, today);
+
+  if (!existsSync(dateDir)) {
+    mkdirSync(dateDir, { recursive: true });
+  }
+
+  const logFile = path.join(dateDir, `worker-${taskId}.log`);
   const stream = createWriteStream(logFile, { flags: 'a' });
 
   return {

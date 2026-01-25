@@ -11,3 +11,6 @@
 #   "confidence_delta": "+5|-10|0"
 # }
 {"ts":"2026-01-25T12:00:00.000Z","event":"LEDGER_INIT","description":"Capability ledger initialized"}
+{"event":"SKILL_ATTEMPT","ts":"2026-01-25T15:38:02.901Z","task_id":"work-1","task_title":"Build Next.js Transactional App","skills_exercised":["node.npm.run_script","nextjs.build.basic"],"iteration":1}
+{"event":"SKILL_ATTEMPT","ts":"2026-01-25T15:39:25.332Z","task_id":"work-1","task_title":"Build Next.js Transactional App","skills_exercised":["node.npm.run_script","nextjs.build.basic"],"iteration":1}
+{"event":"SKILL_ATTEMPT","ts":"2026-01-25T15:42:11.350Z","task_id":"work-1","task_title":"Build Next.js Transactional App","skills_exercised":["node.npm.run_script","nextjs.build.basic"],"iteration":2}
