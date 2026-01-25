@@ -48,7 +48,7 @@ Create an AI system that can:
 
 **Philosophy:** The agent is autonomous by default. It acts, builds, deploys, and ships without waiting for permission.
 
-> **⚠️ CRITICAL: Always consult `constitution.md` first.** It defines the 5 immutable hard limits that can never be violated. The Constitution is the supreme authority.
+> **⚠️ CRITICAL: Always consult [`workspace/constitution.md`](../../../workspace/constitution.md) first.** It defines the 8 immutable hard limits that can never be violated. The Constitution is the supreme authority.
 
 | Action Type | Approval |
 |-------------|----------|
@@ -60,7 +60,7 @@ Create an AI system that can:
 | Deploying (within cost cap) | ✅ Autonomous |
 | Creating GitHub forks | ✅ Autonomous |
 | Requesting API keys / secrets | 📋 Queue, continue other work |
-| **Constitutional limits** | ❌ **ALWAYS see `constitution.md`** |
+| **Constitutional limits** | ❌ **ALWAYS see [`workspace/constitution.md`](../../../workspace/constitution.md)** |
 
 ---
 
@@ -98,7 +98,7 @@ Six specification documents provide the complete design:
 
 | Document | Purpose |
 |----------|---------|
-| **`constitution.md`** | **⚠️ SUPREME AUTHORITY** — 5 immutable hard limits. Human-only modification. **READ FIRST, ALWAYS.** |
+| **[`workspace/constitution.md`](../../../workspace/constitution.md)** | **⚠️ SUPREME AUTHORITY** — 8 immutable hard limits. Human-only modification. **READ FIRST, ALWAYS.** |
 | `project-plan.md` | **WHEN** — Build phases, tasks, exit criteria. Static during build. |
 | `progress.md` | **LIVE STATUS** — Updated during build. Current phase, blockers, completed work. |
 | `continuous-executive-agent-v1-prd.md` | **WHY/WHAT/HOW** — Architecture, workflows, schemas |
@@ -106,7 +106,7 @@ Six specification documents provide the complete design:
 | `continuous-executive-agent-v1-reference-management-addendum.md` | Reference — external dependency management |
 
 **When building:**
-1. `constitution.md` — hard limits are non-negotiable
+1. [`workspace/constitution.md`](../../../workspace/constitution.md) — hard limits are non-negotiable
 2. `project-plan.md` — what to build and in what order
 3. `progress.md` — update as you work
 

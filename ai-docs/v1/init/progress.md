@@ -6,7 +6,7 @@
 
 ---
 
-> **⚠️ CRITICAL: Always consult `constitution.md` first.** All work must respect the 5 Constitutional hard limits.
+> **⚠️ CRITICAL: Always consult [`workspace/constitution.md`](../../../workspace/constitution.md) first.** All work must respect the 8 Constitutional hard limits.
 
 ---
 

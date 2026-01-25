@@ -397,7 +397,7 @@ defaults:
 
 ### What Requires Human Approval (Constitutional Limits)
 
-> **⚠️ CRITICAL: ALWAYS consult `constitution.md` first.** The Constitution defines all immutable hard limits and is the supreme authority.
+> **⚠️ CRITICAL: ALWAYS consult [`workspace/constitution.md`](../../../workspace/constitution.md) first.** The Constitution defines all immutable hard limits and is the supreme authority.
 
 | Action | Constitutional Article | Queue Location |
 |--------|------------------------|----------------|

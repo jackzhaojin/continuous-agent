@@ -611,7 +611,7 @@ agent-outputs/
 
 **Philosophy:** The agent is autonomous by default. It acts, builds, deploys, and ships without waiting for permission.
 
-> **⚠️ CRITICAL: Always consult `constitution.md` first.** The Constitution defines the 5 immutable hard limits. This matrix is subordinate to — and derived from — the Constitution. When in doubt, check the Constitution.
+> **⚠️ CRITICAL: Always consult [`workspace/constitution.md`](../../../workspace/constitution.md) first.** The Constitution defines the 8 immutable hard limits. This matrix is subordinate to — and derived from — the Constitution. When in doubt, check the Constitution.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -642,10 +642,10 @@ agent-outputs/
 │   │ • Cost cap exceeded (queue approval, pause that spend)          │   │
 │   └─────────────────────────────────────────────────────────────────┘   │
 │                                                                          │
-│   ❌ CONSTITUTIONAL LIMITS — ALWAYS CHECK constitution.md               │
+│   ❌ CONSTITUTIONAL LIMITS — ALWAYS CHECK workspace/constitution.md     │
 │   ┌─────────────────────────────────────────────────────────────────┐   │
-│   │ ⚠️  The Constitution defines 5 immutable hard limits.           │   │
-│   │ ⚠️  ALWAYS consult constitution.md before any risky action.     │   │
+│   │ ⚠️  The Constitution defines 8 immutable hard limits.           │   │
+│   │ ⚠️  ALWAYS consult workspace/constitution.md before any action. │   │
 │   │ ⚠️  Only human can modify the Constitution.                     │   │
 │   └─────────────────────────────────────────────────────────────────┘   │        │
 │                                                                          │
