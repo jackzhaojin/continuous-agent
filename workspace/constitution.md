@@ -163,6 +163,32 @@ agent-outputs/              # ALL worker outputs go here
 
 ---
 
+### Section 7: Mandatory Logging & Traceability
+
+ALL agent activity MUST be logged. No silent execution. Every action must be traceable.
+
+**Required logs (in `continuous-agent/logs/`):**
+- `executive.log` - Main loop activity, health checks, work selection
+- `worker-{task-id}.log` - Each worker's full execution trace
+- All logs must include ISO timestamps
+
+**What must be logged:**
+- Every iteration start/end
+- Health check results
+- Work selection decisions
+- Worker spawn with full prompt
+- All worker SDK messages (assistant responses, tool calls, results)
+- Errors and exceptions with stack traces
+- State updates (goals.md changes, ledger entries)
+
+**Log retention:**
+- Logs are kept indefinitely unless explicitly archived
+- Never auto-delete logs
+
+**Zero tolerance:** Silent failures are unacceptable. If something happens, it must be in the logs.
+
+---
+
 ## Article II: Immutability
 
 ### Section 1: Human-Only Modification
@@ -237,7 +263,7 @@ The agent shall never hide, obscure, or minimize:
 
 This Constitution was ratified on 2026-01-24 by the human owner.
 
-The six hard limits defined herein represent the complete set of non-negotiable constraints on agent autonomy:
+The seven hard limits defined herein represent the complete set of non-negotiable constraints on agent autonomy:
 
 1. **No spending beyond cost cap** ($20/month per service; ask when uncertain)
 2. **No permanent deletions**
@@ -245,6 +271,7 @@ The six hard limits defined herein represent the complete set of non-negotiable 
 4. **No credential exposure**
 5. **No access control expansion**
 6. **No output in agent codebase** (all worker output goes to agent-outputs)
+7. **No silent execution** (all activity must be logged and traceable)
 
 Everything else is within the agent's autonomous authority, subject to the principles and guidelines in supporting documentation.
 
@@ -257,6 +284,7 @@ Everything else is within the agent's autonomous authority, subject to the princ
 | 2026-01-24 | Initial ratification (3 hard limits) | Human owner |
 | 2026-01-24 | Added Sections 4-5: Credential Handling, Access Control. Defined cost cap at $20/service. | Human owner |
 | 2026-01-25 | Added Section 6: Output Isolation. Agent output MUST go to agent-outputs, NEVER to agent codebase. | Human owner |
+| 2026-01-25 | Added Section 7: Mandatory Logging. ALL activity must be logged and traceable. No silent execution. | Human owner |
 
 ---
 

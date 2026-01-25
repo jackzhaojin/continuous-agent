@@ -7,7 +7,7 @@ This document tracks the strategic objectives for the Continuous Executive Agent
 ## P1 - Critical Priority
 
 ### Build Next.js Transactional App
-- **Status:** Not Started
+- **Status:** Blocked
 - **Description:** Develop a Next.js-based transactional application as the core deliverable
 - **Success Criteria:** TBD
 - **Dependencies:** None identified
@@ -23,7 +23,7 @@ This document tracks the strategic objectives for the Continuous Executive Agent
 ## P2 - High Priority
 
 ### Self-Enhance Human Interface
-- **Status:** Not Started
+- **Status:** Blocked
 - **Description:** Improve the interface between the agent system and human operators
 - **Success Criteria:** TBD
 - **Dependencies:** None identified

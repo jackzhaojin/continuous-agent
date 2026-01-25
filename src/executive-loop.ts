@@ -1,5 +1,6 @@
 import { config } from 'dotenv';
-import { readFile, writeFile, appendFile } from 'fs/promises';
+import { readFile, writeFile, appendFile, mkdir } from 'fs/promises';
+import { createWriteStream, existsSync } from 'fs';
 import path from 'path';
 import { checkHealth } from './health-checker.js';
 import { selectWork } from './work-selector.js';
@@ -10,6 +11,28 @@ import type { WorkItem } from './work-selector.js';
 
 // Load environment variables
 config();
+
+// === LOGGING SETUP ===
+const LOGS_DIR = path.join(process.cwd(), 'logs');
+const EXECUTIVE_LOG = path.join(LOGS_DIR, 'executive.log');
+
+// Ensure logs directory exists
+if (!existsSync(LOGS_DIR)) {
+  await mkdir(LOGS_DIR, { recursive: true });
+}
+
+// Log stream for file output
+const logStream = createWriteStream(EXECUTIVE_LOG, { flags: 'a' });
+
+/**
+ * Write to both console and log file
+ */
+function writeLog(level: 'INFO' | 'ERROR' | 'WARN', message: string): void {
+  const timestamp = new Date().toISOString();
+  const logLine = `[${timestamp}] [${level}] ${message}`;
+  console.log(logLine);
+  logStream.write(logLine + '\n');
+}
 
 // Global state for the executive loop
 const loopState: LoopState = {
