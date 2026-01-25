@@ -63,6 +63,12 @@ This document tracks the strategic objectives for the Continuous Executive Agent
 - **Success Criteria:** TBD
 - **Dependencies:** None identified
 
+### Integrate Self-Improvement Loop Triggers
+- **Status:** Pending
+- **Description:** Wire practice-loop, retrospective, and reference refresh into idle/scheduled execution
+- **Success Criteria:** Low-priority task scheduled; scope aligned with PRD terminology update
+- **Dependencies:** None identified
+
 ---
 
 ## Archive

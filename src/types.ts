@@ -69,6 +69,9 @@ export interface TaskContract {
   };
   definition_of_done: string[];
   max_turns: number;
+  risk_assessment: string;
+  required_skills: string[];
+  logging_obligations: string[];
   created_at: string;
 }
 

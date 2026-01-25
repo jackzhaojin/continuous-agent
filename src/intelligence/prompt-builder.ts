@@ -58,6 +58,12 @@ export function buildIntelligentPrompt(
   // Definition of Done
   sections.push(buildDoDSection(contract));
 
+  // Risk and skills
+  sections.push(buildRiskAndSkillsSection(contract));
+
+  // Logging obligations
+  sections.push(buildLoggingSection(contract));
+
   // Project context
   sections.push(buildProjectSection(projectPath, contract));
 
@@ -189,6 +195,26 @@ ${dodList}
 }
 
 /**
+ * Risk and required skills section
+ */
+function buildRiskAndSkillsSection(contract: TaskContract): string {
+  const skills = contract.required_skills.length > 0 ? contract.required_skills.join(', ') : 'none specified';
+  return `## Risk & Required Capabilities
+
+**Risk assessment:** ${contract.risk_assessment}
+**Required capabilities:** ${skills}`;
+}
+
+/**
+ * Logging obligations section
+ */
+function buildLoggingSection(contract: TaskContract): string {
+  const obligations = contract.logging_obligations.map(item => `- ${item}`).join('\n');
+  return `## Logging Obligations
+
+${obligations}`;
+}
+/**
  * Project context section
  */
 function buildProjectSection(projectPath: string, contract: TaskContract): string {
@@ -245,6 +271,7 @@ export function buildSimplePrompt(
   const dodList = contract.definition_of_done
     .map((item, i) => `${i + 1}. ${item}`)
     .join('\n');
+  const skills = contract.required_skills.length > 0 ? contract.required_skills.join(', ') : 'none specified';
 
   return `${contract.goal}
 
@@ -254,6 +281,13 @@ Do NOT modify files outside this directory.
 
 ## Definition of Done
 ${dodList}
+
+## Risk & Required Capabilities
+- Risk assessment: ${contract.risk_assessment}
+- Required capabilities: ${skills}
+
+## Logging Obligations
+${contract.logging_obligations.map(item => `- ${item}`).join('\n')}
 
 ## Constraints
 - Max turns: ${contract.max_turns}
