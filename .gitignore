@@ -3,6 +3,8 @@ local-only
 output
 .playwright-mcp
 
+# Build output (regenerated from src/)
+dist/
 
 # node
 node_modules
@@ -24,6 +26,9 @@ Thumbs.db
 # Logs
 *.log
 logs/
+
+# Verifier run results (runtime outputs)
+verifiers/results/
 
 # Temporary files
 *.tmp
