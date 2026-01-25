@@ -8,6 +8,7 @@
 
 import { query, type SDKMessage, type SDKResultMessage } from '@anthropic-ai/claude-agent-sdk';
 import { mkdirSync, existsSync, copyFileSync, createWriteStream } from 'fs';
+import os from 'os';
 import path from 'path';
 import type { TaskContract, WorkerResult, WorkItem } from './types.js';
 import { buildIntelligentPrompt, buildSimplePrompt } from './intelligence/prompt-builder.js';
@@ -15,10 +16,10 @@ import { classifyIntent } from './intelligence/intent-classifier.js';
 import { selectStrategy } from './intelligence/strategy-selector.js';
 
 // Agent outputs directory - where workers create their projects
-const AGENT_OUTPUTS_BASE = process.env.AGENT_OUTPUTS_PATH || '/Users/jackjin/dev/agent-outputs';
+const AGENT_OUTPUTS_BASE = process.env.AGENT_OUTPUTS_PATH || path.join(os.homedir(), 'dev', 'agent-outputs');
 
 // Template directory for project setup files (lives in agent repo, not outputs)
-const AGENT_BASE = process.env.AGENT_PATH || '/Users/jackjin/dev/continuous-agent';
+const AGENT_BASE = process.env.AGENT_PATH || path.join(os.homedir(), 'dev', 'continuous-agent');
 const TEMPLATES_DIR = path.join(AGENT_BASE, 'templates');
 const LEDGERS_DIR = path.join(AGENT_BASE, 'ledgers');
 

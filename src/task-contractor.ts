@@ -145,6 +145,9 @@ export function createTaskContract(
     },
     definition_of_done: generateDefinitionOfDone(workItem, step),
     max_turns: estimateMaxTurns(workItem, step),
+    risk_assessment: assessRisk(workItem, step),
+    required_skills: inferRequiredSkills(workItem, step),
+    logging_obligations: buildLoggingObligations(),
     created_at: new Date().toISOString(),
   };
 }
@@ -291,4 +294,56 @@ function generateDefinitionOfDone(workItem: WorkItem, step?: WorkStep): string[]
   }
 
   return dod;
+}
+
+function assessRisk(workItem: WorkItem, step?: WorkStep): string {
+  const text = step
+    ? `${step.title} ${step.description || ''}`.toLowerCase()
+    : `${workItem.title} ${workItem.description || ''}`.toLowerCase();
+
+  if (text.includes('auth') || text.includes('payment') || text.includes('security')) {
+    return 'High: sensitive or security-related changes';
+  }
+  if (text.includes('integration') || text.includes('migration') || text.includes('deploy')) {
+    return 'Medium: integration or deployment risk';
+  }
+  return 'Low: limited scope, reversible changes';
+}
+
+function inferRequiredSkills(workItem: WorkItem, step?: WorkStep): string[] {
+  const text = step
+    ? `${step.title} ${step.description || ''}`.toLowerCase()
+    : `${workItem.title} ${workItem.description || ''}`.toLowerCase();
+
+  const skills: string[] = [];
+
+  if (text.includes('git') || text.includes('commit')) {
+    skills.push('git.branch_commit');
+  }
+  if (text.includes('npm') || text.includes('node')) {
+    skills.push('node.npm.install');
+  }
+  if (text.includes('build') || text.includes('compile') || text.includes('test')) {
+    skills.push('node.npm.run_script');
+  }
+  if (text.includes('next')) {
+    skills.push('nextjs.build.basic');
+  }
+  if (text.includes('document') || text.includes('readme') || text.includes('docs')) {
+    skills.push('comm.documentation');
+  }
+  if (skills.length === 0) {
+    skills.push('general.task_execution');
+  }
+
+  return [...new Set(skills)];
+}
+
+function buildLoggingObligations(): string[] {
+  return [
+    'Log all work in work-ledger.jsonl',
+    'Capture validation outcomes in reports/validation',
+    'Record capability outcomes in capability-ledger.jsonl',
+    'Update goals.md and needs-you.md as needed',
+  ];
 }

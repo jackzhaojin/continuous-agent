@@ -11,6 +11,7 @@
 import { readFile, writeFile, appendFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
+import { appendInputLog } from './inputs-log.js';
 
 export interface HumanResponse {
   action: string;
@@ -251,6 +252,19 @@ export async function processHumanInputs(): Promise<ProcessedInput> {
 
       // Log the interaction
       await logHumanInteraction(response);
+      await appendInputLog({
+        source: 'needs-you',
+        ts: new Date().toISOString(),
+        raw_input: response.response,
+        priority: response.blocking,
+        scope_allowed: ['workspace/needs-you.md'],
+        intent_type: response.responseType.toLowerCase(),
+        metadata: {
+          action: response.action,
+          reason: response.reason,
+          response_type: response.responseType,
+        },
+      });
 
       // Handle based on response type
       if (response.responseType === 'SKIP') {

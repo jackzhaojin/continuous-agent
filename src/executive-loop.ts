@@ -14,6 +14,9 @@ import { processHumanInputs } from './input-processor.js';
 import { needsBreakdown, generateStaticBreakdown, writeStepsToGoals, shouldReBreakdown, reBreakdownStep, logBreakdownEvent } from './task-breakdown.js';
 import type { HealthStatus, WorkerResult, LoopState, WorkStep } from './types.js';
 import type { WorkItem } from './work-selector.js';
+import { appendInputLog } from './inputs-log.js';
+import { ingestQueueTasks } from './queue-processor.js';
+import { appendGoalsFromQueue, updateProgressOnStart, recordCompletion } from './workspace-writers.js';
 
 // Load environment variables
 config();
@@ -353,12 +356,18 @@ async function executeWork(item: WorkItem, step?: WorkStep): Promise<WorkerResul
   log(`    Goal: ${contract.goal.split('\n')[0]}...`);
   log(`    DoD items: ${contract.definition_of_done.length}`);
 
+  const statusNote = step
+    ? `Step ${step.step_number + 1}: ${step.title}`
+    : 'Task execution started';
+  await updateProgressOnStart(item.title, statusNote);
+
   // Infer capabilities being exercised based on task/intent
   const capabilitiesExercised = inferCapabilitiesFromTask(item, intent);
   log(`  Capabilities exercised: ${capabilitiesExercised.join(', ')}`);
 
   // Log CAPABILITY_ATTEMPT event before starting work
   await logCapabilityAttempt(item, capabilitiesExercised);
+  await logWorkStart(item, step, contract.id);
 
   try {
     // Pass work item and retry context for intelligent prompting
@@ -425,6 +434,24 @@ async function logCapabilityResult(
     verifier_count: verifierResults.length,
     pass_count: verifierResults.filter(r => r.result === 'PASS').length,
     fail_count: verifierResults.filter(r => r.result === 'FAIL').length,
+    iteration: loopState.iteration,
+  });
+  await appendFile(ledgerPath, entry + '\n', 'utf-8');
+}
+
+/**
+ * Log work start event to work ledger
+ */
+async function logWorkStart(item: WorkItem, step: WorkStep | undefined, contractId: string): Promise<void> {
+  const ledgerPath = path.join(process.cwd(), 'ledgers', 'work-ledger.jsonl');
+  const entry = JSON.stringify({
+    event: step ? 'STEP_STARTED' : 'TASK_STARTED',
+    ts: new Date().toISOString(),
+    task_id: item.id,
+    task_title: item.title,
+    contract_id: contractId,
+    step_number: step ? step.step_number + 1 : null,
+    step_title: step ? step.title : null,
     iteration: loopState.iteration,
   });
   await appendFile(ledgerPath, entry + '\n', 'utf-8');
@@ -506,7 +533,13 @@ async function validateWork(item: WorkItem, result: WorkerResult | null): Promis
  * Update state after work completion
  * IMPORTANT: Does NOT mark Blocked on first failure - uses retry tracking
  */
-async function updateState(item: WorkItem, success: boolean, errorInfo?: string, outputPath?: string): Promise<void> {
+async function updateState(
+  item: WorkItem,
+  success: boolean,
+  errorInfo?: string,
+  outputPath?: string,
+  result?: WorkerResult | null
+): Promise<void> {
   log(`Updating state for work item: ${item.id}`);
   log(`  Success: ${success}`);
   if (outputPath) {
@@ -542,8 +575,11 @@ async function updateState(item: WorkItem, success: boolean, errorInfo?: string,
         priority: item.priority,
         iteration: loopState.iteration,
         output_path: outputPath || null,
+        duration_ms: result?.duration_ms || null,
+        artifacts: result?.artifacts || [],
       });
       await appendFile(ledgerPath, ledgerEntry + '\n', 'utf-8');
+      await recordCompletion(item.title, 'Completed', item.title);
     } catch (error) {
       logError('Failed to update state', error);
     }
@@ -588,6 +624,8 @@ async function updateState(item: WorkItem, success: boolean, errorInfo?: string,
     strategies_tried: retry.strategies,
     error: retry.lastError.slice(0, 500),
     output_path: outputPath || null,
+    duration_ms: result?.duration_ms || null,
+    artifacts: result?.artifacts || [],
   });
   await appendFile(ledgerPath, attemptEntry + '\n', 'utf-8');
 
@@ -694,7 +732,7 @@ async function updateStateWithStep(
 ): Promise<void> {
   // If no step, delegate to existing updateState for backward compatibility
   if (!step) {
-    return updateState(item, success, errorInfo, outputPath);
+    return updateState(item, success, errorInfo, outputPath, result);
   }
 
   // Step execution path
@@ -741,6 +779,8 @@ async function updateStateWithStep(
       step_title: step.title,
       iteration: loopState.iteration,
       output_path: outputPath || null,
+      duration_ms: result?.duration_ms || null,
+      artifacts: result?.artifacts || [],
     });
     await appendFile(ledgerPath, ledgerEntry + '\n', 'utf-8');
     
@@ -826,6 +866,8 @@ async function updateStateWithStep(
     attempt: retry.attempts,
     max_retries: MAX_RETRIES,
     error: retry.lastError.slice(0, 500),
+    duration_ms: result?.duration_ms || null,
+    artifacts: result?.artifacts || [],
   });
   await appendFile(ledgerPath, failEntry + '\n', 'utf-8');
 
@@ -872,6 +914,22 @@ async function runIteration(): Promise<void> {
     for (const taskTitle of inputsProcessed.tasksUnblocked) {
       retryTracker.delete(taskTitle);
       log(`  Reset retry counter for: "${taskTitle}"`);
+    }
+  }
+
+  const queueResult = await ingestQueueTasks();
+  if (queueResult.ingested.length > 0) {
+    const added = await appendGoalsFromQueue(queueResult.ingested, 'P3');
+    for (const item of added) {
+      await appendInputLog({
+        source: 'queue',
+        ts: new Date().toISOString(),
+        raw_input: item,
+        priority: 'P3',
+        scope_allowed: ['workspace/goals.md'],
+        intent_type: 'queue_ingest',
+        metadata: { status: 'ingested_to_goals' },
+      });
     }
   }
 

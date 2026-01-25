@@ -33,7 +33,7 @@ A continuously-running autonomous agent that:
 │   │   AGENT REPO         │            │   OUTPUT MONOREPO    │          │
 │   │                      │            │                      │          │
 │   │   • Executive loop   │   builds   │   • nextjs-todo-app/ │          │
-│   │   • Skills           │ ─────────► │   • eds-site-1/      │          │
+│   │   • Capabilities     │ ─────────► │   • eds-site-1/      │          │
 │   │   • Workspace files  │   into     │   • notion-writer/   │          │
 │   │   • Verifiers        │            │   • blog-research/   │          │
 │   │   • Task contracts   │            │   • ... (50+ later)  │          │
@@ -58,7 +58,7 @@ A continuously-running autonomous agent that:
 |----------|------|-------|
 | **Initial Build (MVP)** | Executive loop | PM2, health checks, work selection |
 | **Initial Build (MVP)** | Workspace files | goals.md, needs-you.md, progress.md |
-| **Initial Build (MVP)** | Skill registry | Seeded, SDK-tagged |
+| **Initial Build (MVP)** | Capability registry | Seeded, SDK-tagged |
 | **Initial Build (MVP)** | Core verifiers | git, node, docs |
 | **Initial Build (MVP)** | Worker spawning | Agent SDK integration |
 | | | |
@@ -91,8 +91,8 @@ The agent's job is to do POCs, figure things out, and self-enhance. We don't pre
 │   │        │                            │              │            │   │
 │   │        ▼                            ▼              ▼            │   │
 │   │   ┌─────────┐              ┌────────────────┐  ┌─────────┐     │   │
-│   │   │ Health  │              │  Agent SDK     │  │ Skill   │     │   │
-│   │   │ Status  │              │  Workers       │  │Registry │     │   │
+│   │   │ Health  │              │  Agent SDK     │  │Capability│   │   │
+│   │   │ Status  │              │  Workers       │  │ Registry │   │   │
 │   │   └─────────┘              └────────────────┘  └─────────┘     │   │
 │   │                                    │                            │   │
 │   └────────────────────────────────────│────────────────────────────┘   │
@@ -139,8 +139,7 @@ The agent's job is to do POCs, figure things out, and self-enhance. We don't pre
 │   │ 3. SELECT WORK  │ ──► │ Priority Engine │                           │
 │   └────────┬────────┘     │ • Explicit P1-P3│                           │
 │            │              │ • Dependencies  │                           │
-│            │              │ • Effort/Impact │                           │
-│            │              │ • Learned prefs │                           │
+│            │              │ • (V1: simple)  │                           │
 │            │              └─────────────────┘                           │
 │            ▼                                                             │
 │   ┌─────────────────┐                                                   │
@@ -150,13 +149,14 @@ The agent's job is to do POCs, figure things out, and self-enhance. We don't pre
 │            │                                                             │
 │            ▼                                                             │
 │   ┌─────────────────┐     ┌─────────────────┐                           │
-│   │ 5. EXECUTE      │ ──► │ Direct or       │                           │
-│   │                 │     │ Spawn Worker    │                           │
+│   │ 5. EXECUTE      │ ──► │ Spawn Worker    │                           │
+│   │                 │     │ (direct exec    │                           │
+│   │                 │     │ reserved later) │                           │
 │   └────────┬────────┘     └─────────────────┘                           │
 │            │                                                             │
 │            ▼                                                             │
 │   ┌─────────────────┐                                                   │
-│   │ 6. VALIDATE     │ ← Run verifiers, update skill confidence          │
+│   │ 6. VALIDATE     │ ← Run verifiers, update capability confidence     │
 │   └────────┬────────┘                                                   │
 │            │                                                             │
 │            ▼                                                             │
@@ -185,7 +185,7 @@ The agent's job is to do POCs, figure things out, and self-enhance. We don't pre
 │   ┌──────────────────────────────────────────────────────────┐          │
 │   │ • Prioritizes work                                        │          │
 │   │ • Creates task contracts                                  │          │
-│   │ • Decides: execute directly OR spawn worker               │          │
+│   │ • Spawns worker for execution (direct exec reserved later)│          │
 │   │ • Monitors worker progress                                │          │
 │   │ • Handles failures                                        │          │
 │   └──────────────────────────┬───────────────────────────────┘          │
@@ -209,7 +209,7 @@ The agent's job is to do POCs, figure things out, and self-enhance. We don't pre
 │   │   │ Task: Build │         │ Task: Write │                │          │
 │   │   │ Next.js app │         │ Notion int. │                │          │
 │   │   │             │         │             │                │          │
-│   │   │ Skills:     │         │ Skills:     │                │          │
+│   │   │ Capabilities│         │ Capabilities│                │          │
 │   │   │ • nextjs-*  │         │ • notion-*  │                │          │
 │   │   │ • git-*     │         │ • research  │                │          │
 │   │   └─────────────┘         └─────────────┘                │          │
@@ -343,20 +343,20 @@ The agent's job is to do POCs, figure things out, and self-enhance. We don't pre
 
 ---
 
-## Part 2: Skills Architecture
+## Part 2: Capabilities & Claude/Codex Skills Architecture
 
 ### 2.1 Skills Integration (Proven via FINDINGS.md)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                         SKILLS ARCHITECTURE                              │
+│                   CLAUDE/CODEX SKILLS ARCHITECTURE                        │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                          │
 │   CONFIGURATION REQUIRED (proven working):                               │
 │   ┌──────────────────────────────────────────────────────────┐          │
 │   │  settingSources: ['user', 'project']  ← REQUIRED         │          │
 │   │  allowedTools: ['Skill', 'Read', 'Bash', 'Write', ...]   │          │
-│   │  cwd: PROJECT_ROOT  ← for project skills                 │          │
+│   │  cwd: PROJECT_ROOT  ← for project Claude/Codex skills     │          │
 │   └──────────────────────────────────────────────────────────┘          │
 │                                                                          │
 │   SKILL LOCATIONS                                                        │
@@ -395,7 +395,7 @@ The agent's job is to do POCs, figure things out, and self-enhance. We don't pre
 │                         SDK RUNTIME REGISTRY                             │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                          │
-│   Skills must be tagged by which SDK can execute them.                  │
+│   Capabilities must be tagged by which SDK can execute them.            │
 │   Different SDKs have different capabilities.                           │
 │                                                                          │
 │   V1 SDKS                                                               │
@@ -418,7 +418,7 @@ The agent's job is to do POCs, figure things out, and self-enhance. We don't pre
 │   │                                                                  │   │
 │   └─────────────────────────────────────────────────────────────────┘   │
 │                                                                          │
-│   SKILL ENTRY SCHEMA (with SDK compatibility)                           │
+│   CAPABILITY ENTRY SCHEMA (with SDK compatibility)                      │
 │   ┌─────────────────────────────────────────────────────────────────┐   │
 │   │  - id: nextjs.build.basic                                        │   │
 │   │    confidence: 85                                                │   │
@@ -440,14 +440,14 @@ The agent's job is to do POCs, figure things out, and self-enhance. We don't pre
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 2.3 Three-Bucket Skill Taxonomy
+### 2.3 Three-Bucket Capability Taxonomy
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                          SKILL TAXONOMY                                  │
+│                       CAPABILITY TAXONOMY                                 │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                          │
-│   TECHNICAL SKILLS                    FUNCTIONAL SKILLS                  │
+│   TECHNICAL CAPABILITIES              FUNCTIONAL CAPABILITIES            │
 │   (Tool Operation)                    (Reasoning & Discipline)           │
 │   ├── git.branch_commit: 95%          ├── reason.decomposition: 85%     │
 │   ├── github.pr.create: 90%           ├── reason.debugging: 80%         │
@@ -459,7 +459,7 @@ The agent's job is to do POCs, figure things out, and self-enhance. We don't pre
 │            └───────────────┬───────────────────┘                        │
 │                            │                                             │
 │                            ▼                                             │
-│                     DELIVERY SKILLS                                      │
+│                     DELIVERY CAPABILITIES                                │
 │                     (End-to-End Outcomes)                                │
 │                     ├── deliver.site.static: 90%                        │
 │                     ├── deliver.nextjs.app.basic: 80%                   │
@@ -475,7 +475,7 @@ The agent's job is to do POCs, figure things out, and self-enhance. We don't pre
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 2.4 Skill ↔ Agent SDK Mapping
+### 2.4 Capability ↔ Agent SDK Mapping
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -485,18 +485,18 @@ The agent's job is to do POCs, figure things out, and self-enhance. We don't pre
 │   1. EXECUTIVE SELECTS TASK                                             │
 │      │                                                                   │
 │      ▼                                                                   │
-│   2. CHECK REQUIRED SKILLS                                              │
+│   2. CHECK REQUIRED CAPABILITIES                                        │
 │      ┌──────────────────────────────────────────┐                       │
 │      │ Task: "Build transactional Next.js app"  │                       │
 │      │                                          │                       │
-│      │ Required skills:                         │                       │
+│      │ Required capabilities (not Claude skills):│                       │
 │      │  • nextjs.build.basic (conf: 85%)       │                       │
 │      │  • nextjs.data.api_routes (conf: ??)    │                       │
 │      │  • git.branch_commit (conf: 95%)        │                       │
 │      └──────────────────────────────────────────┘                       │
 │      │                                                                   │
 │      ▼                                                                   │
-│   3. SPAWN WORKER WITH SKILLS                                           │
+│   3. SPAWN WORKER WITH SKILL TOOL                                      │
 │      ┌──────────────────────────────────────────┐                       │
 │      │ query({                                  │                       │
 │      │   prompt: task_contract,                 │                       │
@@ -513,14 +513,14 @@ The agent's job is to do POCs, figure things out, and self-enhance. We don't pre
 │      ┌──────────────────────────────────────────┐                       │
 │      │ Skill tool → "nextjs-build"              │                       │
 │      │ SKILL.md injected as context             │                       │
-│      │ Worker follows skill instructions        │                       │
+│      │ Worker follows Claude/Codex skill instructions │                 │
 │      └──────────────────────────────────────────┘                       │
 │      │                                                                   │
 │      ▼                                                                   │
 │   5. EXECUTIVE VALIDATES & UPDATES CONFIDENCE                           │
 │      ┌──────────────────────────────────────────┐                       │
 │      │ Verifiers run → PASS/FAIL                │                       │
-│      │ Skill confidence adjusted                │                       │
+│      │ Capability confidence adjusted           │                       │
 │      │ Capability ledger updated                │                       │
 │      └──────────────────────────────────────────┘                       │
 │                                                                          │
@@ -536,7 +536,7 @@ The agent's job is to do POCs, figure things out, and self-enhance. We don't pre
 ```
 continuous-agent/
 ├── .claude/
-│   └── skills/                          # Project-bundled skills
+│   └── skills/                          # Project-bundled Claude/Codex skills
 │       ├── executive-loop/
 │       │   └── SKILL.md
 │       ├── task-contract/
@@ -574,12 +574,12 @@ continuous-agent/
 ├── ledgers/
 │   ├── inputs-log.jsonl                 # Immutable input audit trail
 │   ├── work-ledger.jsonl                # Time/effort/artifact tracking
-│   └── capability-ledger.jsonl          # Skill attempt/result events
+│   └── capability-ledger.jsonl          # Capability attempt/result events
 │
-├── skills/
-│   ├── technical-skills.yml             # Tool operation skills
-│   ├── delivery-skills.yml              # End-to-end outcomes
-│   ├── functional-skills.yml            # Reasoning/discipline
+├── capabilities/
+│   ├── technical-capabilities.yml       # Tool operation capabilities
+│   ├── delivery-capabilities.yml        # End-to-end outcomes
+│   ├── functional-capabilities.yml      # Reasoning/discipline
 │   └── sdk-registry.yml                 # SDK capabilities & compatibility
 │
 ├── verifiers/
@@ -711,7 +711,7 @@ agent-outputs/
 │   │    • Run all applicable verifiers                                │   │
 │   │    • Check DoD criteria                                          │   │
 │   │    • Produce validation report                                   │   │
-│   │    • Update skill confidence                                     │   │
+│   │    • Update capability confidence                                │   │
 │   └─────────────────────────────────────────────────────────────────┘   │
 │      │                                                                   │
 │      ▼                                                                   │
@@ -743,7 +743,7 @@ agent-outputs/
 │   │ • Creating branches in agent-outputs/                            │   │
 │   │ • Research, documentation                                        │   │
 │   │ • Running verifiers                                              │   │
-│   │ • Updating skill confidence                                      │   │
+│   │ • Updating capability confidence                                 │   │
 │   │ • Creating task contracts                                        │   │
 │   │ • Spawning worker sessions                                       │   │
 │   │ • Adding references (Mode A, B, C)                               │   │
@@ -788,7 +788,7 @@ agent-outputs/
 │   │ • Builds things  │                    │ • Runs verifiers │          │
 │   │ • Creates code   │    handoff         │ • Checks DoD     │          │
 │   │ • Makes commits  │ ───────────────►   │ • Critiques      │          │
-│   │ • Documents      │                    │ • Updates skills │          │
+│   │ • Documents      │                    │ • Updates capabilities │    │
 │   └──────────────────┘                    └──────────────────┘          │
 │                                                  │                       │
 │                                                  ▼                       │
@@ -804,10 +804,10 @@ agent-outputs/
 │   │                                                                   │  │
 │   │  overall_result: PARTIAL                                          │  │
 │   │                                                                   │  │
-│   │  skills_exercised:                                                │  │
-│   │    - skill_id: nextjs.build.basic                                 │  │
+│   │  capabilities_exercised:                                          │  │
+│   │    - capability_id: nextjs.build.basic                            │  │
 │   │      confidence_delta: +10                                        │  │
-│   │    - skill_id: nextjs.testing                                     │  │
+│   │    - capability_id: nextjs.testing                                │  │
 │   │      confidence_delta: -15                                        │  │
 │   └──────────────────────────────────────────────────────────────────┘  │
 │                                                                          │
@@ -832,7 +832,7 @@ agent-outputs/
 │                                                                          │
 │   WHAT CAN BE IMPROVED                                                   │
 │   ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐        │
-│   │ Skill Registry  │  │ Preferences.md  │  │ Context Rules   │        │
+│   │ Capability Registry│ │ Preferences.md  │  │ Context Rules   │      │
 │   │ • Confidence %  │  │ • Patterns      │  │ • What context  │        │
 │   │ • Maturity      │  │ • Risk tol.     │  │   for what task │        │
 │   │ • Failure modes │  │                 │  │                 │        │
@@ -840,8 +840,8 @@ agent-outputs/
 │                                                                          │
 │   PRACTICE LOOP (when idle)                                             │
 │   ┌──────────────────────────────────────────────────────────────────┐  │
-│   │  1. Identify highest-impact unproven skill needed by P1 goals    │  │
-│   │  2. Generate practice task to exercise that skill safely         │  │
+│   │  1. Identify highest-impact unproven capability needed by P1 goals│  │
+│   │  2. Generate practice task to exercise that capability safely    │  │
 │   │  3. Execute → Validate → Record evidence                         │  │
 │   │  4. Update confidence/maturity                                   │  │
 │   └──────────────────────────────────────────────────────────────────┘  │
@@ -867,7 +867,7 @@ agent-outputs/
 │   │    • Read goals.md and select work                               │   │
 │   │    • Create task contracts                                       │   │
 │   │    • Spawn workers via Agent SDK                                 │   │
-│   │    • Run verifiers and update skills                             │   │
+│   │    • Run verifiers and update capabilities                       │   │
 │   │    • Communicate via needs-you.md                                │   │
 │   │                                                                  │   │
 │   │  This is INFRASTRUCTURE, not solutions.                          │   │
@@ -900,7 +900,7 @@ agent-outputs/
 │   │         Agent does POCs to test approaches                       │   │
 │   │         Agent builds working solution                            │   │
 │   │         Agent documents patterns for future use                  │   │
-│   │         Agent updates own skills with evidence                   │   │
+│   │         Agent updates own capabilities with evidence             │   │
 │   └─────────────────────────────────────────────────────────────────┘   │
 │                                                                          │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -926,14 +926,14 @@ agent-outputs/
 │   ┌─────────────────────────────────────────────────────────────────┐   │
 │   │  • Create workspace/ markdown files                              │   │
 │   │  • Create ledgers/ JSONL files                                   │   │
-│   │  • Create skills/ YAML files (seeded)                            │   │
+│   │  • Create capabilities/ YAML files (seeded)                      │   │
 │   │  • Create constitution.md                                        │   │
 │   └─────────────────────────────────────────────────────────────────┘   │
 │                                                                          │
 │   PHASE 2: SKILL SEEDING (Agent autonomous)                             │
 │   ┌─────────────────────────────────────────────────────────────────┐   │
 │   │  • Create project skills in .claude/skills/                      │   │
-│   │  • Seed technical/delivery/functional skills                     │   │
+│   │  • Seed technical/delivery/functional capabilities               │   │
 │   │  • All start at Declared maturity, low confidence                │   │
 │   └─────────────────────────────────────────────────────────────────┘   │
 │                                                                          │
@@ -947,7 +947,7 @@ agent-outputs/
 │   PHASE 4: CALIBRATION (Agent autonomous)                               │
 │   ┌─────────────────────────────────────────────────────────────────┐   │
 │   │  • Run calibration-nextjs-hello                                  │   │
-│   │  • Update skill confidence from evidence                         │   │
+│   │  • Update capability confidence from evidence                    │   │
 │   │  • Surface blockers                                              │   │
 │   └─────────────────────────────────────────────────────────────────┘   │
 │                                                                          │
@@ -1142,7 +1142,7 @@ The agent receives these in `goals.md` and figures them out through POCs, resear
 | Week 1 | Both repos created, PM2 starts loop, health checks pass |
 | Week 2 | Skills load correctly, 6+ verifiers working, worker spawning functional |
 | Week 3 | Calibration complete, Next.js app in progress, Notion research done |
-| 1 Month | Next.js app complete, Notion working or blocked on auth, 80%+ skills demonstrated |
+| 1 Month | Next.js app complete, Notion working or blocked on auth, 80%+ capabilities demonstrated |
 | 3 Months | 10+ projects in outputs, agent finds work autonomously, needs-you.md is primary interface |
 
 ---
@@ -1168,7 +1168,7 @@ The agent receives these in `goals.md` and figures them out through POCs, resear
 17. **Scope prevents overclaiming** — explicit includes/excludes
 18. **Validator is separate from Executor** — honest assessment
 19. **Gaps are valuable** — known unknowns enable targeted improvement
-20. **Practice fills gaps** — idle time becomes skill development
+20. **Practice fills gaps** — idle time becomes capability development
 21. **Evidence enables learning** — capability ledger provides receipts
 22. **Calibration before trust** — run calibration projects first
 23. **Harnesses are evidence** — existing successes seed confidence
@@ -1196,7 +1196,7 @@ npm install @anthropic-ai/claude-agent-sdk typescript @types/node
 
 1. Create directory structure
 2. Create workspace markdown files
-3. Create skill registries (seeded)
+3. Create capability registries (seeded)
 4. Create verifier definitions
 5. Create executive-loop.ts
 6. Create PM2 ecosystem.config.js
