@@ -18,7 +18,7 @@ sdks:
     version: "0.1.x"
     description: "Official Anthropic SDK for building autonomous Claude agents"
     status: active
-    skill_support: true
+    capability_tracking: true
 
     capabilities:
       core:
@@ -117,7 +117,7 @@ sdks:
     version: "1.x"
     description: "OpenAI's command-line interface for code generation"
     status: active
-    skill_support: false
+    capability_tracking: false
 
     capabilities:
       core:
@@ -164,7 +164,7 @@ sdks:
       supports_tools: true
 
     limitations:
-      - "No native skill tracking"
+      - "No native capability tracking"
       - "Limited agentic capabilities"
       - "Primarily code-focused"
 
@@ -179,7 +179,7 @@ sdks:
     version: "1.x"
     description: "Anthropic's official CLI for Claude with agentic capabilities"
     status: active
-    skill_support: true
+    capability_tracking: true
 
     capabilities:
       core:
@@ -246,7 +246,7 @@ sdks:
       default_model: claude-sonnet-4-20250514
       supports_system_prompt: true
       supports_tools: true
-      supports_skills: true
+      supports_capability_tracking: true
 
     limitations:
       - "Session-based memory only"
@@ -264,7 +264,7 @@ sdks:
     version: "0.x"
     description: "AI pair programming in the terminal"
     status: active
-    skill_support: false
+    capability_tracking: false
 
     capabilities:
       core:
@@ -301,7 +301,7 @@ sdks:
       supports_tools: false
 
     limitations:
-      - "No native skill tracking"
+      - "No native capability tracking"
       - "Manual file selection required"
       - "Third-party maintenance"
 

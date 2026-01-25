@@ -1,14 +1,14 @@
-# Delivery Skills Registry
-# End-to-end outcome delivery skills for the Continuous Executive Agent
+# Delivery Capabilities Registry
+# End-to-end outcome delivery capabilities for the Continuous Executive Agent
 # Version: 1.0.0
 # Last Updated: 2026-01-24
 
 metadata:
   category: delivery
-  description: "End-to-end outcome delivery skills representing complete deliverables"
+  description: "End-to-end outcome delivery capabilities representing complete deliverables"
   version: "1.0.0"
 
-skills:
+capabilities:
   # =============================================================================
   # Static Site Delivery
   # =============================================================================
@@ -27,7 +27,7 @@ skills:
         - "Dynamic server-side rendering"
         - "Database integration"
         - "Complex authentication"
-    requires_skills:
+    requires_capabilities:
       technical:
         - file.read_write
         - git.branch_commit
@@ -77,7 +77,7 @@ skills:
         - "Complex state management"
         - "Authentication systems"
         - "Database integration"
-    requires_skills:
+    requires_capabilities:
       technical:
         - node.npm.install
         - node.npm.run_script
@@ -130,7 +130,7 @@ skills:
         - "Custom infrastructure"
         - "Complex scaling requirements"
         - "Multi-region deployment"
-    requires_skills:
+    requires_capabilities:
       technical:
         - node.npm.install
         - node.npm.run_script
@@ -190,7 +190,7 @@ skills:
         - "Complex custom blocks"
         - "Advanced personalization"
         - "Custom authentication"
-    requires_skills:
+    requires_capabilities:
       technical:
         - eds.scaffold.basic
         - file.read_write
@@ -242,7 +242,7 @@ skills:
         - "Original research"
         - "Interview-based content"
         - "Video/multimedia content"
-    requires_skills:
+    requires_capabilities:
       technical:
         - file.read_write
       functional:
@@ -292,7 +292,7 @@ skills:
         - "Complex state management"
         - "Production deployment"
         - "Multi-tenant architecture"
-    requires_skills:
+    requires_capabilities:
       technical:
         - node.npm.install
         - node.npm.run_script
@@ -347,7 +347,7 @@ skills:
         - "Monorepo setups"
         - "Complex bundling strategies"
         - "Publishing automation"
-    requires_skills:
+    requires_capabilities:
       technical:
         - node.npm.install
         - typescript.build
@@ -387,12 +387,12 @@ skills:
   # =============================================================================
   - id: deliver.calibration.project
     name: "Calibration Project Delivery"
-    description: "Deliver a self-calibration project for skill assessment"
+    description: "Deliver a self-calibration project for capability assessment"
     confidence: 20
     maturity: Declared
     scope:
       includes:
-        - "Skill assessment design"
+        - "Capability assessment design"
         - "Test case creation"
         - "Evidence collection framework"
         - "Confidence scoring"
@@ -400,7 +400,7 @@ skills:
         - "Automated calibration"
         - "Multi-agent calibration"
         - "Production calibration systems"
-    requires_skills:
+    requires_capabilities:
       technical:
         - file.read_write
         - yaml.parse_manipulate
@@ -452,7 +452,7 @@ skills:
         - "Complex OAuth flows"
         - "Webhook handling"
         - "Real-time subscriptions"
-    requires_skills:
+    requires_capabilities:
       technical:
         - node.npm.install
         - typescript.build

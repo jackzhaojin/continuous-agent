@@ -1,16 +1,16 @@
-# Functional Skills Registry
-# Reasoning and discipline skills for the Continuous Executive Agent
+# Functional Capabilities Registry
+# Reasoning and discipline capabilities for the Continuous Executive Agent
 # Version: 1.0.0
 # Last Updated: 2026-01-24
 
 metadata:
   category: functional
-  description: "Reasoning, discipline, and soft skills that enable effective execution"
+  description: "Reasoning, discipline, and soft capabilities that enable effective execution"
   version: "1.0.0"
 
-skills:
+capabilities:
   # =============================================================================
-  # Reasoning Skills
+  # Reasoning Capabilities
   # =============================================================================
   - id: reason.decomposition
     name: "Task Decomposition"
@@ -220,7 +220,7 @@ skills:
     last_used: null
 
   # =============================================================================
-  # Execution Skills
+  # Execution Capabilities
   # =============================================================================
   - id: exec.strategy_switching
     name: "Strategy Switching"
@@ -343,7 +343,7 @@ skills:
     last_used: null
 
   # =============================================================================
-  # Communication Skills
+  # Communication Capabilities
   # =============================================================================
   - id: comm.needs_you.quality
     name: "Needs-You Communication Quality"
@@ -470,7 +470,7 @@ skills:
     last_used: null
 
   # =============================================================================
-  # Additional Functional Skills
+  # Additional Functional Capabilities
   # =============================================================================
   - id: reason.pattern_recognition
     name: "Pattern Recognition"

@@ -1,14 +1,14 @@
-# Technical Skills Registry
-# Tool operation skills for the Continuous Executive Agent
+# Technical Capabilities Registry
+# Tool operation capabilities for the Continuous Executive Agent
 # Version: 1.0.0
 # Last Updated: 2026-01-24
 
 metadata:
   category: technical
-  description: "Tool operation and technical execution skills"
+  description: "Tool operation and technical execution capabilities"
   version: "1.0.0"
 
-skills:
+capabilities:
   # =============================================================================
   # Git Operations
   # =============================================================================
@@ -548,7 +548,7 @@ skills:
     last_used: null
 
   # =============================================================================
-  # Additional Technical Skills
+  # Additional Technical Capabilities
   # =============================================================================
   - id: json.parse_manipulate
     name: "JSON Parsing and Manipulation"
