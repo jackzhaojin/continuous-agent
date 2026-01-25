@@ -1,0 +1,308 @@
+# SDK Registry
+# Available SDK capabilities for the Continuous Executive Agent
+# Version: 1.0.0
+# Last Updated: 2026-01-24
+
+metadata:
+  category: sdk
+  description: "Registry of available SDKs and their capabilities for agent execution"
+  version: "1.0.0"
+
+sdks:
+  # =============================================================================
+  # Claude Agent SDK (Anthropic)
+  # =============================================================================
+  - id: claude_agent_sdk
+    name: "Claude Agent SDK"
+    vendor: Anthropic
+    version: "0.1.x"
+    description: "Official Anthropic SDK for building autonomous Claude agents"
+    status: active
+    skill_support: true
+
+    capabilities:
+      core:
+        - id: conversation_management
+          name: "Conversation Management"
+          description: "Manage multi-turn conversations with context"
+          maturity: stable
+        - id: tool_use
+          name: "Tool Use"
+          description: "Execute tools and handle results"
+          maturity: stable
+        - id: streaming
+          name: "Streaming Responses"
+          description: "Stream responses for real-time output"
+          maturity: stable
+        - id: context_window
+          name: "Large Context Window"
+          description: "Support for 200K+ token context"
+          maturity: stable
+
+      agentic:
+        - id: multi_step_reasoning
+          name: "Multi-Step Reasoning"
+          description: "Chain multiple reasoning steps"
+          maturity: stable
+        - id: self_reflection
+          name: "Self Reflection"
+          description: "Evaluate own outputs and reasoning"
+          maturity: experimental
+        - id: task_decomposition
+          name: "Task Decomposition"
+          description: "Break complex tasks into subtasks"
+          maturity: stable
+        - id: error_recovery
+          name: "Error Recovery"
+          description: "Detect and recover from errors"
+          maturity: experimental
+
+      integration:
+        - id: mcp_support
+          name: "MCP Support"
+          description: "Model Context Protocol integration"
+          maturity: stable
+        - id: computer_use
+          name: "Computer Use"
+          description: "Screen interaction capabilities"
+          maturity: beta
+        - id: file_operations
+          name: "File Operations"
+          description: "Read and write files"
+          maturity: stable
+        - id: web_search
+          name: "Web Search"
+          description: "Search the web for information"
+          maturity: stable
+
+    models_supported:
+      - id: claude-opus-4-5-20251101
+        name: "Claude Opus 4.5"
+        tier: flagship
+        context_window: 200000
+        recommended_for:
+          - "Complex reasoning tasks"
+          - "Multi-step agent workflows"
+          - "Code generation and review"
+      - id: claude-sonnet-4-20250514
+        name: "Claude Sonnet 4"
+        tier: balanced
+        context_window: 200000
+        recommended_for:
+          - "General agent tasks"
+          - "Cost-effective workflows"
+          - "Rapid iteration"
+
+    configuration:
+      default_model: claude-sonnet-4-20250514
+      max_tokens: 16384
+      temperature: 0.7
+      supports_system_prompt: true
+      supports_tools: true
+
+    limitations:
+      - "No persistent memory across sessions"
+      - "Context window limits for very long tasks"
+      - "Rate limits apply"
+      - "Tool execution is synchronous"
+
+    documentation_url: "https://docs.anthropic.com/claude/docs/agents"
+
+  # =============================================================================
+  # Codex CLI (OpenAI)
+  # =============================================================================
+  - id: codex_cli
+    name: "Codex CLI"
+    vendor: OpenAI
+    version: "1.x"
+    description: "OpenAI's command-line interface for code generation"
+    status: active
+    skill_support: false
+
+    capabilities:
+      core:
+        - id: code_completion
+          name: "Code Completion"
+          description: "Complete code from prompts"
+          maturity: stable
+        - id: code_explanation
+          name: "Code Explanation"
+          description: "Explain existing code"
+          maturity: stable
+        - id: code_translation
+          name: "Code Translation"
+          description: "Translate between languages"
+          maturity: stable
+
+      cli:
+        - id: interactive_mode
+          name: "Interactive Mode"
+          description: "Interactive command-line session"
+          maturity: stable
+        - id: file_context
+          name: "File Context"
+          description: "Include files as context"
+          maturity: stable
+        - id: shell_integration
+          name: "Shell Integration"
+          description: "Execute shell commands"
+          maturity: beta
+
+    models_supported:
+      - id: gpt-4o
+        name: "GPT-4o"
+        tier: flagship
+        context_window: 128000
+      - id: gpt-4o-mini
+        name: "GPT-4o Mini"
+        tier: balanced
+        context_window: 128000
+
+    configuration:
+      default_model: gpt-4o
+      supports_system_prompt: true
+      supports_tools: true
+
+    limitations:
+      - "No native skill tracking"
+      - "Limited agentic capabilities"
+      - "Primarily code-focused"
+
+    documentation_url: "https://platform.openai.com/docs"
+
+  # =============================================================================
+  # Claude Code (Anthropic CLI)
+  # =============================================================================
+  - id: claude_code
+    name: "Claude Code"
+    vendor: Anthropic
+    version: "1.x"
+    description: "Anthropic's official CLI for Claude with agentic capabilities"
+    status: active
+    skill_support: true
+
+    capabilities:
+      core:
+        - id: code_generation
+          name: "Code Generation"
+          description: "Generate code from natural language"
+          maturity: stable
+        - id: code_editing
+          name: "Code Editing"
+          description: "Edit existing code files"
+          maturity: stable
+        - id: file_operations
+          name: "File Operations"
+          description: "Read, write, search files"
+          maturity: stable
+        - id: bash_execution
+          name: "Bash Execution"
+          description: "Execute shell commands"
+          maturity: stable
+
+      agentic:
+        - id: task_tracking
+          name: "Task Tracking"
+          description: "Track tasks with TodoWrite"
+          maturity: stable
+        - id: multi_file_editing
+          name: "Multi-File Editing"
+          description: "Edit multiple files in one session"
+          maturity: stable
+        - id: git_integration
+          name: "Git Integration"
+          description: "Native git operations"
+          maturity: stable
+        - id: project_context
+          name: "Project Context"
+          description: "Understand project structure"
+          maturity: stable
+
+      integration:
+        - id: mcp_tools
+          name: "MCP Tools"
+          description: "Use MCP-provided tools"
+          maturity: stable
+        - id: browser_control
+          name: "Browser Control"
+          description: "Control browser via MCP"
+          maturity: beta
+        - id: ide_integration
+          name: "IDE Integration"
+          description: "Integrate with IDEs"
+          maturity: beta
+
+    models_supported:
+      - id: claude-opus-4-5-20251101
+        name: "Claude Opus 4.5"
+        tier: flagship
+        context_window: 200000
+      - id: claude-sonnet-4-20250514
+        name: "Claude Sonnet 4"
+        tier: balanced
+        context_window: 200000
+
+    configuration:
+      default_model: claude-sonnet-4-20250514
+      supports_system_prompt: true
+      supports_tools: true
+      supports_skills: true
+
+    limitations:
+      - "Session-based memory only"
+      - "Context window limits apply"
+      - "Requires API key"
+
+    documentation_url: "https://docs.anthropic.com/claude-code"
+
+  # =============================================================================
+  # Aider (Third-Party)
+  # =============================================================================
+  - id: aider
+    name: "Aider"
+    vendor: Third-Party (Paul Gauthier)
+    version: "0.x"
+    description: "AI pair programming in the terminal"
+    status: active
+    skill_support: false
+
+    capabilities:
+      core:
+        - id: code_editing
+          name: "Code Editing"
+          description: "Edit code with AI assistance"
+          maturity: stable
+        - id: git_aware
+          name: "Git Awareness"
+          description: "Understands git state"
+          maturity: stable
+        - id: multi_file
+          name: "Multi-File Editing"
+          description: "Edit multiple files"
+          maturity: stable
+
+      integration:
+        - id: multi_model
+          name: "Multi-Model Support"
+          description: "Use various LLM providers"
+          maturity: stable
+        - id: voice_input
+          name: "Voice Input"
+          description: "Voice commands"
+          maturity: experimental
+
+    models_supported:
+      - id: various
+        name: "Multiple Providers"
+        description: "Supports OpenAI, Anthropic, and others"
+
+    configuration:
+      supports_system_prompt: false
+      supports_tools: false
+
+    limitations:
+      - "No native skill tracking"
+      - "Manual file selection required"
+      - "Third-party maintenance"
+
+    documentation_url: "https://aider.chat"

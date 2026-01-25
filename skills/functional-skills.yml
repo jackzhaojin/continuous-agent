@@ -1,0 +1,593 @@
+# Functional Skills Registry
+# Reasoning and discipline skills for the Continuous Executive Agent
+# Version: 1.0.0
+# Last Updated: 2026-01-24
+
+metadata:
+  category: functional
+  description: "Reasoning, discipline, and soft skills that enable effective execution"
+  version: "1.0.0"
+
+skills:
+  # =============================================================================
+  # Reasoning Skills
+  # =============================================================================
+  - id: reason.decomposition
+    name: "Task Decomposition"
+    description: "Break down complex tasks into manageable, actionable subtasks"
+    confidence: 85
+    maturity: Reliable
+    scope:
+      includes:
+        - "Identifying task boundaries"
+        - "Sequencing dependencies"
+        - "Estimating subtask complexity"
+        - "Recognizing parallelizable work"
+      excludes:
+        - "Novel domain decomposition"
+        - "Cross-team coordination planning"
+    rubric:
+      pass_conditions:
+        - "Tasks broken into 3-7 clear subtasks"
+        - "Dependencies explicitly identified"
+        - "Each subtask is independently verifiable"
+        - "No missing critical steps"
+        - "Subtasks are appropriately sized"
+      fail_indicators:
+        - "Monolithic task blocks"
+        - "Missing dependencies"
+        - "Subtasks too large or too granular"
+        - "Circular dependencies"
+        - "Implicit assumptions not stated"
+    evidence:
+      successes: 0
+      failures: 0
+      last_success: null
+      last_failure: null
+    common_failure_modes:
+      - "Over-decomposition into trivial steps"
+      - "Under-decomposition leaving large chunks"
+      - "Missing edge case handling tasks"
+      - "Incorrect dependency ordering"
+    last_validated: null
+    last_used: null
+
+  - id: reason.debugging.discipline
+    name: "Debugging Discipline"
+    description: "Systematic approach to identifying and resolving issues"
+    confidence: 80
+    maturity: Demonstrated
+    scope:
+      includes:
+        - "Reproducing issues reliably"
+        - "Hypothesis formation"
+        - "Systematic elimination"
+        - "Root cause identification"
+        - "Fix verification"
+      excludes:
+        - "Hardware debugging"
+        - "Distributed system debugging"
+        - "Performance profiling"
+    rubric:
+      pass_conditions:
+        - "Issue reproduced before fixing"
+        - "Hypothesis stated before changes"
+        - "One variable changed at a time"
+        - "Root cause identified, not just symptom"
+        - "Fix verified with test"
+      fail_indicators:
+        - "Random changes without hypothesis"
+        - "Multiple changes at once"
+        - "Symptom treated, not cause"
+        - "No verification of fix"
+        - "Incomplete understanding claimed as solved"
+    evidence:
+      successes: 0
+      failures: 0
+      last_success: null
+      last_failure: null
+    common_failure_modes:
+      - "Premature solution attempts"
+      - "Confirmation bias in hypothesis testing"
+      - "Incomplete root cause analysis"
+      - "Fix introduces new issues"
+    last_validated: null
+    last_used: null
+
+  - id: reason.risk_assessment
+    name: "Risk Assessment"
+    description: "Identify and evaluate risks before taking action"
+    confidence: 70
+    maturity: Demonstrated
+    scope:
+      includes:
+        - "Identifying potential failure modes"
+        - "Assessing impact and likelihood"
+        - "Proposing mitigations"
+        - "Recommending checkpoints"
+      excludes:
+        - "Quantitative risk modeling"
+        - "Financial risk assessment"
+        - "Security threat modeling"
+    rubric:
+      pass_conditions:
+        - "Major risks identified proactively"
+        - "Impact assessed realistically"
+        - "Mitigations proposed for high risks"
+        - "Checkpoint recommendations made"
+        - "Unknown risks acknowledged"
+      fail_indicators:
+        - "Risks ignored or dismissed"
+        - "Overconfident risk assessment"
+        - "No mitigation strategies"
+        - "False certainty expressed"
+        - "Post-hoc risk identification"
+    evidence:
+      successes: 0
+      failures: 0
+      last_success: null
+      last_failure: null
+    common_failure_modes:
+      - "Underestimating novel risks"
+      - "Overweighting familiar risks"
+      - "Missing systemic risks"
+      - "Mitigation theater"
+    last_validated: null
+    last_used: null
+
+  - id: reason.research.synthesis
+    name: "Research Synthesis"
+    description: "Gather, evaluate, and synthesize information from multiple sources"
+    confidence: 75
+    maturity: Demonstrated
+    scope:
+      includes:
+        - "Source identification"
+        - "Information extraction"
+        - "Cross-source validation"
+        - "Summary generation"
+        - "Citation tracking"
+      excludes:
+        - "Original research"
+        - "Statistical analysis"
+        - "Expert interviews"
+    rubric:
+      pass_conditions:
+        - "Multiple sources consulted"
+        - "Sources evaluated for credibility"
+        - "Contradictions noted and addressed"
+        - "Key findings clearly summarized"
+        - "Sources properly cited"
+      fail_indicators:
+        - "Single source reliance"
+        - "Uncritical source acceptance"
+        - "Missing contradictions"
+        - "Unsourced claims"
+        - "Copy-paste without synthesis"
+    evidence:
+      successes: 0
+      failures: 0
+      last_success: null
+      last_failure: null
+    common_failure_modes:
+      - "Source quality assessment failure"
+      - "Confirmation bias in source selection"
+      - "Over-reliance on first result"
+      - "Missing recent/updated sources"
+    last_validated: null
+    last_used: null
+
+  - id: reason.critical_evaluation
+    name: "Critical Evaluation"
+    description: "Evaluate claims, outputs, and results with appropriate skepticism"
+    confidence: 70
+    maturity: Demonstrated
+    scope:
+      includes:
+        - "Claim verification"
+        - "Logic checking"
+        - "Assumption identification"
+        - "Counter-argument consideration"
+        - "Confidence calibration"
+      excludes:
+        - "Formal logic proofs"
+        - "Statistical significance testing"
+        - "Expert domain evaluation"
+    rubric:
+      pass_conditions:
+        - "Claims verified against evidence"
+        - "Assumptions explicitly stated"
+        - "Counter-arguments considered"
+        - "Confidence appropriately calibrated"
+        - "Gaps in reasoning identified"
+      fail_indicators:
+        - "Uncritical acceptance"
+        - "Hidden assumptions"
+        - "No counter-arguments considered"
+        - "Overconfident conclusions"
+        - "Logical fallacies present"
+    evidence:
+      successes: 0
+      failures: 0
+      last_success: null
+      last_failure: null
+    common_failure_modes:
+      - "Accepting plausible but wrong answers"
+      - "Missing implicit assumptions"
+      - "Insufficient counter-argument exploration"
+      - "Anchoring on initial assessment"
+    last_validated: null
+    last_used: null
+
+  # =============================================================================
+  # Execution Skills
+  # =============================================================================
+  - id: exec.strategy_switching
+    name: "Strategy Switching"
+    description: "Recognize when current approach is failing and switch strategies"
+    confidence: 60
+    maturity: Demonstrated
+    scope:
+      includes:
+        - "Failure pattern recognition"
+        - "Alternative strategy generation"
+        - "Sunk cost avoidance"
+        - "Graceful strategy transitions"
+      excludes:
+        - "Real-time strategy adaptation"
+        - "Multi-agent coordination"
+    rubric:
+      pass_conditions:
+        - "Failure recognized within 2-3 attempts"
+        - "Alternative approaches identified"
+        - "Sunk cost not driving decisions"
+        - "Strategy change clearly communicated"
+        - "Learning extracted from failed approach"
+      fail_indicators:
+        - "Repeated failed attempts (>3)"
+        - "No alternatives considered"
+        - "Sunk cost fallacy"
+        - "Silent strategy changes"
+        - "Blame external factors"
+    evidence:
+      successes: 0
+      failures: 0
+      last_success: null
+      last_failure: null
+    common_failure_modes:
+      - "Persisting too long on failing approach"
+      - "Switching too quickly without learning"
+      - "No clear criteria for switching"
+      - "Returning to failed approaches"
+    last_validated: null
+    last_used: null
+
+  - id: exec.prioritization
+    name: "Prioritization"
+    description: "Order tasks by importance and urgency effectively"
+    confidence: 75
+    maturity: Demonstrated
+    scope:
+      includes:
+        - "Importance vs urgency distinction"
+        - "Dependency-aware ordering"
+        - "Quick win identification"
+        - "Blocker prioritization"
+      excludes:
+        - "Multi-stakeholder prioritization"
+        - "Resource-constrained scheduling"
+    rubric:
+      pass_conditions:
+        - "Critical path items first"
+        - "Blockers addressed immediately"
+        - "Quick wins captured appropriately"
+        - "Dependencies respected"
+        - "Rationale for ordering clear"
+      fail_indicators:
+        - "Random ordering"
+        - "Blockers ignored"
+        - "Only easy tasks prioritized"
+        - "Dependencies violated"
+        - "No clear prioritization logic"
+    evidence:
+      successes: 0
+      failures: 0
+      last_success: null
+      last_failure: null
+    common_failure_modes:
+      - "Urgency bias over importance"
+      - "Avoiding difficult high-priority tasks"
+      - "Missing hidden dependencies"
+      - "Over-optimizing for quick wins"
+    last_validated: null
+    last_used: null
+
+  - id: exec.time_awareness
+    name: "Time Awareness"
+    description: "Maintain awareness of time spent and remaining on tasks"
+    confidence: 65
+    maturity: Demonstrated
+    scope:
+      includes:
+        - "Effort estimation"
+        - "Progress tracking"
+        - "Time boxing"
+        - "Escalation timing"
+      excludes:
+        - "Multi-day project tracking"
+        - "Resource allocation"
+    rubric:
+      pass_conditions:
+        - "Effort estimates provided"
+        - "Progress reported periodically"
+        - "Time limits respected"
+        - "Escalation when stuck"
+        - "Realistic adjustments made"
+      fail_indicators:
+        - "No effort estimates"
+        - "Silent extended execution"
+        - "No progress updates"
+        - "Time limits ignored"
+        - "Late escalation"
+    evidence:
+      successes: 0
+      failures: 0
+      last_success: null
+      last_failure: null
+    common_failure_modes:
+      - "Underestimating complexity"
+      - "Losing track of time"
+      - "Not reporting stalls"
+      - "Optimistic progress reports"
+    last_validated: null
+    last_used: null
+
+  # =============================================================================
+  # Communication Skills
+  # =============================================================================
+  - id: comm.needs_you.quality
+    name: "Needs-You Communication Quality"
+    description: "Communicate clearly when human input or decision is needed"
+    confidence: 80
+    maturity: Demonstrated
+    scope:
+      includes:
+        - "Clear problem statement"
+        - "Context provision"
+        - "Option presentation"
+        - "Recommendation with rationale"
+        - "Specific ask formulation"
+      excludes:
+        - "Complex negotiation"
+        - "Multi-stakeholder communication"
+    rubric:
+      pass_conditions:
+        - "Problem clearly stated"
+        - "Relevant context provided"
+        - "Options presented fairly"
+        - "Recommendation given with reasoning"
+        - "Specific action requested"
+      fail_indicators:
+        - "Vague problem description"
+        - "Missing context"
+        - "Biased option presentation"
+        - "No recommendation"
+        - "Open-ended asks"
+    evidence:
+      successes: 0
+      failures: 0
+      last_success: null
+      last_failure: null
+    common_failure_modes:
+      - "Insufficient context"
+      - "Asking too frequently"
+      - "Not asking when needed"
+      - "Poorly framed questions"
+    last_validated: null
+    last_used: null
+
+  - id: comm.documentation
+    name: "Documentation"
+    description: "Create clear, useful documentation for work performed"
+    confidence: 85
+    maturity: Reliable
+    scope:
+      includes:
+        - "README creation"
+        - "Code comments"
+        - "Decision documentation"
+        - "Setup instructions"
+        - "API documentation"
+      excludes:
+        - "User manuals"
+        - "Marketing documentation"
+        - "Video tutorials"
+    rubric:
+      pass_conditions:
+        - "Purpose clearly stated"
+        - "Setup steps complete and accurate"
+        - "Key decisions documented"
+        - "Examples provided"
+        - "Kept up to date with changes"
+      fail_indicators:
+        - "Missing or outdated docs"
+        - "Incomplete setup steps"
+        - "No decision rationale"
+        - "Copy-paste without context"
+        - "Jargon without explanation"
+    evidence:
+      successes: 0
+      failures: 0
+      last_success: null
+      last_failure: null
+    common_failure_modes:
+      - "Documentation drift from code"
+      - "Assumed knowledge"
+      - "Missing edge cases"
+      - "Over-documentation"
+    last_validated: null
+    last_used: null
+
+  - id: comm.progress_reporting
+    name: "Progress Reporting"
+    description: "Report progress clearly and at appropriate intervals"
+    confidence: 80
+    maturity: Demonstrated
+    scope:
+      includes:
+        - "Status summaries"
+        - "Blocker reporting"
+        - "Milestone communication"
+        - "Estimate updates"
+      excludes:
+        - "Formal status reports"
+        - "Executive summaries"
+        - "Multi-team coordination"
+    rubric:
+      pass_conditions:
+        - "Regular updates provided"
+        - "Blockers highlighted immediately"
+        - "Milestones acknowledged"
+        - "Estimates adjusted as needed"
+        - "Appropriate detail level"
+      fail_indicators:
+        - "Silent execution"
+        - "Hidden blockers"
+        - "Surprise outcomes"
+        - "Over-detailed updates"
+        - "Under-detailed updates"
+    evidence:
+      successes: 0
+      failures: 0
+      last_success: null
+      last_failure: null
+    common_failure_modes:
+      - "Reporting too infrequently"
+      - "Hiding problems"
+      - "Overly optimistic status"
+      - "Information overload"
+    last_validated: null
+    last_used: null
+
+  # =============================================================================
+  # Additional Functional Skills
+  # =============================================================================
+  - id: reason.pattern_recognition
+    name: "Pattern Recognition"
+    description: "Identify recurring patterns in code, errors, and workflows"
+    confidence: 78
+    maturity: Demonstrated
+    scope:
+      includes:
+        - "Code pattern identification"
+        - "Error pattern matching"
+        - "Workflow pattern recognition"
+        - "Anti-pattern detection"
+      excludes:
+        - "Novel pattern discovery"
+        - "Statistical pattern analysis"
+    rubric:
+      pass_conditions:
+        - "Common patterns identified quickly"
+        - "Pattern applicability assessed"
+        - "Anti-patterns flagged"
+        - "Pattern variations handled"
+        - "Pattern confidence stated"
+      fail_indicators:
+        - "Patterns missed"
+        - "False pattern matching"
+        - "Over-generalization"
+        - "Pattern applied incorrectly"
+        - "Anti-patterns not recognized"
+    evidence:
+      successes: 0
+      failures: 0
+      last_success: null
+      last_failure: null
+    common_failure_modes:
+      - "Seeing patterns where none exist"
+      - "Missing subtle patterns"
+      - "Applying wrong pattern"
+      - "Pattern tunnel vision"
+    last_validated: null
+    last_used: null
+
+  - id: exec.recovery_from_failure
+    name: "Recovery from Failure"
+    description: "Gracefully recover from failures and continue productively"
+    confidence: 72
+    maturity: Demonstrated
+    scope:
+      includes:
+        - "Error acknowledgment"
+        - "State assessment"
+        - "Recovery planning"
+        - "Preventing recurrence"
+      excludes:
+        - "Disaster recovery"
+        - "Data recovery"
+    rubric:
+      pass_conditions:
+        - "Failure acknowledged promptly"
+        - "Current state accurately assessed"
+        - "Recovery plan formed"
+        - "Previous work preserved if possible"
+        - "Lessons extracted"
+      fail_indicators:
+        - "Failure denial"
+        - "Unclear current state"
+        - "No recovery plan"
+        - "Previous work lost"
+        - "Same failure repeated"
+    evidence:
+      successes: 0
+      failures: 0
+      last_success: null
+      last_failure: null
+    common_failure_modes:
+      - "Compounding failures"
+      - "Panic responses"
+      - "Incomplete recovery"
+      - "Not learning from failure"
+    last_validated: null
+    last_used: null
+
+  - id: comm.uncertainty_expression
+    name: "Uncertainty Expression"
+    description: "Clearly communicate confidence levels and uncertainties"
+    confidence: 75
+    maturity: Demonstrated
+    scope:
+      includes:
+        - "Confidence calibration"
+        - "Uncertainty acknowledgment"
+        - "Assumption flagging"
+        - "Range estimates"
+      excludes:
+        - "Probabilistic forecasting"
+        - "Statistical confidence intervals"
+    rubric:
+      pass_conditions:
+        - "Confidence levels stated"
+        - "Uncertainties acknowledged"
+        - "Assumptions flagged"
+        - "Ranges given when appropriate"
+        - "Calibration appropriate to knowledge"
+      fail_indicators:
+        - "False certainty"
+        - "Hidden assumptions"
+        - "Point estimates only"
+        - "Uncalibrated confidence"
+        - "Uncertainty buried or hidden"
+    evidence:
+      successes: 0
+      failures: 0
+      last_success: null
+      last_failure: null
+    common_failure_modes:
+      - "Overconfidence"
+      - "Underconfidence"
+      - "Vague uncertainty language"
+      - "Inconsistent calibration"
+    last_validated: null
+    last_used: null

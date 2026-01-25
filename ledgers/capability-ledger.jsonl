@@ -1,0 +1,11 @@
+# Capability Ledger (JSONL Format)
+# Each line is a JSON object representing a capability change event
+# Schema:
+# {
+#   "timestamp": "ISO8601 datetime",
+#   "event_type": "capability_added|capability_removed|capability_updated|auth_changed",
+#   "capability": "name of the capability/tool",
+#   "status": "available|unavailable|limited|pending",
+#   "reason": "why the change occurred",
+#   "metadata": {}
+# }

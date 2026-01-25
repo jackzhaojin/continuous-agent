@@ -1,0 +1,30 @@
+# Reference Registry
+# This file tracks external references, documents, and resources used by the agent system.
+
+schema_version: "1.0"
+last_updated: null
+
+# References are organized by category
+references:
+  # Example entry format:
+  # - id: unique-identifier
+  #   name: Human readable name
+  #   type: document|url|api|file
+  #   location: path or URL
+  #   description: What this reference contains
+  #   added: ISO8601 date
+  #   tags: [list, of, tags]
+  #   status: active|archived|deprecated
+
+categories:
+  documentation: []
+  specifications: []
+  apis: []
+  templates: []
+  external: []
+
+# Notes on usage:
+# - Add new references with unique IDs
+# - Update last_updated when modifying
+# - Mark deprecated references rather than removing them
+# - Use tags for cross-cutting categorization
