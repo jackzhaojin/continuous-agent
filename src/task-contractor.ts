@@ -11,8 +11,10 @@ import { randomUUID } from 'crypto';
 
 /**
  * Default tools allowed for worker agents
+ * Note: 'Skill' is REQUIRED for Claude Code skills to be invoked
  */
 const DEFAULT_TOOLS = [
+  'Skill',   // REQUIRED for skills from ~/.claude/skills/ and .claude/skills/
   'Read',
   'Write',
   'Edit',
