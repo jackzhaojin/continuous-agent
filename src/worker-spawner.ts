@@ -266,6 +266,7 @@ export async function spawnWorker(
       artifacts,
       errors,
       duration_ms: duration,
+      output_path: projectPath,
     };
   } catch (error) {
     const duration = Date.now() - startTime;
@@ -285,6 +286,7 @@ export async function spawnWorker(
       artifacts,
       errors: [`Worker execution failed: ${errorMessage}`],
       duration_ms: duration,
+      output_path: projectPath,
     };
   }
 }

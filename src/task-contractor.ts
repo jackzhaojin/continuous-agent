@@ -32,32 +32,35 @@ const EXTENDED_TOOLS = [
 
 /**
  * Determine the appropriate max_turns based on task complexity
+ * Respects MAX_TURNS environment variable as the cap
  */
 function estimateMaxTurns(workItem: WorkItem): number {
+  // Get max turns from environment, default to 250 for agentic coding tasks
+  const maxTurnsEnv = parseInt(process.env.MAX_TURNS || '250', 10);
+
   // Use both title and description for keyword analysis
   const text = `${workItem.title} ${workItem.description}`.toLowerCase();
 
-  // Simple tasks: 10 turns
+  // For simple tasks, use less turns (but still respect env max)
   if (
     text.includes('fix typo') ||
     text.includes('update version') ||
     text.includes('add comment') ||
     text.includes('rename')
   ) {
-    return 10;
+    return Math.min(50, maxTurnsEnv);
   }
 
-  // Medium complexity: 20 turns
+  // For medium complexity tasks
   if (
     text.includes('refactor') ||
     text.includes('add test') ||
-    text.includes('update config') ||
-    text.includes('implement feature')
+    text.includes('update config')
   ) {
-    return 20;
+    return Math.min(100, maxTurnsEnv);
   }
 
-  // Complex tasks: 30 turns
+  // For complex tasks (building apps, integrations, etc) - use full MAX_TURNS
   if (
     text.includes('migrate') ||
     text.includes('rewrite') ||
@@ -65,22 +68,18 @@ function estimateMaxTurns(workItem: WorkItem): number {
     text.includes('design') ||
     text.includes('build') ||
     text.includes('app') ||
-    text.includes('integration')
+    text.includes('integration') ||
+    text.includes('implement feature')
   ) {
-    return 30;
+    return maxTurnsEnv; // Use full configured max
   }
 
-  // Default based on priority
-  switch (workItem.priority) {
-    case 'P1':
-      return 25;
-    case 'P2':
-      return 20;
-    case 'P3':
-      return 15;
-    default:
-      return 20;
-  }
+  // Default based on priority (but cap at MAX_TURNS)
+  const defaultTurns = workItem.priority === 'P1' ? maxTurnsEnv :
+                       workItem.priority === 'P2' ? Math.min(150, maxTurnsEnv) :
+                       Math.min(100, maxTurnsEnv);
+
+  return defaultTurns;
 }
 
 /**

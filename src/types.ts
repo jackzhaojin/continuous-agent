@@ -56,6 +56,7 @@ export interface WorkerResult {
   artifacts: string[];
   errors: string[];
   duration_ms: number;
+  output_path?: string; // Target folder in agent-outputs where work was done
 }
 
 /**

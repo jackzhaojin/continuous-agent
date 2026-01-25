@@ -14,3 +14,7 @@
 {"event":"SKILL_ATTEMPT","ts":"2026-01-25T15:38:02.901Z","task_id":"work-1","task_title":"Build Next.js Transactional App","skills_exercised":["node.npm.run_script","nextjs.build.basic"],"iteration":1}
 {"event":"SKILL_ATTEMPT","ts":"2026-01-25T15:39:25.332Z","task_id":"work-1","task_title":"Build Next.js Transactional App","skills_exercised":["node.npm.run_script","nextjs.build.basic"],"iteration":1}
 {"event":"SKILL_ATTEMPT","ts":"2026-01-25T15:42:11.350Z","task_id":"work-1","task_title":"Build Next.js Transactional App","skills_exercised":["node.npm.run_script","nextjs.build.basic"],"iteration":2}
+{"event":"SKILL_ATTEMPT","ts":"2026-01-25T15:45:20.956Z","task_id":"work-1","task_title":"Build Next.js Transactional App","skills_exercised":["node.npm.run_script","nextjs.build.basic"],"iteration":3}
+{"event":"SKILL_ATTEMPT","ts":"2026-01-25T15:49:23.649Z","task_id":"work-1","task_title":"Build Next.js Transactional App","skills_exercised":["node.npm.run_script","nextjs.build.basic"],"iteration":4}
+{"event":"CAPABILITY_ATTEMPT","ts":"2026-01-25T15:53:04.816Z","task_id":"work-1","task_title":"Build Next.js Transactional App","capabilities_exercised":["node.npm.run_script","nextjs.build.basic"],"iteration":1}
+{"event":"CAPABILITY_ATTEMPT","ts":"2026-01-25T15:55:01.830Z","task_id":"work-1","task_title":"Build Next.js Transactional App","capabilities_exercised":["node.npm.run_script","nextjs.build.basic"],"iteration":1}

@@ -31,7 +31,7 @@ npm run build && npm start
 **CRITICAL SEPARATION:**
 
 - **`continuous-agent/`** (this repo) - Agent infrastructure ONLY
-  - Executive loop, worker spawner, verifiers, skills, workspace files
+  - Executive loop, worker spawner, verifiers, capabilities, workspace files
   - NO application code, NO project outputs
 
 - **`agent-outputs/`** (sibling directory) - ALL worker outputs
@@ -71,7 +71,7 @@ This separation is enforced by **Constitution Article I, Section 6** (zero toler
 
 **Verification & Learning:**
 - `verifiers/` - Deterministic checks (git-clean, node-build, docs-complete, etc.)
-- `learning/skill-updater.ts` - Updates skill confidence: +10 on PASS, -15 on FAIL
+- `learning/capability-updater.ts` - Updates capability confidence: +10 on PASS, -15 on FAIL
 
 **State Management:**
 - `health-checker.ts` - Validates auth, tools, disk space
@@ -87,18 +87,18 @@ This separation is enforced by **Constitution Article I, Section 6** (zero toler
 
 **Append-only ledgers (JSONL):**
 - `ledgers/work-ledger.jsonl` - Task events (STARTED, COMPLETED, BLOCKED)
-- `ledgers/capability-ledger.jsonl` - Skill attempts and results
+- `ledgers/capability-ledger.jsonl` - Capability attempts and results
 - `ledgers/inputs-log.jsonl` - Human input audit trail
 - `ledgers/executive-{date}.log` - Daily executive loop logs
 - `ledgers/{yyyy-mm-dd}/worker-{task-id}.log` - Worker execution logs (organized by date)
 
 **IMPORTANT:** The `ledgers/` directory is **version controlled** and committed to git for full audit traceability.
 
-**Skill registries (YAML):**
-- `skills/technical-skills.yml` - Tool operation skills (git, npm, ssh, docker)
-- `skills/delivery-skills.yml` - End-to-end outcomes (nextjs app, EDS site)
-- `skills/functional-skills.yml` - Cross-cutting skills (debugging, research)
-- `skills/sdk-registry.yml` - Agent SDK capability mappings
+**Capability registries (YAML):**
+- `capabilities/technical-capabilities.yml` - Tool operation capabilities (git, npm, ssh, docker)
+- `capabilities/delivery-capabilities.yml` - End-to-end outcomes (nextjs app, EDS site)
+- `capabilities/functional-capabilities.yml` - Cross-cutting capabilities (debugging, research)
+- `capabilities/sdk-registry.yml` - Agent SDK capability mappings
 
 ## Constitution (Hard Limits)
 
@@ -185,7 +185,7 @@ Verifiers run after each task and return structured evidence:
 - `docs-checklist` - README/CLAUDE.md present
 - `reference-integrity` - Reference registry valid
 
-Verifier results update skill confidence scores: +10 on PASS, -15 on FAIL.
+Verifier results update capability confidence scores: +10 on PASS, -15 on FAIL.
 
 ## Environment Variables
 
@@ -217,11 +217,13 @@ LOOP_SLEEP_SECONDS=30       # Sleep between iterations
 - Target ES2022, strict mode enabled
 - Import paths need `.js` extension (e.g., `'./types.js'` even for `.ts` files)
 
-## Skills & Claude Agent SDK
+## Capabilities & Claude Agent SDK
 
-**Skill Documentation:** `.claude/skills/{skill-name}/SKILL.md`
+**Claude Code Skills:** `.claude/skills/{skill-name}/SKILL.md` (Claude Code's built-in skill system)
 
-Each skill must have:
+Note: The agent's "capabilities" are distinct from Claude Code's "skills". Claude Code skills are documentation files that help Claude understand project context. Agent capabilities are tracked competencies with confidence scores.
+
+Each Claude Code skill must have:
 ```yaml
 ---
 name: Skill Name
@@ -248,7 +250,7 @@ continuous-agent/
 │   ├── health-checker.ts       # System health validation
 │   ├── intelligence/           # Intent classification, strategy selection
 │   ├── verifiers/              # Deterministic validation
-│   ├── learning/               # Skill confidence updates
+│   ├── learning/               # Capability confidence updates
 │   └── types.ts                # Shared interfaces
 │
 ├── workspace/                  # Human-editable state
@@ -259,15 +261,15 @@ continuous-agent/
 │
 ├── ledgers/                    # Append-only logs
 │   ├── work-ledger.jsonl       # Task events
-│   ├── capability-ledger.jsonl # Skill results
+│   ├── capability-ledger.jsonl # Capability results
 │   └── executive-{date}.log    # Daily execution logs
 │
-├── skills/                     # YAML skill registries
-│   ├── technical-skills.yml    # Tool skills
-│   ├── delivery-skills.yml     # End-to-end outcomes
-│   └── functional-skills.yml   # Cross-cutting skills
+├── capabilities/               # YAML capability registries
+│   ├── technical-capabilities.yml    # Tool capabilities
+│   ├── delivery-capabilities.yml     # End-to-end outcomes
+│   └── functional-capabilities.yml   # Cross-cutting capabilities
 │
-├── .claude/skills/             # Skill documentation (SKILL.md)
+├── .claude/skills/             # Claude Code skill documentation (SKILL.md)
 ├── verifiers/definitions/      # Verifier YAML configs
 ├── strategies/prompts/         # Prompt templates
 └── ai-docs/                    # PRDs, specs, feature docs
@@ -279,7 +281,7 @@ continuous-agent/
 - **Agent** = This codebase (executive loop, orchestration)
 - **Worker** = Spawned Agent SDK session for a specific task
 
-**Skill Types:**
+**Capability Types:**
 - **Technical** = Tool operation (git.commit, npm.install)
 - **Delivery** = End-to-end outcomes (deliver.nextjs.app)
 - **Functional** = Cross-cutting abilities (reason.debugging)
@@ -316,4 +318,5 @@ tail -20 ledgers/work-ledger.jsonl
 - **PRD:** `ai-docs/v1/init/continuous-executive-agent-v1-prd.md`
 - **Constitution:** `workspace/constitution.md`
 - **Features:** `ai-docs/features/` (human-interaction, etc.)
-- **Skills:** `.claude/skills/{skill-name}/SKILL.md`
+- **Claude Code Skills:** `.claude/skills/{skill-name}/SKILL.md`
+- **Agent Capabilities:** `capabilities/*.yml`

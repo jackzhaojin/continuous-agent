@@ -9,7 +9,7 @@ import { spawnWorker, validateAuth, type WorkerRetryContext } from './worker-spa
 import { selectStrategy } from './intelligence/strategy-selector.js';
 import { classifyIntent } from './intelligence/intent-classifier.js';
 import { runAllVerifiers, summarizeResults, type VerifierResult } from './verifiers/index.js';
-import { updateSkillsFromVerifierResults, DEFAULT_SKILL_MAPPINGS } from './learning/skill-updater.js';
+import { updateCapabilitiesFromVerifierResults, DEFAULT_CAPABILITY_MAPPINGS } from './learning/capability-updater.js';
 import { processHumanInputs } from './input-processor.js';
 import type { HealthStatus, WorkerResult, LoopState } from './types.js';
 import type { WorkItem } from './work-selector.js';
@@ -236,59 +236,59 @@ function isHealthyEnoughToWork(health: HealthStatus): boolean {
 }
 
 /**
- * Infer which skills are being exercised based on task characteristics
+ * Infer which capabilities are being exercised based on task characteristics
  */
-function inferSkillsFromTask(item: WorkItem, intent: { type: string }): string[] {
-  const skills: string[] = [];
+function inferCapabilitiesFromTask(item: WorkItem, intent: { type: string }): string[] {
+  const capabilities: string[] = [];
   const titleLower = item.title.toLowerCase();
   const descLower = (item.description || '').toLowerCase();
   const combined = `${titleLower} ${descLower}`;
 
-  // Git skills
+  // Git capabilities
   if (combined.includes('commit') || combined.includes('branch') || combined.includes('git')) {
-    skills.push('git.branch_commit');
+    capabilities.push('git.branch_commit');
   }
 
-  // Node/NPM skills
+  // Node/NPM capabilities
   if (combined.includes('npm') || combined.includes('install') || combined.includes('package')) {
-    skills.push('node.npm.install');
+    capabilities.push('node.npm.install');
   }
   if (combined.includes('build') || combined.includes('compile')) {
-    skills.push('node.npm.run_script');
+    capabilities.push('node.npm.run_script');
   }
   if (combined.includes('test')) {
-    skills.push('node.npm.run_script');
+    capabilities.push('node.npm.run_script');
   }
 
-  // Next.js skills
+  // Next.js capabilities
   if (combined.includes('next') || combined.includes('nextjs') || combined.includes('next.js')) {
-    skills.push('nextjs.build.basic');
+    capabilities.push('nextjs.build.basic');
     if (combined.includes('route') || combined.includes('page')) {
-      skills.push('nextjs.routing.app_router');
+      capabilities.push('nextjs.routing.app_router');
     }
   }
 
-  // Documentation skills
+  // Documentation capabilities
   if (combined.includes('readme') || combined.includes('document') || combined.includes('docs')) {
-    skills.push('comm.documentation');
+    capabilities.push('comm.documentation');
   }
 
   // Based on intent type
   if (intent.type === 'implementation') {
-    if (!skills.includes('git.branch_commit')) {
-      skills.push('git.branch_commit');
+    if (!capabilities.includes('git.branch_commit')) {
+      capabilities.push('git.branch_commit');
     }
   }
   if (intent.type === 'debugging') {
-    skills.push('reason.debugging');
+    capabilities.push('reason.debugging');
   }
 
-  // Default skill if nothing matched
-  if (skills.length === 0) {
-    skills.push('general.task_execution');
+  // Default capability if nothing matched
+  if (capabilities.length === 0) {
+    capabilities.push('general.task_execution');
   }
 
-  return [...new Set(skills)]; // Remove duplicates
+  return [...new Set(capabilities)]; // Remove duplicates
 }
 
 /**
@@ -340,12 +340,12 @@ async function executeWork(item: WorkItem): Promise<WorkerResult | null> {
   log(`    Goal: ${contract.goal.split('\n')[0]}...`);
   log(`    DoD items: ${contract.definition_of_done.length}`);
 
-  // Infer skills being exercised based on task/intent
-  const skillsExercised = inferSkillsFromTask(item, intent);
-  log(`  Skills exercised: ${skillsExercised.join(', ')}`);
+  // Infer capabilities being exercised based on task/intent
+  const capabilitiesExercised = inferCapabilitiesFromTask(item, intent);
+  log(`  Capabilities exercised: ${capabilitiesExercised.join(', ')}`);
 
-  // Log SKILL_ATTEMPT event before starting work
-  await logSkillAttempt(item, skillsExercised);
+  // Log CAPABILITY_ATTEMPT event before starting work
+  await logCapabilityAttempt(item, capabilitiesExercised);
 
   try {
     // Pass work item and retry context for intelligent prompting
@@ -377,32 +377,32 @@ async function executeWork(item: WorkItem): Promise<WorkerResult | null> {
 }
 
 /**
- * Log SKILL_ATTEMPT event to capability ledger
+ * Log CAPABILITY_ATTEMPT event to capability ledger
  */
-async function logSkillAttempt(item: WorkItem, skills: string[]): Promise<void> {
+async function logCapabilityAttempt(item: WorkItem, capabilities: string[]): Promise<void> {
   const ledgerPath = path.join(process.cwd(), 'ledgers', 'capability-ledger.jsonl');
   const entry = JSON.stringify({
-    event: 'SKILL_ATTEMPT',
+    event: 'CAPABILITY_ATTEMPT',
     ts: new Date().toISOString(),
     task_id: item.id,
     task_title: item.title,
-    skills_exercised: skills,
+    capabilities_exercised: capabilities,
     iteration: loopState.iteration,
   });
   await appendFile(ledgerPath, entry + '\n', 'utf-8');
 }
 
 /**
- * Log SKILL_RESULT event to capability ledger
+ * Log CAPABILITY_RESULT event to capability ledger
  */
-async function logSkillResult(
+async function logCapabilityResult(
   item: WorkItem,
   verifierResults: VerifierResult[],
   overallResult: 'PASS' | 'FAIL' | 'PARTIAL'
 ): Promise<void> {
   const ledgerPath = path.join(process.cwd(), 'ledgers', 'capability-ledger.jsonl');
   const entry = JSON.stringify({
-    event: 'SKILL_RESULT',
+    event: 'CAPABILITY_RESULT',
     ts: new Date().toISOString(),
     task_id: item.id,
     task_title: item.title,
@@ -472,12 +472,12 @@ async function validateWork(item: WorkItem, result: WorkerResult | null): Promis
     await writeFile(reportPath, JSON.stringify(report, null, 2), 'utf-8');
     log(`  Validation report saved: ${reportPath}`);
 
-    // Log SKILL_RESULT event
-    await logSkillResult(item, verifierResults, summary.overall);
+    // Log CAPABILITY_RESULT event
+    await logCapabilityResult(item, verifierResults, summary.overall);
 
-    // Update skill confidence from verifier results (learning feedback loop)
-    log('  Updating skill confidence from verifier results...');
-    updateSkillsFromVerifierResults(verifierResults, DEFAULT_SKILL_MAPPINGS);
+    // Update capability confidence from verifier results (learning feedback loop)
+    log('  Updating capability confidence from verifier results...');
+    updateCapabilitiesFromVerifierResults(verifierResults, DEFAULT_CAPABILITY_MAPPINGS);
 
     // Return true only if all verifiers pass
     return summary.overall === 'PASS';
@@ -491,9 +491,12 @@ async function validateWork(item: WorkItem, result: WorkerResult | null): Promis
  * Update state after work completion
  * IMPORTANT: Does NOT mark Blocked on first failure - uses retry tracking
  */
-async function updateState(item: WorkItem, success: boolean, errorInfo?: string): Promise<void> {
+async function updateState(item: WorkItem, success: boolean, errorInfo?: string, outputPath?: string): Promise<void> {
   log(`Updating state for work item: ${item.id}`);
   log(`  Success: ${success}`);
+  if (outputPath) {
+    log(`  Output path: ${outputPath}`);
+  }
 
   // Update loop state
   loopState.current_task = null;
@@ -522,6 +525,7 @@ async function updateState(item: WorkItem, success: boolean, errorInfo?: string)
         title: item.title,
         priority: item.priority,
         iteration: loopState.iteration,
+        output_path: outputPath || null,
       });
       await appendFile(ledgerPath, ledgerEntry + '\n', 'utf-8');
     } catch (error) {
@@ -560,6 +564,7 @@ async function updateState(item: WorkItem, success: boolean, errorInfo?: string)
     max_retries: MAX_RETRIES,
     strategies_tried: retry.strategies,
     error: retry.lastError.slice(0, 500),
+    output_path: outputPath || null,
   });
   await appendFile(ledgerPath, attemptEntry + '\n', 'utf-8');
 
@@ -587,6 +592,7 @@ async function updateState(item: WorkItem, success: boolean, errorInfo?: string)
         title: item.title,
         total_attempts: retry.attempts,
         last_error: retry.lastError.slice(0, 500),
+        output_path: outputPath || null,
       });
       await appendFile(ledgerPath, blockEntry + '\n', 'utf-8');
 
@@ -703,9 +709,10 @@ async function runIteration(): Promise<void> {
   // Step 4: Validate work
   const validationSuccess = await validateWork(workItem, result);
 
-  // Step 5: Update state with error info if failed
+  // Step 5: Update state with error info and output path if failed
   const errorInfo = result?.errors?.join('; ') || (result?.success === false ? 'Worker reported failure' : undefined);
-  await updateState(workItem, validationSuccess, errorInfo);
+  const outputPath = result?.output_path;
+  await updateState(workItem, validationSuccess, errorInfo, outputPath);
 
   log('--- Iteration complete ---');
 }

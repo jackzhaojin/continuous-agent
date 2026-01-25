@@ -7,6 +7,7 @@
 #   "task_id": "unique task identifier",
 #   "description": "what was done or attempted",
 #   "outcome": "success|failure|blocked|partial",
+#   "output_path": "path to agent-outputs folder where work was done",
 #   "related_goal": "optional goal reference",
 #   "duration_ms": "optional execution time",
 #   "metadata": {}
@@ -15,3 +16,5 @@
 {"event":"HUMAN_INPUT_RECEIVED","ts":"2026-01-25T15:38:02.898Z","action":"--------","response_type":"OTHER","response":"----------","blocking_level":"----------"}
 {"event":"TASK_ATTEMPT_FAILED","ts":"2026-01-25T15:40:52.045Z","task_id":"work-1","title":"Build Next.js Transactional App","attempt":1,"max_retries":10,"strategies_tried":[],"error":"Worker failed with: error_max_turns"}
 {"event":"TASK_ATTEMPT_FAILED","ts":"2026-01-25T15:41:40.865Z","task_id":"work-1","title":"Build Next.js Transactional App","attempt":1,"max_retries":10,"strategies_tried":[],"error":"Worker failed with: error_max_turns"}
+{"event":"TASK_ATTEMPT_FAILED","ts":"2026-01-25T15:44:50.474Z","task_id":"work-1","title":"Build Next.js Transactional App","attempt":2,"max_retries":10,"strategies_tried":["nextjs-scaffold-first"],"error":"Worker failed with: error_max_turns"}
+{"event":"TASK_ATTEMPT_FAILED","ts":"2026-01-25T15:48:53.161Z","task_id":"work-1","title":"Build Next.js Transactional App","attempt":3,"max_retries":10,"strategies_tried":["nextjs-scaffold-first","nextjs-minimal"],"error":"Worker execution failed: Claude Code process exited with code 1"}
