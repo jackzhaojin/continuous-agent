@@ -282,3 +282,105 @@ Project Path: .../1769393294746
 - `ecosystem.config.cjs` - Fixed script path to `dist/core/executive-loop.js`
 
 **Result**: Agent now correctly resumes work in the SAME project directory across PM2 restarts. "Like a human resuming after lunch" ✓
+
+---
+
+## Session 5: Self-Enhancement Workflow Validation (Jan 26, 2026)
+
+### Prompt 19: Monitor First Self-Enhance Execution (~9:30 PM)
+
+> (Monitoring request from previous context - user asked to watch self-enhance task execution)
+
+→ Response: Monitored first self-enhance execution. Step 2 completed but bug discovered - goals.md not updating, causing duplicate workers.
+→ Action: Found title prefix bug in work-selector.ts - `[SELF-ENHANCE]` was being stripped, breaking regex matching.
+
+---
+
+### Prompt 20: Task Tool for Subagents? (9:45 PM)
+
+> Looking at '/Users/jackjin/dev/continuous-agent/ledgers/2026-01-26/worker-task-1769398042363.log', don't we need 'Task' for for subagents? or am i reading the output of a subagent already?
+
+→ Response: Clarified logs were from subagent output. Main worker already has Task tool for self-enhance tasks.
+→ Action: Confirmed worker-spawner.ts adds Task tool when isSelfEnhance=true. ✅
+
+---
+
+### Prompt 21: Fix Confusing Tools Logging (9:50 PM)
+
+> I see the confusion in logging, like, can't this be moved up so like, it's part of the logging that happens in current line 344?
+
+→ Response: Moved allowedTools computation before logging block so Tools list shows accurate tools including Task.
+→ Action: Updated worker-spawner.ts - tools list now correct at log time. ✅
+
+---
+
+### Prompt 22: Let It Run (9:55 PM)
+
+> Cool, and good call not restarting right away, let's have it run
+
+→ Response: Agent continued running, rebuilt without PM2 restart to avoid interrupting workers.
+→ Action: npm run build only, no restart. ✅
+
+---
+
+### Prompt 23: Expecting PR or Review Request? (10:00 PM)
+
+> So in theory now is that i'll a task or PR or something right?
+
+→ Response: Explained workflow - self-enhance tasks complete on a branch, need human review before merge.
+→ Action: Checked work-ledger.jsonl, found task completed on branch self-enhance/1769397653036. ✅
+
+---
+
+### Prompt 24: needs-you.md Should Be Populated (10:05 PM)
+
+> well kind of going back to this whole '/Users/jackjin/dev/continuous-agent/workspace/needs-you.md', if it needs me, that needs to be populated no? identify the gap in implementation, i was expecting needs me would be there
+
+→ Response: Identified gap - no automatic notification for human review of completed self-enhance branches.
+→ Action: Added requestSelfEnhanceReview() to state-handler.ts, triggers on self-enhance completion with branch. ✅
+
+---
+
+### Prompt 25: What Do I Paste to Approve? (10:15 PM)
+
+> What do I paste in if I approve?
+
+→ Response: Explained response format: `[APPROVED] details` in Response column.
+→ Action: Showed example with merge command. ✅
+
+---
+
+### Prompt 26: Merge and Switch to Main (10:25 PM)
+
+> For now let's merge it into main, and switch back to main
+
+→ Response: Merged self-enhance/1769397653036 into main, cleaned up needs-you.md.
+→ Action: git checkout main, git merge, updated needs-you.md Resolved section. ✅
+
+---
+
+### Prompt 27: What Is It Working On Now? (10:35 PM)
+
+> What is it working on now?
+
+→ Response: Executive loop working on "POC New Capabilities" (P3 task) after completing self-enhance.
+→ Action: Read worker log, turn 37, building agent-capabilities-poc with state persistence. ✅
+
+---
+
+## Session 5 Summary
+
+**Issues Fixed:**
+1. ✅ Title prefix stripping bug (work-selector.ts) - `[SELF-ENHANCE]` prefix now preserved for regex matching
+2. ✅ Tools logging confusion (worker-spawner.ts) - allowedTools computed before logging
+3. ✅ Missing human review notification (state-handler.ts) - requestSelfEnhanceReview() added
+
+**Key Changes:**
+- `src/agentic/work-selection/work-selector.ts` - Keep full title, only detect prefix for flag
+- `src/agentic/execution/worker-spawner.ts` - Move allowedTools before logging block
+- `src/deterministic/state-handler.ts` - Add requestSelfEnhanceReview() function
+
+**Self-Enhancement Workflow Validated:**
+- Steps 2, 3, 4 completed successfully after title fix
+- Branch self-enhance/1769397653036 merged to main
+- Agent automatically moved to next P3 task
