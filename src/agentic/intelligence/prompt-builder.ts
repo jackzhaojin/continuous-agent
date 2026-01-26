@@ -45,7 +45,8 @@ export async function buildIntelligentPrompt(
       RISK_ASSESSMENT: contract.risk_assessment,
       REQUIRED_CAPABILITIES: contract.required_skills.length > 0 ? contract.required_skills.join(', ') : 'none specified',
       LOGGING_OBLIGATIONS: contract.logging_obligations.map(item => `- ${item}`).join('\n'),
-      TASK_DESCRIPTION: item.description ? `## Description\n${item.description}` : ''
+      TASK_DESCRIPTION: item.description ? `## Description\n${item.description}` : '',
+      AGENT_CODEBASE: process.cwd()
     }
   ]);
 
@@ -159,7 +160,8 @@ export async function buildSimplePrompt(
       RISK_ASSESSMENT: contract.risk_assessment,
       REQUIRED_CAPABILITIES: contract.required_skills.length > 0 ? contract.required_skills.join(', ') : 'none specified',
       LOGGING_OBLIGATIONS: contract.logging_obligations.map(item => `- ${item}`).join('\n'),
-      TASK_DESCRIPTION: ''
+      TASK_DESCRIPTION: '',
+      AGENT_CODEBASE: process.cwd()
     }
   ));
 
