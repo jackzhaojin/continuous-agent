@@ -216,7 +216,8 @@ export async function updateStepState(
 export async function writeToNeedsYou(
   item: WorkItem,
   attempts: number,
-  lastError: string
+  lastError: string,
+  contractId?: string
 ): Promise<void> {
   logAgentic('Escalating to needs-you.md (human intervention required)');
 
@@ -226,7 +227,23 @@ export async function writeToNeedsYou(
     let content = await readFile(needsYouPath, 'utf-8');
     const today = new Date().toISOString().split('T')[0];
 
-    const errorMessage = `Failed after ${attempts} attempts. Last error: ${lastError.slice(0, 200)}`;
+    // Enhanced error message with better truncation (preserve context)
+    // Extract first 300 chars, but try to break at sentence/line boundary
+    let errorSnippet = lastError.slice(0, 300);
+    const lastPeriod = errorSnippet.lastIndexOf('.');
+    const lastNewline = errorSnippet.lastIndexOf('\n');
+    const breakPoint = Math.max(lastPeriod, lastNewline);
+    if (breakPoint > 100) {
+      // Only break early if we have substantial content before the break
+      errorSnippet = errorSnippet.slice(0, breakPoint + 1);
+    }
+
+    // Add log reference if contract ID available
+    const logReference = contractId
+      ? ` See ledgers/${today}/worker-${contractId}.log for details.`
+      : '';
+
+    const errorMessage = `Failed after ${attempts} attempts.${logReference} Error: ${errorSnippet}`;
     const newEntry = `| ${item.title} | ${errorMessage} | | BLOCKING | ${today} |`;
 
     // Insert after the "Actions Needed" table header
@@ -251,7 +268,8 @@ export async function writeToNeedsYou(
 export async function escalateWithDiagnosis(
   item: WorkItem,
   attempts: number,
-  diagnosis: string
+  diagnosis: string,
+  contractId?: string
 ): Promise<void> {
   logAgentic('Escalating with diagnostic details...');
 
@@ -261,7 +279,13 @@ export async function escalateWithDiagnosis(
     let content = await readFile(needsYouPath, 'utf-8');
     const today = new Date().toISOString().split('T')[0];
 
-    const newEntry = `| ${item.title} | ${diagnosis} | | BLOCKING | ${today} |`;
+    // Add log reference if contract ID available
+    const logReference = contractId
+      ? ` See ledgers/${today}/worker-${contractId}.log for full context.`
+      : '';
+
+    const enhancedDiagnosis = `${diagnosis}${logReference}`;
+    const newEntry = `| ${item.title} | ${enhancedDiagnosis} | | BLOCKING | ${today} |`;
 
     const actionsTable =
       /(\| Action \| Why Agent Can't Do It \| Response \| Blocking \| Since \|\n\|[-|]+\|)/;
