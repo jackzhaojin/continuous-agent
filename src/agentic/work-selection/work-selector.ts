@@ -255,8 +255,54 @@ function parseGoalsFile(content: string): ParsedSection[] {
         status: 'pending'
       };
 
-      // Look ahead to parse steps if any exist
-      const { steps, endIndex } = parseSteps(lines, i + 1);
+      // CRITICAL: Parse metadata lines BEFORE looking for steps
+      // This ensures Output path is captured for resume functionality
+      // Metadata lines are between the goal header and the first step
+      let metadataEndIndex = i + 1;
+      while (metadataEndIndex < lines.length) {
+        const metaLine = lines[metadataEndIndex].trim();
+
+        // Stop at step headers or next goal/section
+        if (metaLine.match(/^####/) || metaLine.match(/^#{1,3}\s+(?!Step)/i)) {
+          break;
+        }
+
+        // Parse Status
+        // Note: Status like "In Progress (Step 2 of 4, 25% complete)" contains "complete"
+        // so we must check for "in progress" FIRST
+        const statusMatch = metaLine.match(/^[-*]\s*\*\*Status:\*\*\s*(.+)$/i);
+        if (statusMatch) {
+          const statusText = statusMatch[1].toLowerCase().trim();
+          // Check in_progress FIRST - it may contain "% complete" suffix
+          if (statusText.includes('in progress') || statusText.includes('wip')) {
+            currentItem.status = 'in_progress';
+          } else if (statusText.includes('block')) {
+            currentItem.status = 'blocked';
+          } else if (statusText.includes('not started') || statusText === 'pending') {
+            currentItem.status = 'pending';
+          } else if (statusText.startsWith('complete') || statusText.includes('done')) {
+            // Use startsWith for 'complete' to avoid matching "25% complete"
+            currentItem.status = 'complete';
+          }
+        }
+
+        // Parse Description
+        const descMatch = metaLine.match(/^[-*]\s*\*\*Description:\*\*\s*(.+)$/i);
+        if (descMatch) {
+          currentItem.description = descMatch[1].trim();
+        }
+
+        // Parse Output path - CRITICAL for resume across restarts
+        const outputMatch = metaLine.match(/^[-*]\s*\*\*Output:\*\*\s*(.+)$/i);
+        if (outputMatch) {
+          currentItem.output_path = outputMatch[1].trim();
+        }
+
+        metadataEndIndex++;
+      }
+
+      // Now look ahead to parse steps if any exist
+      const { steps, endIndex } = parseSteps(lines, metadataEndIndex);
       if (steps.length > 0) {
         currentItem.steps = steps;
         // Calculate current step and progress
@@ -266,24 +312,31 @@ function parseGoalsFile(content: string): ParsedSection[] {
         currentItem.progress_pct = Math.round((completedSteps / steps.length) * 100);
         // Adjust loop index to skip step lines we've already processed
         i = endIndex - 1; // -1 because the loop will increment
+      } else {
+        // No steps found, skip to where metadata parsing ended
+        i = metadataEndIndex - 1;
       }
       continue;
     }
 
-    // Parse metadata lines under a goal
+    // Parse metadata lines under a goal (for tasks without steps)
     if (currentItem) {
       // Status line: - **Status:** Not Started
+      // Note: Status like "In Progress (Step 2 of 4, 25% complete)" contains "complete"
+      // so we must check for "in progress" FIRST
       const statusMatch = trimmedLine.match(/^[-*]\s*\*\*Status:\*\*\s*(.+)$/i);
       if (statusMatch) {
         const statusText = statusMatch[1].toLowerCase().trim();
-        if (statusText.includes('complete') || statusText.includes('done')) {
-          currentItem.status = 'complete';
+        // Check in_progress FIRST - it may contain "% complete" suffix
+        if (statusText.includes('in progress') || statusText.includes('wip')) {
+          currentItem.status = 'in_progress';
         } else if (statusText.includes('block')) {
           currentItem.status = 'blocked';
         } else if (statusText.includes('not started') || statusText === 'pending') {
           currentItem.status = 'pending';
-        } else if (statusText.includes('in progress') || statusText.includes('wip')) {
-          currentItem.status = 'in_progress';
+        } else if (statusText.startsWith('complete') || statusText.includes('done')) {
+          // Use startsWith for 'complete' to avoid matching "25% complete"
+          currentItem.status = 'complete';
         } else {
           currentItem.status = 'pending';
         }
@@ -294,6 +347,14 @@ function parseGoalsFile(content: string): ParsedSection[] {
       const descMatch = trimmedLine.match(/^[-*]\s*\*\*Description:\*\*\s*(.+)$/i);
       if (descMatch) {
         currentItem.description = descMatch[1].trim();
+        continue;
+      }
+
+      // Output path line: - **Output:** /path/to/project
+      // This allows resuming work on the same project across restarts
+      const outputMatch = trimmedLine.match(/^[-*]\s*\*\*Output:\*\*\s*(.+)$/i);
+      if (outputMatch) {
+        currentItem.output_path = outputMatch[1].trim();
         continue;
       }
     }
@@ -471,35 +532,44 @@ export async function updateStepStatus(
     started_at?: string;
   }
 ): Promise<boolean> {
+  console.log(`[${new Date().toISOString()}] [DEBUG] >>> updateStepStatus CALLED: task="${taskTitle}", step=${stepNumber + 1}, status="${newStatus}"`);
+
   const goalsPath = path.join(process.cwd(), 'workspace', 'goals.md');
 
   try {
     let content = await readFile(goalsPath, 'utf-8');
 
-    // Find the step and update its status
-    // Pattern: #### Step N: Title followed by - **Status:** ...
-    const stepHeaderPattern = new RegExp(
-      `(####\\s+(?:Step\\s+)?${stepNumber + 1}[a-z]?[:.]?\\s+[^\\n]+\\n(?:.*?\\n)*?)(- \\*\\*Status:\\*\\*)\\s*[^\\n]+`,
+    // FIXED: First find the task section, then find the step within it
+    // This prevents updating steps in other tasks with the same step number
+    const escapedTitle = taskTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    // Find the task section: ### Task Title ... until next ### or ## or end
+    const taskSectionPattern = new RegExp(
+      `(###\\s+${escapedTitle}[\\s\\S]*?)(####\\s+(?:Step\\s+)?${stepNumber + 1}[a-z]?[:.]?\\s+[^\\n]+\\n(?:.*?\\n)*?)(- \\*\\*Status:\\*\\*)\\s*([^\\n]+)`,
       'i'
     );
 
-    if (stepHeaderPattern.test(content)) {
+    console.log(`[${new Date().toISOString()}] [DEBUG] updateStepStatus: task="${taskTitle}", step=${stepNumber + 1}, status="${newStatus}"`);
+    const matchResult = taskSectionPattern.test(content);
+    console.log(`[${new Date().toISOString()}] [DEBUG] Pattern match result: ${matchResult}`);
+
+    if (matchResult) {
       // Format status text
       let statusText = newStatus.charAt(0).toUpperCase() + newStatus.slice(1).replace('_', ' ');
-      
-      content = content.replace(stepHeaderPattern, `$1$2 ${statusText}`);
+
+      content = content.replace(taskSectionPattern, `$1$2$3 ${statusText}`);
 
       // Add additional data if provided
       if (additionalData?.completed_at && newStatus === 'complete') {
-        // Add completed timestamp if not already present
+        // Add completed timestamp if not already present (scoped to task section)
         const completedPattern = new RegExp(
-          `(####\\s+(?:Step\\s+)?${stepNumber + 1}[^\\n]+\\n(?:.*?\\n)*?)(- \\*\\*Completed:\\*\\*)`,
+          `###\\s+${escapedTitle}[\\s\\S]*?####\\s+(?:Step\\s+)?${stepNumber + 1}[^\\n]+\\n(?:.*?\\n)*?- \\*\\*Completed:\\*\\*`,
           'i'
         );
         if (!completedPattern.test(content)) {
-          // Add completed line after status
+          // Add completed line after status (scoped to task section)
           const statusLine = new RegExp(
-            `(####\\s+(?:Step\\s+)?${stepNumber + 1}[^\\n]+\\n(?:.*?\\n)*?- \\*\\*Status:\\*\\*[^\\n]+)`,
+            `(###\\s+${escapedTitle}[\\s\\S]*?####\\s+(?:Step\\s+)?${stepNumber + 1}[^\\n]+\\n(?:.*?\\n)*?- \\*\\*Status:\\*\\*[^\\n]+)`,
             'i'
           );
           content = content.replace(statusLine, `$1\n- **Completed:** ${additionalData.completed_at}`);

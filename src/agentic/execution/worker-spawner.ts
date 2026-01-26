@@ -203,6 +203,9 @@ export async function spawnWorker(
   // Create logger for this worker
   const logger = createWorkerLogger(contract.id);
 
+  // DEBUG: Log what we receive
+  console.log(`[Worker] DEBUG: retryContext received:`, retryContext ? JSON.stringify(retryContext) : 'undefined');
+
   // For retries, reuse existing project path to continue work on same project
   // For first attempt, generate new project path
   let projectPath: string;
@@ -211,8 +214,10 @@ export async function spawnWorker(
   if (retryContext?.existingProjectPath) {
     projectPath = retryContext.existingProjectPath;
     category = detectCategory(contract.goal);
-    logger.log(`RETRY: Reusing existing project path: ${projectPath}`);
+    logger.log(`RESUME: Using existing project path: ${projectPath}`);
+    console.log(`[Worker] RESUME: Using existing project path: ${projectPath}`);
   } else {
+    console.log(`[Worker] NEW: Generating new project path`);
     // Generate project path and set up directory with .gitignore FIRST
     const generated = generateProjectPath(contract);
     projectPath = generated.path;

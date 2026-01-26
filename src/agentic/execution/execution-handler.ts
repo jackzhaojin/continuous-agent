@@ -48,9 +48,35 @@ function getCurrentStrategy(item: WorkItem): { strategyId: string | null; strate
 /**
  * Build retry context for worker
  * AGENTIC: Includes strategy selection and diagnostic fixes
+ *
+ * IMPORTANT: Prefers item.output_path (from goals.md) over in-memory retry tracker.
+ * This allows resuming work on the same project after PM2 restarts.
  */
 function buildRetryContext(item: WorkItem): WorkerRetryContext | undefined {
   const retry = retryTracker.get(item.title);
+
+  // DEBUG: Log what we receive
+  log(`  [DEBUG] buildRetryContext: item.title="${item.title}"`);
+  log(`  [DEBUG] buildRetryContext: item.output_path="${item.output_path || 'undefined'}"`);
+  log(`  [DEBUG] buildRetryContext: retry=${retry ? 'exists' : 'undefined'}`);
+
+  // If task has an output_path from goals.md, ALWAYS use it (enables resume)
+  // This is the key fix for persistent project directories
+  const existingPath = item.output_path || retry?.output_path;
+  log(`  [DEBUG] buildRetryContext: existingPath="${existingPath || 'undefined'}"`);
+
+  // If no retry state but we have an existing path, create minimal context
+  // This handles the "resume after restart" case
+  if ((!retry || retry.attempts === 0) && existingPath) {
+    logAgentic(`  Resuming work on existing project: ${existingPath}`);
+    return {
+      attempts: 0,
+      maxRetries: 10,
+      triedStrategies: [],
+      existingProjectPath: existingPath,
+    };
+  }
+
   if (!retry || retry.attempts === 0) return undefined;
 
   return {
@@ -58,7 +84,7 @@ function buildRetryContext(item: WorkItem): WorkerRetryContext | undefined {
     maxRetries: 10,
     triedStrategies: retry.strategies,
     lastError: retry.lastError,
-    existingProjectPath: retry.output_path,
+    existingProjectPath: existingPath,
   };
 }
 

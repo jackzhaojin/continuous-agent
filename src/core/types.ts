@@ -48,7 +48,10 @@ export interface WorkItem {
   title: string;
   description: string;
   status: 'pending' | 'in_progress' | 'blocked' | 'complete';
-  
+
+  // Output persistence - allows resuming work across restarts
+  output_path?: string;     // Project directory for this task (persisted in goals.md)
+
   // Step tracking for multi-step tasks
   steps?: WorkStep[];
   current_step?: number;    // Index of current step (0-based)

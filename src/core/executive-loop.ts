@@ -43,6 +43,7 @@ import {
   escalateWithDiagnosis,
   markTaskBlocked,
   markStepBlocked,
+  setTaskOutputPath,
 } from '../deterministic/state-handler.js';
 
 // Load environment variables
@@ -178,6 +179,13 @@ async function runIteration(): Promise<IterationResult> {
   if (isValid && result) {
     logDeterministic('PHASE 6: Update State (Success)');
 
+    // CRITICAL: Persist output_path to goals.md for resume across restarts
+    // Only write if we have a new path and the task doesn't already have one
+    if (result.output_path && !workItem.output_path) {
+      logDeterministic('  Persisting output path for future resume...');
+      await setTaskOutputPath(workItem.title, result.output_path);
+    }
+
     if (isStepExecution && currentStep) {
       await updateStepState(workItem, currentStep, true, undefined, result.output_path);
     } else {
@@ -215,8 +223,16 @@ async function runIteration(): Promise<IterationResult> {
   retry.lastError = result?.errors.join(', ') || 'Unknown error';
   retry.lastAttemptAt = new Date().toISOString();
 
+  // Store output_path in memory for retries within this session
   if (result?.output_path && !retry.output_path) {
     retry.output_path = result.output_path;
+  }
+
+  // CRITICAL: Also persist to goals.md so we can resume after PM2 restart
+  // This ensures retries AND restarts use the same project directory
+  if (result?.output_path && !workItem.output_path) {
+    logDeterministic('  Persisting output path for retry/resume...');
+    await setTaskOutputPath(workItem.title, result.output_path);
   }
 
   retryTracker.set(retryKey, retry);

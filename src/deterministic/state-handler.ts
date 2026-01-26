@@ -71,6 +71,65 @@ export async function updateTaskState(
 }
 
 /**
+ * Set the output path for a task in goals.md
+ * This persists the project directory so work can resume across restarts
+ * DETERMINISTIC: File I/O and pattern matching
+ */
+export async function setTaskOutputPath(
+  taskTitle: string,
+  outputPath: string
+): Promise<boolean> {
+  const goalsPath = path.join(WORKSPACE_DIR, 'goals.md');
+
+  try {
+    let content = await readFile(goalsPath, 'utf-8');
+    const escapedTitle = escapeRegex(taskTitle);
+
+    // Check if Output line already exists for this task
+    const existingOutputPattern = new RegExp(
+      `(###\\s+${escapedTitle}[\\s\\S]*?)(- \\*\\*Output:\\*\\*)\\s*[^\\n]+`,
+      'i'
+    );
+
+    if (existingOutputPattern.test(content)) {
+      // Update existing Output line
+      content = content.replace(existingOutputPattern, `$1$2 ${outputPath}`);
+      logDeterministic(`  Updated existing Output path for "${taskTitle}"`);
+    } else {
+      // Add Output line after Description (or after Status if no Description)
+      // Pattern: find task section, then add after Description line
+      const addAfterDescPattern = new RegExp(
+        `(###\\s+${escapedTitle}[\\s\\S]*?- \\*\\*Description:\\*\\*\\s*[^\\n]+)`,
+        'i'
+      );
+
+      const addAfterStatusPattern = new RegExp(
+        `(###\\s+${escapedTitle}[\\s\\S]*?- \\*\\*Status:\\*\\*\\s*[^\\n]+)`,
+        'i'
+      );
+
+      if (addAfterDescPattern.test(content)) {
+        content = content.replace(addAfterDescPattern, `$1\n- **Output:** ${outputPath}`);
+        logDeterministic(`  Added Output path after Description for "${taskTitle}"`);
+      } else if (addAfterStatusPattern.test(content)) {
+        content = content.replace(addAfterStatusPattern, `$1\n- **Output:** ${outputPath}`);
+        logDeterministic(`  Added Output path after Status for "${taskTitle}"`);
+      } else {
+        log(`  Warning: Could not find insertion point for Output path in "${taskTitle}"`);
+        return false;
+      }
+    }
+
+    await writeFile(goalsPath, content, 'utf-8');
+    log(`  Persisted output path: ${outputPath}`);
+    return true;
+  } catch (error) {
+    log(`  Failed to set output path: ${error}`);
+    return false;
+  }
+}
+
+/**
  * Update step state in goals.md
  * DETERMINISTIC: File I/O and pattern matching
  */
@@ -90,7 +149,13 @@ export async function updateStepState(
     if (success) {
       // Update the step status in goals.md
       // This writes the individual step's status to the file
-      await updateStepStatus(item.title, step.step_number, 'complete');
+      log(`  [DEBUG] About to call updateStepStatus with: "${item.title}", ${step.step_number}, "complete"`);
+      try {
+        await updateStepStatus(item.title, step.step_number, 'complete');
+        log(`  [DEBUG] updateStepStatus returned successfully`);
+      } catch (updateErr) {
+        log(`  [ERROR] updateStepStatus failed: ${updateErr}`);
+      }
 
       // Update the step in the local copy for progress calculation
       const stepToUpdate = item.steps?.[step.step_number];

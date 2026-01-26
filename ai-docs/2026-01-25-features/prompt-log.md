@@ -158,7 +158,7 @@ Build verified: ✅ TypeScript compiles with no errors
 
 ---
 
-### Debug Session: Step Persistence Bug (9:00 PM - ongoing)
+### Debug Session: Step Persistence Bug (9:00 PM - 9:15 PM) ✅ RESOLVED
 
 **Issue**: Step 1 shows "complete" in logs but goals.md never updates. Worker keeps re-running Step 1 instead of progressing to Step 2.
 
@@ -169,4 +169,30 @@ Build verified: ✅ TypeScript compiles with no errors
 4. Hard-restarted PM2 (delete + start fresh)
 5. Still no DEBUG output in PM2 logs
 
-**Current status**: Background task monitoring for next worker completion to capture debug output.
+**Root cause found**: The `updateStepStatus` regex pattern in work-selector.ts was NOT scoped to the task title! It matched ANY `#### Step 1:` in goals.md, regardless of which task. With multiple tasks having steps (Notion POC and Self-Enhance Human Interface), the regex would match but not update correctly.
+
+**Fix applied** (work-selector.ts:463-525):
+- Changed regex to include `escapedTitle` to scope step matching to the correct task section
+- Pattern now: `(###\s+${escapedTitle}[\s\S]*?)(####\s+(?:Step\s+)?...`
+- Also fixed completedPattern and statusLine patterns for consistency
+
+**Verification**:
+- Worker completed Step 1 successfully
+- goals.md now shows Step 1: **Complete**
+- Agent immediately started Iteration 2 and selected **Step 2**
+- Resume capability confirmed ✅
+
+---
+
+## Session Summary
+
+**Issues Fixed:**
+1. ✅ NODE_ENV=production → development (ecosystem.config.cjs)
+2. ✅ Validation too strict for research steps → step-aware validation (core-verifiers.ts)
+3. ✅ Step status not persisting → task-scoped regex in updateStepStatus (work-selector.ts)
+
+**Resume Capability Verified:**
+- Agent successfully completed Step 1 of Notion Integration POC
+- Automatically detected 3 steps remaining
+- Selected and started Step 2 without human intervention
+- "Like a human resuming after lunch" ✓
