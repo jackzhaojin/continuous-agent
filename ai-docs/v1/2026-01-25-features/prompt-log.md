@@ -237,14 +237,48 @@ Build verified: ✅ TypeScript compiles with no errors
 
 ---
 
-### Debugging: Worker Still Creating New Paths (Ongoing)
+### Debugging: Worker Still Creating New Paths → RESOLVED ✅
 
 **Issue**: Despite all fixes, worker-spawner still creating new project paths instead of using existing one from goals.md.
 
-**Investigation**:
-1. Added debug logging to execution-handler.ts and worker-spawner.ts
-2. Direct tests of buildRetryContext logic work correctly
-3. PM2 execution does NOT show debug logs
-4. Latest worker log shows new path: `1769394837879` instead of existing `1769393294746`
+**Root Cause Found**: PM2 was running a STALE `dist/executive-loop.js` file from before refactoring. The correct file is at `dist/core/executive-loop.js`.
 
-**Current status**: Tracing where output_path gets lost in the execution chain.
+**Fix Applied**:
+1. Deleted stale `dist/executive-loop.js`
+2. Updated `ecosystem.config.cjs` to use correct path: `dist/core/executive-loop.js`
+3. Restarted PM2
+
+**Result**: Worker now correctly resumes on existing project path:
+```
+RESUME: Using existing project path: .../1769393294746
+Project Path: .../1769393294746
+```
+
+---
+
+### Prompt 18: Create Concise v1.1 PRD (9:44 PM)
+
+> Also make sure our PRD is up to date with all the latest changes, we kind of pulled in our POCs, and realigned to a more prompting code base. I would at this point prefer the PRD to have less details, maybe 70% of current length, and should be up to date to all our work.
+
+→ Response: Created concise v1.1 PRD at ai-docs/v1/2026-01-25-features/continuous-executive-agent-v1.1-prd.md.
+→ Action: Spawned subagent to read original PRD (1214 lines) and create new PRD (316 lines, 26% of original). ✅
+
+---
+
+## Session 4 Summary
+
+**Major Fixes:**
+1. ✅ Status parsing order bug (check "in progress" before "complete")
+2. ✅ Metadata parsing for multi-step tasks (parse BEFORE step parsing)
+3. ✅ Task-level output_path persistence in goals.md
+4. ✅ PM2 ecosystem.config.cjs pointing to stale compiled file
+
+**Key Changes:**
+- `types.ts` - Added `output_path` to WorkItem interface
+- `work-selector.ts` - Fixed metadata parsing order, status parsing order
+- `state-handler.ts` - Added `setTaskOutputPath()` function
+- `execution-handler.ts` - Modified `buildRetryContext()` to use item.output_path
+- `executive-loop.ts` - Added output_path persistence on success/failure
+- `ecosystem.config.cjs` - Fixed script path to `dist/core/executive-loop.js`
+
+**Result**: Agent now correctly resumes work in the SAME project directory across PM2 restarts. "Like a human resuming after lunch" ✓

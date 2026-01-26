@@ -9,7 +9,7 @@ module.exports = {
     {
       // Main executive loop process
       name: 'executive-loop',
-      script: 'dist/executive-loop.js',
+      script: 'dist/core/executive-loop.js',
       cwd: '/Users/jackjin/dev/continuous-agent',
 
       // Environment

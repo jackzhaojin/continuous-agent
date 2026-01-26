@@ -93,17 +93,18 @@ function setupProjectDirectory(projectPath: string, category: string): void {
     console.log(`[Worker] Created project directory: ${projectPath}`);
   }
 
-  // Copy appropriate .gitignore template
+  // Copy universal .gitignore template (covers all technologies)
+  // This ensures Python, Node, etc. are all covered regardless of category
   const gitignoreDest = path.join(projectPath, '.gitignore');
   if (!existsSync(gitignoreDest)) {
-    const templateFile = path.join(TEMPLATES_DIR, `gitignore-${category}`);
+    const universalFile = path.join(TEMPLATES_DIR, 'gitignore-universal');
     const fallbackFile = path.join(TEMPLATES_DIR, 'gitignore-misc');
 
-    const sourceFile = existsSync(templateFile) ? templateFile : fallbackFile;
+    const sourceFile = existsSync(universalFile) ? universalFile : fallbackFile;
 
     if (existsSync(sourceFile)) {
       copyFileSync(sourceFile, gitignoreDest);
-      console.log(`[Worker] Created .gitignore from ${category} template`);
+      console.log(`[Worker] Created .gitignore from universal template`);
     } else {
       console.log(`[Worker] Warning: No .gitignore template found for ${category}`);
     }

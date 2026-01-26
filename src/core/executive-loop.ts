@@ -153,6 +153,11 @@ async function runIteration(): Promise<IterationResult> {
     logAgentic(`Selected TASK: [${workItem.priority}] ${workItem.title}`);
   }
 
+  // Log output_path for resume traceability
+  if (workItem.output_path) {
+    log(`  Output path: ${workItem.output_path} (resuming)`);
+  }
+
   // === PHASE 4: EXECUTE WORK ===
   const contractId = `task-${Date.now()}`;
   loopState.current_task = contractId;

@@ -89,6 +89,19 @@ Complete ALL of the following:
 
 {{TASK_DESCRIPTION}}
 
+## Technology Preferences
+
+**Language priority:** JavaScript > Python > Other
+- Prefer JavaScript/Node.js for most tasks
+- Use plain JavaScript over TypeScript when possible
+- Only use Python if JavaScript SDK/library is unavailable
+- Do NOT add "complementary" implementations in other languages - stick to ONE
+
+**Scope discipline:**
+- Complete the task as specified, no more
+- Do not add extra features, languages, or implementations
+- If the task is done, stop - don't "complement" with alternatives
+
 ## Execution Guidelines
 
 1. **Start with understanding** - Read existing code before changing it
