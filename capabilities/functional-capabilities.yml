@@ -392,7 +392,7 @@ capabilities:
         - Copy-paste without context
         - Jargon without explanation
     evidence:
-      successes: 56
+      successes: 57
       failures: 6
       last_success: null
       last_failure: null

@@ -334,6 +334,12 @@ export async function spawnWorker(
   }
   const model = process.env.MODEL || 'claude-sonnet-4-5-20250929';
 
+  // Determine allowed tools - add Task for self-enhancement (before logging)
+  const allowedTools = [...contract.scope.tools_allowed];
+  if (isSelfEnhance && !allowedTools.includes('Task')) {
+    allowedTools.push('Task');
+  }
+
   // Log worker start with full context
   logger.log(`=== WORKER START ===`);
   logger.log(`Task ID: ${contract.id}`);
@@ -341,18 +347,12 @@ export async function spawnWorker(
   logger.log(`Category: ${category}`);
   logger.log(`Model: ${model}`);
   logger.log(`Max Turns: ${contract.max_turns}`);
-  logger.log(`Tools: ${contract.scope.tools_allowed.join(', ')}`);
+  logger.log(`Tools: ${allowedTools.join(', ')}`);
   logger.log(`--- PROMPT ---`);
   logger.log(prompt);
   logger.log(`--- END PROMPT ---`);
 
   try {
-    // Determine allowed tools - add Task for self-enhancement
-    let allowedTools = [...contract.scope.tools_allowed];
-    if (isSelfEnhance && !allowedTools.includes('Task')) {
-      allowedTools.push('Task');
-      logger.log(`SELF-ENHANCE: Added Task tool for subagent delegation`);
-    }
 
     // Query Claude using the Agent SDK with project directory as cwd
     // CRITICAL: settingSources enables skill/agent loading from user + project

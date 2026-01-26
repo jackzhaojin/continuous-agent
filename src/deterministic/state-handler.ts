@@ -64,9 +64,39 @@ export async function updateTaskState(
         output_path: outputPath || null,
       });
       await appendFile(ledgerPath, entry + '\n', 'utf-8');
+
+      // Self-enhance tasks need human review before merge
+      if (item.selfEnhance && item.branch) {
+        await requestSelfEnhanceReview(item);
+      }
     }
   } catch (error) {
     log(`  Failed to update goals.md: ${error}`);
+  }
+}
+
+/**
+ * Request human review for completed self-enhance task
+ * Adds entry to needs-you.md with branch info
+ */
+async function requestSelfEnhanceReview(item: WorkItem): Promise<void> {
+  const needsYouPath = path.join(WORKSPACE_DIR, 'needs-you.md');
+  const today = new Date().toISOString().split('T')[0];
+
+  try {
+    let content = await readFile(needsYouPath, 'utf-8');
+
+    const reviewEntry = `| Review & merge: ${item.title} | Branch \`${item.branch}\` ready for review. Run: \`git checkout ${item.branch} && git diff main...HEAD\` | | HIGH | ${today} |`;
+
+    // Insert after the Actions Needed table header
+    const tablePattern = /(\| Action \| Why Agent Can't Do It \| Response \| Blocking \| Since \|)\n(\| \*None\* \||\|[^\n]+\|)/;
+    if (tablePattern.test(content)) {
+      content = content.replace(tablePattern, `$1\n${reviewEntry}`);
+      await writeFile(needsYouPath, content, 'utf-8');
+      log(`  Added review request to needs-you.md for branch: ${item.branch}`);
+    }
+  } catch (error) {
+    log(`  Failed to add review request: ${error}`);
   }
 }
 
