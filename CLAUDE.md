@@ -375,10 +375,29 @@ Foundational proof-of-concept projects are stored in `references/poc/`. These ar
 - `cwd` must point to project root for `.claude/skills/` discovery
 - SKILL.md format with frontmatter and instructions
 
+**`references/poc/agent-sdk-subagents-poc/`** - Subagent delegation via Task tool
+- `allowedTools` must include 'Task' to enable subagent delegation
+- `settingSources: ['user', 'project']` loads agents from filesystem
+- User-level agents (`~/.claude/agents/`) and project-level agents (`.claude/agents/`) both work
+- Custom subagents specify: tools, model, permissionMode, hooks, skills
+- Built-in subagents: Explore (haiku), Plan, general-purpose, Bash
+- Subagents run in isolated context, return results to main agent
+- Subagents CANNOT spawn other subagents (no nesting)
+- See `FINDINGS.md` in the POC for complete validation results
+
+**Skills vs Subagents:**
+| Aspect | Skills | Subagents |
+|--------|--------|-----------|
+| Location | `.claude/skills/` | `.claude/agents/` |
+| Tool | `Skill` | `Task` |
+| Context | Runs in main context | Isolated context |
+| Purpose | Reusable prompts | Delegated autonomous tasks |
+
 **Running POCs:**
 ```bash
 cd references/poc/chat-cli && npm install && npm run build && npm start
 cd references/poc/agent-sdk-skills-poc && npm install && npm run build && npm start
+cd references/poc/agent-sdk-subagents-poc && npm install && npm run build && npm start
 ```
 
 These POCs have their own `.env` files (not committed) - copy from `.env.example` and add credentials.
@@ -419,7 +438,8 @@ continuous-agent/
 ├── references/                 # External references and POCs
 │   ├── poc/                    # Foundational proof-of-concept projects
 │   │   ├── chat-cli/           # Agent SDK CLI demo
-│   │   └── agent-sdk-skills-poc/  # Skills integration demo
+│   │   ├── agent-sdk-skills-poc/  # Skills integration demo
+│   │   └── agent-sdk-subagents-poc/  # Subagent delegation demo
 │   └── reference-registry.yaml # Reference tracking
 │
 ├── .claude/skills/             # Claude Code skill documentation

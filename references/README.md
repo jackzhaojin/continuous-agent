@@ -10,6 +10,16 @@ Working proof-of-concept projects demonstrating Agent SDK patterns:
 |-----|---------|---------------|
 | `chat-cli/` | Interactive CLI demo | `query()` usage, streaming, message types, auth patterns |
 | `agent-sdk-skills-poc/` | Skills integration | `settingSources`, `allowedTools: ['Skill']`, SKILL.md format |
+| `agent-sdk-subagents-poc/` | Subagent delegation | `allowedTools: ['Task']`, user/project agents, isolated context |
+
+### Skills vs Subagents
+
+| Aspect | Skills | Subagents |
+|--------|--------|-----------|
+| Location | `.claude/skills/` | `.claude/agents/` |
+| Tool | `Skill` | `Task` |
+| Context | Runs in main | Isolated |
+| Nesting | Can be invoked by subagents | Cannot spawn subagents |
 
 **Running:**
 ```bash

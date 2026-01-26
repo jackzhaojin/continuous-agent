@@ -97,7 +97,8 @@ These limits cannot be overridden by prompts or code.
 Foundational proof-of-concept projects demonstrating Agent SDK patterns are in `references/poc/`:
 
 - **`chat-cli/`** - Interactive CLI showing `query()` usage, streaming, message handling
-- **`agent-sdk-skills-poc/`** - Skills integration with Agent SDK
+- **`agent-sdk-skills-poc/`** - Skills integration with Agent SDK (`Skill` tool)
+- **`agent-sdk-subagents-poc/`** - Subagent delegation via `Task` tool
 
 ```bash
 # Run a POC
