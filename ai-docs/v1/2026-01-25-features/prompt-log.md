@@ -196,3 +196,55 @@ Build verified: ✅ TypeScript compiles with no errors
 - Automatically detected 3 steps remaining
 - Selected and started Step 2 without human intervention
 - "Like a human resuming after lunch" ✓
+
+---
+
+## Session 4: Project Directory Persistence Bug (Jan 25-26, 2026)
+
+### Prompt 14: Check Agent Status (Late PM)
+
+> After compacting, can you see what continuous agent is doing next? is notion poc done and it's on to its next priority?
+
+→ Response: Found agent creating 27+ duplicate Notion project folders instead of working in one.
+→ Action: Read goals.md, checked agent-outputs, discovered fundamental architecture issue.
+
+---
+
+### Prompt 15: Fix Fundamental Issue (Late PM)
+
+> Each time we're generating a new notion project and we have like 23 of them already... Something needs to be fundamentally fixed here. Like a cont agent should be able to work in ONE folder for a long time to complete a poc, days or weeks even. Full resume. Kind of like a human would work on a project for weeks or months.
+
+→ Response: Identified root cause - in-memory retryTracker lost on PM2 restart, no task-level output_path persistence.
+→ Action: Full analysis of work-selector.ts, execution-handler.ts, worker-spawner.ts, executive-loop.ts.
+
+---
+
+### Prompt 16: Full Mapping First (Late PM)
+
+> Do full mapping of the current impl first, assess, think, reason, then fix
+
+→ Response: Identified 3 bugs - status parsing order, metadata skipping for multi-step tasks, no output_path persistence.
+→ Action: Updated types.ts, work-selector.ts, state-handler.ts, execution-handler.ts, executive-loop.ts. ⚠️
+
+---
+
+### Prompt 17: Clean Up Folders (Late PM)
+
+> Can we please clean up all the notion project folders? and like, have it be one clean folder. Also all the '/Users/jackjin/dev/agent-outputs/projects/misc/2026-01-25', all these are notions as well.
+
+→ Response: Cleaned all duplicate folders, kept only 1769393294746.
+→ Action: Removed 26+ duplicate folders in 2026-01-26/, all folders in 2026-01-25/. ✅
+
+---
+
+### Debugging: Worker Still Creating New Paths (Ongoing)
+
+**Issue**: Despite all fixes, worker-spawner still creating new project paths instead of using existing one from goals.md.
+
+**Investigation**:
+1. Added debug logging to execution-handler.ts and worker-spawner.ts
+2. Direct tests of buildRetryContext logic work correctly
+3. PM2 execution does NOT show debug logs
+4. Latest worker log shows new path: `1769394837879` instead of existing `1769393294746`
+
+**Current status**: Tracing where output_path gets lost in the execution chain.
