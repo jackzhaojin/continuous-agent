@@ -46,6 +46,10 @@ import {
   setTaskOutputPath,
 } from '../deterministic/state-handler.js';
 
+// SELF-IMPROVEMENT - Idle and scheduled triggers
+import { checkSelfImprovementTriggers } from '../agentic/calibration/self-improvement-triggers.js';
+import { generateSelfImprovementTask } from '../agentic/calibration/self-improvement-task-generator.js';
+
 // Load environment variables
 config();
 
@@ -139,6 +143,29 @@ async function runIteration(): Promise<IterationResult> {
 
   if (!selectedWork) {
     logAgentic('  No work available in queue');
+
+    // NEW: Check for self-improvement opportunities when idle
+    logAgentic('  Checking for self-improvement opportunities...');
+    const selfImprovementTrigger = await checkSelfImprovementTriggers();
+
+    if (selfImprovementTrigger) {
+      logAgentic(`  Self-improvement trigger found: ${selfImprovementTrigger.type}`);
+      logAgentic(`  Reason: ${selfImprovementTrigger.reason}`);
+
+      // Generate task in goals.md - will be picked up on next iteration
+      const taskAdded = await generateSelfImprovementTask(selfImprovementTrigger);
+
+      if (taskAdded) {
+        logAgentic('  Self-improvement task added to goals.md');
+        // Continue immediately to pick up the new task
+        return 'work_completed';
+      } else {
+        logAgentic('  Self-improvement task already exists or failed to add');
+      }
+    } else {
+      logAgentic('  No self-improvement triggers ready');
+    }
+
     return 'no_work';
   }
 

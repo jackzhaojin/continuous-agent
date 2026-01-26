@@ -11,6 +11,11 @@ import {
 } from '../agentic/work-selection/work-selector.js';
 import type { WorkItem, WorkStep } from '../core/types.js';
 import { logDeterministic, log, logAgentic } from '../core/logging.js';
+import {
+  markPracticeCompleted,
+  markRetrospectiveCompleted,
+  markReferenceRefreshCompleted,
+} from './self-improvement-state.js';
 
 const WORKSPACE_DIR = path.join(process.cwd(), 'workspace');
 const LEDGERS_DIR = path.join(process.cwd(), 'ledgers');
@@ -64,6 +69,18 @@ export async function updateTaskState(
         output_path: outputPath || null,
       });
       await appendFile(ledgerPath, entry + '\n', 'utf-8');
+
+      // Track self-improvement completions
+      if (item.title.includes('[SELF-ENHANCE] Practice')) {
+        await markPracticeCompleted();
+        logDeterministic('  Marked practice loop as completed in self-improvement state');
+      } else if (item.title.includes('[SELF-ENHANCE] Weekly Retrospective') || item.title.includes('[SELF-ENHANCE] Retrospective')) {
+        await markRetrospectiveCompleted();
+        logDeterministic('  Marked retrospective as completed in self-improvement state');
+      } else if (item.title.includes('[SELF-ENHANCE] Reference Refresh')) {
+        await markReferenceRefreshCompleted();
+        logDeterministic('  Marked reference refresh as completed in self-improvement state');
+      }
 
       // Self-enhance tasks need human review before merge
       if (item.selfEnhance && item.branch) {
