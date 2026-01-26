@@ -359,6 +359,30 @@ Implementation (workers execute tasks)
 - Prompts built via `prompt-builder.ts` include Constitution, retry context, strategies
 - Each worker includes 'Skill' tool for accessing Claude Code skills
 
+## Reference POCs
+
+Foundational proof-of-concept projects are stored in `references/poc/`. These are working examples that demonstrate core Agent SDK patterns:
+
+**`references/poc/chat-cli/`** - Interactive CLI demonstrating Claude Agent SDK patterns
+- How to use `query()` from `@anthropic-ai/claude-agent-sdk`
+- Streaming message handling (`for await of stream`)
+- Message type handling (system, assistant, user, result)
+- Authentication patterns (OAuth token vs API key)
+
+**`references/poc/agent-sdk-skills-poc/`** - Skills integration with Agent SDK
+- `settingSources: ['user', 'project']` is REQUIRED for skills
+- `allowedTools` must include 'Skill' for skill invocation
+- `cwd` must point to project root for `.claude/skills/` discovery
+- SKILL.md format with frontmatter and instructions
+
+**Running POCs:**
+```bash
+cd references/poc/chat-cli && npm install && npm run build && npm start
+cd references/poc/agent-sdk-skills-poc && npm install && npm run build && npm start
+```
+
+These POCs have their own `.env` files (not committed) - copy from `.env.example` and add credentials.
+
 ## File Structure Reference
 
 ```
@@ -392,6 +416,12 @@ continuous-agent/
 │   ├── delivery-capabilities.yml     # End-to-end outcomes
 │   └── functional-capabilities.yml   # Cross-cutting capabilities
 
+├── references/                 # External references and POCs
+│   ├── poc/                    # Foundational proof-of-concept projects
+│   │   ├── chat-cli/           # Agent SDK CLI demo
+│   │   └── agent-sdk-skills-poc/  # Skills integration demo
+│   └── reference-registry.yaml # Reference tracking
+│
 ├── .claude/skills/             # Claude Code skill documentation
 ├── verifiers/definitions/      # Verifier YAML configs
 ├── strategies/prompts/         # Prompt templates

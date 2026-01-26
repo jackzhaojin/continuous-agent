@@ -92,12 +92,26 @@ The agent operates under 8 immutable constraints defined in `workspace/constitut
 
 These limits cannot be overridden by prompts or code.
 
+## Reference POCs
+
+Foundational proof-of-concept projects demonstrating Agent SDK patterns are in `references/poc/`:
+
+- **`chat-cli/`** - Interactive CLI showing `query()` usage, streaming, message handling
+- **`agent-sdk-skills-poc/`** - Skills integration with Agent SDK
+
+```bash
+# Run a POC
+cd references/poc/chat-cli
+npm install && npm run build && npm start
+```
+
 ## Documentation
 
 - **CLAUDE.md** - Detailed guidance for working with this codebase
 - **ai-docs/v1/init/** - Product requirements and specifications
 - **ai-docs/features/** - Feature documentation
 - **.claude/skills/** - Skill documentation for the agent
+- **references/poc/** - Working Agent SDK proof-of-concept examples
 
 ## Requirements
 

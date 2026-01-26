@@ -2,8 +2,8 @@
 # Single source of truth for all external references
 # Per PRD Reference Management Addendum
 
-version: "1.0"
-last_verified: "2026-01-25T12:00:00Z"
+version: "1.1"
+last_verified: "2026-01-25T18:00:00Z"
 
 references:
   # ===================================================================
@@ -15,7 +15,7 @@ references:
     mode: A
 
     # Location
-    source_path: null  # External reference, not cloned locally
+    source_path: references/poc/chat-cli  # Local copy in this repo
 
     # Provenance
     upstream: /Users/jackjin/dev/azure-da-mcp/agent-claude-sdk/chat-cli
@@ -49,7 +49,7 @@ references:
     mode: A
 
     # Location
-    source_path: null  # External reference
+    source_path: references/poc/agent-sdk-skills-poc  # Local copy in this repo
 
     # Provenance
     upstream: /Users/jackjin/dev/azure-da-mcp/agent-claude-sdk/agent-sdk-skills-poc
