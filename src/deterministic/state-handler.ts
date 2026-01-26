@@ -88,12 +88,18 @@ export async function updateStepState(
 
   try {
     if (success) {
-      // Update the step in the local copy
+      // Update the step status in goals.md
+      // This writes the individual step's status to the file
+      await updateStepStatus(item.title, step.step_number, 'complete');
+
+      // Update the step in the local copy for progress calculation
       const stepToUpdate = item.steps?.[step.step_number];
       if (stepToUpdate) {
         stepToUpdate.status = 'complete';
         stepToUpdate.completed_at = now;
       }
+
+      // Update the parent task's progress status
       await updateTaskProgressFromSteps(item.title, item.steps || []);
 
       // Log step completion

@@ -17,7 +17,9 @@ module.exports = {
       // Only sleeps when idle (queue empty) or unhealthy
       node_args: '--experimental-specifier-resolution=node',
       env: {
-        NODE_ENV: 'production',
+        // NOTE: Using 'development' to ensure npm installs devDependencies
+        // 'production' was causing workers to fail npm install for TypeScript
+        NODE_ENV: 'development',
         AGENT_OUTPUTS_PATH: '/Users/jackjin/dev/agent-outputs',
         IDLE_SLEEP_SECONDS: '30',       // Sleep when no work (polling interval)
         UNHEALTHY_SLEEP_SECONDS: '60',  // Sleep when system unhealthy

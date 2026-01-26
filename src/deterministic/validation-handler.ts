@@ -2,23 +2,33 @@
  * Work validation logic - MIXED AGENTIC/DETERMINISTIC
  * Deterministic: Running verifiers
  * Agentic: Interpreting results, deciding if work passes
+ *
+ * Step-aware validation:
+ * - Research steps get lighter validation (git clean, some output exists)
+ * - Setup steps check project structure (package.json, npm install)
+ * - Implementation/testing steps get full validation suite
  */
 
-import { runAllVerifiers, summarizeResults } from './verifiers/index.js';
+import { runAllVerifiers, summarizeResults, type StepContext } from './verifiers/index.js';
 import {
   updateCapabilitiesFromVerifierResults,
   DEFAULT_CAPABILITY_MAPPINGS,
 } from '../agentic/learning/capability-updater.js';
-import type { WorkItem, WorkerResult } from '../core/types.js';
+import type { WorkItem, WorkStep, WorkerResult } from '../core/types.js';
 import { logAgentic, logDeterministic, log } from '../core/logging.js';
 
 /**
  * Validate work using verifiers
  * MIXED: Deterministic verifier execution + Agentic result interpretation
+ *
+ * @param item - The work item being validated
+ * @param result - The worker result
+ * @param currentStep - Optional current step for step-aware validation
  */
 export async function validateWork(
   item: WorkItem,
-  result: WorkerResult | null
+  result: WorkerResult | null,
+  currentStep?: WorkStep
 ): Promise<boolean> {
   if (!result) {
     log('  No result to validate');
@@ -31,12 +41,27 @@ export async function validateWork(
   }
 
   try {
-    logDeterministic('Running verifiers on worker output...');
+    // Build step context for step-aware validation
+    const stepContext: StepContext | undefined = currentStep
+      ? {
+          step_number: currentStep.step_number,
+          step_title: currentStep.title,
+          total_steps: item.steps?.length || 1,
+        }
+      : undefined;
+
+    if (stepContext) {
+      logDeterministic(`Running verifiers for step ${stepContext.step_number + 1}/${stepContext.total_steps}: "${stepContext.step_title}"`);
+    } else {
+      logDeterministic('Running verifiers on worker output...');
+    }
 
     // DETERMINISTIC: Run verifiers (mechanical checks)
-    const verifierResults = await runAllVerifiers({
-      project_path: result.output_path,
-    });
+    // Pass step context for step-aware validation
+    const verifierResults = await runAllVerifiers(
+      { project_path: result.output_path },
+      stepContext
+    );
 
     const summary = summarizeResults(verifierResults);
 

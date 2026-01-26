@@ -7,10 +7,10 @@
 
 import fs from 'fs/promises';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import { logAgentic, log } from '../../core/logging.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Prompts live in src/ (not compiled to dist/), so use project root
+const PROMPTS_DIR = path.join(process.cwd(), 'src', 'agentic', 'prompts');
 
 /**
  * Prompt metadata from YAML frontmatter
@@ -156,12 +156,15 @@ export function renderPrompt(template: string, variables: Record<string, any>): 
  * @param name - Prompt name without version (e.g., 'worker-base')
  */
 export async function loadPrompt(category: string, name: string): Promise<LoadedPrompt> {
-  const promptDir = path.join(__dirname, category);
+  const promptDir = path.join(PROMPTS_DIR, category);
   const promptFile = path.join(promptDir, `${name}.md`);
 
   try {
     const content = await fs.readFile(promptFile, 'utf-8');
     const { metadata, content: markdownContent } = parseFrontmatter(content);
+
+    // Log prompt loading
+    logAgentic(`📜 PROMPT LOADED: ${category}/${name} (v${metadata.version || 'unknown'})`);
 
     return {
       metadata,
@@ -170,6 +173,7 @@ export async function loadPrompt(category: string, name: string): Promise<Loaded
     };
   } catch (error: any) {
     if (error.code === 'ENOENT') {
+      log(`❌ PROMPT NOT FOUND: ${category}/${name}.md`);
       throw new Error(`Prompt not found: ${category}/${name}.md`);
     }
     throw error;
@@ -194,12 +198,14 @@ export async function loadAndRender(
   if (prompt.metadata.variables) {
     for (const varDef of prompt.metadata.variables) {
       if (typeof varDef === 'object' && varDef.required && !(varDef.name in variables)) {
+        log(`❌ MISSING VARIABLE: ${varDef.name} for prompt ${category}/${name}`);
         throw new Error(`Missing required variable: ${varDef.name}`);
       }
     }
   }
 
   const rendered = renderPrompt(prompt.content, variables);
+  log(`  ↳ Rendered with ${Object.keys(variables).length} variables (${rendered.length} chars)`);
 
   return {
     metadata: prompt.metadata,
@@ -218,11 +224,16 @@ export async function composePrompts(
   separator: string = '\n\n---\n\n'
 ): Promise<string> {
   const rendered: string[] = [];
+  const promptNames = prompts.map(([cat, name]) => `${cat}/${name}`);
+
+  logAgentic(`📚 COMPOSING ${prompts.length} PROMPTS: [${promptNames.join(', ')}]`);
 
   for (const [category, name, variables] of prompts) {
     const { rendered: content } = await loadAndRender(category, name, variables);
     rendered.push(content);
   }
+
+  log(`  ✓ Composed ${rendered.length} prompts (${rendered.join('').length} chars total)`);
 
   return rendered.join(separator);
 }
@@ -231,7 +242,7 @@ export async function composePrompts(
  * List all available prompts in a category
  */
 export async function listPrompts(category: string): Promise<string[]> {
-  const promptDir = path.join(__dirname, category);
+  const promptDir = path.join(PROMPTS_DIR, category);
 
   try {
     const files = await fs.readdir(promptDir);

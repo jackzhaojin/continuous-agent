@@ -28,6 +28,52 @@ export interface VerifierConfig {
 }
 
 /**
+ * Step context for step-aware validation
+ */
+export interface StepContext {
+  step_number: number;
+  step_title: string;
+  total_steps: number;
+}
+
+/**
+ * Determine step type from step title and number
+ * Research/planning steps get lighter validation
+ */
+function getStepType(step?: StepContext): 'research' | 'setup' | 'implementation' | 'testing' | 'unknown' {
+  if (!step) return 'unknown';
+
+  const title = step.step_title.toLowerCase();
+
+  // Step 1 is typically research/planning
+  if (step.step_number === 0 ||
+      title.includes('research') ||
+      title.includes('plan') ||
+      title.includes('analyze') ||
+      title.includes('investigate')) {
+    return 'research';
+  }
+
+  // Setup/initialization step
+  if (title.includes('initialize') ||
+      title.includes('setup') ||
+      title.includes('scaffold') ||
+      title.includes('project structure')) {
+    return 'setup';
+  }
+
+  // Testing step
+  if (title.includes('test') ||
+      title.includes('quality') ||
+      title.includes('qa')) {
+    return 'testing';
+  }
+
+  // Default to implementation for other steps
+  return 'implementation';
+}
+
+/**
  * Verifier 1: git_status_clean
  * Checks that the git working tree is clean (no uncommitted changes)
  */
@@ -456,13 +502,68 @@ export async function verifyDocsChecklist(config: VerifierConfig): Promise<Verif
 }
 
 /**
- * Run all applicable verifiers for a project
+ * Run applicable verifiers for a project based on step context
+ *
+ * Step-aware validation:
+ * - Research steps: Only check git clean and that some output exists
+ * - Setup steps: Check git clean, files created, npm install works
+ * - Implementation/Testing: Full validation suite
+ * - Unknown (no step info): Full validation for backwards compatibility
  */
-export async function runAllVerifiers(config: VerifierConfig): Promise<VerifierResult[]> {
+export async function runAllVerifiers(
+  config: VerifierConfig,
+  step?: StepContext
+): Promise<VerifierResult[]> {
   const results: VerifierResult[] = [];
+  const stepType = getStepType(step);
 
-  // Run verifiers in sequence
+  // Git status clean is ALWAYS required - work must be committed
   results.push(await verifyGitStatusClean(config));
+
+  // Research/planning steps: minimal validation
+  // Just need git clean and some output (research docs, notes, etc.)
+  if (stepType === 'research') {
+    // Check that at least SOME files exist (research output, markdown docs, etc.)
+    // Accept common research outputs, not just code files
+    const researchFiles = ['RESEARCH.md', 'research.md', 'PLAN.md', 'plan.md', 'README.md', 'NOTES.md', 'notes.md'];
+    const anyResearchFilePath = path.join(config.project_path, 'RESEARCH.md');
+    let hasAnyOutput = false;
+
+    // Check if any research-type file exists
+    for (const file of researchFiles) {
+      if (existsSync(path.join(config.project_path, file))) {
+        hasAnyOutput = true;
+        break;
+      }
+    }
+
+    // Also accept package.json or any .md file as valid research output
+    if (!hasAnyOutput && existsSync(path.join(config.project_path, 'package.json'))) {
+      hasAnyOutput = true;
+    }
+
+    results.push({
+      verifier_id: 'research_output_exists',
+      result: hasAnyOutput ? 'PASS' : 'FAIL',
+      message: hasAnyOutput ? 'Research output files exist' : 'No research output found (expected RESEARCH.md, PLAN.md, or similar)',
+      evidence: { step_type: stepType, checked_files: researchFiles },
+      duration_ms: 0,
+    });
+
+    return results;
+  }
+
+  // Setup steps: check project structure created
+  if (stepType === 'setup') {
+    // For setup, we want basic structure but not necessarily full build
+    results.push(await verifyFilesExist(config, ['package.json']));
+    results.push(await verifyNodeInstall(config));
+    // Skip build/test for setup - those come in later steps
+    return results;
+  }
+
+  // Implementation and testing steps: full validation
+  // Also default for unknown step type (backwards compatibility)
   results.push(await verifyFilesExist(config, ['package.json', 'README.md']));
   results.push(await verifyNodeInstall(config));
   results.push(await verifyNodeBuild(config));

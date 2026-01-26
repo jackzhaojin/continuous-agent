@@ -18,6 +18,7 @@ export {
   summarizeResults,
   type VerifierResult,
   type VerifierConfig,
+  type StepContext,
 } from './core-verifiers.js';
 
 export {

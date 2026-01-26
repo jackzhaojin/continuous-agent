@@ -168,7 +168,8 @@ async function runIteration(): Promise<IterationResult> {
 
   // === PHASE 5: VALIDATE WORK ===
   logAgentic('PHASE 5: Validate Work');
-  const isValid = await validateWork(workItem, result);
+  // Pass current step for step-aware validation
+  const isValid = await validateWork(workItem, result, currentStep);
 
   // Log capability result
   await logCapabilityResult(workItem, capabilities, isValid, contractId);
