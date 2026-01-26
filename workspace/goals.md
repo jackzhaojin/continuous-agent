@@ -85,14 +85,16 @@ This document tracks the strategic objectives for the Continuous Executive Agent
 ## P3 - Normal Priority
 
 ### POC New Capabilities
-- **Status:** Pending
+- **Status:** Complete
 - **Description:** Explore and prototype new agent capabilities
+- **Output:** /Users/jackjin/dev/agent-outputs/projects/misc/2026-01-26/1769398504453
 - **Success Criteria:** TBD
 - **Dependencies:** None identified
 
 ### Integrate Self-Improvement Loop Triggers
-- **Status:** Pending
+- **Status:** Blocked
 - **Description:** Wire practice-loop, retrospective, and reference refresh into idle/scheduled execution
+- **Output:** /Users/jackjin/dev/agent-outputs/projects/misc/2026-01-26/1769399545316
 - **Success Criteria:** Low-priority task scheduled; scope aligned with PRD terminology update
 - **Dependencies:** None identified
 

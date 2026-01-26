@@ -111,14 +111,30 @@ The agent can modify its own infrastructure code through a special self-enhancem
 ### Key Files
 
 - **Self-enhancer agent:** `.claude/agents/self-enhancer.md`
-- **Detection logic:** `src/agentic/work-selection/work-selector.ts` (parses `[SELF-ENHANCE]` prefix)
-- **Routing logic:** `src/agentic/execution/worker-spawner.ts` (routes to agent codebase)
+- **Detection logic:** `src/agentic/work-selection/work-selector.ts` (parses `[SELF-ENHANCE]` prefix, preserves full title for regex matching)
+- **Routing logic:** `src/agentic/execution/worker-spawner.ts` (routes to agent codebase, adds Task tool for subagent delegation)
+- **Review notification:** `src/deterministic/state-handler.ts` (adds review request to needs-you.md on completion)
 
 ## Core Architecture
 
+### Agentic vs Deterministic Split
+
+The codebase enforces a strict separation between AI decision-making and mechanical operations:
+
+| Layer | Location | Purpose | Uses LLM? |
+|-------|----------|---------|-----------|
+| **Agentic** | `src/agentic/` | AI decisions - work selection, strategy, diagnosis, learning | Yes |
+| **Deterministic** | `src/deterministic/` | Mechanical ops - file I/O, health checks, state updates | No |
+| **Core** | `src/core/` | Infrastructure - loop orchestration, types, logging | No |
+
+**Why this matters:**
+- Agentic code can be improved by the AI itself (via self-enhancement)
+- Deterministic code is predictable, testable, and cheap to run
+- Logging tags operations as `[AGENTIC]` or `[DETERMINISTIC]` for debugging
+
 ### Executive Loop (8 Phases)
 
-`src/executive-loop.ts` runs continuously in PM2:
+`src/core/executive-loop.ts` runs continuously in PM2:
 
 1. **Health Check** - GitHub auth, disk space, dependencies
 2. **Check Inputs** - Process human responses from `needs-you.md`
@@ -156,25 +172,30 @@ Complex tasks (>100 estimated turns) are automatically broken down into steps:
 
 ### Key Modules
 
-**Work Selection & Execution:**
-- `work-selector.ts` - Parses goals.md, returns highest priority unblocked task
-- `task-breakdown.ts` - Automatic breakdown of complex tasks into steps
-- `task-contractor.ts` - Creates task contracts with DoD and constraints
-- `worker-spawner.ts` - Spawns Claude Agent SDK sessions with prompts, copies `.env` to worker directory
-- `input-processor.ts` - Parses human responses from needs-you.md
-
-**Intelligence Layer:**
+**Agentic Layer** (`src/agentic/`) - AI decision-making:
+- `work-selection/work-selector.ts` - Parses goals.md, returns highest priority unblocked task
+- `work-selection/task-breakdown.ts` - Automatic breakdown of complex tasks into steps
+- `execution/task-contractor.ts` - Creates task contracts with DoD and constraints
+- `execution/worker-spawner.ts` - Spawns Claude Agent SDK sessions with prompts, copies `.env` to worker directory
+- `execution/execution-handler.ts` - Orchestrates work execution with retry tracking
 - `intelligence/intent-classifier.ts` - Classifies tasks as outcome_only vs what_and_how
 - `intelligence/strategy-selector.ts` - Chooses different strategies per retry
 - `intelligence/prompt-builder.ts` - Builds context-rich prompts with retry history
-
-**Verification & Learning:**
-- `verifiers/` - Deterministic checks (git-clean, node-build, docs-complete, etc.)
+- `diagnosis/agentic-diagnosis.ts` - Analyzes failures to determine next actions
 - `learning/capability-updater.ts` - Updates capability confidence: +10 on PASS, -15 on FAIL
 
-**State Management:**
+**Deterministic Layer** (`src/deterministic/`) - Mechanical operations:
 - `health-checker.ts` - Validates auth, tools, disk space
+- `input-processor.ts` - Parses human responses from needs-you.md
+- `state-handler.ts` - Updates goals.md, needs-you.md, ledgers
+- `validation-handler.ts` - Runs verifiers on worker output
+- `verifiers/` - Deterministic checks (git-clean, node-build, docs-complete)
+- `backoff-manager.ts` - Rate limit detection and exponential backoff
+
+**Core Layer** (`src/core/`):
+- `executive-loop.ts` - Main 8-phase loop orchestration
 - `types.ts` - Shared TypeScript interfaces
+- `logging.ts` - Structured logging with agentic/deterministic distinction
 
 ### Workspace Files (Markdown + JSONL)
 
@@ -461,17 +482,29 @@ These POCs have their own `.env` files (not committed) - copy from `.env.example
 ```
 continuous-agent/
 ├── src/                        # TypeScript source (compiles to dist/)
-│   ├── executive-loop.ts       # Main 8-phase loop
-│   ├── work-selector.ts        # Parses goals.md with step awareness
-│   ├── task-breakdown.ts       # Automatic breakdown of complex tasks
-│   ├── task-contractor.ts      # Creates task contracts
-│   ├── worker-spawner.ts       # Agent SDK integration, .env copying
-│   ├── input-processor.ts      # Parses needs-you.md responses
-│   ├── health-checker.ts       # System health validation
-│   ├── intelligence/           # Intent classification, strategy selection
-│   ├── verifiers/              # Deterministic validation
-│   ├── learning/               # Capability confidence updates
-│   └── types.ts                # Shared interfaces
+│   ├── core/                   # Core infrastructure
+│   │   ├── executive-loop.ts   # Main 8-phase loop
+│   │   ├── types.ts            # Shared interfaces
+│   │   └── logging.ts          # Structured logging
+│   ├── agentic/                # AI decision-making (LLM-powered)
+│   │   ├── work-selection/     # Task selection & breakdown
+│   │   │   ├── work-selector.ts  # Parses goals.md with step awareness
+│   │   │   └── task-breakdown.ts # Complex task decomposition
+│   │   ├── execution/          # Worker spawning
+│   │   │   ├── worker-spawner.ts # Agent SDK integration, .env copying
+│   │   │   ├── task-contractor.ts # Creates task contracts
+│   │   │   └── execution-handler.ts # Orchestrates execution
+│   │   ├── intelligence/       # Intent classification, strategy selection
+│   │   ├── diagnosis/          # Failure analysis
+│   │   ├── learning/           # Capability confidence updates
+│   │   └── prompts/            # Prompt templates and loading
+│   └── deterministic/          # Mechanical operations (no LLM)
+│       ├── health-checker.ts   # System health validation
+│       ├── input-processor.ts  # Parses needs-you.md responses
+│       ├── state-handler.ts    # Updates goals.md, needs-you.md
+│       ├── validation-handler.ts # Runs verifiers
+│       ├── verifiers/          # Deterministic validation checks
+│       └── backoff-manager.ts  # Rate limit handling
 
 ├── workspace/                  # Human-editable state
 │   ├── constitution.md         # **IMMUTABLE** hard limits
@@ -550,6 +583,8 @@ tail -20 ledgers/work-ledger.jsonl
 - Retry loops → Check `strategy-selector.ts` is picking different strategies
 - Verifiers checking wrong directory → Ensure verifiers use `result.output_path`, not `process.cwd()`
 - TypeScript errors → Run `npm install` to ensure `@types/node` is installed
+- Self-enhance steps repeat → Title prefix must be preserved (not stripped) for regex matching in `updateStepStatus`
+- PM2 running stale code → Verify `ecosystem.config.cjs` script path points to `dist/core/executive-loop.js`
 
 ## Documentation Locations
 

@@ -6,7 +6,7 @@ capabilities:
   - id: git.branch_commit
     name: Git Branch and Commit
     description: Create branches, stage changes, and commit with proper messages
-    confidence: 100
+    confidence: 50
     maturity: Demonstrated
     scope:
       includes:
@@ -27,8 +27,8 @@ capabilities:
       - git_status_check
       - commit_exists
     evidence:
-      successes: 21
-      failures: 48
+      successes: 22
+      failures: 52
       last_success: null
       last_failure: null
       last_validated: '2026-01-26'
@@ -137,7 +137,7 @@ capabilities:
   - id: node.npm.install
     name: NPM Package Installation
     description: Install npm packages and manage dependencies
-    confidence: 100
+    confidence: 55
     maturity: Reliable
     scope:
       includes:
@@ -158,8 +158,8 @@ capabilities:
       - node_modules_exists
       - package_lock_updated
     evidence:
-      successes: 64
-      failures: 3
+      successes: 66
+      failures: 6
       last_success: null
       last_failure: null
       last_validated: '2026-01-26'
@@ -173,8 +173,8 @@ capabilities:
   - id: node.npm.run_script
     name: NPM Script Execution
     description: Run npm scripts defined in package.json
-    confidence: 100
-    maturity: Reliable
+    confidence: 40
+    maturity: Demonstrated
     scope:
       includes:
         - Running predefined scripts
@@ -192,8 +192,8 @@ capabilities:
       - script_exit_code
       - expected_output_patterns
     evidence:
-      successes: 136
-      failures: 53
+      successes: 143
+      failures: 61
       last_success: null
       last_failure: null
       last_validated: '2026-01-26'
@@ -207,7 +207,7 @@ capabilities:
   - id: nextjs.build.basic
     name: Next.js Basic Build
     description: Build Next.js applications for production
-    confidence: 20
+    confidence: 0
     maturity: Demonstrated
     scope:
       includes:
@@ -228,7 +228,7 @@ capabilities:
       - dot_next_directory_exists
     evidence:
       successes: 20
-      failures: 43
+      failures: 48
       last_success: null
       last_failure: null
       last_validated: '2026-01-26'
