@@ -172,8 +172,19 @@ async function moveToResolved(response: HumanResponse): Promise<void> {
     let content = await readFile(needsYouPath, 'utf-8');
     const today = new Date().toISOString().split('T')[0];
 
-    // Create resolved entry
-    const resolvedEntry = `| ${response.action} | ${response.response} | ${today} |`;
+    // Create resolved entry with more context
+    let resolutionSummary = response.response;
+    if (response.responseType === 'SKIP') {
+      resolutionSummary = `Skipped by human request`;
+    } else if (response.responseType === 'APPROVED') {
+      resolutionSummary = `Approved${response.responseDetails ? ': ' + response.responseDetails.slice(0, 50) : ''}`;
+    } else if (response.responseType === 'DECISION') {
+      resolutionSummary = `Decision: ${response.responseDetails || 'provided'}`;
+    } else if (response.responseType === 'INFO') {
+      resolutionSummary = `Info provided${response.responseDetails ? ': ' + response.responseDetails.slice(0, 50) : ''}`;
+    }
+
+    const resolvedEntry = `| ${response.action} | ${resolutionSummary} | ${today} |`;
 
     // Insert into Resolved section
     const resolvedTable = /(\| Item \| Resolution \| Resolved Date \|\n\|[-|]+\|)/;
@@ -250,6 +261,12 @@ export async function processHumanInputs(): Promise<ProcessedInput> {
       console.log(`  Type: ${response.responseType}`);
       console.log(`  Response: ${response.response}`);
 
+      // Validate response format and provide warnings
+      if (response.responseType === 'OTHER') {
+        console.log(`  ⚠️  Warning: Response not tagged with [APPROVED]/[DECISION]/[INFO]/[SKIP]`);
+        console.log(`     Will treat as general approval, but consider using explicit tags for clarity`);
+      }
+
       // Log the interaction
       await logHumanInteraction(response);
       await appendInputLog({
@@ -275,10 +292,12 @@ export async function processHumanInputs(): Promise<ProcessedInput> {
         // All other response types: unblock the task
         const unblocked = await unblockTaskInGoals(response.action);
         if (unblocked) {
-          console.log(`  Action: Unblocked task in goals.md`);
+          console.log(`  ✓ Action: Unblocked task in goals.md`);
+          console.log(`  ✓ Task will be retried with fresh context (10 new attempts)`);
           tasksUnblocked.push(response.action);
         } else {
-          console.log(`  Warning: Could not find matching task in goals.md`);
+          console.log(`  ⚠️  Warning: Could not find matching task in goals.md`);
+          console.log(`     Task may have been renamed or removed. Check goals.md manually.`);
         }
 
         // Move to resolved section

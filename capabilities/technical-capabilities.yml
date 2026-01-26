@@ -27,7 +27,7 @@ capabilities:
       - git_status_check
       - commit_exists
     evidence:
-      successes: 18
+      successes: 19
       failures: 48
       last_success: null
       last_failure: null
@@ -158,7 +158,7 @@ capabilities:
       - node_modules_exists
       - package_lock_updated
     evidence:
-      successes: 61
+      successes: 62
       failures: 3
       last_success: null
       last_failure: null

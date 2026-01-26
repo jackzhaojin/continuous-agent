@@ -249,13 +249,9 @@ function parseGoalsFile(content: string): ParsedSection[] {
       itemCounter++;
 
       // Check for [SELF-ENHANCE] prefix - indicates self-enhancement task
-      let rawTitle = goalMatch[1].trim();
-      let selfEnhance = false;
-      const selfEnhanceMatch = rawTitle.match(/^\[SELF-ENHANCE\]\s*(.+)$/i);
-      if (selfEnhanceMatch) {
-        selfEnhance = true;
-        rawTitle = selfEnhanceMatch[1].trim();
-      }
+      // IMPORTANT: Keep the full title including prefix for goals.md regex matching
+      const rawTitle = goalMatch[1].trim();
+      const selfEnhance = /^\[SELF-ENHANCE\]/i.test(rawTitle);
 
       currentItem = {
         id: `work-${itemCounter}`,

@@ -24,6 +24,10 @@ This document tracks items requiring human attention, decisions, or actions.
 - `[INFO] the information` - Provide requested information
 - `[SKIP]` - Skip this task entirely
 
+**Example:** If the agent needs an API key, respond with: `[INFO] API_KEY=sk_test_abc123xyz`
+
+**Note:** After you respond, the agent will automatically detect your response in the next loop iteration (typically within 30 seconds), unblock the task, and retry with fresh context.
+
 | Action | Why Agent Can't Do It | Response | Blocking | Since |
 | *None* | | | | |
 
@@ -51,6 +55,8 @@ This document tracks items requiring human attention, decisions, or actions.
 
 ## Notes
 
-- Mark items with urgency: BLOCKING, HIGH, NORMAL, LOW
-- Include context for why human input is needed
-- Remove items once resolved (move to Resolved section)
+- **Urgency Levels:** BLOCKING (stops all work), HIGH (important), NORMAL, LOW
+- **Log References:** When available, check the referenced log file for full error context
+- **Auto-Processing:** Responses are detected automatically within ~30 seconds
+- **Task Unblocking:** Non-SKIP responses reset retry counter and give task 10 fresh attempts
+- **History:** Resolved items remain visible for reference (last ~10 items shown)
