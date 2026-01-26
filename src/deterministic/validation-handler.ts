@@ -8,9 +8,9 @@ import { runAllVerifiers, summarizeResults } from './verifiers/index.js';
 import {
   updateCapabilitiesFromVerifierResults,
   DEFAULT_CAPABILITY_MAPPINGS,
-} from './learning/capability-updater.js';
-import type { WorkItem, WorkerResult } from './types.js';
-import { logAgentic, logDeterministic, log } from './logging.js';
+} from '../agentic/learning/capability-updater.js';
+import type { WorkItem, WorkerResult } from '../core/types.js';
+import { logAgentic, logDeterministic, log } from '../core/logging.js';
 
 /**
  * Validate work using verifiers

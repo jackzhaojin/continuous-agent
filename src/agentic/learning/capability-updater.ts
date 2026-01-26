@@ -10,7 +10,7 @@
 import { readFileSync, writeFileSync, appendFileSync } from 'fs';
 import path from 'path';
 import yaml from 'js-yaml';
-import type { VerifierResult } from '../verifiers/core-verifiers.js';
+import type { VerifierResult } from '../../deterministic/verifiers/core-verifiers.js';
 
 interface Capability {
   id: string;

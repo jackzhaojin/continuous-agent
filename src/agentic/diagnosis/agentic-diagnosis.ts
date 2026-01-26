@@ -12,7 +12,7 @@ import { readFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 import os from 'os';
-import type { WorkItem, WorkerResult } from './types.js';
+import type { WorkItem, WorkerResult } from '../../core/types.js';
 
 const AGENT_BASE = process.env.AGENT_PATH || path.join(os.homedir(), 'dev', 'continuous-agent');
 const LEDGERS_DIR = path.join(AGENT_BASE, 'ledgers');

@@ -6,7 +6,7 @@
  * Each retry should use a DIFFERENT strategy to attack the problem.
  */
 
-import type { WorkItem } from '../types.js';
+import type { WorkItem } from '../../core/types.js';
 
 export interface Strategy {
   id: string;

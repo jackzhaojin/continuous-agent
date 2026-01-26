@@ -8,9 +8,9 @@ import path from 'path';
 import {
   updateStepStatus,
   updateTaskProgressFromSteps,
-} from './work-selector.js';
-import type { WorkItem, WorkStep } from './types.js';
-import { logDeterministic, log, logAgentic } from './logging.js';
+} from '../agentic/work-selection/work-selector.js';
+import type { WorkItem, WorkStep } from '../core/types.js';
+import { logDeterministic, log, logAgentic } from '../core/logging.js';
 
 const WORKSPACE_DIR = path.join(process.cwd(), 'workspace');
 const LEDGERS_DIR = path.join(process.cwd(), 'ledgers');

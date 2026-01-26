@@ -1,11 +1,37 @@
+---
+name: retry-context
+description: Retry and persistence context for failed attempts. Provides previous attempt history and encourages different strategies.
+version: 1.0.0
+variables:
+  - name: CURRENT_ATTEMPT
+    type: number
+    required: true
+  - name: MAX_RETRIES
+    type: number
+    required: true
+  - name: REMAINING_ATTEMPTS
+    type: number
+    required: true
+  - name: STRATEGIES_TRIED
+    type: string
+    required: false
+  - name: LAST_ERROR
+    type: string
+    required: false
+  - name: IS_FINAL_ATTEMPTS
+    type: boolean
+    required: true
+---
+
 ## PERSISTENCE STATUS
 
 **Attempt {{CURRENT_ATTEMPT}} of {{MAX_RETRIES}}**
-{{REMAINING_MESSAGE}}
+{{REMAINING_ATTEMPTS}} attempts remaining before this task is blocked.
 
-{{#if PREVIOUS_ATTEMPTS}}
 ### Previous Attempts Failed
+
 Strategies tried: {{STRATEGIES_TRIED}}
+
 Last error: {{LAST_ERROR}}
 
 **This attempt MUST be different.** Consider:
@@ -13,17 +39,9 @@ Last error: {{LAST_ERROR}}
 - What's a simpler version of this problem?
 - What approach haven't you tried?
 - Can you prove a smaller piece works first?
-{{/if}}
 
-{{#if FINAL_ATTEMPTS}}
-### FINAL ATTEMPTS WARNING
-You are running low on retries. Be strategic:
-1. Try the SIMPLEST possible version that proves the core concept
-2. If that works, build up incrementally
-3. If fundamental blockers exist, document them clearly for needs-you.md
-{{/if}}
+{{FINAL_ATTEMPTS_WARNING}}
 
-{{#unless PREVIOUS_ATTEMPTS}}
 ## PERSISTENCE GUIDELINES
 
 **AI is smart. Think, research, try, try again.**
@@ -33,4 +51,3 @@ You are running low on retries. Be strategic:
 - Break complex problems into smaller pieces
 - If stuck, simplify the scope to the minimum viable version
 - Document what you learn for future attempts
-{{/unless}}

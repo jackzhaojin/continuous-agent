@@ -159,7 +159,7 @@ async function runIteration(): Promise<IterationResult> {
   logAgentic('PHASE 4: Execute Work (Agent SDK Worker)');
 
   // Log capability attempt
-  const intent = classifyIntent(workItem);
+  const intent = await classifyIntent(workItem);
   const capabilities = inferCapabilitiesFromTask(workItem, intent);
   await logCapabilityAttempt(workItem, capabilities);
   await logWorkStart(workItem, currentStep, contractId);

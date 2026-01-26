@@ -1,7 +1,7 @@
 import { readFile, writeFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
-import type { WorkItem, WorkStep } from './types.js';
+import type { WorkItem, WorkStep } from '../../core/types.js';
 
 export type { WorkItem };
 export type { WorkStep };

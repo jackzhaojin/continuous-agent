@@ -7,7 +7,7 @@
 
 import { readFile, writeFile } from 'fs/promises';
 import path from 'path';
-import type { WorkItem, WorkStep } from './types.js';
+import type { WorkItem, WorkStep } from '../../core/types.js';
 
 // Configuration from environment
 const BREAKDOWN_THRESHOLD_TURNS = parseInt(process.env.BREAKDOWN_THRESHOLD_TURNS || '100', 10);

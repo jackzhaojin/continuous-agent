@@ -11,10 +11,10 @@ import { mkdirSync, existsSync, copyFileSync, createWriteStream } from 'fs';
 import { execSync } from 'child_process';
 import os from 'os';
 import path from 'path';
-import type { TaskContract, WorkerResult, WorkItem } from './types.js';
-import { buildIntelligentPrompt, buildSimplePrompt } from './intelligence/prompt-builder.js';
-import { classifyIntent } from './intelligence/intent-classifier.js';
-import { selectStrategy } from './intelligence/strategy-selector.js';
+import type { TaskContract, WorkerResult, WorkItem } from '../../core/types.js';
+import { buildIntelligentPrompt, buildSimplePrompt } from '../intelligence/prompt-builder.js';
+import { classifyIntent } from '../intelligence/intent-classifier.js';
+import { selectStrategy } from '../intelligence/strategy-selector.js';
 
 // Agent outputs directory - where workers create their projects
 const AGENT_OUTPUTS_BASE = process.env.AGENT_OUTPUTS_PATH || path.join(os.homedir(), 'dev', 'agent-outputs');
@@ -159,27 +159,27 @@ export interface WorkerRetryContext {
  * Build the system prompt for a worker agent
  * Now uses intelligent prompt builder with research phase and strategy context
  */
-function buildWorkerPrompt(
+async function buildWorkerPrompt(
   contract: TaskContract,
   projectPath: string,
   workItem?: WorkItem,
   retryContext?: WorkerRetryContext
-): string {
+): Promise<string> {
   // If we have full context, use intelligent prompt
   if (workItem) {
-    const intent = classifyIntent(workItem);
+    const intent = await classifyIntent(workItem);
 
     // For simple, well-specified tasks, use simple prompt
     if (intent.type === 'what_and_how' && !retryContext?.attempts) {
-      return buildSimplePrompt(contract, projectPath);
+      return await buildSimplePrompt(contract, projectPath);
     }
 
     // For complex/vague tasks or retries, use intelligent prompt
-    return buildIntelligentPrompt(contract, workItem, projectPath, retryContext);
+    return await buildIntelligentPrompt(contract, workItem, projectPath, retryContext);
   }
 
   // Fallback to simple prompt if no work item context
-  return buildSimplePrompt(contract, projectPath);
+  return await buildSimplePrompt(contract, projectPath);
 }
 
 /**
@@ -220,7 +220,7 @@ export async function spawnWorker(
     setupProjectDirectory(projectPath, category);
   }
 
-  const prompt = buildWorkerPrompt(contract, projectPath, workItem, retryContext);
+  const prompt = await buildWorkerPrompt(contract, projectPath, workItem, retryContext);
 
   // Track which strategy we're using if retrying
   if (retryContext && workItem) {

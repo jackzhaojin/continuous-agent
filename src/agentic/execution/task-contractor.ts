@@ -5,8 +5,8 @@
  * task contracts that can be executed by worker agents.
  */
 
-import type { WorkItem, WorkStep } from './work-selector.js';
-import type { TaskContract } from './types.js';
+import type { WorkItem, WorkStep } from '../work-selection/work-selector.js';
+import type { TaskContract } from '../../core/types.js';
 import { randomUUID } from 'crypto';
 
 /**

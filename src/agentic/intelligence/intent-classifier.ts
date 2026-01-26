@@ -7,7 +7,7 @@
  * - what_and_how: "Write a post using outline in drafts/" → Can execute directly
  */
 
-import type { WorkItem } from '../types.js';
+import type { WorkItem } from '../../core/types.js';
 
 export type IntentType = 'outcome_only' | 'what_only' | 'what_and_how';
 
@@ -60,7 +60,7 @@ const OUTCOME_INDICATORS = [
 /**
  * Classify the intent type of a work item
  */
-export function classifyIntent(item: WorkItem): IntentClassification {
+export async function classifyIntent(item: WorkItem): Promise<IntentClassification> {
   const text = `${item.title} ${item.description || ''}`;
 
   // Count indicators
@@ -154,7 +154,7 @@ function generateResearchQuestions(item: WorkItem, type: IntentType): string[] {
 /**
  * Check if a task needs research phase
  */
-export function needsResearch(item: WorkItem): boolean {
-  const classification = classifyIntent(item);
+export async function needsResearch(item: WorkItem): Promise<boolean> {
+  const classification = await classifyIntent(item);
   return classification.research_required;
 }

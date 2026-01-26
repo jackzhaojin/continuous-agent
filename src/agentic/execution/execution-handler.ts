@@ -6,10 +6,10 @@
 import { appendFile } from 'fs/promises';
 import path from 'path';
 import { spawnWorker, type WorkerRetryContext } from './worker-spawner.js';
-import { selectStrategy } from './intelligence/strategy-selector.js';
-import { classifyIntent } from './intelligence/intent-classifier.js';
-import type { WorkItem, WorkerResult, WorkStep } from './types.js';
-import { logAgentic, log } from './logging.js';
+import { selectStrategy } from '../intelligence/strategy-selector.js';
+import { classifyIntent } from '../intelligence/intent-classifier.js';
+import type { WorkItem, WorkerResult, WorkStep } from '../../core/types.js';
+import { logAgentic, log } from '../../core/logging.js';
 
 const LEDGERS_DIR = path.join(process.cwd(), 'ledgers');
 
@@ -75,7 +75,7 @@ export async function executeWork(
 
   try {
     // AGENTIC: Classify intent and select strategy
-    const intent = classifyIntent(item);
+    const intent = await classifyIntent(item);
     log(`  Intent: ${intent.type} (confidence: ${intent.confidence})`);
 
     const retryContext = buildRetryContext(item);
