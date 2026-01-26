@@ -6,7 +6,7 @@ capabilities:
   - id: git.branch_commit
     name: Git Branch and Commit
     description: Create branches, stage changes, and commit with proper messages
-    confidence: 0
+    confidence: 10
     maturity: Demonstrated
     scope:
       includes:
@@ -27,7 +27,7 @@ capabilities:
       - git_status_check
       - commit_exists
     evidence:
-      successes: 0
+      successes: 1
       failures: 43
       last_success: null
       last_failure: null
@@ -137,7 +137,7 @@ capabilities:
   - id: node.npm.install
     name: NPM Package Installation
     description: Install npm packages and manage dependencies
-    confidence: 85
+    confidence: 70
     maturity: Reliable
     scope:
       includes:
@@ -159,7 +159,7 @@ capabilities:
       - package_lock_updated
     evidence:
       successes: 41
-      failures: 2
+      failures: 3
       last_success: null
       last_failure: null
       last_validated: '2026-01-25'
@@ -173,7 +173,7 @@ capabilities:
   - id: node.npm.run_script
     name: NPM Script Execution
     description: Run npm scripts defined in package.json
-    confidence: 80
+    confidence: 60
     maturity: Reliable
     scope:
       includes:
@@ -192,8 +192,8 @@ capabilities:
       - script_exit_code
       - expected_output_patterns
     evidence:
-      successes: 98
-      failures: 31
+      successes: 99
+      failures: 33
       last_success: null
       last_failure: null
       last_validated: '2026-01-25'
@@ -228,7 +228,7 @@ capabilities:
       - dot_next_directory_exists
     evidence:
       successes: 18
-      failures: 25
+      failures: 26
       last_success: null
       last_failure: null
       last_validated: '2026-01-25'

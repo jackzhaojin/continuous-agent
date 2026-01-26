@@ -1,0 +1,36 @@
+## PERSISTENCE STATUS
+
+**Attempt {{CURRENT_ATTEMPT}} of {{MAX_RETRIES}}**
+{{REMAINING_MESSAGE}}
+
+{{#if PREVIOUS_ATTEMPTS}}
+### Previous Attempts Failed
+Strategies tried: {{STRATEGIES_TRIED}}
+Last error: {{LAST_ERROR}}
+
+**This attempt MUST be different.** Consider:
+- What assumption was wrong?
+- What's a simpler version of this problem?
+- What approach haven't you tried?
+- Can you prove a smaller piece works first?
+{{/if}}
+
+{{#if FINAL_ATTEMPTS}}
+### FINAL ATTEMPTS WARNING
+You are running low on retries. Be strategic:
+1. Try the SIMPLEST possible version that proves the core concept
+2. If that works, build up incrementally
+3. If fundamental blockers exist, document them clearly for needs-you.md
+{{/if}}
+
+{{#unless PREVIOUS_ATTEMPTS}}
+## PERSISTENCE GUIDELINES
+
+**AI is smart. Think, research, try, try again.**
+
+- If something fails, understand WHY before retrying
+- Try a DIFFERENT approach, not the same thing again
+- Break complex problems into smaller pieces
+- If stuck, simplify the scope to the minimum viable version
+- Document what you learn for future attempts
+{{/unless}}

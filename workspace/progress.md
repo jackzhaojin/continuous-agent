@@ -54,10 +54,13 @@ This document tracks work currently in progress by the agent system.
 
 - Self-Enhance Human Interface (Step 1: Research existing patterns and plan approach)
 
+- Notion Integration POC (Step 1: Research existing patterns and plan approach)
+
 ## Recently Started
 
 | Work Item | Started | Status | Notes |
 |-----------|---------|--------|-------|
+| Notion Integration POC | 2026-01-25T23:36:39.558Z | Step 1: Research existing patterns and plan approach | |
 | Self-Enhance Human Interface | 2026-01-25T23:21:03.060Z | Step 1: Research existing patterns and plan approach | |
 | Notion Integration POC | 2026-01-25T23:17:42.027Z | Step 1: Research existing patterns and plan approach | |
 | Notion Integration POC | 2026-01-25T23:12:49.232Z | Step 1: Research existing patterns and plan approach | |

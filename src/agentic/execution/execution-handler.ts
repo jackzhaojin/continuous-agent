@@ -1,0 +1,261 @@
+/**
+ * Work execution logic - MOSTLY AGENTIC
+ * Handles spawning workers, retry logic, strategy selection
+ */
+
+import { appendFile } from 'fs/promises';
+import path from 'path';
+import { spawnWorker, type WorkerRetryContext } from './worker-spawner.js';
+import { selectStrategy } from './intelligence/strategy-selector.js';
+import { classifyIntent } from './intelligence/intent-classifier.js';
+import type { WorkItem, WorkerResult, WorkStep } from './types.js';
+import { logAgentic, log } from './logging.js';
+
+const LEDGERS_DIR = path.join(process.cwd(), 'ledgers');
+
+// Retry state tracker - persists output_path across retries
+interface RetryState {
+  attempts: number;
+  lastError: string;
+  strategies: string[];
+  lastAttemptAt: string;
+  currentStrategyId: string | null;
+  output_path?: string;
+  suggestedFix?: string; // From diagnostic agent
+}
+
+const retryTracker: Map<string, RetryState> = new Map();
+
+/**
+ * Get retry tracker (exported for state updates)
+ */
+export function getRetryTracker(): Map<string, RetryState> {
+  return retryTracker;
+}
+
+/**
+ * Get current strategy for a work item
+ * AGENTIC: Selects strategy based on what's been tried
+ */
+function getCurrentStrategy(item: WorkItem): { strategyId: string | null; strategies: string[] } {
+  const retry = retryTracker.get(item.title);
+  return {
+    strategyId: retry?.currentStrategyId || null,
+    strategies: retry?.strategies || [],
+  };
+}
+
+/**
+ * Build retry context for worker
+ * AGENTIC: Includes strategy selection and diagnostic fixes
+ */
+function buildRetryContext(item: WorkItem): WorkerRetryContext | undefined {
+  const retry = retryTracker.get(item.title);
+  if (!retry || retry.attempts === 0) return undefined;
+
+  return {
+    attempts: retry.attempts,
+    maxRetries: 10,
+    triedStrategies: retry.strategies,
+    lastError: retry.lastError,
+    existingProjectPath: retry.output_path,
+  };
+}
+
+/**
+ * Execute work item (task or step) using Agent SDK worker
+ * AGENTIC: Spawns AI agent to do the work
+ */
+export async function executeWork(
+  item: WorkItem,
+  step?: WorkStep,
+  currentTask?: string
+): Promise<WorkerResult | null> {
+  logAgentic(`Executing: ${item.title}${step ? ` - Step ${step.step_number + 1}` : ''}`);
+
+  try {
+    // AGENTIC: Classify intent and select strategy
+    const intent = classifyIntent(item);
+    log(`  Intent: ${intent.type} (confidence: ${intent.confidence})`);
+
+    const retryContext = buildRetryContext(item);
+    if (retryContext) {
+      logAgentic(`  Retry attempt ${retryContext.attempts}/${retryContext.maxRetries}`);
+      if (retryContext.triedStrategies.length > 0) {
+        log(`  Previous strategies: ${retryContext.triedStrategies.join(', ')}`);
+      }
+    }
+
+    // AGENTIC: Select strategy for this attempt
+    const { strategyId } = getCurrentStrategy(item);
+    if (!strategyId && retryContext) {
+      const strategySelection = selectStrategy(item, retryContext.triedStrategies);
+      if (strategySelection) {
+        logAgentic(`  Selected strategy: ${strategySelection.strategy.name}`);
+        const retry = retryTracker.get(item.title);
+        if (retry) {
+          retry.currentStrategyId = strategySelection.strategy.id;
+          retryTracker.set(item.title, retry);
+        }
+      }
+    }
+
+    // AGENTIC: Spawn Agent SDK worker
+    log(`  Spawning Agent SDK worker...`);
+    const result = await spawnWorker(
+      {
+        id: currentTask || `task-${Date.now()}`,
+        goal: step ? step.description : item.description,
+        scope: {
+          repos_allowed: ['agent-outputs'],
+          tools_allowed: [
+            'Skill',
+            'Read',
+            'Write',
+            'Edit',
+            'Bash',
+            'Glob',
+            'Grep',
+            'WebFetch',
+            'WebSearch',
+          ],
+        },
+        definition_of_done: [
+          step ? `Complete step: ${step.title}` : 'Complete task as described',
+          'All code compiles and runs',
+          'Changes are committed to git',
+        ],
+        max_turns: 100,
+        risk_assessment: 'low',
+        required_skills: [],
+        logging_obligations: ['All work logged to output directory'],
+        created_at: new Date().toISOString(),
+      },
+      item,
+      retryContext
+    );
+
+    if (result.success) {
+      logAgentic(`  ✓ Worker completed successfully`);
+      log(`  Duration: ${Math.round(result.duration_ms / 1000)}s`);
+      log(`  Output: ${result.output_path || 'none'}`);
+    } else {
+      logAgentic(`  ✗ Worker failed`);
+      log(`  Errors: ${result.errors.join(', ')}`);
+    }
+
+    return result;
+  } catch (error) {
+    logAgentic(`  ✗ Worker execution failed: ${error}`);
+    return {
+      success: false,
+      output: '',
+      artifacts: [],
+      errors: [error instanceof Error ? error.message : String(error)],
+      duration_ms: 0,
+    };
+  }
+}
+
+/**
+ * Infer capabilities being exercised from task
+ * AGENTIC: Uses heuristics to map task → capabilities
+ */
+export function inferCapabilitiesFromTask(item: WorkItem, intent: { type: string }): string[] {
+  const capabilities: string[] = [];
+
+  // Map task patterns to capabilities
+  const goalLower = (item.title + ' ' + item.description).toLowerCase();
+
+  // Delivery capabilities
+  if (goalLower.includes('next.js') || goalLower.includes('nextjs')) {
+    capabilities.push('deliver.nextjs.app.basic');
+  }
+  if (goalLower.includes('notion')) {
+    capabilities.push('deliver.notion.integration');
+  }
+  if (goalLower.includes('react')) {
+    capabilities.push('deliver.react.component');
+  }
+
+  // Technical capabilities
+  if (goalLower.includes('git')) {
+    capabilities.push('git.commit', 'git.status');
+  }
+  if (goalLower.includes('npm') || goalLower.includes('package')) {
+    capabilities.push('npm.install', 'npm.test');
+  }
+
+  // Functional capabilities based on intent
+  if (intent.type === 'outcome_only') {
+    capabilities.push('reason.planning', 'reason.research');
+  }
+
+  return capabilities.length > 0 ? capabilities : ['general.implementation'];
+}
+
+/**
+ * Log capability attempt (before execution)
+ */
+export async function logCapabilityAttempt(item: WorkItem, capabilities: string[]): Promise<void> {
+  const ledgerPath = path.join(LEDGERS_DIR, 'capability-ledger.jsonl');
+  const entry = JSON.stringify({
+    event: 'CAPABILITY_ATTEMPT',
+    ts: new Date().toISOString(),
+    task_id: item.id,
+    task_title: item.title,
+    capabilities,
+  });
+  await appendFile(ledgerPath, entry + '\n', 'utf-8');
+}
+
+/**
+ * Log capability result (after validation)
+ */
+export async function logCapabilityResult(
+  item: WorkItem,
+  capabilities: string[],
+  success: boolean,
+  contractId: string
+): Promise<void> {
+  const ledgerPath = path.join(LEDGERS_DIR, 'capability-ledger.jsonl');
+  const entry = JSON.stringify({
+    event: 'CAPABILITY_RESULT',
+    ts: new Date().toISOString(),
+    task_id: item.id,
+    contract_id: contractId,
+    task_title: item.title,
+    capabilities,
+    result: success ? 'PASS' : 'FAIL',
+  });
+  await appendFile(ledgerPath, entry + '\n', 'utf-8');
+}
+
+/**
+ * Log work start event
+ */
+export async function logWorkStart(
+  item: WorkItem,
+  step: WorkStep | undefined,
+  contractId: string
+): Promise<void> {
+  const ledgerPath = path.join(LEDGERS_DIR, 'work-ledger.jsonl');
+  const entry = step
+    ? JSON.stringify({
+        event: 'STEP_STARTED',
+        ts: new Date().toISOString(),
+        task_id: item.id,
+        contract_id: contractId,
+        task_title: item.title,
+        step_number: step.step_number + 1,
+        step_title: step.title,
+      })
+    : JSON.stringify({
+        event: 'TASK_STARTED',
+        ts: new Date().toISOString(),
+        task_id: item.id,
+        contract_id: contractId,
+        title: item.title,
+      });
+  await appendFile(ledgerPath, entry + '\n', 'utf-8');
+}

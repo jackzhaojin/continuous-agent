@@ -1,5 +1,5 @@
 import { config } from 'dotenv';
-import { readFile, writeFile, appendFile, readdir } from 'fs/promises';
+import { readFile, writeFile, appendFile } from 'fs/promises';
 import { createWriteStream, existsSync } from 'fs';
 import path from 'path';
 import { checkHealth } from './health-checker.js';
@@ -9,6 +9,7 @@ import { spawnWorker, validateAuth, type WorkerRetryContext } from './worker-spa
 import { selectStrategy } from './intelligence/strategy-selector.js';
 import { classifyIntent } from './intelligence/intent-classifier.js';
 import { runAllVerifiers, summarizeResults, type VerifierResult } from './verifiers/index.js';
+import { diagnoseFailure } from './agentic-diagnosis.js';
 import { updateCapabilitiesFromVerifierResults, DEFAULT_CAPABILITY_MAPPINGS } from './learning/capability-updater.js';
 import { processHumanInputs } from './input-processor.js';
 import { needsBreakdown, generateStaticBreakdown, writeStepsToGoals, shouldReBreakdown, reBreakdownStep, logBreakdownEvent } from './task-breakdown.js';
@@ -83,6 +84,7 @@ interface RetryState {
   lastAttemptAt: string;
   currentStrategyId: string | null;
   output_path?: string; // Persist project path across retries to continue same work
+  suggestedFix?: string; // Fix suggested by diagnostic agent
 }
 const retryTracker: Map<string, RetryState> = new Map();
 
@@ -632,15 +634,17 @@ async function updateState(
   });
   await appendFile(ledgerPath, attemptEntry + '\n', 'utf-8');
 
-  // PATTERN DETECTION: Check if we're hitting the same wall repeatedly
-  // Escalate early if failure pattern detected (don't wait for all 10 retries)
+  // AGENTIC DIAGNOSIS: After 3 failures, use Agent SDK to investigate WHY
   if (retry.attempts >= 3) {
-    log(`  🔍 Checking for failure patterns (attempt ${retry.attempts}/${MAX_RETRIES})...`);
+    log(`  🔍 Spawning diagnostic agent to investigate task failure (attempt ${retry.attempts}/${MAX_RETRIES})...`);
 
-    const earlyEscalationThreshold = 5;
+    const diagnosis = await diagnoseFailure(item, retry.attempts, retry.lastError, outputPath);
 
-    if (retry.attempts >= earlyEscalationThreshold) {
-      log(`  ⚠️ Early escalation triggered after ${retry.attempts} consistent failures`);
+    log(`  🔬 Diagnosis: ${diagnosis.rootCause}`);
+
+    if (diagnosis.escalateToHuman) {
+      // Diagnostic agent determined this needs human intervention
+      log(`  ⚠️ Diagnostic agent recommends human intervention`);
       log(`  Marking as blocked and escalating to needs-you.md`);
 
       // Mark as blocked in goals.md
@@ -652,17 +656,35 @@ async function updateState(
         log(`  Updated goals.md: ${item.title} → Blocked`);
       }
 
-      // Write to needs-you.md with diagnostic
+      // Write to needs-you.md with diagnostic context
       await escalateWithPattern(item, retry, {
         detected: true,
         failingVerifiers: ['validation_failure'],
         consecutiveFailures: retry.attempts,
         sameErrorPattern: true,
-        diagnosis: `Task failing consistently after ${retry.attempts} attempts. Last error: ${retry.lastError.slice(0, 200)}. This indicates a systemic issue - review task requirements, verifier expectations, or resource constraints.`
+        diagnosis: diagnosis.diagnosis
       });
 
       retryTracker.delete(item.title);
       return;
+    }
+
+    if (diagnosis.shouldRetry && diagnosis.suggestedFix) {
+      // Diagnostic agent found a fix - apply it and retry
+      log(`  ✨ Diagnostic agent suggested fix: ${diagnosis.suggestedFix}`);
+      log(`  🔄 Retrying with suggested fix...`);
+
+      // Store the suggested fix in retry state so prompt builder can use it
+      retry.suggestedFix = diagnosis.suggestedFix;
+      retryTracker.set(item.title, retry);
+
+      // Continue to next iteration (will retry with the fix)
+      return;
+    }
+
+    // If diagnosis says don't retry and don't escalate, continue with normal retry logic
+    if (!diagnosis.shouldRetry && !diagnosis.escalateToHuman) {
+      log(`  ℹ️ Diagnostic agent suggests continuing with normal retry logic`);
     }
   }
 
@@ -908,35 +930,51 @@ async function updateStateWithStep(
   });
   await appendFile(ledgerPath, failEntry + '\n', 'utf-8');
 
-  // PATTERN DETECTION: Check if we're hitting the same wall repeatedly
-  // If so, escalate EARLY rather than burning all 10 retries
+  // AGENTIC DIAGNOSIS: After 3 failures, use Agent SDK to investigate WHY
   if (retry.attempts >= 3) {
-    // Get verifier results from the validation that just ran
-    // We need to pass these in from the caller, but for now we'll trigger detection at threshold
-    log(`  🔍 Checking for failure patterns (attempt ${retry.attempts}/${MAX_RETRIES})...`);
+    log(`  🔍 Spawning diagnostic agent to investigate failure (attempt ${retry.attempts}/${MAX_RETRIES})...`);
 
-    // For now, escalate early if we've hit 5 failures (halfway to max)
-    // In future iterations, we can make this smarter with actual pattern analysis
-    const earlyEscalationThreshold = 5;
+    const diagnosis = await diagnoseFailure(item, retry.attempts, retry.lastError, outputPath);
 
-    if (retry.attempts >= earlyEscalationThreshold) {
-      log(`  ⚠️ Early escalation triggered after ${retry.attempts} consistent failures`);
+    log(`  🔬 Diagnosis: ${diagnosis.rootCause}`);
+
+    if (diagnosis.escalateToHuman) {
+      // Diagnostic agent determined this needs human intervention
+      log(`  ⚠️ Diagnostic agent recommends human intervention`);
       log(`  Marking step as blocked and escalating to needs-you.md`);
 
       await updateStepStatus(item.title, step.step_number, 'blocked');
-      await updateState(item, false, `Step ${step.step_number + 1} failed: ${errorInfo}`, outputPath);
+      await updateState(item, false, `Step ${step.step_number + 1} failed: ${diagnosis.rootCause}`, outputPath);
 
-      // Write to needs-you.md with context
+      // Write to needs-you.md with diagnostic context
       await escalateWithPattern(item, retry, {
         detected: true,
         failingVerifiers: ['validation_failure'],
         consecutiveFailures: retry.attempts,
         sameErrorPattern: true,
-        diagnosis: `Step failing consistently after ${retry.attempts} attempts. Last error: ${retry.lastError.slice(0, 200)}. Consider reviewing task requirements or breaking down further.`
+        diagnosis: diagnosis.diagnosis
       });
 
       retryTracker.delete(retryKey);
       return;
+    }
+
+    if (diagnosis.shouldRetry && diagnosis.suggestedFix) {
+      // Diagnostic agent found a fix - apply it and retry
+      log(`  ✨ Diagnostic agent suggested fix: ${diagnosis.suggestedFix}`);
+      log(`  🔄 Retrying with suggested fix...`);
+
+      // Store the suggested fix in retry state so prompt builder can use it
+      retry.suggestedFix = diagnosis.suggestedFix;
+      retryTracker.set(retryKey, retry);
+
+      // Continue to next iteration (will retry with the fix)
+      return;
+    }
+
+    // If diagnosis says don't retry and don't escalate, continue with normal retry logic
+    if (!diagnosis.shouldRetry && !diagnosis.escalateToHuman) {
+      log(`  ℹ️ Diagnostic agent suggests continuing with normal retry logic`);
     }
   }
 
@@ -966,97 +1004,6 @@ interface FailurePattern {
   diagnosis: string;             // Human-readable explanation
 }
 
-/**
- * Detect if same failure pattern is repeating
- * Reads recent validation reports to identify patterns
- */
-async function detectFailurePattern(
-  item: WorkItem,
-  currentVerifiers: VerifierResult[],
-  retryAttempts: number
-): Promise<FailurePattern> {
-  const pattern: FailurePattern = {
-    detected: false,
-    failingVerifiers: [],
-    consecutiveFailures: 0,
-    sameErrorPattern: false,
-    diagnosis: ''
-  };
-
-  // Need at least 3 attempts to detect a pattern
-  if (retryAttempts < 3) {
-    return pattern;
-  }
-
-  try {
-    // Get current failing verifiers
-    const currentFailures = currentVerifiers
-      .filter(v => v.result === 'FAIL')
-      .map(v => v.verifier_id);
-
-    if (currentFailures.length === 0) {
-      return pattern;
-    }
-
-    // Read recent validation reports
-    const reportsDir = path.join(process.cwd(), 'reports', 'validation');
-    const recentReports = await readdir(reportsDir);
-
-    // Filter to this task's reports, sort by timestamp (newest first)
-    const taskReports = recentReports
-      .filter(f => f.startsWith(`validation-${item.id}-`))
-      .sort()
-      .reverse()
-      .slice(0, 5); // Last 5 attempts
-
-    if (taskReports.length < 3) {
-      return pattern;
-    }
-
-    // Analyze last 3 reports
-    const failureHistory: string[][] = [];
-    for (const reportFile of taskReports.slice(0, 3)) {
-      const reportPath = path.join(reportsDir, reportFile);
-      const reportData = JSON.parse(await readFile(reportPath, 'utf-8'));
-      const failures = reportData.results
-        .filter((r: VerifierResult) => r.result === 'FAIL')
-        .map((r: VerifierResult) => r.verifier_id);
-      failureHistory.push(failures);
-    }
-
-    // Check if same verifiers are failing repeatedly
-    const commonFailures = failureHistory[0].filter(v =>
-      failureHistory.every(history => history.includes(v))
-    );
-
-    if (commonFailures.length > 0) {
-      pattern.detected = true;
-      pattern.failingVerifiers = commonFailures;
-      pattern.consecutiveFailures = failureHistory.length;
-      pattern.sameErrorPattern = true;
-
-      // Build diagnosis
-      const verifierList = commonFailures.join(', ');
-      pattern.diagnosis = `Same verifier(s) failing ${failureHistory.length} times in a row: ${verifierList}. `;
-
-      // Add specific advice based on verifier type
-      if (commonFailures.includes('git_status_clean')) {
-        pattern.diagnosis += 'Git workspace has uncommitted changes. This may indicate the verifier expectations are too strict for this task type, or work needs to be committed before validation.';
-      } else if (commonFailures.includes('node_build')) {
-        pattern.diagnosis += 'Build script failing repeatedly. This may indicate missing dependencies, incorrect build configuration, or the project doesn\'t need a build step.';
-      } else {
-        pattern.diagnosis += 'Consider reviewing verifier requirements or task constraints.';
-      }
-
-      log(`  🔍 PATTERN DETECTED: ${pattern.diagnosis}`);
-    }
-
-    return pattern;
-  } catch (error) {
-    log(`  Warning: Could not analyze failure pattern: ${error}`);
-    return pattern;
-  }
-}
 
 /**
  * Escalate to needs-you.md with detailed pattern diagnosis
