@@ -129,3 +129,44 @@ Build verified: ✅ TypeScript compiles with no errors
 
 → Response: Logging Session 2 covering agent deployment, MAX_TURNS fix, and traceability improvements.
 → Action: Updated prompt-log.md with 7 new prompts. ✅
+
+---
+
+## Session 3: Bug Fixes & Resume Capability Testing (Jan 25, 8:22 PM)
+
+### Prompt 12: Start Agent and Monitor (8:22 PM)
+
+> OK after compaction, let's start it back up with pm2, you need to monitor the logs every 5 min, and see if agent is doing the right thing, actively decide and make sure we give the executive agent enough time to recover, but if it doesn't seem to recover, use your own opus 4.5 logic and see how to fix forward.
+>
+> We did just make a bunch of prompting logic, make sure they're being triggered.
+>
+> Actually before we start, make sure we have good logging on which each prompt files are being loaded, that way we can see if they're actually being used. After logging is done, start it back up with pm2
+
+→ Response: Added prompt logging to loader.ts, fixed path resolution (__dirname to PROMPTS_DIR), started monitoring.
+→ Action: Updated loader.ts, started PM2, began 5-min monitoring cycles.
+
+---
+
+### Prompt 13: Fix All Issues and Test Resume (8:55 PM)
+
+> Fix all of them, and monitor and validate that we can resume intelligently. like we're supposed to built a % of a major item in goal, and ideally we should be able to resume.
+>
+> like a human, can resume after lunch, our executive agent needs to do the same
+
+→ Response: Identified 3 issues - NODE_ENV=production, validation too strict, step status not persisting.
+→ Action: Fixed ecosystem.config.cjs (NODE_ENV=development), core-verifiers.ts (step-aware), state-handler.ts (updateStepStatus call).
+
+---
+
+### Debug Session: Step Persistence Bug (9:00 PM - ongoing)
+
+**Issue**: Step 1 shows "complete" in logs but goals.md never updates. Worker keeps re-running Step 1 instead of progressing to Step 2.
+
+**Root cause investigation**:
+1. Added call to `updateStepStatus(item.title, step.step_number, 'complete')` in state-handler.ts
+2. Added DEBUG logging to trace execution
+3. Discovered DEBUG logs never appear despite being in compiled dist file
+4. Hard-restarted PM2 (delete + start fresh)
+5. Still no DEBUG output in PM2 logs
+
+**Current status**: Background task monitoring for next worker completion to capture debug output.
