@@ -247,12 +247,23 @@ function parseGoalsFile(content: string): ParsedSection[] {
       }
 
       itemCounter++;
+
+      // Check for [SELF-ENHANCE] prefix - indicates self-enhancement task
+      let rawTitle = goalMatch[1].trim();
+      let selfEnhance = false;
+      const selfEnhanceMatch = rawTitle.match(/^\[SELF-ENHANCE\]\s*(.+)$/i);
+      if (selfEnhanceMatch) {
+        selfEnhance = true;
+        rawTitle = selfEnhanceMatch[1].trim();
+      }
+
       currentItem = {
         id: `work-${itemCounter}`,
         priority: currentPriority,
-        title: goalMatch[1].trim(),
+        title: rawTitle,
         description: '',
-        status: 'pending'
+        status: 'pending',
+        selfEnhance: selfEnhance,
       };
 
       // CRITICAL: Parse metadata lines BEFORE looking for steps
@@ -296,6 +307,12 @@ function parseGoalsFile(content: string): ParsedSection[] {
         const outputMatch = metaLine.match(/^[-*]\s*\*\*Output:\*\*\s*(.+)$/i);
         if (outputMatch) {
           currentItem.output_path = outputMatch[1].trim();
+        }
+
+        // Parse Branch - for self-enhancement tasks to resume on same branch
+        const branchMatch = metaLine.match(/^[-*]\s*\*\*Branch:\*\*\s*(.+)$/i);
+        if (branchMatch) {
+          currentItem.branch = branchMatch[1].trim();
         }
 
         metadataEndIndex++;
@@ -355,6 +372,14 @@ function parseGoalsFile(content: string): ParsedSection[] {
       const outputMatch = trimmedLine.match(/^[-*]\s*\*\*Output:\*\*\s*(.+)$/i);
       if (outputMatch) {
         currentItem.output_path = outputMatch[1].trim();
+        continue;
+      }
+
+      // Branch line: - **Branch:** self-enhance/feature-name
+      // For self-enhancement tasks to resume on same branch
+      const branchMatch = trimmedLine.match(/^[-*]\s*\*\*Branch:\*\*\s*(.+)$/i);
+      if (branchMatch) {
+        currentItem.branch = branchMatch[1].trim();
         continue;
       }
     }

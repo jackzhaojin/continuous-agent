@@ -157,6 +157,86 @@ export interface WorkerRetryContext {
 }
 
 /**
+ * Build prompt for self-enhancement tasks
+ * Instructs the worker to delegate to the self-enhancer subagent
+ * Handles both new tasks and resuming existing work on a branch
+ */
+function buildSelfEnhancePrompt(contract: TaskContract, workItem: WorkItem): string {
+  // Use existing branch if tracked, otherwise generate new one
+  const isResume = !!workItem.branch;
+  const branchName = workItem.branch || `self-enhance/${contract.id.replace('task-', '')}`;
+
+  const resumeInstructions = isResume
+    ? `## RESUMING EXISTING WORK
+
+**This task has already started.** A branch exists: \`${branchName}\`
+
+The self-enhancer MUST:
+1. Check out the existing branch: \`git checkout ${branchName}\`
+2. Review what work has already been done (check git log, current files)
+3. Continue from where the previous work left off
+4. Do NOT create a new branch - continue on the existing one
+
+`
+    : `## STARTING NEW WORK
+
+This is a new self-enhancement task. The self-enhancer will:
+1. Create branch: \`${branchName}\`
+2. Make the required changes
+3. Run typecheck and build validation
+4. Commit changes with clear message
+5. Report back for human review
+
+`;
+
+  return `# Self-Enhancement Task: ${workItem.title}
+
+You are executing a **self-enhancement task** - modifying the continuous-agent system itself.
+
+## Task Details
+- **Priority:** ${workItem.priority}
+- **Contract:** ${contract.id}
+- **Branch:** ${branchName}
+- **Status:** ${isResume ? 'RESUMING existing work' : 'NEW task'}
+
+## Description
+${workItem.description || 'No description provided'}
+
+## Definition of Done
+${contract.definition_of_done.map((item, i) => `${i + 1}. ${item}`).join('\n')}
+
+${resumeInstructions}
+## Instructions
+
+**Use the self-enhancer subagent to complete this task.**
+
+Delegate to the self-enhancer agent using the Task tool:
+\`\`\`
+Use the self-enhancer subagent to: ${workItem.title}
+
+Branch: ${branchName}
+Resume: ${isResume ? 'YES - continue existing work' : 'NO - start fresh'}
+
+${workItem.description || ''}
+\`\`\`
+
+## CRITICAL REMINDERS
+- The self-enhancer works in the agent codebase (continuous-agent)
+- It CANNOT modify workspace/constitution.md
+- All changes must pass typecheck and build
+- Changes are staged on a branch for human review before merge
+${isResume ? '- This is RESUMING work - check the existing branch first!' : '- This is NEW work - create the branch first'}
+
+## Output
+Report the self-enhancer's results:
+- Branch name: ${branchName}
+- Summary of changes
+- Validation status (typecheck/build)
+- Any issues or concerns
+`;
+}
+
+/**
  * Build the system prompt for a worker agent
  * Now uses intelligent prompt builder with research phase and strategy context
  */
@@ -204,15 +284,26 @@ export async function spawnWorker(
   // Create logger for this worker
   const logger = createWorkerLogger(contract.id);
 
+  // Check if this is a self-enhancement task
+  const isSelfEnhance = workItem?.selfEnhance === true;
+
   // DEBUG: Log what we receive
   console.log(`[Worker] DEBUG: retryContext received:`, retryContext ? JSON.stringify(retryContext) : 'undefined');
+  console.log(`[Worker] DEBUG: selfEnhance:`, isSelfEnhance);
 
   // For retries, reuse existing project path to continue work on same project
   // For first attempt, generate new project path
+  // EXCEPTION: Self-enhancement tasks always use AGENT_BASE
   let projectPath: string;
   let category: string;
 
-  if (retryContext?.existingProjectPath) {
+  if (isSelfEnhance) {
+    // Self-enhancement: work in the agent codebase itself
+    projectPath = AGENT_BASE;
+    category = 'self-enhance';
+    logger.log(`SELF-ENHANCE: Working in agent codebase: ${projectPath}`);
+    console.log(`[Worker] SELF-ENHANCE: Working in agent codebase: ${projectPath}`);
+  } else if (retryContext?.existingProjectPath) {
     projectPath = retryContext.existingProjectPath;
     category = detectCategory(contract.goal);
     logger.log(`RESUME: Using existing project path: ${projectPath}`);
@@ -226,7 +317,13 @@ export async function spawnWorker(
     setupProjectDirectory(projectPath, category);
   }
 
-  const prompt = await buildWorkerPrompt(contract, projectPath, workItem, retryContext);
+  // Build prompt - use self-enhancement prompt for self-enhance tasks
+  let prompt: string;
+  if (isSelfEnhance && workItem) {
+    prompt = buildSelfEnhancePrompt(contract, workItem);
+  } else {
+    prompt = await buildWorkerPrompt(contract, projectPath, workItem, retryContext);
+  }
 
   // Track which strategy we're using if retrying
   if (retryContext && workItem) {
@@ -250,16 +347,23 @@ export async function spawnWorker(
   logger.log(`--- END PROMPT ---`);
 
   try {
+    // Determine allowed tools - add Task for self-enhancement
+    let allowedTools = [...contract.scope.tools_allowed];
+    if (isSelfEnhance && !allowedTools.includes('Task')) {
+      allowedTools.push('Task');
+      logger.log(`SELF-ENHANCE: Added Task tool for subagent delegation`);
+    }
+
     // Query Claude using the Agent SDK with project directory as cwd
-    // CRITICAL: settingSources enables skill loading from user + project
+    // CRITICAL: settingSources enables skill/agent loading from user + project
     const stream = query({
       prompt,
       options: {
         model,
         maxTurns: contract.max_turns,
-        cwd: projectPath,  // Worker operates in isolated project directory
-        allowedTools: contract.scope.tools_allowed,
-        settingSources: ['user', 'project'] as const,  // REQUIRED for skills
+        cwd: projectPath,  // Self-enhance uses AGENT_BASE, regular uses agent-outputs
+        allowedTools: allowedTools,
+        settingSources: ['user', 'project'] as const,  // REQUIRED for skills and agents
       },
     });
 

@@ -60,6 +60,60 @@ npm run build  # Rebuild only - changes take effect on next natural restart
 
 This separation is enforced by **Constitution Article I, Section 6** (zero tolerance violation).
 
+**EXCEPTION: Self-Enhancement Tasks** - Tasks prefixed with `[SELF-ENHANCE]` in goals.md are routed to the self-enhancer subagent which works in the continuous-agent codebase. See "Self-Enhancement Workflow" below.
+
+## Self-Enhancement Workflow
+
+The agent can modify its own infrastructure code through a special self-enhancement pathway.
+
+### How It Works
+
+1. **Tag-based Detection**: Tasks in `goals.md` prefixed with `[SELF-ENHANCE]` are recognized as self-enhancement tasks
+2. **Special Routing**: Worker spawner routes these to the agent codebase instead of agent-outputs
+3. **Subagent Delegation**: Uses the `self-enhancer` subagent (`.claude/agents/self-enhancer.md`) via Task tool
+4. **Staged Changes**: All changes are made on a branch for human review before merge
+
+### Goals.md Format
+
+```markdown
+## P2 - High Priority
+
+### [SELF-ENHANCE] Improve retry logic
+- **Status:** In Progress
+- **Description:** Enhance the retry logic to better handle rate limits
+- **Branch:** self-enhance/improve-retry-logic
+```
+
+**Branch Tracking:** When a self-enhancement task starts, the self-enhancer updates `goals.md` with a `**Branch:**` field. This allows the agent to resume work on the same branch across restarts, preventing duplicate branches.
+
+### What Can Be Modified
+
+| Category | Examples | Allowed |
+|----------|----------|---------|
+| Agent source code | `src/**/*.ts` | ✅ Yes |
+| Prompt templates | `src/agentic/prompts/**/*.md` | ✅ Yes |
+| Skills & Agents | `.claude/skills/`, `.claude/agents/` | ✅ Yes |
+| Configuration | `capabilities/*.yml`, `tsconfig.json` | ✅ Yes |
+| Documentation | `CLAUDE.md`, `README.md`, `ai-docs/` | ✅ Yes |
+| Constitution | `workspace/constitution.md` | ❌ **NEVER** |
+
+### Self-Enhancement Workflow
+
+```
+1. Create branch: self-enhance/<task-slug>
+2. Make changes
+3. Run: npm run typecheck && npm run build
+4. Commit with clear message
+5. Report for human review
+   (Human merges or rejects)
+```
+
+### Key Files
+
+- **Self-enhancer agent:** `.claude/agents/self-enhancer.md`
+- **Detection logic:** `src/agentic/work-selection/work-selector.ts` (parses `[SELF-ENHANCE]` prefix)
+- **Routing logic:** `src/agentic/execution/worker-spawner.ts` (routes to agent codebase)
+
 ## Core Architecture
 
 ### Executive Loop (8 Phases)

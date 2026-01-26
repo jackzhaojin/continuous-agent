@@ -94,3 +94,55 @@
 ---
 
 **Session 1 Summary**: Created POC infrastructure, validated Agent SDK subagents via Task tool, documented Skills vs Subagents patterns.
+
+---
+
+## Session 2: Self-Enhancement Subagent (Jan 25, 2026)
+
+### Prompt 12: Self-Enhancement Architecture (10:15 PM)
+
+> Let's tackle a big project... The task ahead of us is to ensure that there are two types of work we do here with the continuous agent:
+> 1. Building things in the output directory
+> 2. Enhancing itself
+>
+> Since we finished our proof of concept with the capability to use sub-agents, I proposed we have a dedicated special sub-agent that would be used that will bypass the default rules of basically not being able to write to the continuous agent development folder.
+>
+> AFTER reading in a bunch of files, but before you work on it, ask me 3 questions
+
+→ Response: Asked 3 multiple-choice questions about scope, routing, and verification.
+→ Action: Read constitution.md, worker-spawner.ts, work-selector.ts, prompts to understand architecture. ✅
+
+### Prompt 13: Design Choices (10:20 PM)
+
+> 1D, 2A, 3C
+
+User selected:
+- **1D**: Everything except Constitution (full access to all files)
+- **2A**: Tag-based routing (`[SELF-ENHANCE]` prefix in goals.md)
+- **3C**: Staged + review (branch, test, human approval before merge)
+
+→ Response: Created implementation plan with 6 phases.
+→ Action: Outlined self-enhancer agent, type changes, routing logic. ✅
+
+### Prompt 14: Build Self-Enhancement System (10:25 PM)
+
+> Yup that's fine, let's go!
+
+→ Response: Implemented complete self-enhancement workflow.
+→ Action: Created/modified 5 files:
+  - `.claude/agents/self-enhancer.md` - Full-access subagent with branch workflow
+  - `src/core/types.ts` - Added `selfEnhance?: boolean` to WorkItem
+  - `src/agentic/work-selection/work-selector.ts` - Detect `[SELF-ENHANCE]` prefix
+  - `src/agentic/execution/worker-spawner.ts` - Route to agent codebase, add Task tool
+  - `CLAUDE.md` - Added Self-Enhancement Workflow documentation ✅
+
+### Prompt 15: Branch Tracking for Resume (10:40 PM)
+
+> I added this in self enhance, i don't want like, 50 branches working on the samething, we should make sure goals or whatever gets updated to make sure the agent knows to pick up the work and working on it. One of the capabilities of the feature is to have AI agents pick up its own work, so we want to really avoid having a bunch of branches doing the same work starting from fresh.
+
+→ Response: Added branch tracking to prevent duplicate branches and enable resume.
+→ Action: Updated types.ts (branch field), work-selector.ts (parse Branch:), worker-spawner.ts (resume logic), self-enhancer.md (check existing + update goals.md), CLAUDE.md (docs). ✅
+
+---
+
+**Session 2 Summary**: Implemented self-enhancement capability with branch tracking. Agent can modify its own code via dedicated subagent, tracks branch in goals.md, and resumes work instead of creating duplicates.

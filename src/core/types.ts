@@ -52,6 +52,14 @@ export interface WorkItem {
   // Output persistence - allows resuming work across restarts
   output_path?: string;     // Project directory for this task (persisted in goals.md)
 
+  // Self-enhancement flag - when true, work modifies the agent itself
+  // Detected by [SELF-ENHANCE] prefix in goal title
+  selfEnhance?: boolean;
+
+  // Branch tracking for self-enhancement tasks
+  // Persisted in goals.md to allow resuming work on same branch
+  branch?: string;
+
   // Step tracking for multi-step tasks
   steps?: WorkStep[];
   current_step?: number;    // Index of current step (0-based)
