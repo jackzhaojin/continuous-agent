@@ -22,7 +22,7 @@
 | Feature | What It Does | Why It Matters |
 |---------|--------------|----------------|
 | **Goal State Machine** | Folder-based pipeline: drafts → ondeck → in-progress → blocked → archive | Goals mature before execution; no more wasted retries on half-baked ideas |
-| **Goal Bundles** | Each goal is a folder with README.md + references/assets | Space for specs to breathe; complex goals get proper scaffolding |
+| **Goal Bundles** | Each goal is a folder with PROMPT.md + references/assets (mirrors skill structure) | Space for specs to breathe; complex goals get proper scaffolding |
 | **Multi-Project Access** | Copy-in → isolated work → approval → copy-back | Agent can enhance your existing projects safely |
 | **Notion Reporting** | Beautiful dashboard of milestones, highlights, summaries | Rich visibility into agent activity without parsing logs |
 | **Project-Based Skills** | Confidence anchored to actual built projects | Agent references real outputs, not abstract percentages |
@@ -88,7 +88,7 @@ Folder-based state pipeline where goals mature before execution:
 workspace/
 ├── drafts/              # Ideas baking
 │   └── {goal-slug}/
-│       ├── README.md    # Entry point (always required)
+│       ├── PROMPT.md    # Execution instructions (always required)
 │       ├── references/  # Research, links, prior art
 │       └── assets/      # Diagrams, mockups
 │
@@ -144,25 +144,33 @@ workspace/
 
 ### Goal Bundle Structure
 
-Every goal lives in a folder with README.md as entry point:
+Every goal lives in a folder with PROMPT.md as the entry point (mirrors skill structure):
 
 ```
 {goal-slug}/
-├── README.md          # Required: description, DoD, status
+├── PROMPT.md          # Required: execution instructions (agent reads this)
 ├── references/        # Optional: research, prior art
 ├── assets/            # Optional: diagrams, mockups
 └── scripts/           # Optional: supporting automation
 ```
 
-README.md contains: title, status, priority, complexity, description, Definition of Done, open questions (for drafts), agent notes.
+**PROMPT.md** (required) - Agent execution instructions:
+- Title, status, priority, complexity
+- Problem context and motivation
+- Definition of Done (checkable criteria)
+- Execution approach (what the agent should do)
+- Open questions (for drafts)
+- Agent notes (accumulated during work)
+
+This mirrors the skill pattern where `SKILL.md` is the single entry point.
 
 ### Task Templates
 
 Agent scaffolds based on complexity:
 
-- **Simple** (< 2 hours): README.md only
-- **Medium** (2-8 hours): README.md + references/
-- **Complex** (> 8 hours): Full bundle with steps breakdown
+- **Simple** (< 2 hours): PROMPT.md only
+- **Medium** (2-8 hours): PROMPT.md + references/
+- **Complex** (> 8 hours): Full bundle with PROMPT.md + references/ + assets/ + steps breakdown
 
 ---
 
@@ -407,7 +415,7 @@ Local ledgers will be .gitignored in v1.2. Cloud migration happens when we need 
 | Criterion | Measure |
 |-----------|---------|
 | **Goals mature** | Agent won't execute drafts; only in-progress/P{n} goals run |
-| **Bundles work** | Complex goal with README + references successfully executes |
+| **Bundles work** | Complex goal with PROMPT.md + references successfully executes |
 | **External projects enhanced** | Copy-in → work → approve → copy-back completes end-to-end |
 | **Notion populated** | Milestones, highlights, and weekly summary visible in dashboard |
 | **Skills reference projects** | Agent cites past work when executing similar tasks |
@@ -420,7 +428,7 @@ Local ledgers will be .gitignored in v1.2. Cloud migration happens when we need 
 Suggested order (building agent decides final approach):
 
 1. **Goal State Machine** — Folder structure, state transitions, agent behavior rules
-2. **Goal Bundles** — README.md parsing, template scaffolding
+2. **Goal Bundles** — PROMPT.md parsing, template scaffolding
 3. **Notion Integration** — MCP connection, milestone reporting, summary generation
 4. **Multi-Project Access** — Copy-in workflow, registry, approval flow, copy-back
 5. **Project-Based Skills** — Migrate from percentage confidence to project references
