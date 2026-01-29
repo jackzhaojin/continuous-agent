@@ -9,6 +9,7 @@ import path from 'path';
 import { parsePromptMd, type PromptMdFile } from '../../deterministic/prompt-md-parser.js';
 import type { WorkItem, WorkStep } from '../../core/types.js';
 import type { SelectableWork } from './work-selector.js';
+import { readTasksJson, taskStepsToWorkSteps, migrateFromPromptMd } from '../../deterministic/tasks-json-handler.js';
 
 const WORKSPACE_DIR = path.join(process.cwd(), 'workspace');
 
@@ -273,9 +274,10 @@ function parseStepsFromBody(body: string): WorkStep[] {
 }
 
 /**
- * Convert a GoalBundle to a WorkItem
+ * Convert a GoalBundle to a WorkItem.
+ * Reads steps from TASKS.json (primary) with fallback to PROMPT.md body (legacy).
  */
-function bundleToWorkItem(bundle: GoalBundle): WorkItem {
+async function bundleToWorkItemAsync(bundle: GoalBundle): Promise<WorkItem> {
   const { frontmatter, body } = bundle.promptMd;
 
   const selfEnhance = /^\[SELF-ENHANCE\]/i.test(frontmatter.title);
@@ -291,8 +293,20 @@ function bundleToWorkItem(bundle: GoalBundle): WorkItem {
     status = 'complete';
   }
 
-  // Parse steps from body
-  const steps = parseStepsFromBody(body);
+  // Primary: read steps from TASKS.json
+  let steps: WorkStep[] = [];
+  const tasksFile = await readTasksJson(bundle.sourcePath);
+  if (tasksFile && tasksFile.steps.length > 0) {
+    steps = taskStepsToWorkSteps(tasksFile.steps);
+  } else {
+    // Legacy fallback: parse steps from PROMPT.md body + one-time migration
+    const migrated = await migrateFromPromptMd(bundle.sourcePath, body, parseStepsFromBody);
+    if (migrated) {
+      steps = migrated;
+    } else {
+      steps = parseStepsFromBody(body);
+    }
+  }
 
   // Calculate progress
   let current_step: number | undefined;
@@ -340,7 +354,7 @@ export async function buildSelectableWorkFromBundles(): Promise<SelectableWork[]
     if (bundle.state !== 'in-progress') continue;
     if (!bundle.priority) continue;
 
-    const workItem = bundleToWorkItem(bundle);
+    const workItem = await bundleToWorkItemAsync(bundle);
 
     // Skip completed or blocked
     if (workItem.status === 'complete' || workItem.status === 'blocked') continue;
@@ -395,7 +409,7 @@ export async function getDraftResearchTasks(): Promise<SelectableWork[]> {
     }
 
     if (!hasReferences) {
-      const workItem = bundleToWorkItem(bundle);
+      const workItem = await bundleToWorkItemAsync(bundle);
       workItem.status = 'pending';
       // Mark as research task with capped scope
       workItem.description = `[RESEARCH ONLY] ${workItem.description}`;

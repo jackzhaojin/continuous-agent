@@ -12,6 +12,8 @@ import type { WorkItem, WorkerResult, WorkStep } from '../../core/types.js';
 import { logAgentic, log } from '../../core/logging.js';
 import { reportMilestone } from '../../deterministic/notion-reporter.js';
 import { readPreviousStepHandoff } from '../../deterministic/state-handler.js';
+import { updateStepStatus as updateStepInTasksJson, stepId } from '../../deterministic/tasks-json-handler.js';
+import { logStepStartedProgress } from '../../deterministic/progress-log-writer.js';
 
 const LEDGERS_DIR = path.join(process.cwd(), 'ledgers');
 
@@ -340,7 +342,8 @@ export async function logCapabilityResult(
 }
 
 /**
- * Log work start event
+ * Log work start event.
+ * Also updates TASKS.json step status to in_progress and appends to PROGRESS_LOG.md.
  */
 export async function logWorkStart(
   item: WorkItem,
@@ -348,10 +351,11 @@ export async function logWorkStart(
   contractId: string
 ): Promise<void> {
   const ledgerPath = path.join(LEDGERS_DIR, 'work-ledger.jsonl');
+  const now = new Date().toISOString();
   const entry = step
     ? JSON.stringify({
         event: 'STEP_STARTED',
-        ts: new Date().toISOString(),
+        ts: now,
         task_id: item.id,
         contract_id: contractId,
         task_title: item.title,
@@ -360,12 +364,28 @@ export async function logWorkStart(
       })
     : JSON.stringify({
         event: 'TASK_STARTED',
-        ts: new Date().toISOString(),
+        ts: now,
         task_id: item.id,
         contract_id: contractId,
         title: item.title,
       });
   await appendFile(ledgerPath, entry + '\n', 'utf-8');
+
+  // Update TASKS.json + PROGRESS_LOG.md for step starts
+  if (step && item.source_path) {
+    await updateStepInTasksJson(item.source_path, stepId(step.step_number), 'in_progress', {
+      started_at: now,
+    });
+
+    await logStepStartedProgress(
+      item.source_path,
+      stepId(step.step_number),
+      step.step_number + 1,
+      item.steps?.length || 1,
+      step.title,
+      contractId,
+    );
+  }
 
   // Report started milestone to Notion (fire-and-forget)
   await reportMilestone(

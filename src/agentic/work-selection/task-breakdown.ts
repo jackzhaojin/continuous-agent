@@ -5,10 +5,10 @@
  * manageable steps that can be executed incrementally.
  */
 
-import { readFile, writeFile } from 'fs/promises';
-import { existsSync } from 'fs';
 import path from 'path';
 import type { WorkItem, WorkStep } from '../../core/types.js';
+import { createTasksFile, writeTasksJson, tasksJsonExists } from '../../deterministic/tasks-json-handler.js';
+import { logBreakdownProgress } from '../../deterministic/progress-log-writer.js';
 
 // Configuration from environment
 const BREAKDOWN_THRESHOLD_TURNS = parseInt(process.env.BREAKDOWN_THRESHOLD_TURNS || '100', 10);
@@ -91,12 +91,18 @@ export function estimateComplexity(item: WorkItem): number {
 }
 
 /**
- * Check if a task needs automatic breakdown
+ * Check if a task needs automatic breakdown.
+ * Checks TASKS.json existence first (primary), then in-memory steps (legacy fallback).
  */
 export function needsBreakdown(item: WorkItem): boolean {
   if (!AUTO_BREAKDOWN_ENABLED) return false;
-  if (item.steps && item.steps.length > 0) return false; // Already has steps
-  
+
+  // Primary: check TASKS.json exists in the bundle
+  if (item.source_path && tasksJsonExists(item.source_path)) return false;
+
+  // Legacy fallback: check in-memory steps
+  if (item.steps && item.steps.length > 0) return false;
+
   const estimatedTurns = estimateComplexity(item);
   return estimatedTurns > BREAKDOWN_THRESHOLD_TURNS;
 }
@@ -293,61 +299,34 @@ export function reBreakdownStep(
 }
 
 /**
- * Write steps to a goal bundle's PROMPT.md (V1.2)
- * Appends a ## Steps section to the end of the PROMPT.md body.
- * The goal-scanner parses this section on subsequent reads.
+ * Write steps to a goal bundle's TASKS.json (source of truth) + PROGRESS_LOG.md.
+ * TASKS.json is the only step store -- PROMPT.md is no longer written with ## Steps.
  */
-export async function writeStepsToPromptMd(
+export async function writeStepsToBundle(
   bundlePath: string,
-  steps: WorkStep[]
+  steps: WorkStep[],
+  trigger: 'auto' | 're-breakdown' = 'auto'
 ): Promise<boolean> {
-  const promptPath = path.join(bundlePath, 'PROMPT.md');
-
-  if (!existsSync(promptPath)) {
-    console.log(`[${new Date().toISOString()}] PROMPT.md not found at ${bundlePath} — cannot write steps`);
+  // Guard: don't overwrite if TASKS.json already exists
+  if (tasksJsonExists(bundlePath)) {
+    console.log(`[${new Date().toISOString()}] TASKS.json already exists at ${bundlePath} — skipping write`);
     return false;
   }
 
-  try {
-    let content = await readFile(promptPath, 'utf-8');
+  // Write TASKS.json (atomic via .tmp + rename)
+  const tasksFile = createTasksFile(steps, trigger);
+  const written = await writeTasksJson(bundlePath, tasksFile);
 
-    // Don't write if steps section already exists
-    if (/^##\s+Steps$/im.test(content)) {
-      console.log(`[${new Date().toISOString()}] PROMPT.md already has ## Steps section — skipping`);
-      return false;
-    }
-
-    // Build steps markdown
-    const stepsSection = [
-      '',
-      '## Steps',
-      '',
-      ...steps.flatMap((step) => [
-        `### Step ${step.step_number + 1}: ${step.title}`,
-        `- **Status:** ${formatStatus(step.status)}`,
-        step.description ? `- **Description:** ${step.description}` : '',
-        step.estimated_turns ? `- **Est. Turns:** ${step.estimated_turns}` : '',
-        '',
-      ]).filter(line => line !== ''),
-    ].join('\n');
-
-    content = content.trimEnd() + '\n' + stepsSection + '\n';
-
-    await writeFile(promptPath, content, 'utf-8');
-    console.log(`[${new Date().toISOString()}] Wrote ${steps.length} steps to ${promptPath}`);
-    return true;
-  } catch (error) {
-    console.error(`[${new Date().toISOString()}] Error writing steps to PROMPT.md:`, error);
+  if (!written) {
+    console.log(`[${new Date().toISOString()}] Failed to write TASKS.json at ${bundlePath}`);
     return false;
   }
-}
 
-/**
- * Format status for display
- */
-function formatStatus(status: WorkStep['status']): string {
-  const formatted = status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ');
-  return formatted;
+  // Append breakdown event to PROGRESS_LOG.md
+  const totalEstimatedTurns = steps.reduce((sum, s) => sum + (s.estimated_turns || 100), 0);
+  await logBreakdownProgress(bundlePath, steps.length, trigger, totalEstimatedTurns);
+
+  return true;
 }
 
 /**

@@ -200,31 +200,56 @@ Complex tasks (>100 estimated turns) are automatically broken down into steps:
 
 - **Automatic Breakdown:** `task-breakdown.ts` generates 2-4 steps when `estimateComplexity()` exceeds threshold
 - **Step Execution:** Each step is executed independently with max 100 turns per step
-- **Progress Tracking:** Steps tracked in `goals.md` with status (pending/in-progress/complete/blocked)
+- **Progress Tracking:** Steps are tracked in **TASKS.json** (machine-readable source of truth) + **PROGRESS_LOG.md** (append-only timeline). Legacy `## Steps` in PROMPT.md is still written during transition.
 - **Shared Output:** All steps for a task write to the SAME project directory
 - **Configuration:**
   - `BREAKDOWN_THRESHOLD_TURNS=100` - Trigger breakdown if estimated > 100 turns
   - `MAX_TURNS_PER_STEP=100` - Max turns per step (MINIMUM 100)
   - `AUTO_BREAKDOWN_ENABLED=true` - Enable/disable auto-breakdown
 
-**Step statuses in goals.md:**
-```markdown
-### Task Title
-- **Status:** In Progress (Step 2 of 4, 50% complete)
-#### Step 1: Research and planning
-- **Status:** complete
-#### Step 2: Implementation
-- **Status:** in-progress
-#### Step 3: Testing
-- **Status:** pending
+**Step tracking files per goal bundle:**
 ```
+workspace/in-progress/P2/my-goal/
+  PROMPT.md          # Content only (problem, DoD, approach)
+  TASKS.json         # Machine-readable step definitions + status (source of truth)
+  PROGRESS_LOG.md    # Append-only human-readable timeline
+  step-1-handoff.md  # Per-step handoff context (still written during transition)
+```
+
+**TASKS.json schema:**
+```json
+{
+  "version": 1,
+  "created_at": "2026-01-29T05:44:52Z",
+  "trigger": "auto",
+  "revision": 3,
+  "steps": [
+    {
+      "id": "step-0",
+      "order": 0,
+      "title": "Research and plan approach",
+      "description": "Analyze requirements...",
+      "status": "complete",
+      "dependencies": [],
+      "estimated_turns": 80,
+      "completed_at": "2026-01-29T05:59:42Z",
+      "completed_by_contract": "task-1769665492207"
+    }
+  ]
+}
+```
+
+**Dual-read/write strategy (transition period):**
+- **Reads:** TASKS.json first, falls back to `## Steps` in PROMPT.md body
+- **Writes:** TASKS.json (primary) + PROMPT.md `## Steps` (legacy) + PROGRESS_LOG.md (append-only)
+- **Migration:** Run `npx tsx scripts/migrate-steps-to-tasks-json.ts` to convert existing bundles
 
 ### Key Modules
 
 **Agentic Layer** (`src/agentic/`) - AI decision-making:
 - `work-selection/work-selector.ts` - Selects highest priority unblocked task (goal bundles first, legacy goals.md fallback)
-- `work-selection/goal-scanner.ts` - Scans workspace folder tree for goal bundles, reads PROMPT.md, auto-promotes ondeck goals
-- `work-selection/task-breakdown.ts` - Automatic breakdown of complex tasks into steps
+- `work-selection/goal-scanner.ts` - Scans workspace folder tree for goal bundles, reads TASKS.json (primary) or PROMPT.md (fallback), auto-promotes ondeck goals
+- `work-selection/task-breakdown.ts` - Automatic breakdown of complex tasks into steps; `writeStepsToBundle()` writes TASKS.json + PROMPT.md + PROGRESS_LOG.md
 - `execution/task-contractor.ts` - Creates task contracts with DoD and constraints
 - `execution/worker-spawner.ts` - Spawns Claude Agent SDK sessions with prompts, copies `.env` to worker directory
 - `execution/execution-handler.ts` - Orchestrates work execution with retry tracking
@@ -241,7 +266,9 @@ Complex tasks (>100 estimated turns) are automatically broken down into steps:
 - `health-checker.ts` - Validates auth, tools, disk space
 - `input-processor.ts` - Parses human responses from needs-you.md
 - `prompt-md-parser.ts` - Parses PROMPT.md files (YAML frontmatter + markdown body)
-- `state-handler.ts` - Updates goal bundles, needs-you.md, ledgers; multi-project patch generation
+- `state-handler.ts` - Updates goal bundles (TASKS.json + PROMPT.md + PROGRESS_LOG.md), needs-you.md, ledgers; multi-project patch generation
+- `tasks-json-handler.ts` - Read/write/update TASKS.json files (atomic writes via temp+rename)
+- `progress-log-writer.ts` - Append-only PROGRESS_LOG.md writer for goal bundles
 - `validation-handler.ts` - Runs verifiers on worker output
 - `verifiers/` - Deterministic checks (git-clean, node-build, docs-complete)
 - `backoff-manager.ts` - Rate limit detection and exponential backoff
@@ -565,6 +592,8 @@ continuous-agent/
 │       ├── health-checker.ts   # System health validation
 │       ├── input-processor.ts  # Parses needs-you.md responses
 │       ├── prompt-md-parser.ts # Parses PROMPT.md frontmatter + body
+│       ├── tasks-json-handler.ts # TASKS.json read/write/update (atomic writes)
+│       ├── progress-log-writer.ts # Append-only PROGRESS_LOG.md writer
 │       ├── state-handler.ts    # Updates goal bundles, needs-you.md
 │       ├── validation-handler.ts # Runs verifiers
 │       ├── verifiers/          # Deterministic validation checks
@@ -663,6 +692,8 @@ tail -20 ledgers/work-ledger.jsonl
 - Retry loops → Check `strategy-selector.ts` is picking different strategies
 - Verifiers checking wrong directory → Ensure verifiers use `result.output_path`, not `process.cwd()`
 - TypeScript errors → Run `npm install` to ensure `@types/node` is installed
+- Steps lost on restart → Check TASKS.json exists in the bundle; if only `## Steps` in PROMPT.md, run migration: `npx tsx scripts/migrate-steps-to-tasks-json.ts`
+- Step status not updating → Check TASKS.json is writable; `tasks-json-handler.ts` uses atomic temp+rename writes
 - Self-enhance steps repeat → Title prefix must be preserved (not stripped) for regex matching in `updateStepStatus`
 - PM2 running stale code → Verify `ecosystem.config.cjs` script path points to `dist/core/executive-loop.js`
 - No work selected → Check `workspace/in-progress/P{0-4}/` for goal bundles with `status: pending` in PROMPT.md; also check `workspace/ondeck/` for goals awaiting auto-promotion

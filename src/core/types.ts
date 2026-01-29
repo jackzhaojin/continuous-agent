@@ -21,8 +21,37 @@ export interface HealthStatus {
 }
 
 /**
+ * Machine-readable step definition stored in TASKS.json (source of truth)
+ * Replaces fragile regex-based ## Steps parsing from PROMPT.md
+ */
+export interface TaskStep {
+  id: string;              // Stable identifier (e.g., "step-0")
+  order: number;           // Execution order (0-based)
+  title: string;
+  description: string;
+  status: 'pending' | 'in_progress' | 'complete' | 'blocked';
+  dependencies: string[];  // IDs of steps this depends on
+  estimated_turns: number;
+  started_at?: string;
+  completed_at?: string;
+  completed_by_contract?: string;
+  re_breakdown_count?: number;
+}
+
+/**
+ * TASKS.json file schema — per-bundle source of truth for step tracking
+ */
+export interface TasksFile {
+  version: number;
+  created_at: string;
+  trigger: 'auto' | 're-breakdown' | 'manual';
+  revision: number;        // Bumped on every write
+  steps: TaskStep[];
+}
+
+/**
  * Individual step within a multi-step task
- * Steps are tracked in PROMPT.md under parent tasks
+ * Steps are tracked in TASKS.json per goal bundle (source of truth)
  */
 export interface WorkStep {
   step_number: number;

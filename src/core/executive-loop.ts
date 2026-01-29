@@ -23,7 +23,7 @@ import {
   estimateComplexity,
   generateStaticBreakdown,
   logBreakdownEvent,
-  writeStepsToPromptMd,
+  writeStepsToBundle,
 } from '../agentic/work-selection/task-breakdown.js';
 import { diagnoseFailure } from '../agentic/diagnosis/agentic-diagnosis.js';
 import { classifyIntent } from '../agentic/intelligence/intent-classifier.js';
@@ -227,11 +227,11 @@ async function runIteration(): Promise<IterationResult> {
     const steps = generateStaticBreakdown(workItem);
     log(`  Generated ${steps.length} steps for "${workItem.title}"`);
 
-    // Write steps to the bundle's PROMPT.md (V1.2)
+    // Write steps to the bundle: TASKS.json (primary) + PROMPT.md (legacy)
     if (workItem.source_path) {
-      const written = await writeStepsToPromptMd(workItem.source_path, steps);
+      const written = await writeStepsToBundle(workItem.source_path, steps);
       if (written) {
-        logAgentic(`  Steps written to PROMPT.md — re-selecting to execute step 1`);
+        logAgentic(`  Steps written to TASKS.json — re-selecting to execute step 1`);
 
         // Log breakdown event to work ledger
         await logBreakdownEvent(workItem.id, workItem.title, steps.length, 'auto');

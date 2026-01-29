@@ -18,6 +18,8 @@ import { reportMilestone } from './notion-reporter.js';
 import { parsePromptMd, updateFrontmatter } from './prompt-md-parser.js';
 import { appendProjectMemory, type ProjectMemoryEntry } from './project-memory-store.js';
 import { registerProject, generateProjectSlug, findProjectBySlug, type ProjectRegistryEntry } from './project-registry.js';
+import { readTasksJson, writeTasksJson, updateStepStatus as updateStepInTasksJson, stepId } from './tasks-json-handler.js';
+import { logStepCompletedProgress, logStepBlockedProgress } from './progress-log-writer.js';
 
 const WORKSPACE_DIR = path.join(process.cwd(), 'workspace');
 const LEDGERS_DIR = path.join(process.cwd(), 'ledgers');
@@ -45,71 +47,6 @@ export async function updatePromptMdStatus(
     return true;
   } catch (error) {
     log(`  Failed to update PROMPT.md: ${error}`);
-    return false;
-  }
-}
-
-/**
- * Update a step's status in the ## Steps section of PROMPT.md body
- * Finds the step by number and updates its - **Status:** line
- * DETERMINISTIC: File I/O and pattern matching
- */
-async function updateStepStatusInPromptMd(
-  sourcePath: string,
-  stepNumber: number,
-  newStatus: WorkStep['status']
-): Promise<boolean> {
-  const promptPath = path.join(sourcePath, 'PROMPT.md');
-
-  if (!existsSync(promptPath)) {
-    log(`  Warning: No PROMPT.md at ${promptPath} — cannot update step status`);
-    return false;
-  }
-
-  try {
-    const content = await readFile(promptPath, 'utf-8');
-    const lines = content.split('\n');
-
-    // Find the step header: ### Step N: Title (N is 1-indexed in the file)
-    const stepHeaderPattern = new RegExp(`^#{3,4}\\s+(?:Step\\s+)?${stepNumber + 1}[:.\\s]`, 'i');
-    let foundStep = false;
-    let modified = false;
-
-    for (let i = 0; i < lines.length; i++) {
-      const trimmed = lines[i].trim();
-
-      if (stepHeaderPattern.test(trimmed)) {
-        foundStep = true;
-        continue;
-      }
-
-      // Once we found our step, look for its Status line
-      if (foundStep) {
-        // If we hit another step header or section header, stop
-        if (trimmed.match(/^#{2,4}\s+/)) {
-          break;
-        }
-
-        const statusMatch = trimmed.match(/^([-*]\s*\*\*Status:\*\*\s*).+$/i);
-        if (statusMatch) {
-          const formattedStatus = newStatus.charAt(0).toUpperCase() + newStatus.slice(1).replace('_', ' ');
-          lines[i] = lines[i].replace(/(\*\*Status:\*\*\s*).+$/i, `$1${formattedStatus}`);
-          modified = true;
-          break;
-        }
-      }
-    }
-
-    if (modified) {
-      await writeFile(promptPath, lines.join('\n'), 'utf-8');
-      log(`  Updated step ${stepNumber + 1} status to "${newStatus}" in PROMPT.md`);
-      return true;
-    } else {
-      log(`  Warning: Could not find step ${stepNumber + 1} status line in PROMPT.md`);
-      return false;
-    }
-  } catch (error) {
-    log(`  Failed to update step status in PROMPT.md: ${error}`);
     return false;
   }
 }
@@ -320,7 +257,7 @@ async function requestMultiProjectApproval(item: WorkItem, outputPath: string): 
 
 /**
  * Set the output path for a task
- * V1.2: Updates PROMPT.md frontmatter (source of truth)
+ * V1.2: Updates PROMPT.md frontmatter + TASKS.json (if exists)
  * DETERMINISTIC: File I/O and pattern matching
  */
 export async function setTaskOutputPath(
@@ -330,8 +267,8 @@ export async function setTaskOutputPath(
 ): Promise<boolean> {
   log(`  Persisting output path: ${outputPath}`);
 
-  // V1.2: Update PROMPT.md frontmatter (source of truth)
   if (sourcePath) {
+    // V1.2: Update PROMPT.md frontmatter (source of truth)
     const updated = await updatePromptMdStatus(sourcePath, { output_path: outputPath });
     if (updated) {
       logDeterministic(`  Updated PROMPT.md output_path for "${taskTitle}"`);
@@ -367,9 +304,23 @@ export async function updateStepState(
         stepToUpdate.completed_at = now;
       }
 
-      // V1.2: Persist step status to PROMPT.md body (## Steps section)
       if (item.source_path) {
-        await updateStepStatusInPromptMd(item.source_path, step.step_number, 'complete');
+        // Primary: update TASKS.json (source of truth for step status)
+        await updateStepInTasksJson(item.source_path, stepId(step.step_number), 'complete', {
+          completed_at: now,
+          completed_by_contract: contractId,
+        });
+
+        // Append to PROGRESS_LOG.md
+        await logStepCompletedProgress(
+          item.source_path,
+          stepId(step.step_number),
+          step.step_number + 1,
+          item.steps?.length || 1,
+          step.title,
+          contractId,
+          outputPath,
+        );
       }
 
       // Log step completion
@@ -626,17 +577,28 @@ export async function markTaskBlocked(item: WorkItem): Promise<void> {
 }
 
 /**
- * Mark step as blocked in PROMPT.md
+ * Mark step as blocked in TASKS.json (primary) + PROMPT.md (legacy) + PROGRESS_LOG.md
  * DETERMINISTIC: File I/O
  */
 export async function markStepBlocked(item: WorkItem, stepNumber: number): Promise<void> {
   logDeterministic(`Marking step ${stepNumber + 1} as blocked...`);
 
-  // V1.2: Update step status in PROMPT.md body, then mark task blocked
   if (item.source_path) {
     try {
-      await updateStepStatusInPromptMd(item.source_path, stepNumber, 'blocked');
-      log(`  Step ${stepNumber + 1} marked as blocked in PROMPT.md body`);
+      // Primary: update TASKS.json (source of truth for step status)
+      await updateStepInTasksJson(item.source_path, stepId(stepNumber), 'blocked');
+
+      // Append to PROGRESS_LOG.md
+      const stepTitle = item.steps?.[stepNumber]?.title || `Step ${stepNumber + 1}`;
+      await logStepBlockedProgress(
+        item.source_path,
+        stepId(stepNumber),
+        stepNumber + 1,
+        item.steps?.length || 1,
+        stepTitle,
+      );
+
+      log(`  Step ${stepNumber + 1} marked as blocked`);
       // Note: markTaskBlocked() is always called after this by the executive loop,
       // which handles frontmatter update and directory move
     } catch (error) {
