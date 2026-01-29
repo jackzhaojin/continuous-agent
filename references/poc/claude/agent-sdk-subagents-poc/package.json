@@ -19,7 +19,7 @@
   "author": "",
   "license": "Private",
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.1.0",
+    "@anthropic-ai/claude-agent-sdk": "^0.2.23",
     "dotenv": "^16.3.1"
   },
   "devDependencies": {
