@@ -114,7 +114,7 @@ export function generateStaticBreakdown(item: WorkItem): WorkStep[] {
   const isNextJs = text.includes('next') || text.includes('nextjs');
   const isApi = text.includes('api') || text.includes('endpoint');
   const isFullStack = text.includes('full') && text.includes('stack');
-  const haAuth = text.includes('auth') || text.includes('login');
+  const hasAuth = text.includes('auth') || text.includes('login');
   const hasDb = text.includes('database') || text.includes('schema') || text.includes('model');
   const hasDeploy = text.includes('deploy') || text.includes('production');
 
@@ -162,7 +162,7 @@ export function generateStaticBreakdown(item: WorkItem): WorkStep[] {
   }
 
   // Step 4: Authentication (if needed)
-  if (haAuth) {
+  if (hasAuth) {
     steps.push({
       step_number: stepNum++,
       title: 'Implement authentication system',

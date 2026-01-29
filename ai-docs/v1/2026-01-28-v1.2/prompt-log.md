@@ -31,3 +31,54 @@
 
 -> Response: Workers run on `claude-sonnet-4-5` via global `MODEL` env var (not configurable per step/task). Subagents have hardcoded models: task-researcher=opus, self-enhancer=opus, code-validator=sonnet.
 -> Action: Read `.env.example`, `worker-spawner.ts`, `.claude/agents/*.md`. Informational only.
+
+### Prompt 5: Wire Task Breakdown into V1.2 (11:00 PM)
+
+> (Continued from audit) Fix the orphaned task-breakdown — it's never called from V1.2 code path. Also fix 2 gaps: (1) step status not persisted to PROMPT.md body, (2) blocked bundles not moved to workspace/blocked/ directory.
+
+-> Response: Wired `checkAndBreakdownTask()` into executive-loop.ts Phase 3b. Added `updateStepStatusInPromptMd()` to persist step status in PROMPT.md body, `moveBundleToBlocked()` to move bundles to blocked/, updated `unblockTaskInBundle()` to move back to in-progress/P{n}/.
+-> Action: Updated `state-handler.ts` (3 new functions + wired into existing), `input-processor.ts` (unblock moves bundle back), `executive-loop.ts` (Phase 3b). Build clean. ✅
+
+### Prompt 6: Confirm V1.2 Logic Replacement (11:15 PM)
+
+> You're not just removing logic right? but moving to the new 1.2 logic?
+
+-> Response: Confirmed all removals have V1.2 replacements. Old `updateStepStatus()` regex on goals.md replaced by `updateStepStatusInPromptMd()` on PROMPT.md body. Old flat-file system replaced by directory moves (in-progress ↔ blocked).
+-> Action: Walkthrough only, no code changes.
+
+### Prompt 7: Expand PROMPT.md Complexity for Subtask Testing (11:30 PM)
+
+> Can you add more complexity to all 4 MDS in ondeck and drafts so we're testing the subtasking capability?
+
+-> Response: All 4 were frontend-only (4 breakdown steps). Rewrote all as full-stack apps (Next.js + SQLite + JWT + REST API + rich UI) to trigger all breakdown keywords → 8 steps each.
+-> Action: Rewrote 4 PROMPT.md files: music-player-ui, recipe-card-explorer, chatbot-ui-react, retro-dashboard. All now full-stack with auth/db/api. ✅
+
+### Prompt 8: Update Monitor Instructions for V1.2 (11:45 PM)
+
+> anything you'd change to monitor-instructions.md before we start it with the SKILL.md?
+
+-> Response: Found 6 issues — stale goals.md references, no subtasking coverage, incorrect lifecycle docs. Applied 12 edits: removed goals.md refs, added Phase 3b docs, multi-step lifecycle, step progress monitoring in quick check + deep audit scripts, step-specific anomaly detection and intervention thresholds.
+-> Action: Updated `monitor-instructions.md` with 12 edits covering goals.md removal, subtasking system, and directory lifecycle corrections. ✅
+
+## Session 2: V1.2 First Run & Monitoring (Jan 29, 2026)
+
+### Prompt 9: Start PM2 and Monitor (12:30 AM)
+
+> /long-agent-monitor let's start pm2 and monitor carefully! ideally we should see the stuff in on deck moved into in progress with right priority. Do some scouting in workspace before we start. monitor instructions 'monitor-instructions.md'
+
+-> Response: Scouted workspace baseline (2 ondeck P3, 2 drafts P2, in-progress empty). Started PM2. Agent picked up P3 music-player-ui first, auto-promoted both ondeck→in-progress/P3/, broke down into 8 steps, started Step 1 (research). Work ledger confirmed GOAL_PROMOTED x2, TASK_BREAKDOWN, STEP_STARTED.
+-> Action: PM2 started, monitoring loop active. Verified ondeck promotion, 8-step breakdown, worker executing Step 1.
+
+### Prompt 10: Move P2s to Ondeck (12:46 AM)
+
+> also i moved 2 P2s into on deck. OK I moved 2 P2s into on deck, let's see when we'll pick up the new P2s away from the P3s in progress.
+
+-> Response: User manually moved chatbot-ui-react (P2) and retro-dashboard (P2) from drafts/ to ondeck/. These should auto-promote to in-progress/P2/ on next iteration and get priority over P3 tasks.
+-> Action: Paused monitoring per user request ("stop monitoring for a second"), logging session.
+
+### Prompt 11: Conversation Logger (12:46 AM)
+
+> /conversation-logger to '/Users/jackjin/dev/continuous-agent/ai-docs/v1/2026-01-28-v1.2/prompt-log.md'
+
+-> Response: Appended prompts 5-11 covering gap fixes, complexity expansion, monitor update, PM2 start, and P2 ondeck move.
+-> Action: Updated prompt-log.md. ✅

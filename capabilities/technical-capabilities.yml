@@ -6,7 +6,7 @@ capabilities:
   - id: git.branch_commit
     name: Git Branch and Commit
     description: Create branches, stage changes, and commit with proper messages
-    confidence: 60
+    confidence: 70
     maturity: Demonstrated
     scope:
       includes:
@@ -27,7 +27,7 @@ capabilities:
       - git_status_check
       - commit_exists
     evidence:
-      successes: 23
+      successes: 24
       failures: 52
       last_success: null
       last_failure: null

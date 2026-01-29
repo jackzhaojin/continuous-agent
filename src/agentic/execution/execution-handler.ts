@@ -11,6 +11,7 @@ import { classifyIntent } from '../intelligence/intent-classifier.js';
 import type { WorkItem, WorkerResult, WorkStep } from '../../core/types.js';
 import { logAgentic, log } from '../../core/logging.js';
 import { reportMilestone } from '../../deterministic/notion-reporter.js';
+import { readPreviousStepHandoff } from '../../deterministic/state-handler.js';
 
 const LEDGERS_DIR = path.join(process.cwd(), 'ledgers');
 
@@ -84,6 +85,65 @@ function buildRetryContext(item: WorkItem): WorkerRetryContext | undefined {
 }
 
 /**
+ * Build a step-scoped description that replaces the full task description
+ * when executing an individual step. This prevents the worker from seeing
+ * the entire task spec and building everything in one step.
+ * Includes previous step's handoff for continuity.
+ */
+async function buildStepScopedDescription(item: WorkItem, step: WorkStep, previousHandoff?: string | null): Promise<string> {
+  const totalSteps = item.steps?.length || 1;
+  const stepNum = step.step_number + 1;
+
+  const completedSteps = item.steps
+    ?.filter(s => s.status === 'complete')
+    .map(s => `- Step ${s.step_number + 1}: ${s.title} (complete)`)
+    .join('\n') || '(none — this is the first step)';
+
+  const remainingSteps = item.steps
+    ?.filter(s => s.status !== 'complete' && s.step_number !== step.step_number)
+    .map(s => `- Step ${s.step_number + 1}: ${s.title}`)
+    .join('\n') || '(none)';
+
+  const isResearchStep = step.title.toLowerCase().includes('research') ||
+    step.title.toLowerCase().includes('plan') ||
+    step.description?.toLowerCase().includes('research');
+
+  const researchWarning = isResearchStep
+    ? `\n### RESEARCH ONLY — DO NOT BUILD\nThis is a research/planning step. Your deliverables are:\n- A RESEARCH.md or planning document with findings\n- Analysis of patterns, best practices, and approach\n- DO NOT write application code, initialize projects, or install dependencies\n- DO NOT implement any features — that happens in later steps\n`
+    : '';
+
+  return `## Step ${stepNum} of ${totalSteps}: ${step.title}
+
+**Parent Task:** ${item.title}
+**Priority:** ${item.priority}
+${researchWarning}
+### What to Do in This Step
+
+${step.description || step.title}
+
+### SCOPE BOUNDARIES (CRITICAL)
+
+- Complete ONLY the work described for this step
+- Do NOT build the entire application — this is 1 of ${totalSteps} steps
+- Do NOT implement features belonging to other steps
+- Your deliverable is ONLY: "${step.title}"
+- Stay focused and finish this step within the turn budget
+
+### Previous Steps Completed
+${completedSteps}
+
+### Remaining Steps (do NOT do these — they are handled separately)
+${remainingSteps}${previousHandoff ? `
+
+### Previous Step Handoff
+The previous step left this handoff for you:
+
+---
+${previousHandoff.slice(0, 3000)}
+---` : ''}`;
+}
+
+/**
  * Execute work item (task or step) using Agent SDK worker
  * AGENTIC: Spawns AI agent to do the work
  */
@@ -95,8 +155,28 @@ export async function executeWork(
   logAgentic(`Executing: ${item.title}${step ? ` - Step ${step.step_number + 1}` : ''}`);
 
   try {
+    // When executing a step, create a scoped copy of the WorkItem
+    // so the worker only sees step-relevant context, NOT the full task spec
+    let scopedItem: WorkItem = item;
+    if (step) {
+      // Read previous step's handoff for continuity
+      const previousHandoff = item.source_path
+        ? await readPreviousStepHandoff(item.source_path, step.step_number)
+        : null;
+      if (previousHandoff) {
+        log(`  Including handoff from step ${step.step_number} for context`);
+      }
+
+      const stepDescription = await buildStepScopedDescription(item, step, previousHandoff);
+      scopedItem = {
+        ...item,
+        title: `${item.title} — Step ${step.step_number + 1}/${item.steps?.length || '?'}: ${step.title}`,
+        description: stepDescription,
+      };
+    }
+
     // AGENTIC: Classify intent and select strategy
-    const intent = await classifyIntent(item);
+    const intent = await classifyIntent(scopedItem);
     log(`  Intent: ${intent.type} (confidence: ${intent.confidence})`);
 
     const retryContext = buildRetryContext(item);
@@ -126,7 +206,7 @@ export async function executeWork(
     const result = await spawnWorker(
       {
         id: currentTask || `task-${Date.now()}`,
-        goal: step ? step.description : item.description,
+        goal: scopedItem.description || item.description,
         scope: {
           repos_allowed: ['agent-outputs'],
           tools_allowed: [
@@ -141,18 +221,25 @@ export async function executeWork(
             'WebSearch',
           ],
         },
-        definition_of_done: [
-          step ? `Complete step: ${step.title}` : 'Complete task as described',
-          'All code compiles and runs',
-          'Changes are committed to git',
-        ],
+        definition_of_done: step
+          ? [
+              `Complete step: ${step.title}`,
+              `Do NOT build the entire application — only this step`,
+              'All code compiles and runs (if applicable to this step)',
+              'Changes are committed to git',
+            ]
+          : [
+              'Complete task as described',
+              'All code compiles and runs',
+              'Changes are committed to git',
+            ],
         max_turns: 100,
         risk_assessment: 'low',
         required_skills: [],
         logging_obligations: ['All work logged to output directory'],
         created_at: new Date().toISOString(),
       },
-      item,
+      scopedItem,
       retryContext
     );
 

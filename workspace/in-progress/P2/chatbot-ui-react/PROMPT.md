@@ -1,13 +1,25 @@
 ---
 title: Full-Stack Conversational Chat Application
 slug: chatbot-ui-react
-priority: P2
 status: pending
+priority: P2
 complexity: high
-created: 2026-01-28
-tags: [react, nextjs, tailwind, frontend, ui-ux, chatbot, api, database, authentication, full-stack, responsive, animation]
+created: 2026-01-28T00:00:00.000Z
+tags:
+  - react
+  - nextjs
+  - tailwind
+  - frontend
+  - ui-ux
+  - chatbot
+  - api
+  - database
+  - authentication
+  - full-stack
+  - responsive
+  - animation
 output_path:
-branch:
+branch: null
 ---
 
 ## Problem

@@ -81,37 +81,3 @@ Build a full-stack music player platform inspired by Spotify/Apple Music. This i
 
 This is a complex full-stack task requiring database setup, API implementation, authentication, and rich UI. Expect 6-8 implementation steps.
 
-## Steps
-
-### Step 1: Research existing patterns and plan approach
-- **Status:** Pending
-- **Description:** Analyze requirements for "Full-Stack Music Player Platform". Research best practices, existing patterns, and create a technical plan.
-- **Est. Turns:** 80
-### Step 2: Initialize project with Next.js and TypeScript
-- **Status:** Pending
-- **Description:** Set up Next.js project with TypeScript, configure ESLint, set up folder structure.
-- **Est. Turns:** 100
-### Step 3: Design and implement database schema
-- **Status:** Pending
-- **Description:** Create database models, migrations, and seed data. Set up ORM if needed.
-- **Est. Turns:** 110
-### Step 4: Implement authentication system
-- **Status:** Pending
-- **Description:** Set up user authentication with JWT or session-based auth. Create login/logout/register flows.
-- **Est. Turns:** 120
-### Step 5: Build core API endpoints
-- **Status:** Pending
-- **Description:** Implement main API routes with CRUD operations. Add validation and error handling.
-- **Est. Turns:** 130
-### Step 6: Create UI components and pages
-- **Status:** Pending
-- **Description:** Build React components for the user interface. Create main pages and navigation.
-- **Est. Turns:** 140
-### Step 7: Integration and feature completion
-- **Status:** Pending
-- **Description:** Connect all components, ensure data flow works end-to-end. Add any missing features.
-- **Est. Turns:** 100
-### Step 8: Testing and quality assurance
-- **Status:** Pending
-- **Description:** Write unit tests, integration tests. Fix bugs and edge cases.
-- **Est. Turns:** 100

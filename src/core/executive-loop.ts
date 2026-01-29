@@ -44,6 +44,7 @@ import { createGoalBundle } from '../deterministic/workspace-writers.js';
 import { appendInputLog } from '../deterministic/inputs-log.js';
 import { isRateLimitError, isInCooldown, enterCooldown, resetBackoff } from '../deterministic/backoff-manager.js';
 import { validateWork } from '../deterministic/validation-handler.js';
+import { regenerateGoalsIndex } from '../deterministic/goals-index-generator.js';
 import {
   updateTaskState,
   updateStepState,
@@ -125,6 +126,13 @@ async function runIteration(): Promise<IterationResult> {
   if (!isHealthyEnoughToWork(health)) {
     logDeterministic('System unhealthy - skipping work execution');
     return 'unhealthy';
+  }
+
+  // Regenerate goals.md index from bundles (human-readable checkbox view)
+  try {
+    await regenerateGoalsIndex();
+  } catch (e) {
+    log(`  Goals index generation failed (non-blocking): ${e}`);
   }
 
   // === PHASE 2: CHECK HUMAN INPUTS ===

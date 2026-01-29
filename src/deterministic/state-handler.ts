@@ -384,6 +384,11 @@ export async function updateStepState(
       });
       await appendFile(ledgerPath, entry + '\n', 'utf-8');
 
+      // Write step handoff file for human visibility and next-step context
+      if (item.source_path) {
+        await writeStepHandoff(item, step, outputPath, contractId);
+      }
+
       // Report step completion milestone to Notion (fire-and-forget)
       await reportMilestone('Step Completed', item, contractId, {
         stepTitle: step.title,
@@ -418,6 +423,96 @@ export async function updateStepState(
     }
   } catch (error) {
     log(`  Failed to update step state: ${error}`);
+  }
+}
+
+/**
+ * Write a step handoff file to the goal bundle directory.
+ * This serves two purposes:
+ * 1. Human visibility — see what each step accomplished
+ * 2. AI continuity — next step reads previous handoff to resume intelligently
+ *
+ * File: {goal-bundle}/step-{N}-handoff.md
+ */
+export async function writeStepHandoff(
+  item: WorkItem,
+  step: WorkStep,
+  outputPath?: string,
+  contractId?: string
+): Promise<void> {
+  if (!item.source_path) return;
+
+  const stepNum = step.step_number + 1;
+  const handoffPath = path.join(item.source_path, `step-${stepNum}-handoff.md`);
+  const now = new Date().toISOString();
+
+  // Find worker log for this step
+  const today = now.split('T')[0];
+  const workerLogPath = contractId
+    ? path.join(process.cwd(), 'ledgers', today, `worker-${contractId}.log`)
+    : null;
+
+  // Extract final output summary from worker log (last assistant text)
+  let workerSummary = '(no summary available)';
+  if (workerLogPath && existsSync(workerLogPath)) {
+    try {
+      const logContent = await readFile(workerLogPath, 'utf-8');
+      // Look for PROJECT_SUMMARY or final text output
+      const summaryMatch = logContent.match(/PROJECT_SUMMARY[\s\S]*?(?=\[MSG\]|\[TURN\]|=== WORKER|$)/i);
+      if (summaryMatch) {
+        workerSummary = summaryMatch[0].slice(0, 2000);
+      } else {
+        // Grab last few substantial text outputs
+        const textBlocks = logContent.match(/\[TURN \d+\][\s\S]*?(?=\[TURN|\[MSG\]|=== WORKER|$)/g);
+        if (textBlocks && textBlocks.length > 0) {
+          workerSummary = textBlocks[textBlocks.length - 1].slice(0, 2000);
+        }
+      }
+    } catch { /* ignore */ }
+  }
+
+  const content = `# Step ${stepNum} Handoff: ${step.title}
+
+**Task:** ${item.title}
+**Completed:** ${now}
+**Contract:** ${contractId || 'unknown'}
+**Output Path:** ${outputPath || 'none'}
+
+## What Was Done
+
+${workerSummary}
+
+## Files Context
+
+Output directory: \`${outputPath || 'none'}\`
+Worker log: \`ledgers/${today}/worker-${contractId}.log\`
+`;
+
+  try {
+    await writeFile(handoffPath, content, 'utf-8');
+    log(`  Wrote step ${stepNum} handoff to ${handoffPath}`);
+  } catch (error) {
+    log(`  Failed to write step handoff: ${error}`);
+  }
+}
+
+/**
+ * Read the previous step's handoff for inclusion in the next step's prompt.
+ * Returns the handoff content or null if not available.
+ */
+export async function readPreviousStepHandoff(
+  sourcePath: string,
+  currentStepNumber: number
+): Promise<string | null> {
+  if (currentStepNumber <= 0) return null;
+
+  const handoffPath = path.join(sourcePath, `step-${currentStepNumber}-handoff.md`);
+  if (!existsSync(handoffPath)) return null;
+
+  try {
+    return await readFile(handoffPath, 'utf-8');
+  } catch {
+    return null;
   }
 }
 
