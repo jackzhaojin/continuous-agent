@@ -11,6 +11,7 @@ import { readFile, writeFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 import type { SelfImprovementTrigger } from './self-improvement-triggers.js';
+import { createGoalBundle } from '../../deterministic/workspace-writers.js';
 
 /**
  * Generate a self-improvement task in goals.md
@@ -56,6 +57,17 @@ export async function generateSelfImprovementTask(trigger: SelfImprovementTrigge
     const newContent = content.slice(0, insertPosition) + '\n' + taskEntry + '\n' + content.slice(insertPosition);
 
     await writeFile(goalsPath, newContent, 'utf-8');
+
+    // V1.2: Also create a goal bundle in in-progress
+    try {
+      const priorityDir = trigger.priority === 'P2'
+        ? path.join(process.cwd(), 'workspace', 'in-progress', 'P2')
+        : path.join(process.cwd(), 'workspace', 'in-progress', 'P3');
+
+      await createGoalBundle(task.title, task.description, priorityDir);
+    } catch (bundleError) {
+      console.log(`[${new Date().toISOString()}] Failed to create goal bundle: ${bundleError}`);
+    }
 
     console.log(`[${new Date().toISOString()}] Added self-improvement task: ${task.title}`);
     return true;

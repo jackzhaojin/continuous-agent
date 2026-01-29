@@ -2,6 +2,7 @@ import { readFile, writeFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 import type { WorkItem, WorkStep } from '../../core/types.js';
+import { buildSelectableWorkFromBundles, getDraftResearchTasks } from './goal-scanner.js';
 
 export type { WorkItem };
 export type { WorkStep };
@@ -430,6 +431,30 @@ function areStepDependenciesMet(step: WorkStep, allSteps: WorkStep[]): boolean {
  * Returns both the task and the specific step to execute (if multi-step)
  */
 export async function selectWorkWithSteps(): Promise<SelectableWork | null> {
+  // V1.2: Try folder-based goal bundles first
+  try {
+    const bundleWork = await buildSelectableWorkFromBundles();
+    if (bundleWork.length > 0) {
+      const selected = bundleWork[0];
+      if (selected.type === 'step') {
+        console.log(`[${new Date().toISOString()}] [Bundle] Selected step: [${selected.priority}] ${selected.task.title} - Step ${selected.step!.step_number + 1}: ${selected.step!.title}`);
+      } else {
+        console.log(`[${new Date().toISOString()}] [Bundle] Selected task: [${selected.priority}] ${selected.task.title}`);
+      }
+      return selected;
+    }
+
+    // Check drafts for research tasks
+    const researchTasks = await getDraftResearchTasks();
+    if (researchTasks.length > 0) {
+      console.log(`[${new Date().toISOString()}] [Bundle] Selected draft research: ${researchTasks[0].task.title}`);
+      return researchTasks[0];
+    }
+  } catch (error) {
+    console.log(`[${new Date().toISOString()}] Bundle scanning failed, falling back to goals.md: ${error}`);
+  }
+
+  // V1.1 fallback: Parse goals.md directly
   const goalsPath = path.join(process.cwd(), 'workspace', 'goals.md');
 
   if (!existsSync(goalsPath)) {

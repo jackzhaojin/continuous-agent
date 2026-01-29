@@ -4,6 +4,7 @@
  */
 
 import { readFile, writeFile, appendFile } from 'fs/promises';
+import { existsSync } from 'fs';
 import path from 'path';
 import {
   updateStepStatus,
@@ -17,6 +18,8 @@ import {
   markReferenceRefreshCompleted,
 } from './self-improvement-state.js';
 import { reportMilestone } from './notion-reporter.js';
+import { parsePromptMd, updateFrontmatter } from './prompt-md-parser.js';
+import { generateGoalsIndex } from './goal-index-generator.js';
 
 const WORKSPACE_DIR = path.join(process.cwd(), 'workspace');
 const LEDGERS_DIR = path.join(process.cwd(), 'ledgers');
@@ -27,6 +30,33 @@ const LEDGERS_DIR = path.join(process.cwd(), 'ledgers');
  */
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Update PROMPT.md frontmatter for a goal bundle
+ * V1.2: Updates the PROMPT.md file directly instead of regex on goals.md
+ */
+export async function updatePromptMdStatus(
+  sourcePath: string,
+  updates: Record<string, string>
+): Promise<boolean> {
+  const promptPath = path.join(sourcePath, 'PROMPT.md');
+
+  try {
+    if (!existsSync(promptPath)) {
+      log(`  Warning: No PROMPT.md at ${promptPath}`);
+      return false;
+    }
+
+    const content = await readFile(promptPath, 'utf-8');
+    const updated = updateFrontmatter(content, updates);
+    await writeFile(promptPath, updated, 'utf-8');
+    log(`  Updated PROMPT.md at ${sourcePath}`);
+    return true;
+  } catch (error) {
+    log(`  Failed to update PROMPT.md: ${error}`);
+    return false;
+  }
 }
 
 /**
@@ -96,6 +126,16 @@ export async function updateTaskState(
       await reportMilestone('Failed', item, contractId, {
         errorSummary: errorInfo,
       });
+    }
+
+    // V1.2: Also update PROMPT.md if source_path is available
+    if (item.source_path) {
+      await updatePromptMdStatus(item.source_path, {
+        status: success ? 'complete' : 'in_progress',
+        ...(outputPath ? { output_path: outputPath } : {}),
+      });
+      // Regenerate goals.md index
+      await generateGoalsIndex();
     }
   } catch (error) {
     log(`  Failed to update goals.md: ${error}`);
@@ -389,6 +429,12 @@ export async function markTaskBlocked(item: WorkItem): Promise<void> {
 
     // Report blocked milestone to Notion (fire-and-forget)
     await reportMilestone('Blocked', item);
+
+    // V1.2: Also update PROMPT.md
+    if (item.source_path) {
+      await updatePromptMdStatus(item.source_path, { status: 'blocked' });
+      await generateGoalsIndex();
+    }
   } catch (error) {
     log(`  Failed to mark task as blocked: ${error}`);
   }

@@ -65,6 +65,9 @@ export interface WorkItem {
   current_step?: number;    // Index of current step (0-based)
   progress_pct?: number;    // Calculated from completed steps
   breakdown_generated_at?: string; // When auto-breakdown was performed
+
+  // V1.2: Goal bundle source path
+  source_path?: string;     // Path to goal bundle directory
 }
 
 /**

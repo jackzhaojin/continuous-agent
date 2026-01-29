@@ -51,6 +51,9 @@ import {
 import { checkSelfImprovementTriggers } from '../agentic/calibration/self-improvement-triggers.js';
 import { generateSelfImprovementTask } from '../agentic/calibration/self-improvement-task-generator.js';
 
+// V1.2 - Goal index regeneration
+import { generateGoalsIndex } from '../deterministic/goal-index-generator.js';
+
 // Load environment variables
 config();
 
@@ -244,6 +247,9 @@ async function runIteration(): Promise<IterationResult> {
     // Reset backoff on success
     resetBackoff();
 
+    // V1.2: Regenerate goals.md index from folder tree
+    await generateGoalsIndex();
+
     loopState.last_work_at = new Date().toISOString();
     return 'work_completed';
   }
@@ -337,6 +343,9 @@ async function runIteration(): Promise<IterationResult> {
     }
     await markTaskBlocked(workItem);
     await writeToNeedsYou(workItem, retry.attempts, retry.lastError, contractId);
+
+    // V1.2: Regenerate goals.md index
+    await generateGoalsIndex();
 
     retryTracker.delete(retryKey);
     return 'work_failed';
