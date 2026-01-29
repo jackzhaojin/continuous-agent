@@ -108,3 +108,42 @@
 
 -> Response: Appended Session 2 with all prompts to existing prompt-log.
 -> Action: Updated `ai-docs/v1/2026-01-28-v1.2/prompt-log.md`.
+
+---
+
+## Session 3: V1.2 Gap Fixes (Jan 28, 2026)
+
+### Prompt 11: Fix All Critical-to-Medium Gaps (10:45 PM)
+
+> Let's fix all critical to medium ones
+>
+> [Gap table: CRITICAL ondeck auto-promotion (JUST FIXED), HIGH queue ingestion still V1.1, MEDIUM self-improvement double-write, MEDIUM task start Notion events, MEDIUM multi-project patch generation, MEDIUM multi-project approval workflow, MEDIUM goal state transition ledger, MEDIUM project memory lessons empty]
+>
+> Make a plan, and Leverage Tasks/Subagents with just the right context so your memory stays at the executive high level, make sure it gets done.
+>
+> When you think it's done, do another validation against PRD
+
+-> Response: Planned 2-batch execution (3 parallel + 1 sequential), dispatched 5 subagents total. All 7 gaps validated PASS against PRD.
+-> Action: Fixed 6 gaps (Gap #3 already implemented). Modified 5 source files, updated 3 agent model configs. Typecheck + build clean.
+
+**Also requested mid-prompt:** Change all agent models to Opus, leave code-validator at Sonnet.
+-> Action: Updated `.claude/agents/{task-researcher,self-enhancer}.md` to opus, `code-validator.md` to sonnet.
+
+**Batch 1 (parallel):**
+- Gap #1 (HIGH): Queue ingestion → draft bundles. `executive-loop.ts` now calls `createGoalBundle()` instead of deleted `appendGoalsFromQueue()`. Default P3 priority.
+- Gap #2 (MEDIUM): Self-improvement double-write removed. `self-improvement-task-generator.ts` stripped of goals.md write path, `formatTaskEntry()` deleted. Bundle-only.
+- Gap #6 (MEDIUM): GOAL_PROMOTED events logged to `work-ledger.jsonl` in `goal-scanner.ts` after successful promotion. TODO comment for GOAL_ARCHIVED.
+
+**Batch 2 (sequential, all touch state-handler.ts):**
+- Gap #4 (MEDIUM): Multi-project patch generation via `git diff --no-index` between source project and output. Saves `source-project-changes.patch`.
+- Gap #5 (MEDIUM): `requestMultiProjectApproval()` creates needs-you.md entry for human copy-back approval.
+- Gap #7 (MEDIUM): `extractFeaturesFromOutput()` + `extractLessonsFromOutput()` populate project memory. `workerOutput` param wired from `executive-loop.ts`.
+
+**Validation:** Independent subagent validated all 7 gaps as PASS against PRD. No dead code, no circular deps, all error handling in place.
+
+### Prompt 12: Log Session (10:55 PM)
+
+> /conversation-logger to prompt-log.md
+
+-> Response: Appended Session 3 to existing prompt-log.
+-> Action: Updated `ai-docs/v1/2026-01-28-v1.2/prompt-log.md`.
