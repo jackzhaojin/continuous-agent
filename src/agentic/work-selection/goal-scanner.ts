@@ -86,17 +86,15 @@ export async function autoPromoteOndeckGoals(): Promise<string[]> {
   return promoted;
 }
 
-// TODO: Add GOAL_ARCHIVED event logging when archive logic is implemented.
-// Currently, archive_path is only computed as metadata in state-handler.ts
-// (string replacement on source_path) but no directory move to workspace/archive/
-// actually occurs. When that logic is added, log a GOAL_ARCHIVED event here with:
-//   { event: 'GOAL_ARCHIVED', ts, goal_slug, from_state: 'in-progress', to_state: 'archive' }
+// Note: Completed goals are moved from in-progress/P{n}/ to completed/ by
+// moveBundleToCompleted() in state-handler.ts when a task succeeds.
+// Blocked goals stay in-place in in-progress/P{n}/ with status: blocked in frontmatter.
 
 interface GoalBundle {
   slug: string;
   promptMd: PromptMdFile;
   sourcePath: string;  // Full path to the goal directory
-  state: 'drafts' | 'ondeck' | 'in-progress' | 'blocked' | 'archive';
+  state: 'drafts' | 'ondeck' | 'in-progress' | 'blocked' | 'archive' | 'completed';
   priority?: 'P0' | 'P1' | 'P2' | 'P3' | 'P4';
 }
 
@@ -129,12 +127,12 @@ export async function scanGoalBundles(): Promise<GoalBundle[]> {
     }
   }
 
-  // Scan blocked (for reference only)
-  const blockedDir = path.join(WORKSPACE_DIR, 'blocked');
-  if (existsSync(blockedDir)) {
-    const goalDirs = await listGoalDirs(blockedDir);
+  // Scan completed (for reference only)
+  const completedDir = path.join(WORKSPACE_DIR, 'completed');
+  if (existsSync(completedDir)) {
+    const goalDirs = await listGoalDirs(completedDir);
     for (const goalDir of goalDirs) {
-      const bundle = await readGoalBundle(goalDir, 'blocked');
+      const bundle = await readGoalBundle(goalDir, 'completed');
       if (bundle) bundles.push(bundle);
     }
   }

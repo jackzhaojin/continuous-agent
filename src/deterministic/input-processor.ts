@@ -132,46 +132,44 @@ function parseNeedsYouResponses(content: string): HumanResponse[] {
 
 /**
  * Unblock a task in its goal bundle's PROMPT.md
- * V1.2: Updates PROMPT.md frontmatter status from blocked to pending,
- * then moves the bundle back from workspace/blocked/ to workspace/in-progress/P{n}/
+ * Blocked goals stay in-place in workspace/in-progress/P{n}/ — just update status from blocked to pending.
  */
 async function unblockTaskInBundle(taskTitle: string): Promise<boolean> {
-  // Search for matching bundle in the blocked directory
-  const blockedDir = path.join(process.cwd(), 'workspace', 'blocked');
-  if (!existsSync(blockedDir)) {
-    return false;
-  }
+  const workspaceDir = path.join(process.cwd(), 'workspace');
 
   try {
-    const { readdir, rename, mkdir } = await import('fs/promises');
-    const dirs = await readdir(blockedDir, { withFileTypes: true });
+    const { readdir } = await import('fs/promises');
 
-    for (const dir of dirs) {
-      if (!dir.isDirectory() || dir.name.startsWith('.')) continue;
+    // Search in-progress/P{0-4}/ for bundles with status: blocked
+    for (const priority of ['P0', 'P1', 'P2', 'P3', 'P4']) {
+      const priorityDir = path.join(workspaceDir, 'in-progress', priority);
+      if (!existsSync(priorityDir)) continue;
 
-      const bundlePath = path.join(blockedDir, dir.name);
-      const promptPath = path.join(bundlePath, 'PROMPT.md');
-      if (!existsSync(promptPath)) continue;
+      const dirs = await readdir(priorityDir, { withFileTypes: true });
 
-      const content = await readFile(promptPath, 'utf-8');
-      // Check if this bundle's title matches
-      const titleMatch = content.match(/^title:\s*"?([^"\n]+)"?\s*$/m);
-      if (titleMatch && titleMatch[1].trim() === taskTitle.trim()) {
-        // Update status from blocked to pending
-        const { updateFrontmatter, parsePromptMdContent } = await import('./prompt-md-parser.js');
-        const updated = updateFrontmatter(content, { status: 'pending' });
-        await writeFile(promptPath, updated, 'utf-8');
+      for (const dir of dirs) {
+        if (!dir.isDirectory() || dir.name.startsWith('.')) continue;
 
-        // Move bundle back to in-progress directory based on priority
-        const parsed = parsePromptMdContent(updated);
-        const priority = parsed.frontmatter.priority || 'P3';
-        const inProgressDir = path.join(process.cwd(), 'workspace', 'in-progress', priority);
-        await mkdir(inProgressDir, { recursive: true });
-        const destPath = path.join(inProgressDir, dir.name);
-        await rename(bundlePath, destPath);
+        const bundlePath = path.join(priorityDir, dir.name);
+        const promptPath = path.join(bundlePath, 'PROMPT.md');
+        if (!existsSync(promptPath)) continue;
 
-        console.log(`  Unblocked task "${taskTitle}" — moved from blocked/ to in-progress/${priority}/`);
-        return true;
+        const content = await readFile(promptPath, 'utf-8');
+        // Check if this bundle's title matches
+        const titleMatch = content.match(/^title:\s*"?([^"\n]+)"?\s*$/m);
+        if (titleMatch && titleMatch[1].trim() === taskTitle.trim()) {
+          // Verify it's actually blocked
+          const statusMatch = content.match(/^status:\s*(\S+)/m);
+          if (statusMatch && statusMatch[1].toLowerCase() !== 'blocked') continue;
+
+          // Update status from blocked to pending
+          const { updateFrontmatter } = await import('./prompt-md-parser.js');
+          const updated = updateFrontmatter(content, { status: 'pending' });
+          await writeFile(promptPath, updated, 'utf-8');
+
+          console.log(`  Unblocked task "${taskTitle}" in in-progress/${priority}/ (status set to pending)`);
+          return true;
+        }
       }
     }
 

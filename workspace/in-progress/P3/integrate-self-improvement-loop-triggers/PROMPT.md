@@ -1,7 +1,7 @@
 ---
 title: Integrate Self-Improvement Loop Triggers
 slug: integrate-self-improvement-loop-triggers
-status: blocked
+status: pending
 complexity: medium
 created: 2026-01-26
 priority: P3

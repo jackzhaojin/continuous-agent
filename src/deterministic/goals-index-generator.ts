@@ -42,11 +42,11 @@ export async function regenerateGoalsIndex(): Promise<void> {
     }
   }
 
-  // Scan blocked
-  const blockedDir = path.join(WORKSPACE_DIR, 'blocked');
-  if (existsSync(blockedDir)) {
-    for (const slug of await listDirs(blockedDir)) {
-      const goal = await readGoal(path.join(blockedDir, slug), slug, 'BLOCKED');
+  // Scan completed
+  const completedDir = path.join(WORKSPACE_DIR, 'completed');
+  if (existsSync(completedDir)) {
+    for (const slug of await listDirs(completedDir)) {
+      const goal = await readGoal(path.join(completedDir, slug), slug, 'COMPLETE');
       if (goal) goals.push(goal);
     }
   }

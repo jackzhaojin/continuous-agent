@@ -8,3 +8,19 @@ projects:
       - deliver.react.component
       - git.commit
     reusable: true
+  - slug: full-stack-conversational-chat-application
+    title: Full-Stack Conversational Chat Application
+    output_path: /Users/jackjin/dev/agent-outputs/projects/nextjs/2026-01-29/1769671611924
+    completed: "2026-01-29"
+    category: react
+    capabilities:
+      - deliver.react.component
+    reusable: true
+  - slug: full-stack-retro-analytics-dashboard
+    title: Full-Stack Retro Analytics Dashboard
+    output_path: /Users/jackjin/dev/agent-outputs/projects/nextjs/2026-01-29/1769678844738
+    completed: "2026-01-29"
+    category: misc
+    capabilities:
+      - general.implementation
+    reusable: true

@@ -52,27 +52,27 @@ export async function updatePromptMdStatus(
 }
 
 /**
- * Move a goal bundle directory to workspace/blocked/
+ * Move a goal bundle directory to workspace/completed/
  * DETERMINISTIC: File I/O
  */
-async function moveBundleToBlocked(sourcePath: string): Promise<boolean> {
+async function moveBundleToCompleted(sourcePath: string): Promise<boolean> {
   const slug = path.basename(sourcePath);
-  const blockedDir = path.join(WORKSPACE_DIR, 'blocked');
-  const destPath = path.join(blockedDir, slug);
+  const completedDir = path.join(WORKSPACE_DIR, 'completed');
+  const destPath = path.join(completedDir, slug);
 
-  // Don't move if already in blocked/
-  if (sourcePath.includes('/blocked/')) {
-    log(`  Bundle already in blocked/ — skipping move`);
+  // Don't move if already in completed/
+  if (sourcePath.includes('/completed/')) {
+    log(`  Bundle already in completed/ — skipping move`);
     return true;
   }
 
   try {
-    await mkdir(blockedDir, { recursive: true });
+    await mkdir(completedDir, { recursive: true });
     await rename(sourcePath, destPath);
-    log(`  Moved bundle to blocked/: ${sourcePath} → ${destPath}`);
+    log(`  Moved bundle to completed/: ${sourcePath} → ${destPath}`);
     return true;
   } catch (error) {
-    log(`  Failed to move bundle to blocked/: ${error}`);
+    log(`  Failed to move bundle to completed/: ${error}`);
     return false;
   }
 }
@@ -118,7 +118,7 @@ export async function updateTaskState(
         category: detectProjectCategory(item),
         completed: new Date().toISOString().split('T')[0],
         output_path: outputPath || '',
-        archive_path: item.source_path ? item.source_path.replace(/in-progress\/P\d\//, 'archive/') : undefined,
+        archive_path: item.source_path ? item.source_path.replace(/in-progress\/P\d\//, 'completed/') : undefined,
         capabilities_exercised: inferProjectCapabilities(item),
         features_built: extractFeaturesFromOutput(workerOutput),
         lessons: extractLessonsFromOutput(workerOutput),
@@ -200,6 +200,11 @@ export async function updateTaskState(
       status: success ? 'complete' : 'in_progress',
       ...(outputPath ? { output_path: outputPath } : {}),
     });
+
+    // Move completed bundles to workspace/completed/
+    if (success) {
+      await moveBundleToCompleted(item.source_path);
+    }
   }
 
 }
@@ -569,10 +574,9 @@ export async function markTaskBlocked(item: WorkItem): Promise<void> {
   // Report blocked milestone to Notion (fire-and-forget)
   await reportMilestone('Blocked', item);
 
-  // V1.2: Update PROMPT.md (source of truth) and move to blocked directory
+  // V1.2: Update PROMPT.md (source of truth) — blocked goals stay in-place in in-progress/P{n}/
   if (item.source_path) {
     await updatePromptMdStatus(item.source_path, { status: 'blocked' });
-    await moveBundleToBlocked(item.source_path);
   }
 }
 

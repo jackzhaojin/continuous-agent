@@ -15,3 +15,23 @@ projects:
       - "### 📁 Files Created/Modified"
       - "**Created:**"
     lessons: []
+  - id: goal-chatbot-ui-react
+    name: Full-Stack Conversational Chat Application
+    category: react
+    completed: "2026-01-29"
+    output_path: /Users/jackjin/dev/agent-outputs/projects/nextjs/2026-01-29/1769671611924
+    archive_path: /Users/jackjin/dev/continuous-agent/workspace/archive/chatbot-ui-react
+    capabilities_exercised:
+      - deliver.react.component
+    features_built: []
+    lessons: []
+  - id: goal-retro-dashboard
+    name: Full-Stack Retro Analytics Dashboard
+    category: misc
+    completed: "2026-01-29"
+    output_path: /Users/jackjin/dev/agent-outputs/projects/nextjs/2026-01-29/1769678844738
+    archive_path: /Users/jackjin/dev/continuous-agent/workspace/archive/retro-dashboard
+    capabilities_exercised:
+      - general.implementation
+    features_built: []
+    lessons: []

@@ -1,13 +1,26 @@
 ---
 title: Full-Stack Recipe Discovery Platform
 slug: recipe-card-explorer
-priority: P3
 status: pending
+priority: P3
 complexity: high
-created: 2026-01-28
-tags: [react, nextjs, tailwind, frontend, ui-ux, cards, filtering, api, database, authentication, full-stack, responsive, animation]
-output_path:
-branch:
+created: 2026-01-28T00:00:00.000Z
+tags:
+  - react
+  - nextjs
+  - tailwind
+  - frontend
+  - ui-ux
+  - cards
+  - filtering
+  - api
+  - database
+  - authentication
+  - full-stack
+  - responsive
+  - animation
+output_path: /Users/jackjin/dev/agent-outputs/projects/nextjs/2026-01-29/1769685367609
+branch: null
 ---
 
 ## Problem

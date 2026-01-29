@@ -155,8 +155,7 @@ workspace/
 │   ├── P2/              # High
 │   ├── P3/              # Normal (default for queue items)
 │   └── P4/              # Low / self-improvement
-├── blocked/             # Goals blocked after 10 retries
-├── archive/             # Completed/cancelled goals
+├── completed/           # Successfully completed goals
 ```
 
 **PROMPT.md frontmatter:**
@@ -175,7 +174,9 @@ source_project:          # V1.2: slug of source project to copy from
 ---
 ```
 
-**Goal lifecycle:** `drafts/` → `ondeck/` → `in-progress/P{n}/` → `archive/` (or `blocked/`)
+**Goal lifecycle:** `drafts/` → `ondeck/` → `in-progress/P{n}/` → `completed/`
+
+**Blocked goals** stay in `in-progress/P{n}/` with `status: blocked` in frontmatter. They are unblocked in-place when a human responds in `needs-you.md`.
 
 **Auto-promotion:** `goal-scanner.ts` auto-promotes goals from `ondeck/` to `in-progress/P{n}/` based on the `priority` field in frontmatter. Logs `GOAL_PROMOTED` events to `work-ledger.jsonl`.
 
@@ -614,8 +615,7 @@ continuous-agent/
 │   ├── drafts/                 # New goal bundles
 │   ├── ondeck/                 # Queued for auto-promotion
 │   ├── in-progress/P{0-4}/    # Active goals by priority
-│   ├── blocked/                # Goals needing human input
-│   └── archive/                # Completed/cancelled goals
+│   └── completed/              # Successfully completed goals
 
 ├── ledgers/                    # Append-only logs (version controlled)
 │   ├── work-ledger.jsonl       # Task events

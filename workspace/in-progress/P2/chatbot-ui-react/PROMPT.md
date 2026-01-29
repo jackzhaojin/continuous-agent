@@ -1,7 +1,7 @@
 ---
 title: Full-Stack Conversational Chat Application
 slug: chatbot-ui-react
-status: pending
+status: complete
 priority: P2
 complexity: high
 created: 2026-01-28T00:00:00.000Z

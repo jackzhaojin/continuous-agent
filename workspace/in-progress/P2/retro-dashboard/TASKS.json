@@ -1,20 +1,20 @@
 {
   "version": 1,
-  "created_at": "2026-01-29T07:17:59.919Z",
+  "created_at": "2026-01-29T09:27:24.736Z",
   "trigger": "auto",
-  "revision": 26,
+  "revision": 20,
   "steps": [
     {
       "id": "step-0",
       "order": 0,
       "title": "Research existing patterns and plan approach",
-      "description": "Analyze requirements for \"Full-Stack Conversational Chat Application\". Research best practices, existing patterns, and create a technical plan.",
+      "description": "Analyze requirements for \"Full-Stack Retro Analytics Dashboard\". Research best practices, existing patterns, and create a technical plan.",
       "status": "complete",
       "dependencies": [],
       "estimated_turns": 80,
-      "started_at": "2026-01-29T07:26:51.925Z",
-      "completed_at": "2026-01-29T07:31:27.550Z",
-      "completed_by_contract": "task-1769671611924"
+      "started_at": "2026-01-29T09:27:24.738Z",
+      "completed_at": "2026-01-29T09:33:00.723Z",
+      "completed_by_contract": "task-1769678844738"
     },
     {
       "id": "step-1",
@@ -26,9 +26,9 @@
         "step-0"
       ],
       "estimated_turns": 100,
-      "started_at": "2026-01-29T07:47:44.092Z",
-      "completed_at": "2026-01-29T07:49:25.109Z",
-      "completed_by_contract": "task-1769672864092"
+      "started_at": "2026-01-29T09:39:12.431Z",
+      "completed_at": "2026-01-29T09:41:31.751Z",
+      "completed_by_contract": "task-1769679552431"
     },
     {
       "id": "step-2",
@@ -40,9 +40,9 @@
         "step-1"
       ],
       "estimated_turns": 110,
-      "started_at": "2026-01-29T07:49:25.510Z",
-      "completed_at": "2026-01-29T07:58:40.558Z",
-      "completed_by_contract": "task-1769672965510"
+      "started_at": "2026-01-29T09:41:32.057Z",
+      "completed_at": "2026-01-29T09:50:00.057Z",
+      "completed_by_contract": "task-1769679692057"
     },
     {
       "id": "step-3",
@@ -54,9 +54,9 @@
         "step-2"
       ],
       "estimated_turns": 120,
-      "started_at": "2026-01-29T08:11:02.191Z",
-      "completed_at": "2026-01-29T08:13:53.702Z",
-      "completed_by_contract": "task-1769674262191"
+      "started_at": "2026-01-29T09:50:00.480Z",
+      "completed_at": "2026-01-29T09:58:39.681Z",
+      "completed_by_contract": "task-1769680200480"
     },
     {
       "id": "step-4",
@@ -68,9 +68,9 @@
         "step-3"
       ],
       "estimated_turns": 130,
-      "started_at": "2026-01-29T08:37:52.761Z",
-      "completed_at": "2026-01-29T08:44:12.259Z",
-      "completed_by_contract": "task-1769675872761"
+      "started_at": "2026-01-29T09:58:40.117Z",
+      "completed_at": "2026-01-29T10:06:19.033Z",
+      "completed_by_contract": "task-1769680720117"
     },
     {
       "id": "step-5",
@@ -82,9 +82,9 @@
         "step-4"
       ],
       "estimated_turns": 140,
-      "started_at": "2026-01-29T08:44:12.612Z",
-      "completed_at": "2026-01-29T08:52:04.172Z",
-      "completed_by_contract": "task-1769676252612"
+      "started_at": "2026-01-29T10:17:11.980Z",
+      "completed_at": "2026-01-29T10:22:48.845Z",
+      "completed_by_contract": "task-1769681831979"
     },
     {
       "id": "step-6",
@@ -96,9 +96,9 @@
         "step-5"
       ],
       "estimated_turns": 100,
-      "started_at": "2026-01-29T09:00:25.862Z",
-      "completed_at": "2026-01-29T09:05:38.129Z",
-      "completed_by_contract": "task-1769677225862"
+      "started_at": "2026-01-29T10:35:44.312Z",
+      "completed_at": "2026-01-29T10:41:00.690Z",
+      "completed_by_contract": "task-1769682944311"
     },
     {
       "id": "step-7",
@@ -110,9 +110,9 @@
         "step-6"
       ],
       "estimated_turns": 100,
-      "started_at": "2026-01-29T09:21:30.921Z",
-      "completed_at": "2026-01-29T09:27:24.394Z",
-      "completed_by_contract": "task-1769678490921"
+      "started_at": "2026-01-29T10:41:01.059Z",
+      "completed_at": "2026-01-29T10:49:19.225Z",
+      "completed_by_contract": "task-1769683261058"
     }
   ]
 }

@@ -1,10 +1,11 @@
 ---
 title: "[SELF-ENHANCE] Reference Refresh"
-slug: "reference-refresh"
+slug: reference-refresh
 status: complete
 priority: P3
 created: "2026-01-29"
-branch: "self-enhance/1769687485721"
+branch: self-enhance/1769687485721
+output_path: /Users/jackjin/dev/continuous-agent
 ---
 
 ## Description
