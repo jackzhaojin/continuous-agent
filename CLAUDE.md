@@ -24,6 +24,8 @@ npm run dev
 npm run build && npm start
 ```
 
+**Entry points:** `src/index.ts` re-exports `src/core/executive-loop.ts`. PM2 runs `dist/core/executive-loop.js` directly. The PM2 process name is `executive-loop`.
+
 **Production deployment:** Use PM2 to run continuously:
 
 ```bash
@@ -183,6 +185,9 @@ Complex tasks (>100 estimated turns) are automatically broken down into steps:
 - `intelligence/prompt-builder.ts` - Builds context-rich prompts with retry history
 - `diagnosis/agentic-diagnosis.ts` - Analyzes failures to determine next actions
 - `learning/capability-updater.ts` - Updates capability confidence: +10 on PASS, -15 on FAIL
+- `calibration/self-improvement-task-generator.ts` - Generates self-improvement opportunities
+- `calibration/self-improvement-triggers.ts` - Detects when self-improvement should occur
+- `prompts/loader.ts` - Loads prompt templates from categorized subdirectories
 
 **Deterministic Layer** (`src/deterministic/`) - Mechanical operations:
 - `health-checker.ts` - Validates auth, tools, disk space
@@ -191,6 +196,10 @@ Complex tasks (>100 estimated turns) are automatically broken down into steps:
 - `validation-handler.ts` - Runs verifiers on worker output
 - `verifiers/` - Deterministic checks (git-clean, node-build, docs-complete)
 - `backoff-manager.ts` - Rate limit detection and exponential backoff
+- `workspace-writers.ts` - Writes to workspace markdown files
+- `queue-processor.ts` - Parses queue.md
+- `inputs-log.ts` - Appends to JSONL audit logs
+- `self-improvement-state.ts` - Tracks self-improvement state
 
 **Core Layer** (`src/core/`):
 - `executive-loop.ts` - Main 8-phase loop orchestration
@@ -359,7 +368,7 @@ NOTION_API_KEY=                # Notion integration key
 1. **Executive loop changes:** Test with `npm run dev` before deploying to PM2
 2. **Verifiers:** Must return `VerifierResult` interface with PASS/FAIL + evidence
    - **CRITICAL:** Verifiers must check `result.output_path` (worker's directory), NOT `process.cwd()` (agent infrastructure)
-3. **Intelligence layer:** Changes to prompts/strategies affect all future tasks
+3. **Intelligence layer:** Changes to prompts/strategies affect all future tasks. Prompts are in `src/agentic/prompts/` organized by category subdirectories (calibration, contracts, diagnosis, execution, intelligence, retry, strategy, validation, work-selection, worker)
 4. **Workspace files:** Never auto-modify `constitution.md` (human-only)
 5. **Ledgers:** Append-only JSONL, never truncate or modify existing entries
 6. **PM2 restarts:** After rebuilding, only restart PM2 if explicitly needed - avoid interrupting running tasks
@@ -369,6 +378,7 @@ NOTION_API_KEY=                # Notion integration key
 - Target ES2022, strict mode enabled
 - Import paths need `.js` extension (e.g., `'./types.js'` even for `.ts` files)
 - Run `npm install` to ensure `@types/node` is installed (required for TypeScript)
+- No test framework is currently configured — validation is done through verifiers at runtime, not unit tests
 
 ## Capabilities & Claude Agent SDK
 
@@ -497,14 +507,19 @@ continuous-agent/
 │   │   ├── intelligence/       # Intent classification, strategy selection
 │   │   ├── diagnosis/          # Failure analysis
 │   │   ├── learning/           # Capability confidence updates
-│   │   └── prompts/            # Prompt templates and loading
+│   │   ├── calibration/        # Self-improvement triggers and task generation
+│   │   └── prompts/            # Prompt templates organized by category (loader.ts + subdirs)
 │   └── deterministic/          # Mechanical operations (no LLM)
 │       ├── health-checker.ts   # System health validation
 │       ├── input-processor.ts  # Parses needs-you.md responses
 │       ├── state-handler.ts    # Updates goals.md, needs-you.md
 │       ├── validation-handler.ts # Runs verifiers
 │       ├── verifiers/          # Deterministic validation checks
-│       └── backoff-manager.ts  # Rate limit handling
+│       ├── backoff-manager.ts  # Rate limit handling
+│       ├── workspace-writers.ts # Writes to workspace files
+│       ├── queue-processor.ts  # Parses queue.md
+│       ├── inputs-log.ts       # JSONL audit logging
+│       └── self-improvement-state.ts # Self-improvement tracking
 
 ├── workspace/                  # Human-editable state
 │   ├── constitution.md         # **IMMUTABLE** hard limits
@@ -530,9 +545,12 @@ continuous-agent/
 │   │       └── agent-sdk-subagents-poc/  # Subagent delegation demo
 │   └── reference-registry.yaml # Reference tracking
 │
-├── .claude/skills/             # Claude Code skill documentation
-├── verifiers/definitions/      # Verifier YAML configs
-├── strategies/prompts/         # Prompt templates
+├── .claude/
+│   ├── agents/                 # Subagent definitions (self-enhancer, code-validator, task-researcher)
+│   └── skills/                 # Claude Code skill definitions (SKILL.md files)
+├── verifiers/
+│   ├── definitions/            # Verifier YAML configs (git-status-clean, node-build, etc.)
+│   └── run-verifier.sh         # Shell runner for verifiers
 └── ai-docs/                    # PRDs, specs, feature docs
 ```
 
