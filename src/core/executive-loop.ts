@@ -10,6 +10,7 @@
  */
 
 import { config } from 'dotenv';
+import path from 'path';
 
 // CORE
 import { logAgentic, logDeterministic, log, logHealthStatus, closeLogStream } from './logging.js';
@@ -66,6 +67,9 @@ const loopState: LoopState = {
   current_task: null,
 };
 
+// Track day boundary for daily summary generation
+let lastReportedDay: string | null = null;
+
 /**
  * Check if system is healthy enough to work
  * DETERMINISTIC: Simple threshold check
@@ -92,6 +96,19 @@ async function runIteration(): Promise<IterationResult> {
   log('='.repeat(80));
   log(`ITERATION ${loopState.iteration}`);
   log('='.repeat(80));
+
+  // Check if day boundary crossed - generate daily summary for previous day
+  const today = new Date().toISOString().split('T')[0];
+  if (lastReportedDay && lastReportedDay !== today) {
+    logDeterministic('Day boundary detected - generating daily summary for yesterday');
+    try {
+      const { reportDailySummary } = await import('../deterministic/notion-reporter.js');
+      await reportDailySummary(path.join(process.cwd(), 'ledgers'));
+    } catch (e) {
+      log(`  Daily summary generation failed (non-blocking): ${e}`);
+    }
+  }
+  lastReportedDay = today;
 
   // === PHASE 1: HEALTH CHECK ===
   logDeterministic('PHASE 1: Health Check');
@@ -219,9 +236,9 @@ async function runIteration(): Promise<IterationResult> {
     }
 
     if (isStepExecution && currentStep) {
-      await updateStepState(workItem, currentStep, true, undefined, result.output_path);
+      await updateStepState(workItem, currentStep, true, undefined, result.output_path, contractId);
     } else {
-      await updateTaskState(workItem, true, undefined, result.output_path);
+      await updateTaskState(workItem, true, undefined, result.output_path, contractId);
     }
 
     // Reset backoff on success

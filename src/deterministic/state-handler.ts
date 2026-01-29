@@ -16,6 +16,7 @@ import {
   markRetrospectiveCompleted,
   markReferenceRefreshCompleted,
 } from './self-improvement-state.js';
+import { reportMilestone } from './notion-reporter.js';
 
 const WORKSPACE_DIR = path.join(process.cwd(), 'workspace');
 const LEDGERS_DIR = path.join(process.cwd(), 'ledgers');
@@ -36,7 +37,8 @@ export async function updateTaskState(
   item: WorkItem,
   success: boolean,
   errorInfo?: string,
-  outputPath?: string
+  outputPath?: string,
+  contractId?: string
 ): Promise<void> {
   logDeterministic('Updating goals.md...');
 
@@ -70,6 +72,9 @@ export async function updateTaskState(
       });
       await appendFile(ledgerPath, entry + '\n', 'utf-8');
 
+      // Report milestone to Notion (fire-and-forget)
+      await reportMilestone('Completed', item, contractId, { outputPath });
+
       // Track self-improvement completions
       if (item.title.includes('[SELF-ENHANCE] Practice')) {
         await markPracticeCompleted();
@@ -86,6 +91,11 @@ export async function updateTaskState(
       if (item.selfEnhance && item.branch) {
         await requestSelfEnhanceReview(item);
       }
+    } else {
+      // Report failure milestone to Notion (fire-and-forget)
+      await reportMilestone('Failed', item, contractId, {
+        errorSummary: errorInfo,
+      });
     }
   } catch (error) {
     log(`  Failed to update goals.md: ${error}`);
@@ -185,7 +195,8 @@ export async function updateStepState(
   step: WorkStep,
   success: boolean,
   errorInfo?: string,
-  outputPath?: string
+  outputPath?: string,
+  contractId?: string
 ): Promise<void> {
   logDeterministic('Updating step status...');
 
@@ -226,6 +237,13 @@ export async function updateStepState(
       });
       await appendFile(ledgerPath, entry + '\n', 'utf-8');
 
+      // Report step completion milestone to Notion (fire-and-forget)
+      await reportMilestone('Step Completed', item, contractId, {
+        stepTitle: step.title,
+        stepNumber: step.step_number + 1,
+        outputPath,
+      });
+
       log(`  ✓ Step ${step.step_number + 1} complete`);
 
       // Check if this was the last step
@@ -233,7 +251,7 @@ export async function updateStepState(
         const remainingSteps = item.steps.filter((s) => s.status !== 'complete');
         if (remainingSteps.length === 0) {
           log(`  ✓ All steps complete! Marking task as complete.`);
-          await updateTaskState(item, true, undefined, outputPath);
+          await updateTaskState(item, true, undefined, outputPath, contractId);
         } else {
           log(`  ${remainingSteps.length} steps remaining`);
         }
@@ -368,6 +386,9 @@ export async function markTaskBlocked(item: WorkItem): Promise<void> {
       await writeFile(goalsPath, updatedContent, 'utf-8');
       log(`  Updated: ${item.title} → Blocked`);
     }
+
+    // Report blocked milestone to Notion (fire-and-forget)
+    await reportMilestone('Blocked', item);
   } catch (error) {
     log(`  Failed to mark task as blocked: ${error}`);
   }

@@ -10,6 +10,7 @@ import { selectStrategy } from '../intelligence/strategy-selector.js';
 import { classifyIntent } from '../intelligence/intent-classifier.js';
 import type { WorkItem, WorkerResult, WorkStep } from '../../core/types.js';
 import { logAgentic, log } from '../../core/logging.js';
+import { reportMilestone } from '../../deterministic/notion-reporter.js';
 
 const LEDGERS_DIR = path.join(process.cwd(), 'ledgers');
 
@@ -278,4 +279,12 @@ export async function logWorkStart(
         title: item.title,
       });
   await appendFile(ledgerPath, entry + '\n', 'utf-8');
+
+  // Report started milestone to Notion (fire-and-forget)
+  await reportMilestone(
+    'Started',
+    item,
+    contractId,
+    step ? { stepTitle: step.title, stepNumber: step.step_number + 1 } : undefined
+  );
 }
