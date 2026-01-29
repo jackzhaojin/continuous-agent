@@ -7,6 +7,7 @@
  */
 
 import type { WorkItem } from '../../core/types.js';
+import { queryByCategory } from '../../deterministic/project-memory-store.js';
 
 export interface Strategy {
   id: string;
@@ -247,9 +248,17 @@ export function selectStrategy(
 
   const strategy = untried[0];
 
+  // V1.2: Check project memory for past successes in this category
+  let memoryNote = '';
+  const pastProjects = queryByCategory(category);
+  if (pastProjects.length > 0) {
+    const recent = pastProjects[pastProjects.length - 1];
+    memoryNote = ` Past success: "${recent.name}" (${recent.completed}).`;
+  }
+
   return {
     strategy,
-    context: `Category: ${category}. This is strategy ${triedStrategies.length + 1} of ${strategies.length}.`,
+    context: `Category: ${category}. This is strategy ${triedStrategies.length + 1} of ${strategies.length}.${memoryNote}`,
     previous_attempts: triedStrategies.length,
     remaining_strategies: untried.length - 1,
   };

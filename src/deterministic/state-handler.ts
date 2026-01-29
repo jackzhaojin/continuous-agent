@@ -20,6 +20,7 @@ import {
 import { reportMilestone } from './notion-reporter.js';
 import { parsePromptMd, updateFrontmatter } from './prompt-md-parser.js';
 import { generateGoalsIndex } from './goal-index-generator.js';
+import { appendProjectMemory, type ProjectMemoryEntry } from './project-memory-store.js';
 
 const WORKSPACE_DIR = path.join(process.cwd(), 'workspace');
 const LEDGERS_DIR = path.join(process.cwd(), 'ledgers');
@@ -104,6 +105,25 @@ export async function updateTaskState(
 
       // Report milestone to Notion (fire-and-forget)
       await reportMilestone('Completed', item, contractId, { outputPath });
+
+      // V1.2: Record project memory entry
+      try {
+        const memoryEntry: ProjectMemoryEntry = {
+          id: item.id || `task-${Date.now()}`,
+          name: item.title,
+          category: detectProjectCategory(item),
+          completed: new Date().toISOString().split('T')[0],
+          output_path: outputPath || '',
+          archive_path: item.source_path ? item.source_path.replace(/in-progress\/P\d\//, 'archive/') : undefined,
+          capabilities_exercised: inferProjectCapabilities(item),
+          features_built: [],  // Will be populated by future agentic analysis
+          lessons: [],         // Will be populated by future agentic analysis
+        };
+        appendProjectMemory(memoryEntry);
+        logDeterministic('  Recorded project memory entry');
+      } catch (memErr) {
+        log(`  Warning: Failed to record project memory: ${memErr}`);
+      }
 
       // Track self-improvement completions
       if (item.title.includes('[SELF-ENHANCE] Practice')) {
@@ -453,4 +473,35 @@ export async function markStepBlocked(item: WorkItem, stepNumber: number): Promi
   } catch (error) {
     log(`  Failed to mark step as blocked: ${error}`);
   }
+}
+
+/**
+ * Detect project category from work item
+ * V1.2: Used for project memory categorization
+ */
+function detectProjectCategory(item: WorkItem): string {
+  const text = `${item.title} ${item.description || ''}`.toLowerCase();
+  if (text.includes('next.js') || text.includes('nextjs')) return 'nextjs';
+  if (text.includes('react')) return 'react';
+  if (text.includes('node')) return 'node';
+  if (text.includes('python')) return 'python';
+  if (text.includes('notion')) return 'misc';
+  return 'misc';
+}
+
+/**
+ * Infer capabilities from work item
+ * V1.2: Used for project memory
+ */
+function inferProjectCapabilities(item: WorkItem): string[] {
+  const capabilities: string[] = [];
+  const text = `${item.title} ${item.description || ''}`.toLowerCase();
+
+  if (text.includes('next.js') || text.includes('nextjs')) capabilities.push('deliver.nextjs.app.basic');
+  if (text.includes('notion')) capabilities.push('deliver.notion.integration');
+  if (text.includes('react')) capabilities.push('deliver.react.component');
+  if (text.includes('git')) capabilities.push('git.commit');
+  if (text.includes('npm') || text.includes('package')) capabilities.push('npm.install');
+
+  return capabilities.length > 0 ? capabilities : ['general.implementation'];
 }

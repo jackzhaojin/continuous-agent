@@ -1,0 +1,5 @@
+# Project Memory - Persistent record of completed projects and lessons learned
+# V1.2: Append-only, version controlled
+# Each entry records: what was built, what capabilities were used, and what was learned
+
+projects: []

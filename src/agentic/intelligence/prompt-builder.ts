@@ -9,6 +9,7 @@ import type { TaskContract, WorkItem } from '../../core/types.js';
 import { classifyIntent, type IntentClassification } from './intent-classifier.js';
 import { selectStrategy } from './strategy-selector.js';
 import { composePrompts } from '../prompts/loader.js';
+import { buildProjectMemoryContext } from '../../deterministic/project-memory-store.js';
 
 interface RetryContext {
   attempts: number;
@@ -135,7 +136,17 @@ You are running low on retries. Be strategic:
   }
 
   // Compose all prompts together
-  return await composePrompts(prompts);
+  let finalPrompt = await composePrompts(prompts);
+
+  // V1.2: Append project memory context (not template-based)
+  const taskCategory = detectTaskCategory(item);
+  const taskCapabilities = inferCapabilities(item);
+  const memoryContext = buildProjectMemoryContext(taskCapabilities, taskCategory);
+  if (memoryContext) {
+    finalPrompt += '\n\n' + memoryContext;
+  }
+
+  return finalPrompt;
 }
 
 /**
@@ -166,4 +177,40 @@ export async function buildSimplePrompt(
   ));
 
   return rendered;
+}
+
+/**
+ * Detect task category from work item (for project memory lookup)
+ */
+function detectTaskCategory(item: WorkItem): string {
+  const text = `${item.title} ${item.description || ''}`.toLowerCase();
+  if (text.includes('next.js') || text.includes('nextjs')) return 'nextjs';
+  if (text.includes('react')) return 'react';
+  if (text.includes('node')) return 'node';
+  if (text.includes('python')) return 'python';
+  if (text.includes('notion')) return 'misc';
+  return 'misc';
+}
+
+/**
+ * Infer capabilities from work item (for project memory lookup)
+ */
+function inferCapabilities(item: WorkItem): string[] {
+  const capabilities: string[] = [];
+  const text = `${item.title} ${item.description || ''}`.toLowerCase();
+
+  if (text.includes('next.js') || text.includes('nextjs')) {
+    capabilities.push('deliver.nextjs.app.basic');
+  }
+  if (text.includes('notion')) {
+    capabilities.push('deliver.notion.integration');
+  }
+  if (text.includes('react')) {
+    capabilities.push('deliver.react.component');
+  }
+  if (text.includes('git')) {
+    capabilities.push('git.commit', 'git.status');
+  }
+
+  return capabilities.length > 0 ? capabilities : ['general.implementation'];
 }
