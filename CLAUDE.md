@@ -46,6 +46,8 @@ pm2 stop executive-loop    # Stop agent
 npm run build  # Rebuild only - changes take effect on next natural restart
 ```
 
+**PM2 gotcha:** `NODE_ENV` is set to `development` (not `production`) in `ecosystem.config.cjs` so that `npm install` in worker directories installs devDependencies (needed for TypeScript). The PM2 `cwd` and `AGENT_OUTPUTS_PATH` are hardcoded absolute paths in that file.
+
 ## Two-Repository Architecture
 
 **CRITICAL SEPARATION:**
@@ -134,17 +136,62 @@ The codebase enforces a strict separation between AI decision-making and mechani
 - Deterministic code is predictable, testable, and cheap to run
 - Logging tags operations as `[AGENTIC]` or `[DETERMINISTIC]` for debugging
 
+### Goal Bundles (V1.2 - Folder-Based Goals)
+
+Work items are now organized as **goal bundles** — directories containing a `PROMPT.md` file with YAML frontmatter. This replaces the old flat `goals.md` approach (legacy fallback still exists).
+
+**Workspace directory layout:**
+```
+workspace/
+├── _TEMPLATE/           # Goal bundle template (copy to create new goals)
+│   ├── PROMPT.md        # Template with all fields
+│   ├── references/      # Reference materials
+│   └── requirements/    # Detailed requirements
+├── drafts/              # New/unprocessed goal bundles
+├── ondeck/              # Queued for auto-promotion by priority
+├── in-progress/         # Currently active goals
+│   ├── P0/              # Critical priority
+│   ├── P1/              # Urgent
+│   ├── P2/              # High
+│   ├── P3/              # Normal (default for queue items)
+│   └── P4/              # Low / self-improvement
+├── blocked/             # Goals blocked after 10 retries
+├── archive/             # Completed/cancelled goals
+```
+
+**PROMPT.md frontmatter:**
+```yaml
+---
+title: "Goal Title"
+slug: "goal-slug"
+priority: P3
+status: pending
+complexity: medium
+created: "2026-01-01"
+tags: [tag1, tag2]
+output_path:             # Set by worker on first execution
+branch:                  # Set for self-enhancement tasks
+source_project:          # V1.2: slug of source project to copy from
+---
+```
+
+**Goal lifecycle:** `drafts/` → `ondeck/` → `in-progress/P{n}/` → `archive/` (or `blocked/`)
+
+**Auto-promotion:** `goal-scanner.ts` auto-promotes goals from `ondeck/` to `in-progress/P{n}/` based on the `priority` field in frontmatter. Logs `GOAL_PROMOTED` events to `work-ledger.jsonl`.
+
+**Queue ingestion:** Items from `queue.md` are ingested as draft bundles with P3 priority.
+
 ### Executive Loop (8 Phases)
 
 `src/core/executive-loop.ts` runs continuously in PM2:
 
-1. **Health Check** - GitHub auth, disk space, dependencies
+1. **Health Check** - GitHub auth, disk space, dependencies; regenerates `goals.md` index from bundles
 2. **Check Inputs** - Process human responses from `needs-you.md`
-3. **Select Work** - Priority-based selection from goal bundles (P0 > P1 > P2 > P3 > P4), with step awareness
+3. **Select Work** - Scans goal bundles by priority (P0 > P1 > P2 > P3 > P4), falls back to legacy goals.md if no bundles exist
 4. **Create Task Contract** - Scope, risk level, Definition of Done
 5. **Execute** - Spawn Agent SDK worker with intelligent prompting
 6. **Validate** - Run verifiers on worker's output directory (NOT agent infrastructure)
-7. **Update State** - Update goals.md, needs-you.md, ledgers
+7. **Update State** - Update goal bundle status, needs-you.md, ledgers
 8. **Continue or Sleep** - Immediately continue if work exists, sleep only when idle
 
 ### Incremental Execution (Multi-Step Tasks)
@@ -175,7 +222,8 @@ Complex tasks (>100 estimated turns) are automatically broken down into steps:
 ### Key Modules
 
 **Agentic Layer** (`src/agentic/`) - AI decision-making:
-- `work-selection/work-selector.ts` - Parses goals.md, returns highest priority unblocked task
+- `work-selection/work-selector.ts` - Selects highest priority unblocked task (goal bundles first, legacy goals.md fallback)
+- `work-selection/goal-scanner.ts` - Scans workspace folder tree for goal bundles, reads PROMPT.md, auto-promotes ondeck goals
 - `work-selection/task-breakdown.ts` - Automatic breakdown of complex tasks into steps
 - `execution/task-contractor.ts` - Creates task contracts with DoD and constraints
 - `execution/worker-spawner.ts` - Spawns Claude Agent SDK sessions with prompts, copies `.env` to worker directory
@@ -192,7 +240,8 @@ Complex tasks (>100 estimated turns) are automatically broken down into steps:
 **Deterministic Layer** (`src/deterministic/`) - Mechanical operations:
 - `health-checker.ts` - Validates auth, tools, disk space
 - `input-processor.ts` - Parses human responses from needs-you.md
-- `state-handler.ts` - Updates goals.md, needs-you.md, ledgers
+- `prompt-md-parser.ts` - Parses PROMPT.md files (YAML frontmatter + markdown body)
+- `state-handler.ts` - Updates goal bundles, needs-you.md, ledgers; multi-project patch generation
 - `validation-handler.ts` - Runs verifiers on worker output
 - `verifiers/` - Deterministic checks (git-clean, node-build, docs-complete)
 - `backoff-manager.ts` - Rate limit detection and exponential backoff
@@ -210,9 +259,11 @@ Complex tasks (>100 estimated turns) are automatically broken down into steps:
 
 **Human-editable markdown:**
 - `workspace/constitution.md` - **IMMUTABLE** hard limits (human-only modification)
-- `workspace/goals.md` - P0-P4 prioritized work items with status and steps (auto-generated index)
+- `workspace/goals.md` - Auto-generated index from goal bundles (also serves as legacy fallback if no bundles exist)
 - `workspace/needs-you.md` - Human-agent interaction interface
 - `workspace/queue.md`, `progress.md`, `completed.md` - State tracking
+- `workspace/preferences.md` - Learned preferences and conventions (code style, workflow, anti-patterns)
+- `workspace/project-registry.yml` - Tracks completed projects for reuse (V1.2: multi-project access)
 
 **Append-only ledgers (JSONL):**
 - `ledgers/work-ledger.jsonl` - Task events (STARTED, COMPLETED, BLOCKED, STEP_STARTED, STEP_COMPLETED)
@@ -498,7 +549,8 @@ continuous-agent/
 │   │   └── logging.ts          # Structured logging
 │   ├── agentic/                # AI decision-making (LLM-powered)
 │   │   ├── work-selection/     # Task selection & breakdown
-│   │   │   ├── work-selector.ts  # Parses goals.md with step awareness
+│   │   │   ├── work-selector.ts  # Selects work from goal bundles (fallback: goals.md)
+│   │   │   ├── goal-scanner.ts   # Scans workspace folders, auto-promotes ondeck goals
 │   │   │   └── task-breakdown.ts # Complex task decomposition
 │   │   ├── execution/          # Worker spawning
 │   │   │   ├── worker-spawner.ts # Agent SDK integration, .env copying
@@ -512,7 +564,8 @@ continuous-agent/
 │   └── deterministic/          # Mechanical operations (no LLM)
 │       ├── health-checker.ts   # System health validation
 │       ├── input-processor.ts  # Parses needs-you.md responses
-│       ├── state-handler.ts    # Updates goals.md, needs-you.md
+│       ├── prompt-md-parser.ts # Parses PROMPT.md frontmatter + body
+│       ├── state-handler.ts    # Updates goal bundles, needs-you.md
 │       ├── validation-handler.ts # Runs verifiers
 │       ├── verifiers/          # Deterministic validation checks
 │       ├── backoff-manager.ts  # Rate limit handling
@@ -521,11 +574,19 @@ continuous-agent/
 │       ├── inputs-log.ts       # JSONL audit logging
 │       └── self-improvement-state.ts # Self-improvement tracking
 
-├── workspace/                  # Human-editable state
+├── workspace/                  # Human-editable state + goal bundles
 │   ├── constitution.md         # **IMMUTABLE** hard limits
-│   ├── goals.md                # P0-P4 work items with steps (auto-generated index)
+│   ├── goals.md                # Auto-generated index from goal bundles
 │   ├── needs-you.md            # Human interaction interface
-│   └── {queue,progress,completed}.md
+│   ├── preferences.md          # Learned preferences and conventions
+│   ├── project-registry.yml    # Completed projects for reuse (V1.2)
+│   ├── {queue,progress,completed}.md
+│   ├── _TEMPLATE/              # Goal bundle template
+│   ├── drafts/                 # New goal bundles
+│   ├── ondeck/                 # Queued for auto-promotion
+│   ├── in-progress/P{0-4}/    # Active goals by priority
+│   ├── blocked/                # Goals needing human input
+│   └── archive/                # Completed/cancelled goals
 
 ├── ledgers/                    # Append-only logs (version controlled)
 │   ├── work-ledger.jsonl       # Task events
@@ -604,6 +665,8 @@ tail -20 ledgers/work-ledger.jsonl
 - TypeScript errors → Run `npm install` to ensure `@types/node` is installed
 - Self-enhance steps repeat → Title prefix must be preserved (not stripped) for regex matching in `updateStepStatus`
 - PM2 running stale code → Verify `ecosystem.config.cjs` script path points to `dist/core/executive-loop.js`
+- No work selected → Check `workspace/in-progress/P{0-4}/` for goal bundles with `status: pending` in PROMPT.md; also check `workspace/ondeck/` for goals awaiting auto-promotion
+- Goal not promoted → Ensure PROMPT.md frontmatter has a valid `priority` field (P0-P4)
 
 ## Documentation Locations
 
