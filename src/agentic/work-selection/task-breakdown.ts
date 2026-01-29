@@ -6,6 +6,7 @@
  */
 
 import { readFile, writeFile } from 'fs/promises';
+import { existsSync } from 'fs';
 import path from 'path';
 import type { WorkItem, WorkStep } from '../../core/types.js';
 
@@ -285,10 +286,16 @@ export function reBreakdownStep(
 }
 
 /**
- * Write steps to goals.md under a task
+ * Write steps to goals.md index under a task (best-effort, goals.md may not exist)
+ * V1.2: goals.md is auto-generated index; PROMPT.md is source of truth
  */
 export async function writeStepsToGoals(taskTitle: string, steps: WorkStep[]): Promise<boolean> {
   const goalsPath = path.join(process.cwd(), 'workspace', 'goals.md');
+
+  if (!existsSync(goalsPath)) {
+    console.log(`[${new Date().toISOString()}] goals.md not found — skipping legacy step write`);
+    return false;
+  }
 
   try {
     let content = await readFile(goalsPath, 'utf-8');

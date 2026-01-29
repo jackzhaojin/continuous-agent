@@ -547,8 +547,8 @@ export async function getAllWorkItems(): Promise<WorkItem[]> {
 }
 
 /**
- * Update goals.md with step progress
- * Updates status for a specific step within a task
+ * Update goals.md index with step progress (best-effort, goals.md may not exist)
+ * V1.2: goals.md is auto-generated index; PROMPT.md is source of truth
  */
 export async function updateStepStatus(
   taskTitle: string,
@@ -564,6 +564,11 @@ export async function updateStepStatus(
   console.log(`[${new Date().toISOString()}] [DEBUG] >>> updateStepStatus CALLED: task="${taskTitle}", step=${stepNumber + 1}, status="${newStatus}"`);
 
   const goalsPath = path.join(process.cwd(), 'workspace', 'goals.md');
+
+  if (!existsSync(goalsPath)) {
+    console.log(`[${new Date().toISOString()}] goals.md not found — skipping legacy step status update`);
+    return false;
+  }
 
   try {
     let content = await readFile(goalsPath, 'utf-8');
@@ -619,10 +624,16 @@ export async function updateStepStatus(
 }
 
 /**
- * Update parent task status based on step completion
+ * Update parent task status based on step completion (best-effort goals.md update)
+ * V1.2: goals.md is auto-generated index; PROMPT.md is source of truth
  */
 export async function updateTaskProgressFromSteps(taskTitle: string, steps: WorkStep[]): Promise<boolean> {
   const goalsPath = path.join(process.cwd(), 'workspace', 'goals.md');
+
+  if (!existsSync(goalsPath)) {
+    console.log(`[${new Date().toISOString()}] goals.md not found — skipping legacy task progress update`);
+    return false;
+  }
 
   try {
     let content = await readFile(goalsPath, 'utf-8');

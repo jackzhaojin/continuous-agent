@@ -63,7 +63,8 @@ export async function updatePromptMdStatus(
 }
 
 /**
- * Update task state in goals.md
+ * Update task state after execution
+ * V1.2: PROMPT.md is the source of truth. goals.md update is best-effort.
  * DETERMINISTIC: File I/O and pattern matching
  */
 export async function updateTaskState(
@@ -74,137 +75,140 @@ export async function updateTaskState(
   contractId?: string,
   workerOutput?: string
 ): Promise<void> {
-  logDeterministic('Updating goals.md...');
+  logDeterministic('Updating task state...');
 
-  const goalsPath = path.join(WORKSPACE_DIR, 'goals.md');
   const ledgerPath = path.join(LEDGERS_DIR, 'work-ledger.jsonl');
 
-  try {
-    const content = await readFile(goalsPath, 'utf-8');
-    const newStatus = success ? 'Complete' : 'In Progress';
+  // --- V1.2 primary operations (independent of goals.md) ---
 
-    // Update status line
-    const titlePattern = new RegExp(
-      `(###\\s+${escapeRegex(item.title)}[\\s\\S]*?- \\*\\*Status:\\*\\*)\\s*[^\\n]+`,
-      'i'
-    );
-
-    if (titlePattern.test(content)) {
-      const updatedContent = content.replace(titlePattern, `$1 ${newStatus}`);
-      await writeFile(goalsPath, updatedContent, 'utf-8');
-      log(`  Updated: ${item.title} → ${newStatus}`);
-    }
-
+  if (success) {
     // Log to work ledger
-    if (success) {
-      const entry = JSON.stringify({
-        event: 'TASK_COMPLETED',
-        ts: new Date().toISOString(),
-        task_id: item.id,
-        title: item.title,
-        output_path: outputPath || null,
-      });
-      await appendFile(ledgerPath, entry + '\n', 'utf-8');
+    const entry = JSON.stringify({
+      event: 'TASK_COMPLETED',
+      ts: new Date().toISOString(),
+      task_id: item.id,
+      title: item.title,
+      output_path: outputPath || null,
+    });
+    await appendFile(ledgerPath, entry + '\n', 'utf-8');
 
-      // Report milestone to Notion (fire-and-forget)
-      await reportMilestone('Completed', item, contractId, { outputPath });
+    // Report milestone to Notion (fire-and-forget)
+    await reportMilestone('Completed', item, contractId, { outputPath });
 
-      // V1.2: Record project memory entry
-      try {
-        const memoryEntry: ProjectMemoryEntry = {
-          id: item.id || `task-${Date.now()}`,
-          name: item.title,
-          category: detectProjectCategory(item),
+    // V1.2: Record project memory entry
+    try {
+      const memoryEntry: ProjectMemoryEntry = {
+        id: item.id || `task-${Date.now()}`,
+        name: item.title,
+        category: detectProjectCategory(item),
+        completed: new Date().toISOString().split('T')[0],
+        output_path: outputPath || '',
+        archive_path: item.source_path ? item.source_path.replace(/in-progress\/P\d\//, 'archive/') : undefined,
+        capabilities_exercised: inferProjectCapabilities(item),
+        features_built: extractFeaturesFromOutput(workerOutput),
+        lessons: extractLessonsFromOutput(workerOutput),
+      };
+      appendProjectMemory(memoryEntry);
+      logDeterministic('  Recorded project memory entry');
+    } catch (memErr) {
+      log(`  Warning: Failed to record project memory: ${memErr}`);
+    }
+
+    // V1.2: Register project in registry for reuse
+    try {
+      if (outputPath) {
+        const regEntry: ProjectRegistryEntry = {
+          slug: generateProjectSlug(item.title),
+          title: item.title,
+          output_path: outputPath,
           completed: new Date().toISOString().split('T')[0],
-          output_path: outputPath || '',
-          archive_path: item.source_path ? item.source_path.replace(/in-progress\/P\d\//, 'archive/') : undefined,
-          capabilities_exercised: inferProjectCapabilities(item),
-          features_built: extractFeaturesFromOutput(workerOutput),
-          lessons: extractLessonsFromOutput(workerOutput),
+          category: detectProjectCategory(item),
+          capabilities: inferProjectCapabilities(item),
+          reusable: true,
         };
-        appendProjectMemory(memoryEntry);
-        logDeterministic('  Recorded project memory entry');
-      } catch (memErr) {
-        log(`  Warning: Failed to record project memory: ${memErr}`);
+        registerProject(regEntry);
+        logDeterministic('  Registered project in registry');
       }
+    } catch (regErr) {
+      log(`  Warning: Failed to register project: ${regErr}`);
+    }
 
-      // V1.2: Register project in registry for reuse
+    // Track self-improvement completions
+    if (item.title.includes('[SELF-ENHANCE] Practice')) {
+      await markPracticeCompleted();
+      logDeterministic('  Marked practice loop as completed in self-improvement state');
+    } else if (item.title.includes('[SELF-ENHANCE] Weekly Retrospective') || item.title.includes('[SELF-ENHANCE] Retrospective')) {
+      await markRetrospectiveCompleted();
+      logDeterministic('  Marked retrospective as completed in self-improvement state');
+    } else if (item.title.includes('[SELF-ENHANCE] Reference Refresh')) {
+      await markReferenceRefreshCompleted();
+      logDeterministic('  Marked reference refresh as completed in self-improvement state');
+    }
+
+    // Self-enhance tasks need human review before merge
+    if (item.selfEnhance && item.branch) {
+      await requestSelfEnhanceReview(item);
+    }
+
+    // V1.2: Multi-project patch generation and approval
+    if (item.source_project && outputPath) {
       try {
-        if (outputPath) {
-          const regEntry: ProjectRegistryEntry = {
-            slug: generateProjectSlug(item.title),
-            title: item.title,
-            output_path: outputPath,
-            completed: new Date().toISOString().split('T')[0],
-            category: detectProjectCategory(item),
-            capabilities: inferProjectCapabilities(item),
-            reusable: true,
-          };
-          registerProject(regEntry);
-          logDeterministic('  Registered project in registry');
+        const sourceEntry = findProjectBySlug(item.source_project);
+        if (sourceEntry && existsSync(sourceEntry.output_path)) {
+          const patchContent = execSync(
+            `git diff --no-index "${sourceEntry.output_path}" "${outputPath}" || true`,
+            { encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 }
+          );
+          const patchPath = path.join(outputPath, 'source-project-changes.patch');
+          await writeFile(patchPath, patchContent, 'utf-8');
+          log(`  Generated multi-project patch: ${patchPath}`);
+
+          // Request human approval for copy-back
+          await requestMultiProjectApproval(item, outputPath);
+        } else {
+          log(`  Warning: Source project "${item.source_project}" not found or path missing, skipping patch generation`);
         }
-      } catch (regErr) {
-        log(`  Warning: Failed to register project: ${regErr}`);
+      } catch (patchError) {
+        log(`  Failed to generate multi-project patch: ${patchError}`);
       }
-
-      // Track self-improvement completions
-      if (item.title.includes('[SELF-ENHANCE] Practice')) {
-        await markPracticeCompleted();
-        logDeterministic('  Marked practice loop as completed in self-improvement state');
-      } else if (item.title.includes('[SELF-ENHANCE] Weekly Retrospective') || item.title.includes('[SELF-ENHANCE] Retrospective')) {
-        await markRetrospectiveCompleted();
-        logDeterministic('  Marked retrospective as completed in self-improvement state');
-      } else if (item.title.includes('[SELF-ENHANCE] Reference Refresh')) {
-        await markReferenceRefreshCompleted();
-        logDeterministic('  Marked reference refresh as completed in self-improvement state');
-      }
-
-      // Self-enhance tasks need human review before merge
-      if (item.selfEnhance && item.branch) {
-        await requestSelfEnhanceReview(item);
-      }
-
-      // V1.2: Multi-project patch generation and approval
-      if (item.source_project && outputPath) {
-        try {
-          const sourceEntry = findProjectBySlug(item.source_project);
-          if (sourceEntry && existsSync(sourceEntry.output_path)) {
-            const patchContent = execSync(
-              `git diff --no-index "${sourceEntry.output_path}" "${outputPath}" || true`,
-              { encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 }
-            );
-            const patchPath = path.join(outputPath, 'source-project-changes.patch');
-            await writeFile(patchPath, patchContent, 'utf-8');
-            log(`  Generated multi-project patch: ${patchPath}`);
-
-            // Request human approval for copy-back
-            await requestMultiProjectApproval(item, outputPath);
-          } else {
-            log(`  Warning: Source project "${item.source_project}" not found or path missing, skipping patch generation`);
-          }
-        } catch (patchError) {
-          log(`  Failed to generate multi-project patch: ${patchError}`);
-        }
-      }
-    } else {
-      // Report failure milestone to Notion (fire-and-forget)
-      await reportMilestone('Failed', item, contractId, {
-        errorSummary: errorInfo,
-      });
     }
-
-    // V1.2: Also update PROMPT.md if source_path is available
-    if (item.source_path) {
-      await updatePromptMdStatus(item.source_path, {
-        status: success ? 'complete' : 'in_progress',
-        ...(outputPath ? { output_path: outputPath } : {}),
-      });
-      // Regenerate goals.md index
-      await generateGoalsIndex();
-    }
-  } catch (error) {
-    log(`  Failed to update goals.md: ${error}`);
+  } else {
+    // Report failure milestone to Notion (fire-and-forget)
+    await reportMilestone('Failed', item, contractId, {
+      errorSummary: errorInfo,
+    });
   }
+
+  // V1.2: Update PROMPT.md (source of truth for goal bundles)
+  if (item.source_path) {
+    await updatePromptMdStatus(item.source_path, {
+      status: success ? 'complete' : 'in_progress',
+      ...(outputPath ? { output_path: outputPath } : {}),
+    });
+  }
+
+  // Legacy: Best-effort update of goals.md (auto-generated index)
+  try {
+    const goalsPath = path.join(WORKSPACE_DIR, 'goals.md');
+    if (existsSync(goalsPath)) {
+      const content = await readFile(goalsPath, 'utf-8');
+      const newStatus = success ? 'Complete' : 'In Progress';
+      const titlePattern = new RegExp(
+        `(###\\s+${escapeRegex(item.title)}[\\s\\S]*?- \\*\\*Status:\\*\\*)\\s*[^\\n]+`,
+        'i'
+      );
+      if (titlePattern.test(content)) {
+        const updatedContent = content.replace(titlePattern, `$1 ${newStatus}`);
+        await writeFile(goalsPath, updatedContent, 'utf-8');
+        log(`  Updated goals.md index: ${item.title} → ${newStatus}`);
+      }
+    }
+  } catch (goalsErr) {
+    log(`  Warning: Failed to update goals.md index: ${goalsErr}`);
+  }
+
+  // Regenerate goals.md index from folder tree
+  await generateGoalsIndex();
 }
 
 /**
@@ -259,15 +263,31 @@ async function requestMultiProjectApproval(item: WorkItem, outputPath: string): 
 }
 
 /**
- * Set the output path for a task in goals.md
- * This persists the project directory so work can resume across restarts
+ * Set the output path for a task
+ * V1.2: Updates PROMPT.md frontmatter (source of truth) + goals.md index (best-effort)
  * DETERMINISTIC: File I/O and pattern matching
  */
 export async function setTaskOutputPath(
   taskTitle: string,
-  outputPath: string
+  outputPath: string,
+  sourcePath?: string
 ): Promise<boolean> {
+  log(`  Persisting output path: ${outputPath}`);
+
+  // V1.2: Update PROMPT.md frontmatter (source of truth)
+  if (sourcePath) {
+    const updated = await updatePromptMdStatus(sourcePath, { output_path: outputPath });
+    if (updated) {
+      logDeterministic(`  Updated PROMPT.md output_path for "${taskTitle}"`);
+    }
+  }
+
+  // Legacy: Best-effort update of goals.md index
   const goalsPath = path.join(WORKSPACE_DIR, 'goals.md');
+  if (!existsSync(goalsPath)) {
+    logDeterministic('  goals.md not found — skipping legacy output path update');
+    return true; // PROMPT.md is the source of truth
+  }
 
   try {
     let content = await readFile(goalsPath, 'utf-8');
@@ -280,17 +300,13 @@ export async function setTaskOutputPath(
     );
 
     if (existingOutputPattern.test(content)) {
-      // Update existing Output line
       content = content.replace(existingOutputPattern, `$1$2 ${outputPath}`);
-      logDeterministic(`  Updated existing Output path for "${taskTitle}"`);
+      logDeterministic(`  Updated existing Output path in goals.md for "${taskTitle}"`);
     } else {
-      // Add Output line after Description (or after Status if no Description)
-      // Pattern: find task section, then add after Description line
       const addAfterDescPattern = new RegExp(
         `(###\\s+${escapedTitle}[\\s\\S]*?- \\*\\*Description:\\*\\*\\s*[^\\n]+)`,
         'i'
       );
-
       const addAfterStatusPattern = new RegExp(
         `(###\\s+${escapedTitle}[\\s\\S]*?- \\*\\*Status:\\*\\*\\s*[^\\n]+)`,
         'i'
@@ -298,22 +314,18 @@ export async function setTaskOutputPath(
 
       if (addAfterDescPattern.test(content)) {
         content = content.replace(addAfterDescPattern, `$1\n- **Output:** ${outputPath}`);
-        logDeterministic(`  Added Output path after Description for "${taskTitle}"`);
       } else if (addAfterStatusPattern.test(content)) {
         content = content.replace(addAfterStatusPattern, `$1\n- **Output:** ${outputPath}`);
-        logDeterministic(`  Added Output path after Status for "${taskTitle}"`);
       } else {
-        log(`  Warning: Could not find insertion point for Output path in "${taskTitle}"`);
-        return false;
+        return true; // PROMPT.md was updated, goals.md pattern not found is fine
       }
     }
 
     await writeFile(goalsPath, content, 'utf-8');
-    log(`  Persisted output path: ${outputPath}`);
     return true;
   } catch (error) {
-    log(`  Failed to set output path: ${error}`);
-    return false;
+    log(`  Warning: Failed to update goals.md index output path: ${error}`);
+    return true; // PROMPT.md is the source of truth
   }
 }
 
@@ -497,38 +509,42 @@ export async function escalateWithDiagnosis(
 }
 
 /**
- * Mark task as blocked in goals.md
+ * Mark task as blocked
+ * V1.2: PROMPT.md is source of truth. goals.md update is best-effort.
  * DETERMINISTIC: File I/O
  */
 export async function markTaskBlocked(item: WorkItem): Promise<void> {
-  logDeterministic('Marking task as blocked in goals.md...');
+  logDeterministic('Marking task as blocked...');
 
-  const goalsPath = path.join(WORKSPACE_DIR, 'goals.md');
+  // Report blocked milestone to Notion (fire-and-forget)
+  await reportMilestone('Blocked', item);
 
-  try {
-    const content = await readFile(goalsPath, 'utf-8');
-    const titlePattern = new RegExp(
-      `(###\\s+${escapeRegex(item.title)}[\\s\\S]*?- \\*\\*Status:\\*\\*)\\s*[^\\n]+`,
-      'i'
-    );
-
-    if (titlePattern.test(content)) {
-      const updatedContent = content.replace(titlePattern, `$1 Blocked`);
-      await writeFile(goalsPath, updatedContent, 'utf-8');
-      log(`  Updated: ${item.title} → Blocked`);
-    }
-
-    // Report blocked milestone to Notion (fire-and-forget)
-    await reportMilestone('Blocked', item);
-
-    // V1.2: Also update PROMPT.md
-    if (item.source_path) {
-      await updatePromptMdStatus(item.source_path, { status: 'blocked' });
-      await generateGoalsIndex();
-    }
-  } catch (error) {
-    log(`  Failed to mark task as blocked: ${error}`);
+  // V1.2: Update PROMPT.md (source of truth)
+  if (item.source_path) {
+    await updatePromptMdStatus(item.source_path, { status: 'blocked' });
   }
+
+  // Legacy: Best-effort update of goals.md index
+  try {
+    const goalsPath = path.join(WORKSPACE_DIR, 'goals.md');
+    if (existsSync(goalsPath)) {
+      const content = await readFile(goalsPath, 'utf-8');
+      const titlePattern = new RegExp(
+        `(###\\s+${escapeRegex(item.title)}[\\s\\S]*?- \\*\\*Status:\\*\\*)\\s*[^\\n]+`,
+        'i'
+      );
+      if (titlePattern.test(content)) {
+        const updatedContent = content.replace(titlePattern, `$1 Blocked`);
+        await writeFile(goalsPath, updatedContent, 'utf-8');
+        log(`  Updated goals.md index: ${item.title} → Blocked`);
+      }
+    }
+  } catch (goalsErr) {
+    log(`  Warning: Failed to update goals.md index: ${goalsErr}`);
+  }
+
+  // Regenerate goals.md index from folder tree
+  await generateGoalsIndex();
 }
 
 /**
