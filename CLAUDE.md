@@ -140,7 +140,7 @@ The codebase enforces a strict separation between AI decision-making and mechani
 
 1. **Health Check** - GitHub auth, disk space, dependencies
 2. **Check Inputs** - Process human responses from `needs-you.md`
-3. **Select Work** - Priority-based selection from `goals.md` (P1 > P2 > P3), with step awareness
+3. **Select Work** - Priority-based selection from goal bundles (P0 > P1 > P2 > P3 > P4), with step awareness
 4. **Create Task Contract** - Scope, risk level, Definition of Done
 5. **Execute** - Spawn Agent SDK worker with intelligent prompting
 6. **Validate** - Run verifiers on worker's output directory (NOT agent infrastructure)
@@ -210,7 +210,7 @@ Complex tasks (>100 estimated turns) are automatically broken down into steps:
 
 **Human-editable markdown:**
 - `workspace/constitution.md` - **IMMUTABLE** hard limits (human-only modification)
-- `workspace/goals.md` - P1/P2/P3 prioritized work items with status and steps
+- `workspace/goals.md` - P0-P4 prioritized work items with status and steps (auto-generated index)
 - `workspace/needs-you.md` - Human-agent interaction interface
 - `workspace/queue.md`, `progress.md`, `completed.md` - State tracking
 
@@ -523,7 +523,7 @@ continuous-agent/
 
 ├── workspace/                  # Human-editable state
 │   ├── constitution.md         # **IMMUTABLE** hard limits
-│   ├── goals.md                # P1/P2/P3 work items with steps
+│   ├── goals.md                # P0-P4 work items with steps (auto-generated index)
 │   ├── needs-you.md            # Human interaction interface
 │   └── {queue,progress,completed}.md
 

@@ -44,7 +44,7 @@ export interface WorkStep {
  */
 export interface WorkItem {
   id: string;
-  priority: 'P1' | 'P2' | 'P3';
+  priority: 'P0' | 'P1' | 'P2' | 'P3' | 'P4';
   title: string;
   description: string;
   status: 'pending' | 'in_progress' | 'blocked' | 'complete';

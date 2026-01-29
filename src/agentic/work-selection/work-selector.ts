@@ -14,11 +14,11 @@ export interface SelectableWork {
   type: 'task' | 'step';
   task: WorkItem;
   step?: WorkStep;
-  priority: 'P1' | 'P2' | 'P3';
+  priority: 'P0' | 'P1' | 'P2' | 'P3' | 'P4';
 }
 
 interface ParsedSection {
-  priority: 'P1' | 'P2' | 'P3';
+  priority: 'P0' | 'P1' | 'P2' | 'P3' | 'P4';
   items: WorkItem[];
 }
 
@@ -188,7 +188,7 @@ function parseGoalsFile(content: string): ParsedSection[] {
   const sections: ParsedSection[] = [];
   const lines = content.split('\n');
 
-  let currentPriority: 'P1' | 'P2' | 'P3' | null = null;
+  let currentPriority: 'P0' | 'P1' | 'P2' | 'P3' | 'P4' | null = null;
   let currentItem: Partial<WorkItem> | null = null;
   let itemCounter = 0;
 
@@ -196,31 +196,14 @@ function parseGoalsFile(content: string): ParsedSection[] {
     const line = lines[i];
     const trimmedLine = line.trim();
 
-    // Check for priority section headers (## P1, ## P2, ## P3)
-    if (trimmedLine.match(/^#{1,2}\s*P1\b/i)) {
+    // Check for priority section headers (## P0, ## P1, ## P2, ## P3, ## P4)
+    const priorityMatch = trimmedLine.match(/^#{1,2}\s*(P[0-4])\b/i);
+    if (priorityMatch) {
       // Save current item before switching sections
       if (currentItem && currentItem.title && currentPriority) {
         saveItem(sections, currentItem as WorkItem, currentPriority);
       }
-      currentPriority = 'P1';
-      currentItem = null;
-      continue;
-    }
-    if (trimmedLine.match(/^#{1,2}\s*P2\b/i)) {
-      // Save current item before switching sections
-      if (currentItem && currentItem.title && currentPriority) {
-        saveItem(sections, currentItem as WorkItem, currentPriority);
-      }
-      currentPriority = 'P2';
-      currentItem = null;
-      continue;
-    }
-    if (trimmedLine.match(/^#{1,2}\s*P3\b/i)) {
-      // Save current item before switching sections
-      if (currentItem && currentItem.title && currentPriority) {
-        saveItem(sections, currentItem as WorkItem, currentPriority);
-      }
-      currentPriority = 'P3';
+      currentPriority = priorityMatch[1].toUpperCase() as 'P0' | 'P1' | 'P2' | 'P3' | 'P4';
       currentItem = null;
       continue;
     }
@@ -387,16 +370,16 @@ function parseGoalsFile(content: string): ParsedSection[] {
     saveItem(sections, currentItem as WorkItem, currentPriority);
   }
 
-  // Sort sections by priority (P1 first, then P2, then P3)
+  // Sort sections by priority (P0 first, then P1, P2, P3, P4)
   sections.sort((a, b) => {
-    const priorityOrder = { P1: 1, P2: 2, P3: 3 };
-    return priorityOrder[a.priority] - priorityOrder[b.priority];
+    const priorityOrder: Record<string, number> = { P0: 0, P1: 1, P2: 2, P3: 3, P4: 4 };
+    return (priorityOrder[a.priority] ?? 5) - (priorityOrder[b.priority] ?? 5);
   });
 
   return sections;
 }
 
-function saveItem(sections: ParsedSection[], item: WorkItem, priority: 'P1' | 'P2' | 'P3'): void {
+function saveItem(sections: ParsedSection[], item: WorkItem, priority: 'P0' | 'P1' | 'P2' | 'P3' | 'P4'): void {
   let section = sections.find(s => s.priority === priority);
   if (!section) {
     section = { priority, items: [] };
@@ -408,9 +391,9 @@ function saveItem(sections: ParsedSection[], item: WorkItem, priority: 'P1' | 'P
 /**
  * Get priority value for sorting (lower = higher priority)
  */
-function priorityValue(priority: 'P1' | 'P2' | 'P3'): number {
-  const order = { P1: 1, P2: 2, P3: 3 };
-  return order[priority];
+function priorityValue(priority: 'P0' | 'P1' | 'P2' | 'P3' | 'P4'): number {
+  const order: Record<string, number> = { P0: 0, P1: 1, P2: 2, P3: 3, P4: 4 };
+  return order[priority] ?? 5;
 }
 
 /**
@@ -517,7 +500,7 @@ export async function selectWorkWithSteps(): Promise<SelectableWork | null> {
       return null;
     }
 
-    // Sort by priority (P1 > P2 > P3)
+    // Sort by priority (P0 > P1 > P2 > P3 > P4)
     allSelectableWork.sort((a, b) => priorityValue(a.priority) - priorityValue(b.priority));
 
     // Return highest priority work

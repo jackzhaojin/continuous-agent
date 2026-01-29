@@ -142,13 +142,13 @@ async function runIteration(): Promise<IterationResult> {
   // Ingest queue tasks if any
   const queueResult = await ingestQueueTasks();
   if (queueResult.ingested.length > 0) {
-    const added = await appendGoalsFromQueue(queueResult.ingested, 'P3');
+    const added = await appendGoalsFromQueue(queueResult.ingested, 'P4');
     for (const item of added) {
       await appendInputLog({
         source: 'queue',
         ts: new Date().toISOString(),
         raw_input: item,
-        priority: 'P3',
+        priority: 'P4',
         scope_allowed: ['workspace/goals.md'],
         intent_type: 'queue_ingest',
         metadata: { status: 'ingested_to_goals' },
@@ -158,7 +158,7 @@ async function runIteration(): Promise<IterationResult> {
   }
 
   // === PHASE 3: SELECT WORK ===
-  logAgentic('PHASE 3: Select Work (Priority: P1 > P2 > P3)');
+  logAgentic('PHASE 3: Select Work (Priority: P0 > P1 > P2 > P3 > P4)');
   const selectedWork = await selectWorkWithSteps();
 
   if (!selectedWork) {

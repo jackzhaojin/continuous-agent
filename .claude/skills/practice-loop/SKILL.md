@@ -1,7 +1,7 @@
 ---
 name: practice-loop
 description: |
-  Run practice tasks when idle to improve skill confidence. Use when no primary work items are available, waiting for human input, in rate limit cooldown, skills blocking P1 goals have low confidence, skills have maturity=Declared, or skills unused >30 days.
+  Run practice tasks when idle to improve skill confidence. Use when no primary work items are available, waiting for human input, in rate limit cooldown, skills blocking P0/P1 goals have low confidence, skills have maturity=Declared, or skills unused >30 days.
 ---
 
 # Practice Loop
@@ -16,7 +16,7 @@ Run practice tasks when idle to improve skill confidence.
 
 ## Priority Order
 
-1. Skills blocking P1 goals
+1. Skills blocking P0/P1 goals
 2. Skills with confidence < 50%
 3. Skills with maturity = Declared (never tested)
 4. Skills with high failure rate

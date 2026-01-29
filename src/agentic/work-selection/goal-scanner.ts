@@ -17,18 +17,18 @@ interface GoalBundle {
   promptMd: PromptMdFile;
   sourcePath: string;  // Full path to the goal directory
   state: 'drafts' | 'ondeck' | 'in-progress' | 'blocked' | 'archive';
-  priority?: 'P1' | 'P2' | 'P3';
+  priority?: 'P0' | 'P1' | 'P2' | 'P3' | 'P4';
 }
 
 /**
  * Scan all goal bundles from the workspace folder tree
- * Priority order: P1 > P2 > P3
+ * Priority order: P0 > P1 > P2 > P3 > P4
  */
 export async function scanGoalBundles(): Promise<GoalBundle[]> {
   const bundles: GoalBundle[] = [];
 
   // Scan in-progress goals by priority
-  for (const priority of ['P1', 'P2', 'P3'] as const) {
+  for (const priority of ['P0', 'P1', 'P2', 'P3', 'P4'] as const) {
     const priorityDir = path.join(WORKSPACE_DIR, 'in-progress', priority);
     if (existsSync(priorityDir)) {
       const goalDirs = await listGoalDirs(priorityDir);
@@ -82,7 +82,7 @@ async function listGoalDirs(dirPath: string): Promise<string[]> {
 async function readGoalBundle(
   goalDir: string,
   state: GoalBundle['state'],
-  priority?: 'P1' | 'P2' | 'P3'
+  priority?: 'P0' | 'P1' | 'P2' | 'P3' | 'P4'
 ): Promise<GoalBundle | null> {
   const promptPath = path.join(goalDir, 'PROMPT.md');
 
@@ -226,7 +226,7 @@ function bundleToWorkItem(bundle: GoalBundle): WorkItem {
 
   return {
     id: `goal-${bundle.slug}`,
-    priority: bundle.priority || 'P3',
+    priority: bundle.priority || 'P4',
     title: frontmatter.title,
     description: body.slice(0, 2000), // Use body as description (truncated)
     status,
@@ -243,7 +243,7 @@ function bundleToWorkItem(bundle: GoalBundle): WorkItem {
 
 /**
  * Build selectable work list from scanned bundles
- * Returns work sorted by priority (P1 > P2 > P3)
+ * Returns work sorted by priority (P0 > P1 > P2 > P3 > P4)
  */
 export async function buildSelectableWorkFromBundles(): Promise<SelectableWork[]> {
   const bundles = await scanGoalBundles();
@@ -281,8 +281,8 @@ export async function buildSelectableWorkFromBundles(): Promise<SelectableWork[]
   }
 
   // Sort by priority
-  const priorityOrder = { P1: 1, P2: 2, P3: 3 };
-  selectableWork.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
+  const priorityOrder: Record<string, number> = { P0: 0, P1: 1, P2: 2, P3: 3, P4: 4 };
+  selectableWork.sort((a, b) => (priorityOrder[a.priority] ?? 5) - (priorityOrder[b.priority] ?? 5));
 
   return selectableWork;
 }
@@ -316,7 +316,7 @@ export async function getDraftResearchTasks(): Promise<SelectableWork[]> {
       researchTasks.push({
         type: 'task',
         task: workItem,
-        priority: 'P3',
+        priority: 'P4',
       });
     }
   }

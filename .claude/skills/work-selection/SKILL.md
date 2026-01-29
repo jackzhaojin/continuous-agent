@@ -1,7 +1,7 @@
 ---
 name: work-selection
 description: |
-  Select the next work item from goals queue. Use at the beginning of each executive loop iteration, when evaluating priority order (P1 > P2 > P3), filtering by status and dependencies, handling retry logic with different strategies, or determining when to idle or run practice tasks.
+  Select the next work item from goals queue. Use at the beginning of each executive loop iteration, when evaluating priority order (P0 > P1 > P2 > P3 > P4), filtering by status and dependencies, handling retry logic with different strategies, or determining when to idle or run practice tasks.
 ---
 
 # Work Selection
@@ -10,16 +10,18 @@ Select the next eligible work item from goals.md.
 
 ## Priority Order
 
-1. **P1** - Critical / Revenue / Blocking
-2. **P2** - Important / Value-adding
-3. **P3** - Nice-to-have / Enhancement
+1. **P0** - Emergency / Blocking
+2. **P1** - Critical / Revenue
+3. **P2** - High / Value-adding
+4. **P3** - Normal / Enhancement
+5. **P4** - Low / Nice-to-have
 
 ## Selection Algorithm
 
 ```
 1. Parse goals.md for all work items
 2. Filter: status = "Not Started" OR "In Progress"
-3. Sort by priority (P1 first)
+3. Sort by priority (P0 first)
 4. For each candidate:
    - Check dependencies met
    - Check retry state (max 10 retries)

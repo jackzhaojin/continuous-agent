@@ -2,7 +2,7 @@ import { readFile, writeFile, writeFile as writeFileAsync } from 'fs/promises';
 import { existsSync, mkdirSync } from 'fs';
 import path from 'path';
 
-export async function appendGoalsFromQueue(titles: string[], priority: 'P1' | 'P2' | 'P3' = 'P3'): Promise<string[]> {
+export async function appendGoalsFromQueue(titles: string[], priority: 'P0' | 'P1' | 'P2' | 'P3' | 'P4' = 'P4'): Promise<string[]> {
   const goalsPath = path.join(process.cwd(), 'workspace', 'goals.md');
   if (!existsSync(goalsPath) || titles.length === 0) {
     return [];

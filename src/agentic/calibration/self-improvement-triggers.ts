@@ -16,7 +16,7 @@ export type SelfImprovementType = 'practice' | 'retrospective' | 'reference-refr
 export interface SelfImprovementTrigger {
   type: SelfImprovementType;
   reason: string;
-  priority: 'P2' | 'P3';
+  priority: 'P0' | 'P1' | 'P2' | 'P3' | 'P4';
 }
 
 /**
@@ -77,7 +77,7 @@ async function shouldRunReferenceRefresh(): Promise<boolean> {
 
 /**
  * Check if practice loop should run
- * Triggers when idle (called when no P1/P2/P3 work available)
+ * Triggers when idle (called when no P0-P4 work available)
  */
 async function shouldRunPracticeLoop(): Promise<boolean> {
   const state = await loadSelfImprovementState();

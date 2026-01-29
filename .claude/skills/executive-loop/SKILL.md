@@ -12,7 +12,7 @@ Central orchestrator that runs continuously, selecting and delegating work to wo
 
 1. **Health check** - Verify GitHub API, disk space, tools (node, npm, git)
 2. **Check inputs** - Read goals.md and queue.md for work items
-3. **Select work** - Pick highest priority eligible item (P1 > P2 > P3)
+3. **Select work** - Pick highest priority eligible item (P0 > P1 > P2 > P3 > P4)
 4. **Create contract** - Build task contract with goal, DoD, scope, max_turns
 5. **Execute/delegate** - Small tasks: execute directly. Large: spawn worker
 6. **Validate** - Run verifiers, check DoD, produce validation report

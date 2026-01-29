@@ -1,6 +1,6 @@
 ---
 name: work-selection-priority
-description: Selects highest priority unblocked work from goals.md. Priority order: P1 > P2 > P3, with dependency and status checks.
+description: Selects highest priority unblocked work from goals.md. Priority order: P0 > P1 > P2 > P3 > P4, with dependency and status checks.
 version: 1.0.0
 variables:
   - name: GOALS_CONTENT
@@ -47,7 +47,7 @@ Provide a JSON response:
 {
   "selected_work": {
     "title": "Task title",
-    "priority": "P1" | "P2" | "P3",
+    "priority": "P0" | "P1" | "P2" | "P3" | "P4",
     "status": "current status",
     "current_step": "Step title if multi-step",
     "step_number": 1,
@@ -72,9 +72,11 @@ Provide a JSON response:
 ## Selection Rules
 
 ### Priority Order
-1. **P1 tasks:** Highest priority, always work on these first
-2. **P2 tasks:** Medium priority, work when no P1 available
-3. **P3 tasks:** Low priority, work when no P1/P2 available
+1. **P0 tasks:** Emergency priority, always work on these first
+2. **P1 tasks:** Critical priority, work when no P0 available
+3. **P2 tasks:** High priority, work when no P0/P1 available
+4. **P3 tasks:** Normal priority, work when no P0/P1/P2 available
+5. **P4 tasks:** Low priority, work when no higher priority available
 
 ### Status Filter
 - **Pending:** Eligible for selection
@@ -106,7 +108,7 @@ Provide a JSON response:
 
 1. **Filter by status:** Only pending/in-progress tasks
 2. **Check dependencies:** Only unblocked tasks
-3. **Sort by priority:** P1 first, then P2, then P3
+3. **Sort by priority:** P0 first, then P1, P2, P3, P4
 4. **Within priority:** Sort by position in goals.md (top first)
 5. **Step awareness:** If multi-step, select correct step
 6. **Return first match:** Highest priority unblocked task

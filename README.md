@@ -54,7 +54,7 @@ pm2 delete continuous-agent  # Remove from PM2
 The agent NEVER writes code to its own codebase. All outputs go to isolated project directories in `agent-outputs/`.
 
 **Key Files:**
-- `workspace/goals.md` - P1/P2/P3 prioritized work items
+- `workspace/goals.md` - P0-P4 prioritized work items (auto-generated index)
 - `workspace/needs-you.md` - Human-agent interaction interface
 - `workspace/constitution.md` - Immutable hard limits (human-only modification)
 - `ledgers/work-ledger.jsonl` - Append-only task event log

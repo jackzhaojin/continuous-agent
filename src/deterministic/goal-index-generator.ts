@@ -140,15 +140,17 @@ export async function generateGoalsIndex(): Promise<void> {
   const goalsPath = path.join(WORKSPACE_DIR, 'goals.md');
 
   // Collect entries from all state directories
+  const p0Entries = await scanPriorityDir(path.join(WORKSPACE_DIR, 'in-progress', 'P0'), 'P0');
   const p1Entries = await scanPriorityDir(path.join(WORKSPACE_DIR, 'in-progress', 'P1'), 'P1');
   const p2Entries = await scanPriorityDir(path.join(WORKSPACE_DIR, 'in-progress', 'P2'), 'P2');
   const p3Entries = await scanPriorityDir(path.join(WORKSPACE_DIR, 'in-progress', 'P3'), 'P3');
+  const p4Entries = await scanPriorityDir(path.join(WORKSPACE_DIR, 'in-progress', 'P4'), 'P4');
   const draftEntries = await scanStateDir(path.join(WORKSPACE_DIR, 'drafts'), 'draft');
   const ondeckEntries = await scanStateDir(path.join(WORKSPACE_DIR, 'ondeck'), 'ondeck');
   const blockedEntries = await scanStateDir(path.join(WORKSPACE_DIR, 'blocked'), 'blocked');
 
   // Check if any bundles exist - if not, skip regeneration to preserve legacy goals.md
-  const totalEntries = p1Entries.length + p2Entries.length + p3Entries.length + draftEntries.length + ondeckEntries.length + blockedEntries.length;
+  const totalEntries = p0Entries.length + p1Entries.length + p2Entries.length + p3Entries.length + p4Entries.length + draftEntries.length + ondeckEntries.length + blockedEntries.length;
   if (totalEntries === 0) {
     logDeterministic('  No goal bundles found - skipping goals.md regeneration (preserving legacy format)');
     return;
@@ -161,6 +163,14 @@ export async function generateGoalsIndex(): Promise<void> {
     `> Last updated: ${new Date().toISOString()}`,
     '',
   ];
+
+  // P0 section
+  if (p0Entries.length > 0) {
+    lines.push('## P0 - Emergency Priority', '');
+    for (const entry of p0Entries) {
+      lines.push(...formatEntry(entry));
+    }
+  }
 
   // P1 section
   if (p1Entries.length > 0) {
@@ -182,6 +192,14 @@ export async function generateGoalsIndex(): Promise<void> {
   if (p3Entries.length > 0) {
     lines.push('## P3 - Normal Priority', '');
     for (const entry of p3Entries) {
+      lines.push(...formatEntry(entry));
+    }
+  }
+
+  // P4 section
+  if (p4Entries.length > 0) {
+    lines.push('## P4 - Low Priority', '');
+    for (const entry of p4Entries) {
       lines.push(...formatEntry(entry));
     }
   }

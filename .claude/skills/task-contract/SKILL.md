@@ -16,7 +16,7 @@ Agreement between Executive and Worker defining what needs to be done and how su
 task_contract:
   id: "task-YYYY-MM-DD-NNN"
   source_goal: "Title from goals.md"
-  priority: "P1|P2|P3"
+  priority: "P0|P1|P2|P3|P4"
   intent_type: "outcome_only|what_only|what_and_how"
   research_required: true|false
   goal: "Clear description of what to accomplish"

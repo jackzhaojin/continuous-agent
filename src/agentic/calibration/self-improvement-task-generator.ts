@@ -38,7 +38,9 @@ export async function generateSelfImprovementTask(trigger: SelfImprovementTrigge
     }
 
     // Find the appropriate priority section
-    const sectionHeader = trigger.priority === 'P2' ? '## P2 - High Priority' : '## P3 - Normal Priority';
+    const sectionHeader = trigger.priority === 'P2' ? '## P2 - High Priority' :
+                          trigger.priority === 'P3' ? '## P3 - Normal Priority' :
+                          `## ${trigger.priority}`;
     const sectionIndex = content.indexOf(sectionHeader);
 
     if (sectionIndex === -1) {
@@ -60,9 +62,7 @@ export async function generateSelfImprovementTask(trigger: SelfImprovementTrigge
 
     // V1.2: Also create a goal bundle in in-progress
     try {
-      const priorityDir = trigger.priority === 'P2'
-        ? path.join(process.cwd(), 'workspace', 'in-progress', 'P2')
-        : path.join(process.cwd(), 'workspace', 'in-progress', 'P3');
+      const priorityDir = path.join(process.cwd(), 'workspace', 'in-progress', trigger.priority);
 
       await createGoalBundle(task.title, task.description, priorityDir);
     } catch (bundleError) {

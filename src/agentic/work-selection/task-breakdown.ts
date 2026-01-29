@@ -43,9 +43,11 @@ export function estimateComplexity(item: WorkItem): number {
   }
 
   // Base complexity by priority
-  let baseTurns = item.priority === 'P1' ? 100 :
+  let baseTurns = item.priority === 'P0' ? 120 :
+                  item.priority === 'P1' ? 100 :
                   item.priority === 'P2' ? 75 :
-                  50;
+                  item.priority === 'P3' ? 50 :
+                  40;
 
   // Complexity modifiers based on keywords
   const complexityKeywords: { pattern: RegExp; multiplier: number }[] = [

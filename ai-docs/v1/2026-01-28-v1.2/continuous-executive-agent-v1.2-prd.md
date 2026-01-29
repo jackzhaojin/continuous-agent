@@ -77,7 +77,7 @@ V1.2 transforms the agent from a task executor into a **learning system with ric
 
 Before specifying V1.2 features, here is where the V1.1 system stands:
 
-**Work selection** (`src/agentic/work-selection/work-selector.ts`): Parses `workspace/goals.md` as flat markdown. Extracts `### Title` headings under `## P1/P2/P3` sections. Parses `- **Status:**`, `- **Output:**`, `- **Branch:**` metadata and `#### Step N:` sub-headings. Returns highest-priority non-blocked, non-complete item.
+**Work selection** (`src/agentic/work-selection/work-selector.ts`): Parses `workspace/goals.md` as flat markdown. Extracts `### Title` headings under `## P0-P4` sections. Parses `- **Status:**`, `- **Output:**`, `- **Branch:**` metadata and `#### Step N:` sub-headings. Returns highest-priority non-blocked, non-complete item.
 
 **Worker spawning** (`src/agentic/execution/worker-spawner.ts`): Calls `query()` from `@anthropic-ai/claude-agent-sdk`. Generates project paths as `agent-outputs/projects/{category}/{date}/{slug}`. Copies `.env` and `.gitignore` template. Streams responses and logs to `ledgers/{date}/worker-{id}.log`.
 
@@ -122,12 +122,16 @@ workspace/
 │       └── PROMPT.md
 │
 ├── in-progress/            # Active work — agent executes highest priority first
-│   ├── P1/
+│   ├── P0/
 │   │   └── {goal-slug}/
 │   │       └── PROMPT.md
+│   ├── P1/
+│   │   └── {goal-slug}/
 │   ├── P2/
 │   │   └── {goal-slug}/
-│   └── P3/
+│   ├── P3/
+│   │   └── {goal-slug}/
+│   └── P4/
 │       └── {goal-slug}/
 │
 ├── blocked/                # Hard-blocked on human input (10 retries exhausted)
@@ -188,12 +192,12 @@ The YAML frontmatter provides structured metadata for the work selector. The mar
     └──────────┘                          └──────────┘
          │                                      │
          │ agent researches,                    │ human moves to
-         │ adds to references/,                 │ in-progress/P{n}/
+         │ adds to references/,                 │ in-progress/P{0-4}/
          │ suggests "ready" in                  │
          │ needs-you.md                         ▼
          │                              ┌─────────────┐
          │                              │ IN-PROGRESS  │
-         │                              │  P1/P2/P3    │◄─── human responds
+         │                              │  P0-P4    │◄─── human responds
          │                              └─────────────┘     (from blocked)
          │                                      │
          │                            agent executes │
@@ -229,7 +233,7 @@ The current `work-selector.ts` (460 lines) parses `goals.md` with regex. V1.2 re
 ```
 Phase 3 (Select Work) flow:
 
-1. Scan workspace/in-progress/P1/ → P2/ → P3/  (priority order)
+1. Scan workspace/in-progress/P0/ → P1/ → P2/ → P3/ → P4/  (priority order)
 2. For each goal-slug/ directory found:
    a. Read PROMPT.md, parse YAML frontmatter
    b. Check status field (skip if "blocked" or "complete")
@@ -254,7 +258,7 @@ After each iteration, the state handler regenerates `workspace/goals.md` from th
 ## P1 - Critical Priority
 ### Build Next.js Transactional App
 - **Status:** In Progress (Step 2 of 4, 50% complete)
-- **Source:** workspace/in-progress/P1/build-nextjs-transactional-app/
+- **Source:** workspace/in-progress/P0/build-nextjs-transactional-app/
 - **Output:** /Users/jackjin/dev/agent-outputs/projects/nextjs/2026-01-25/d5d9e97f
 
 ## Drafts
@@ -296,9 +300,11 @@ After each iteration, the state handler regenerates `workspace/goals.md` from th
 | `src/deterministic/goal-index-generator.ts` | Regenerate goals.md from folder tree |
 | `workspace/drafts/.gitkeep` | Ensure empty directories are tracked |
 | `workspace/ondeck/.gitkeep` | |
+| `workspace/in-progress/P0/.gitkeep` | |
 | `workspace/in-progress/P1/.gitkeep` | |
 | `workspace/in-progress/P2/.gitkeep` | |
 | `workspace/in-progress/P3/.gitkeep` | |
+| `workspace/in-progress/P4/.gitkeep` | |
 | `workspace/blocked/.gitkeep` | |
 | `workspace/archive/.gitkeep` | |
 
@@ -341,7 +347,7 @@ Notion writes are **fire-and-forget with retry**. If Notion API fails, the agent
 |----------|------|--------|
 | Title | Title | Task title |
 | Event | Select | Started, Completed, Failed, Blocked, Step Completed |
-| Priority | Select | P1, P2, P3 |
+| Priority | Select | P0, P1, P2, P3, P4 |
 | Timestamp | Date | ISO timestamp |
 | Duration | Number | Minutes (for completed events) |
 | Contract ID | Rich Text | Links to local worker log |
@@ -746,7 +752,7 @@ All new operations (goal state transitions, Notion reporting, project copy-in) m
 |-----------|---------|-------|
 | **Notion milestones visible** | Task start/complete/fail events appear in Notion database | 1 |
 | **Daily summary generated** | At least one daily summary page created in Notion | 1 |
-| **Goals live in folders** | All active goals are in `workspace/in-progress/P{n}/{slug}/PROMPT.md` | 2 |
+| **Goals live in folders** | All active goals are in `workspace/in-progress/P{0-4}/{slug}/PROMPT.md` | 2 |
 | **Drafts don't execute** | Agent researches drafts but does not spawn workers for them | 2 |
 | **goals.md auto-generated** | `workspace/goals.md` is regenerated from folder tree after each iteration | 2 |
 | **Existing goals migrated** | All V1.1 goals.md entries converted to goal bundles | 2 |
