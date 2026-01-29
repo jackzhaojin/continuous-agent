@@ -49,7 +49,7 @@ npm run clean
 - `ANTHROPIC_API_KEY` - API key from console.anthropic.com
 
 **Optional**:
-- `MODEL` - Defaults to `claude-sonnet-4-5-20250929`
+- `MODEL` - Defaults to `claude-opus-4-5`
 
 **Critical Token Format**:
 - Must start with `sk-ant-` prefix

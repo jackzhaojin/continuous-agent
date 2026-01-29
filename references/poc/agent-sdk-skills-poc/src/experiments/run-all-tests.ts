@@ -59,7 +59,7 @@ async function runTest(
     const stream = query({
       prompt,
       options: {
-        model: process.env.MODEL || 'claude-sonnet-4-5-20250929',
+        model: process.env.MODEL || 'claude-sonnet-4-5',
         maxTurns: 3,
         ...options
       }

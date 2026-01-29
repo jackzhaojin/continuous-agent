@@ -27,7 +27,7 @@ async function debugSkillInvocation(prompt: string): Promise<void> {
   const stream = query({
     prompt,
     options: {
-      model: process.env.MODEL || 'claude-sonnet-4-5-20250929',
+      model: process.env.MODEL || 'claude-sonnet-4-5',
       maxTurns: 5,
       cwd: PROJECT_ROOT,
       settingSources: ['user', 'project'],

@@ -26,7 +26,7 @@ interface TestResult {
 async function runTests(): Promise<void> {
   const oauthToken = process.env.CLAUDE_CODE_OAUTH_TOKEN;
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  const model = process.env.MODEL || 'claude-sonnet-4-5-20250929';
+  const model = process.env.MODEL || 'claude-sonnet-4-5';
 
   if (!oauthToken && !apiKey) {
     console.error('❌ No authentication credentials found');

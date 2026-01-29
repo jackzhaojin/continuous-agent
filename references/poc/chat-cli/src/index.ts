@@ -12,7 +12,7 @@ async function main(): Promise<void> {
   // Get authentication credentials from environment
   const oauthToken = process.env.CLAUDE_CODE_OAUTH_TOKEN;
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  const model = process.env.MODEL || 'claude-sonnet-4-5-20250929';
+  const model = process.env.MODEL || 'claude-opus-4-5';
 
   // Validate authentication
   if (!oauthToken && !apiKey) {
