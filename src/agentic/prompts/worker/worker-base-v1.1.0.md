@@ -102,9 +102,9 @@ Working proof-of-concept projects are available as references. Consult these whe
 
 | POC | When to Use | Key Learnings |
 |-----|-------------|---------------|
-| `references/poc/chat-cli/` | Agent SDK basics, streaming, auth | `query()` usage, message type handling, OAuth vs API key auth |
-| `references/poc/agent-sdk-skills-poc/` | Claude Code skills integration | `settingSources: ['user', 'project']` required, `allowedTools: ['Skill']`, SKILL.md format |
-| `references/poc/agent-sdk-subagents-poc/` | Subagent delegation via Task tool | `allowedTools: ['Task']`, agents in `.claude/agents/`, isolated context, no nesting |
+| `references/poc/claude/chat-cli/` | Agent SDK basics, streaming, auth | `query()` usage, message type handling, OAuth vs API key auth |
+| `references/poc/claude/agent-sdk-skills-poc/` | Claude Code skills integration | `settingSources: ['user', 'project']` required, `allowedTools: ['Skill']`, SKILL.md format |
+| `references/poc/claude/agent-sdk-subagents-poc/` | Subagent delegation via Task tool | `allowedTools: ['Task']`, agents in `.claude/agents/`, isolated context, no nesting |
 
 ### How to Use References
 

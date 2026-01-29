@@ -436,21 +436,21 @@ Implementation (workers execute tasks)
 
 ## Reference POCs
 
-Foundational proof-of-concept projects are stored in `references/poc/`. These are working examples that demonstrate core Agent SDK patterns:
+Foundational proof-of-concept projects are stored in `references/poc/`, organized by agent platform. This structure supports expanding the agent pool beyond Claude to include ChatGPT, Gemini, and other agents.
 
-**`references/poc/chat-cli/`** - Interactive CLI demonstrating Claude Agent SDK patterns
+**`references/poc/claude/chat-cli/`** - Interactive CLI demonstrating Claude Agent SDK patterns
 - How to use `query()` from `@anthropic-ai/claude-agent-sdk`
 - Streaming message handling (`for await of stream`)
 - Message type handling (system, assistant, user, result)
 - Authentication patterns (OAuth token vs API key)
 
-**`references/poc/agent-sdk-skills-poc/`** - Skills integration with Agent SDK
+**`references/poc/claude/agent-sdk-skills-poc/`** - Skills integration with Agent SDK
 - `settingSources: ['user', 'project']` is REQUIRED for skills
 - `allowedTools` must include 'Skill' for skill invocation
 - `cwd` must point to project root for `.claude/skills/` discovery
 - SKILL.md format with frontmatter and instructions
 
-**`references/poc/agent-sdk-subagents-poc/`** - Subagent delegation via Task tool
+**`references/poc/claude/agent-sdk-subagents-poc/`** - Subagent delegation via Task tool
 - `allowedTools` must include 'Task' to enable subagent delegation
 - `settingSources: ['user', 'project']` loads agents from filesystem
 - User-level agents (`~/.claude/agents/`) and project-level agents (`.claude/agents/`) both work
@@ -470,9 +470,9 @@ Foundational proof-of-concept projects are stored in `references/poc/`. These ar
 
 **Running POCs:**
 ```bash
-cd references/poc/chat-cli && npm install && npm run build && npm start
-cd references/poc/agent-sdk-skills-poc && npm install && npm run build && npm start
-cd references/poc/agent-sdk-subagents-poc && npm install && npm run build && npm start
+cd references/poc/claude/chat-cli && npm install && npm run build && npm start
+cd references/poc/claude/agent-sdk-skills-poc && npm install && npm run build && npm start
+cd references/poc/claude/agent-sdk-subagents-poc && npm install && npm run build && npm start
 ```
 
 These POCs have their own `.env` files (not committed) - copy from `.env.example` and add credentials.
@@ -524,9 +524,10 @@ continuous-agent/
 
 ├── references/                 # External references and POCs
 │   ├── poc/                    # Foundational proof-of-concept projects
-│   │   ├── chat-cli/           # Agent SDK CLI demo
-│   │   ├── agent-sdk-skills-poc/  # Skills integration demo
-│   │   └── agent-sdk-subagents-poc/  # Subagent delegation demo
+│   │   └── claude/             # Claude Agent SDK POCs
+│   │       ├── chat-cli/           # Agent SDK CLI demo
+│   │       ├── agent-sdk-skills-poc/  # Skills integration demo
+│   │       └── agent-sdk-subagents-poc/  # Subagent delegation demo
 │   └── reference-registry.yaml # Reference tracking
 │
 ├── .claude/skills/             # Claude Code skill documentation

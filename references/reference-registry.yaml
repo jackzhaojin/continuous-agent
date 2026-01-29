@@ -15,7 +15,7 @@ references:
     mode: A
 
     # Location
-    source_path: references/poc/chat-cli  # Local copy in this repo
+    source_path: references/poc/claude/chat-cli  # Local copy in this repo
 
     # Provenance
     upstream: /Users/jackjin/dev/azure-da-mcp/agent-claude-sdk/chat-cli
@@ -49,7 +49,7 @@ references:
     mode: A
 
     # Location
-    source_path: references/poc/agent-sdk-skills-poc  # Local copy in this repo
+    source_path: references/poc/claude/agent-sdk-skills-poc  # Local copy in this repo
 
     # Provenance
     upstream: /Users/jackjin/dev/azure-da-mcp/agent-claude-sdk/agent-sdk-skills-poc
@@ -80,7 +80,7 @@ references:
     mode: A
 
     # Location
-    source_path: references/poc/agent-sdk-subagents-poc  # Created in this repo
+    source_path: references/poc/claude/agent-sdk-subagents-poc  # Created in this repo
 
     # Provenance
     upstream: null  # Original POC, created here
