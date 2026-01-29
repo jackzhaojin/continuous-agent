@@ -5,6 +5,7 @@
 
 import { readFile, writeFile, appendFile } from 'fs/promises';
 import { existsSync } from 'fs';
+import { execSync } from 'child_process';
 import path from 'path';
 import {
   updateStepStatus,
@@ -21,7 +22,7 @@ import { reportMilestone } from './notion-reporter.js';
 import { parsePromptMd, updateFrontmatter } from './prompt-md-parser.js';
 import { generateGoalsIndex } from './goal-index-generator.js';
 import { appendProjectMemory, type ProjectMemoryEntry } from './project-memory-store.js';
-import { registerProject, generateProjectSlug, type ProjectRegistryEntry } from './project-registry.js';
+import { registerProject, generateProjectSlug, findProjectBySlug, type ProjectRegistryEntry } from './project-registry.js';
 
 const WORKSPACE_DIR = path.join(process.cwd(), 'workspace');
 const LEDGERS_DIR = path.join(process.cwd(), 'ledgers');
@@ -70,7 +71,8 @@ export async function updateTaskState(
   success: boolean,
   errorInfo?: string,
   outputPath?: string,
-  contractId?: string
+  contractId?: string,
+  workerOutput?: string
 ): Promise<void> {
   logDeterministic('Updating goals.md...');
 
@@ -117,8 +119,8 @@ export async function updateTaskState(
           output_path: outputPath || '',
           archive_path: item.source_path ? item.source_path.replace(/in-progress\/P\d\//, 'archive/') : undefined,
           capabilities_exercised: inferProjectCapabilities(item),
-          features_built: [],  // Will be populated by future agentic analysis
-          lessons: [],         // Will be populated by future agentic analysis
+          features_built: extractFeaturesFromOutput(workerOutput),
+          lessons: extractLessonsFromOutput(workerOutput),
         };
         appendProjectMemory(memoryEntry);
         logDeterministic('  Recorded project memory entry');
@@ -160,6 +162,29 @@ export async function updateTaskState(
       // Self-enhance tasks need human review before merge
       if (item.selfEnhance && item.branch) {
         await requestSelfEnhanceReview(item);
+      }
+
+      // V1.2: Multi-project patch generation and approval
+      if (item.source_project && outputPath) {
+        try {
+          const sourceEntry = findProjectBySlug(item.source_project);
+          if (sourceEntry && existsSync(sourceEntry.output_path)) {
+            const patchContent = execSync(
+              `git diff --no-index "${sourceEntry.output_path}" "${outputPath}" || true`,
+              { encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 }
+            );
+            const patchPath = path.join(outputPath, 'source-project-changes.patch');
+            await writeFile(patchPath, patchContent, 'utf-8');
+            log(`  Generated multi-project patch: ${patchPath}`);
+
+            // Request human approval for copy-back
+            await requestMultiProjectApproval(item, outputPath);
+          } else {
+            log(`  Warning: Source project "${item.source_project}" not found or path missing, skipping patch generation`);
+          }
+        } catch (patchError) {
+          log(`  Failed to generate multi-project patch: ${patchError}`);
+        }
       }
     } else {
       // Report failure milestone to Notion (fire-and-forget)
@@ -204,6 +229,32 @@ async function requestSelfEnhanceReview(item: WorkItem): Promise<void> {
     }
   } catch (error) {
     log(`  Failed to add review request: ${error}`);
+  }
+}
+
+/**
+ * Request human approval for copying multi-project changes back to source
+ * Adds entry to needs-you.md with patch file reference
+ * DETERMINISTIC: File I/O
+ */
+async function requestMultiProjectApproval(item: WorkItem, outputPath: string): Promise<void> {
+  const needsYouPath = path.join(WORKSPACE_DIR, 'needs-you.md');
+  const today = new Date().toISOString().split('T')[0];
+
+  try {
+    let content = await readFile(needsYouPath, 'utf-8');
+
+    const approvalEntry = `| Copy-back: ${item.title} to ${item.source_project} | Diff in: ${outputPath}/source-project-changes.patch | | BLOCKING | ${today} |`;
+
+    // Insert after the Actions Needed table header
+    const tablePattern = /(\| Action \| Why Agent Can't Do It \| Response \| Blocking \| Since \|)\n(\| \*None\* \||\|[^\n]+\|)/;
+    if (tablePattern.test(content)) {
+      content = content.replace(tablePattern, `$1\n${approvalEntry}`);
+      await writeFile(needsYouPath, content, 'utf-8');
+      log(`  Added multi-project approval request to needs-you.md for source: ${item.source_project}`);
+    }
+  } catch (error) {
+    log(`  Failed to add multi-project approval request: ${error}`);
   }
 }
 
@@ -493,6 +544,54 @@ export async function markStepBlocked(item: WorkItem, stepNumber: number): Promi
   } catch (error) {
     log(`  Failed to mark step as blocked: ${error}`);
   }
+}
+
+/**
+ * Extract features built from worker output
+ * DETERMINISTIC: Simple heuristic keyword matching on output text
+ */
+function extractFeaturesFromOutput(output?: string): string[] {
+  if (!output) return [];
+  const features: string[] = [];
+  const lines = output.split('\n');
+  for (const line of lines) {
+    const lower = line.toLowerCase();
+    if (
+      lower.includes('created') ||
+      lower.includes('implemented') ||
+      lower.includes('built') ||
+      lower.includes('added feature')
+    ) {
+      const clean = line.trim().slice(0, 100);
+      if (clean.length > 10) features.push(clean);
+    }
+    if (features.length >= 5) break;
+  }
+  return features;
+}
+
+/**
+ * Extract lessons from worker output
+ * DETERMINISTIC: Simple heuristic keyword matching on output text
+ */
+function extractLessonsFromOutput(output?: string): string[] {
+  if (!output) return [];
+  const lessons: string[] = [];
+  const lines = output.split('\n');
+  for (const line of lines) {
+    const lower = line.toLowerCase();
+    if (
+      lower.includes('warning:') ||
+      lower.includes('note:') ||
+      lower.includes('lesson') ||
+      lower.includes('workaround')
+    ) {
+      const clean = line.trim().slice(0, 100);
+      if (clean.length > 10) lessons.push(clean);
+    }
+    if (lessons.length >= 5) break;
+  }
+  return lessons;
 }
 
 /**

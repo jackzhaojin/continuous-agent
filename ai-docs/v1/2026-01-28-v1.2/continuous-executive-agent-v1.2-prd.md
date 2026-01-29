@@ -117,7 +117,7 @@ workspace/
 │       ├── references/     # Optional: research, links, prior art
 │       └── assets/         # Optional: diagrams, mockups, screenshots
 │
-├── ondeck/                 # Validated and ready — awaiting human priority assignment
+├── ondeck/                 # Validated and ready — auto-promoted when priority is set in PROMPT.md
 │   └── {goal-slug}/
 │       └── PROMPT.md
 │
@@ -152,12 +152,13 @@ workspace/
 ---
 title: Build Next.js Transactional App
 slug: build-nextjs-transactional-app
+priority: P2                        # P0-P4 — determines execution order and in-progress placement
 status: pending
 complexity: complex
 created: 2026-01-25
 tags: [nextjs, typescript, full-stack]
-output_path:                    # Set by agent when work begins
-branch:                         # Set by agent for [SELF-ENHANCE] tasks
+output_path:                        # Set by agent when work begins
+branch:                             # Set by agent for [SELF-ENHANCE] tasks
 ---
 
 ## Problem
@@ -181,7 +182,24 @@ How should the agent tackle this? Key decisions, constraints, technology choices
 <!-- Accumulated by agent during execution — research findings, decisions made -->
 ```
 
+The `priority` field (P0-P4) is critical: it determines which `in-progress/P{n}/` subdirectory the goal lands in, and controls execution order. Goals in `ondeck/` or `drafts/` use this field for auto-promotion (see "Ondeck Auto-Promotion" below).
+
 The YAML frontmatter provides structured metadata for the work selector. The markdown body provides rich context for the worker prompt. This mirrors the SKILL.md pattern used by Claude Code skills.
+
+### Goal Bundle Template
+
+A `_TEMPLATE/` directory at `workspace/_TEMPLATE/` provides the canonical goal bundle structure:
+
+```
+workspace/_TEMPLATE/
+├── PROMPT.md              # Full PROMPT.md with all frontmatter fields
+├── references/            # Place example code, patterns, API docs
+│   └── README.md
+└── requirements/          # Detailed technical requirements
+    └── requirements.md
+```
+
+To create a new goal, copy `_TEMPLATE/` to the appropriate state folder and customize. The goal scanner ignores directories starting with `_`.
 
 ### State Transitions
 
@@ -191,9 +209,9 @@ The YAML frontmatter provides structured metadata for the work selector. The mar
     │  DRAFTS  │ ────────────────────── ► │  ONDECK  │
     └──────────┘                          └──────────┘
          │                                      │
-         │ agent researches,                    │ human moves to
-         │ adds to references/,                 │ in-progress/P{0-4}/
-         │ suggests "ready" in                  │
+         │ agent researches,                    │ human sets priority in
+         │ adds to references/,                 │ PROMPT.md frontmatter
+         │ suggests "ready" in                  │ → agent auto-promotes
          │ needs-you.md                         ▼
          │                              ┌─────────────┐
          │                              │ IN-PROGRESS  │
@@ -221,10 +239,57 @@ The YAML frontmatter provides structured metadata for the work selector. The mar
 | State | Agent Can | Agent Cannot |
 |-------|-----------|--------------|
 | **drafts** | Read PROMPT.md, research topic, add findings to `references/`, suggest "ready" via needs-you.md | Execute (spawn worker), move folder to ondeck |
-| **ondeck** | Read PROMPT.md, estimate complexity, suggest priority via needs-you.md | Execute without human-assigned priority |
+| **ondeck** | Read PROMPT.md, estimate complexity, suggest priority via needs-you.md, **auto-promote to in-progress/P{n}/ when priority is set in frontmatter** | Execute directly from ondeck (must promote first), set priority without human (human assigns priority) |
 | **in-progress** | Full execution: spawn workers, run verifiers, update PROMPT.md with notes | Skip verification, move to archive without DoD passing |
 | **blocked** | Work on other goals, continue researching alternatives | Retry without human input, modify block reason |
 | **archive** | Reference for project memory (Feature 5), read lessons | Modify PROMPT.md content |
+
+### Ondeck Auto-Promotion
+
+Goals in `ondeck/` have a `priority` field in their PROMPT.md frontmatter. When the work selector scans for work, it also scans `ondeck/` and **auto-promotes** goals that have a priority assigned:
+
+```
+Phase 3 (Select Work) — Ondeck promotion step:
+
+1. Scan workspace/ondeck/ for goal bundles
+2. For each bundle with a priority field set (e.g., priority: P1):
+   a. Move the goal directory to workspace/in-progress/P{n}/
+   b. Update PROMPT.md frontmatter status: pending → in_progress
+   c. Log the promotion to work-ledger.jsonl
+3. Continue normal in-progress scanning (now includes newly promoted goals)
+```
+
+This means the human workflow is:
+1. Create goal bundle in `drafts/` (idea incubation)
+2. Move to `ondeck/` when ready (or agent suggests via needs-you.md)
+3. Set `priority: P1` in PROMPT.md frontmatter
+4. Agent auto-promotes to `in-progress/P1/` on next iteration
+
+**Without a priority field**, ondeck goals remain in ondeck indefinitely — they require a human-assigned priority before execution.
+
+### Priority Preemption
+
+The agent always executes the **highest-priority work available**. This creates implicit preemption:
+
+```
+Scenario: Agent is working on P3 task. Human adds P1 goal to ondeck/.
+
+Iteration N:   Agent is executing P3 task (worker spawned, running)
+               Worker completes or times out naturally at end of iteration
+
+Iteration N+1: Phase 3 scans ondeck/ → finds P1 goal → auto-promotes to in-progress/P1/
+               Phase 3 scans in-progress/P0/ (empty) → P1/ (new goal!) → selects P1
+               P3 task remains in in-progress/P3/ with status: in_progress (paused)
+               Agent begins executing P1 task
+
+Iteration N+2: P1 completes → agent looks for next work → finds P3 still in-progress → resumes P3
+```
+
+**Key rules:**
+- The agent does NOT abort a running worker mid-execution. Preemption happens between iterations.
+- The paused P3 task keeps its `status: in_progress` and `output_path` — it resumes where it left off.
+- P0 goals are treated as emergencies: if a P0 appears in ondeck, it is promoted and selected immediately on the next iteration.
+- Priority ties (multiple P1 goals) are resolved by creation date (oldest first).
 
 ### Key Implementation: Work Selector Rewrite
 
@@ -233,12 +298,19 @@ The current `work-selector.ts` (460 lines) parses `goals.md` with regex. V1.2 re
 ```
 Phase 3 (Select Work) flow:
 
+0. ONDECK AUTO-PROMOTION (before scanning in-progress)
+   a. Scan workspace/ondeck/ for goal bundles
+   b. For each bundle where PROMPT.md has priority field set:
+      - Move directory to workspace/in-progress/P{n}/
+      - Log promotion event to work-ledger.jsonl
+   c. Skip bundles without priority (remain in ondeck)
+
 1. Scan workspace/in-progress/P0/ → P1/ → P2/ → P3/ → P4/  (priority order)
 2. For each goal-slug/ directory found:
    a. Read PROMPT.md, parse YAML frontmatter
    b. Check status field (skip if "blocked" or "complete")
    c. If steps exist, find first non-complete step
-   d. Return as SelectableWork
+   d. Return as SelectableWork (highest priority wins — preempts lower priority work)
 3. If no in-progress work found:
    a. Scan workspace/drafts/ for research opportunities
    b. If draft has no references/ content yet → research task
@@ -246,7 +318,9 @@ Phase 3 (Select Work) flow:
 4. If nothing anywhere → check self-improvement triggers (existing behavior)
 ```
 
-The `SelectableWork` and `WorkItem` interfaces in `src/core/types.ts` gain a `source_path` field pointing to the goal directory.
+**Priority preemption is implicit:** Step 1 always returns the highest-priority goal. If a P1 was just promoted from ondeck, it will be selected over an existing P3 that was previously in-progress. The P3 stays in `in-progress/P3/` and resumes when higher-priority work is done.
+
+The `SelectableWork` and `WorkItem` interfaces in `src/core/types.ts` gain a `source_path` field pointing to the goal directory. Priority is read from the PROMPT.md `priority` frontmatter field — for `in-progress/` goals the directory location (P0-P4) is authoritative, for `ondeck/` goals the frontmatter field determines which priority directory to promote into.
 
 ### Auto-Generated Index (goals.md)
 
@@ -295,7 +369,7 @@ After each iteration, the state handler regenerates `workspace/goals.md` from th
 
 | File | Purpose |
 |------|---------|
-| `src/agentic/work-selection/goal-scanner.ts` | Scan folder tree, read/parse PROMPT.md files, build SelectableWork list |
+| `src/agentic/work-selection/goal-scanner.ts` | Scan folder tree, read/parse PROMPT.md files, auto-promote ondeck goals with priority set, build SelectableWork list |
 | `src/deterministic/prompt-md-parser.ts` | Parse PROMPT.md YAML frontmatter + markdown body (reuse `js-yaml` dep) |
 | `src/deterministic/goal-index-generator.ts` | Regenerate goals.md from folder tree |
 | `workspace/drafts/.gitkeep` | Ensure empty directories are tracked |
@@ -307,6 +381,7 @@ After each iteration, the state handler regenerates `workspace/goals.md` from th
 | `workspace/in-progress/P4/.gitkeep` | |
 | `workspace/blocked/.gitkeep` | |
 | `workspace/archive/.gitkeep` | |
+| `workspace/_TEMPLATE/` | Canonical goal bundle template (PROMPT.md + references/ + requirements/) |
 
 ---
 

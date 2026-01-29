@@ -5,7 +5,7 @@ description: |
   Use when the task involves improving, fixing, or enhancing the continuous-agent system itself.
   This agent has full write access to the agent codebase EXCEPT constitution.md.
 tools: Read, Write, Edit, Bash, Glob, Grep, WebSearch, WebFetch
-model: sonnet
+model: opus
 ---
 
 # Self-Enhancement Agent

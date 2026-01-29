@@ -3,7 +3,7 @@
  * Scans workspace folder tree for goal bundles, reads PROMPT.md, builds work list
  */
 
-import { readdir } from 'fs/promises';
+import { readdir, rename, mkdir, appendFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 import { parsePromptMd, type PromptMdFile } from '../../deterministic/prompt-md-parser.js';
@@ -11,6 +11,85 @@ import type { WorkItem, WorkStep } from '../../core/types.js';
 import type { SelectableWork } from './work-selector.js';
 
 const WORKSPACE_DIR = path.join(process.cwd(), 'workspace');
+
+const VALID_PRIORITIES = ['P0', 'P1', 'P2', 'P3', 'P4'] as const;
+type Priority = typeof VALID_PRIORITIES[number];
+
+function isValidPriority(value: unknown): value is Priority {
+  return typeof value === 'string' && (VALID_PRIORITIES as readonly string[]).includes(value);
+}
+
+/**
+ * Auto-promote ondeck goals that have a valid priority in their PROMPT.md frontmatter.
+ * Moves the directory from workspace/ondeck/{slug}/ to workspace/in-progress/P{n}/{slug}/
+ * Returns array of promoted slugs for logging.
+ */
+export async function autoPromoteOndeckGoals(): Promise<string[]> {
+  const ondeckDir = path.join(WORKSPACE_DIR, 'ondeck');
+  if (!existsSync(ondeckDir)) return [];
+
+  const goalDirs = await listGoalDirs(ondeckDir);
+  const promoted: string[] = [];
+
+  for (const goalDir of goalDirs) {
+    const promptPath = path.join(goalDir, 'PROMPT.md');
+    if (!existsSync(promptPath)) continue;
+
+    try {
+      const promptMd = await parsePromptMd(promptPath);
+      const priority = promptMd.frontmatter.priority;
+
+      if (!isValidPriority(priority)) continue;
+
+      const slug = path.basename(goalDir);
+      const targetParent = path.join(WORKSPACE_DIR, 'in-progress', priority);
+
+      // Ensure target priority directory exists
+      if (!existsSync(targetParent)) {
+        await mkdir(targetParent, { recursive: true });
+      }
+
+      const targetPath = path.join(targetParent, slug);
+
+      // Don't overwrite if a directory with the same slug already exists in target
+      if (existsSync(targetPath)) {
+        console.log(`[GoalScanner] Skipping promotion of "${slug}" — already exists in in-progress/${priority}`);
+        continue;
+      }
+
+      await rename(goalDir, targetPath);
+      console.log(`[GoalScanner] Auto-promoted "${slug}" from ondeck to in-progress/${priority}`);
+
+      // Log GOAL_PROMOTED event to work ledger
+      try {
+        const ledgerPath = path.join(process.cwd(), 'ledgers', 'work-ledger.jsonl');
+        const entry = JSON.stringify({
+          event: 'GOAL_PROMOTED',
+          ts: new Date().toISOString(),
+          goal_slug: slug,
+          from_state: 'ondeck',
+          to_state: 'in-progress',
+          target_priority: priority,
+        });
+        await appendFile(ledgerPath, entry + '\n', 'utf-8');
+      } catch (ledgerError) {
+        console.log(`[GoalScanner] Failed to log GOAL_PROMOTED for "${slug}": ${ledgerError}`);
+      }
+
+      promoted.push(slug);
+    } catch (error) {
+      console.log(`[GoalScanner] Failed to promote ${goalDir}: ${error}`);
+    }
+  }
+
+  return promoted;
+}
+
+// TODO: Add GOAL_ARCHIVED event logging when archive logic is implemented.
+// Currently, archive_path is only computed as metadata in state-handler.ts
+// (string replacement on source_path) but no directory move to workspace/archive/
+// actually occurs. When that logic is added, log a GOAL_ARCHIVED event here with:
+//   { event: 'GOAL_ARCHIVED', ts, goal_slug, from_state: 'in-progress', to_state: 'archive' }
 
 interface GoalBundle {
   slug: string;
@@ -69,7 +148,7 @@ async function listGoalDirs(dirPath: string): Promise<string[]> {
   try {
     const entries = await readdir(dirPath, { withFileTypes: true });
     return entries
-      .filter(e => e.isDirectory() && !e.name.startsWith('.'))
+      .filter(e => e.isDirectory() && !e.name.startsWith('.') && !e.name.startsWith('_'))
       .map(e => path.join(dirPath, e.name));
   } catch {
     return [];
@@ -94,12 +173,16 @@ async function readGoalBundle(
     const promptMd = await parsePromptMd(promptPath);
     const slug = path.basename(goalDir);
 
+    // Fall back to frontmatter priority if no directory-based priority was provided
+    const resolvedPriority = priority ??
+      (isValidPriority(promptMd.frontmatter.priority) ? promptMd.frontmatter.priority : undefined);
+
     return {
       slug,
       promptMd,
       sourcePath: goalDir,
       state,
-      priority,
+      priority: resolvedPriority,
     };
   } catch (error) {
     console.log(`[GoalScanner] Failed to parse ${promptPath}: ${error}`);
@@ -246,6 +329,9 @@ function bundleToWorkItem(bundle: GoalBundle): WorkItem {
  * Returns work sorted by priority (P0 > P1 > P2 > P3 > P4)
  */
 export async function buildSelectableWorkFromBundles(): Promise<SelectableWork[]> {
+  // Auto-promote ondeck goals with priority before scanning
+  await autoPromoteOndeckGoals();
+
   const bundles = await scanGoalBundles();
   const selectableWork: SelectableWork[] = [];
 

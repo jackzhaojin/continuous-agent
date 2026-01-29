@@ -2,7 +2,7 @@
 name: code-validator
 description: Validates code changes for correctness and best practices. Use after implementing changes to verify quality.
 tools: Read, Grep, Glob, Bash
-model: haiku
+model: sonnet
 ---
 
 You are a code validation specialist. Your role is to verify code changes meet quality standards.

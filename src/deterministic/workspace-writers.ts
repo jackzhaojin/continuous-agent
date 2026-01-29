@@ -2,55 +2,6 @@ import { readFile, writeFile, writeFile as writeFileAsync } from 'fs/promises';
 import { existsSync, mkdirSync } from 'fs';
 import path from 'path';
 
-export async function appendGoalsFromQueue(titles: string[], priority: 'P0' | 'P1' | 'P2' | 'P3' | 'P4' = 'P4'): Promise<string[]> {
-  const goalsPath = path.join(process.cwd(), 'workspace', 'goals.md');
-  if (!existsSync(goalsPath) || titles.length === 0) {
-    return [];
-  }
-
-  const content = await readFile(goalsPath, 'utf-8');
-  const added: string[] = [];
-
-  const alreadyExists = (title: string): boolean => {
-    const titlePattern = new RegExp(`^###\\s+${escapeRegex(title)}\\s*$`, 'm');
-    return titlePattern.test(content);
-  };
-
-  const newEntries = titles
-    .filter(title => !alreadyExists(title))
-    .map(title => {
-      added.push(title);
-      return [
-        `### ${title}`,
-        `- **Status:** Pending`,
-        `- **Description:** Imported from queue.md (Ready to Start)`,
-        `- **Success Criteria:** TBD`,
-        `- **Dependencies:** None identified`,
-        '',
-      ].join('\n');
-    })
-    .join('\n');
-
-  if (!newEntries) {
-    return [];
-  }
-
-  const sectionPattern = new RegExp(`(##\\s+${priority}\\b[\\s\\S]*?)(\\n##\\s+|\\n##\\s+Archive|$)`, 'i');
-  let updatedContent = content;
-
-  if (sectionPattern.test(content)) {
-    updatedContent = content.replace(sectionPattern, (match, sectionBody, sectionTail) => {
-      const trimmedSection = sectionBody.trimEnd();
-      return `${trimmedSection}\n\n${newEntries}${sectionTail}`;
-    });
-  } else {
-    updatedContent = `${content.trimEnd()}\n\n## ${priority}\n\n${newEntries}`;
-  }
-
-  await writeFile(goalsPath, updatedContent, 'utf-8');
-  return added;
-}
-
 export async function updateProgressOnStart(itemTitle: string, statusNote: string): Promise<void> {
   const progressPath = path.join(process.cwd(), 'workspace', 'progress.md');
   if (!existsSync(progressPath)) {
@@ -97,10 +48,6 @@ export async function recordCompletion(itemTitle: string, outcome: string, relat
   await writeFile(completedPath, updated, 'utf-8');
 }
 
-function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
 /**
  * Create a new goal bundle in drafts/
  * V1.2: New goals start as draft bundles instead of goals.md entries
@@ -108,7 +55,8 @@ function escapeRegex(str: string): string {
 export async function createGoalBundle(
   title: string,
   description: string,
-  targetDir: string = path.join(process.cwd(), 'workspace', 'drafts')
+  targetDir: string = path.join(process.cwd(), 'workspace', 'drafts'),
+  priority: string = 'P3'
 ): Promise<string | null> {
   const slug = title
     .toLowerCase()
@@ -129,6 +77,7 @@ export async function createGoalBundle(
 title: "${title.replace(/"/g, '\\"')}"
 slug: "${slug}"
 status: pending
+priority: ${priority}
 created: "${new Date().toISOString().split('T')[0]}"
 ---
 

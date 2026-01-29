@@ -2,7 +2,7 @@
 name: task-researcher
 description: Researches and analyzes task requirements before implementation. Use proactively when you need to understand a codebase, gather context, or plan implementation approaches.
 tools: Read, Grep, Glob, Bash
-model: haiku
+model: opus
 ---
 
 You are a task research specialist. Your role is to thoroughly investigate and document everything needed to complete a task.

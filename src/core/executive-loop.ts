@@ -33,7 +33,7 @@ import {
 import { checkHealth } from '../deterministic/health-checker.js';
 import { processHumanInputs } from '../deterministic/input-processor.js';
 import { ingestQueueTasks } from '../deterministic/queue-processor.js';
-import { appendGoalsFromQueue } from '../deterministic/workspace-writers.js';
+import { createGoalBundle } from '../deterministic/workspace-writers.js';
 import { appendInputLog } from '../deterministic/inputs-log.js';
 import { isRateLimitError, isInCooldown, enterCooldown, resetBackoff } from '../deterministic/backoff-manager.js';
 import { validateWork } from '../deterministic/validation-handler.js';
@@ -139,22 +139,27 @@ async function runIteration(): Promise<IterationResult> {
     }
   }
 
-  // Ingest queue tasks if any
+  // Ingest queue tasks as draft bundles (V1.2)
   const queueResult = await ingestQueueTasks();
   if (queueResult.ingested.length > 0) {
-    const added = await appendGoalsFromQueue(queueResult.ingested, 'P4');
-    for (const item of added) {
-      await appendInputLog({
-        source: 'queue',
-        ts: new Date().toISOString(),
-        raw_input: item,
-        priority: 'P4',
-        scope_allowed: ['workspace/goals.md'],
-        intent_type: 'queue_ingest',
-        metadata: { status: 'ingested_to_goals' },
-      });
+    let createdCount = 0;
+    for (const item of queueResult.ingested) {
+      const description = `Imported from queue.md (Ready to Start)`;
+      const bundlePath = await createGoalBundle(item, description, undefined, 'P3');
+      if (bundlePath) {
+        createdCount++;
+        await appendInputLog({
+          source: 'queue',
+          ts: new Date().toISOString(),
+          raw_input: item,
+          priority: 'P3',
+          scope_allowed: ['workspace/drafts/'],
+          intent_type: 'queue_ingest',
+          metadata: { status: 'ingested_to_draft_bundle', bundle_path: bundlePath },
+        });
+      }
     }
-    log(`  Ingested ${added.length} task(s) from queue`);
+    log(`  Ingested ${createdCount} task(s) from queue as draft bundles`);
   }
 
   // === PHASE 3: SELECT WORK ===
@@ -241,7 +246,7 @@ async function runIteration(): Promise<IterationResult> {
     if (isStepExecution && currentStep) {
       await updateStepState(workItem, currentStep, true, undefined, result.output_path, contractId);
     } else {
-      await updateTaskState(workItem, true, undefined, result.output_path, contractId);
+      await updateTaskState(workItem, true, undefined, result.output_path, contractId, result.output);
     }
 
     // Reset backoff on success
