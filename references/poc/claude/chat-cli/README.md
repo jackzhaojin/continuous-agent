@@ -58,10 +58,10 @@ ANTHROPIC_API_KEY=sk-ant-api03-...
 
 ### Optional Configuration
 
-You can specify which Claude model to use (defaults to `claude-sonnet-4-5-20250929`):
+You can specify which Claude model to use (defaults to `claude-sonnet-4-5`):
 
 ```bash
-MODEL=claude-sonnet-4-5-20250929
+MODEL=claude-sonnet-4-5
 ```
 
 ## Usage
@@ -89,7 +89,7 @@ Once running, you'll see:
 ```
 🤖 Claude Agent SDK Chat Demo
 ══════════════════════════════════════════════════
-Model: claude-sonnet-4-5-20250929
+Model: claude-sonnet-4-5
 Auth: OAuth Token
 ══════════════════════════════════════════════════
 Type your message and press Enter. Type "exit" or "quit" to end.

@@ -184,7 +184,7 @@ export async function diagnoseFailure(
     console.log(`[Diagnosis] Spawning diagnostic agent with ${validationReports.length} validation reports and ${workerLogs.length} worker logs`);
 
     // Spawn diagnostic agent using Agent SDK
-    const model = process.env.MODEL || 'claude-sonnet-4-5-20250929';
+    const model = process.env.MODEL || 'claude-sonnet-4-5';
     const stream = query({
       prompt,
       options: {

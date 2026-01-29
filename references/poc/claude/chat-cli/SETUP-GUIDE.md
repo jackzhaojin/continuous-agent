@@ -105,8 +105,8 @@ Edit the `.env` file and add your token:
 # Authentication (OAuth Token for Claude Pro/Max subscribers)
 CLAUDE_CODE_OAUTH_TOKEN=sk-ant-api03-your-actual-token-here
 
-# Optional: Specify Claude model (defaults to claude-sonnet-4-5-20250929)
-MODEL=claude-sonnet-4-5-20250929
+# Optional: Specify Claude model (defaults to claude-sonnet-4-5)
+MODEL=claude-sonnet-4-5
 ```
 
 **CRITICAL: Token Format Rules**
@@ -140,7 +140,7 @@ You should see:
 ```
 🤖 Claude Agent SDK Chat Demo
 ══════════════════════════════════════════════════
-Model: claude-sonnet-4-5-20250929
+Model: claude-sonnet-4-5
 Auth: OAuth Token
 ══════════════════════════════════════════════════
 Type your message and press Enter. Type "exit" or "quit" to end.
@@ -478,10 +478,10 @@ npm run prod         # Uses .env.production
 
 ```env
 # Use Claude Opus instead of Sonnet
-MODEL=claude-opus-4-5-20251022
+MODEL=claude-opus-4-5
 
 # Use Claude Haiku for faster, cheaper responses
-MODEL=claude-haiku-3-5-20241022
+MODEL=claude-haiku-3-5
 ```
 
 ### Timeout Configuration

@@ -341,7 +341,7 @@ CLAUDE_CODE_OAUTH_TOKEN=    # Option 1: OAuth (Claude Pro/Max)
 ANTHROPIC_API_KEY=          # Option 2: API key
 
 # Optional configuration
-MODEL=claude-sonnet-4-5-20250929
+MODEL=claude-sonnet-4-5
 MAX_TURNS=250               # Max turns per worker session for single-step tasks
 MAX_TURNS_PER_STEP=100      # Max turns per step for multi-step tasks (MINIMUM 100)
 

@@ -76,8 +76,8 @@ nvm use 20
 # OAuth Token (required) - starts with sk-ant-
 CLAUDE_CODE_OAUTH_TOKEN=sk-ant-api03-your-actual-token-here
 
-# Model (optional) - defaults to claude-sonnet-4-5-20250929
-MODEL=claude-sonnet-4-5-20250929
+# Model (optional) - defaults to claude-sonnet-4-5
+MODEL=claude-sonnet-4-5
 ```
 
 ---
