@@ -221,6 +221,9 @@ function bundleToWorkItem(bundle: GoalBundle): WorkItem {
     progress_pct = Math.round((completedSteps / steps.length) * 100);
   }
 
+  // Read source_project from frontmatter (for multi-project access)
+  const source_project = frontmatter.source_project as string | undefined;
+
   return {
     id: `goal-${bundle.slug}`,
     priority: bundle.priority || 'P3',
@@ -234,6 +237,7 @@ function bundleToWorkItem(bundle: GoalBundle): WorkItem {
     current_step,
     progress_pct,
     source_path: bundle.sourcePath, // V1.2 field
+    source_project: source_project || undefined, // V1.2: Multi-project access
   };
 }
 

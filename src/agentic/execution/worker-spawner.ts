@@ -15,6 +15,7 @@ import type { TaskContract, WorkerResult, WorkItem } from '../../core/types.js';
 import { buildIntelligentPrompt, buildSimplePrompt } from '../intelligence/prompt-builder.js';
 import { classifyIntent } from '../intelligence/intent-classifier.js';
 import { selectStrategy } from '../intelligence/strategy-selector.js';
+import { findProjectBySlug } from '../../deterministic/project-registry.js';
 
 // Agent outputs directory - where workers create their projects
 const AGENT_OUTPUTS_BASE = process.env.AGENT_OUTPUTS_PATH || path.join(os.homedir(), 'dev', 'agent-outputs');
@@ -142,6 +143,36 @@ function setupProjectDirectory(projectPath: string, category: string): void {
     }
   } catch (error) {
     console.log(`[Worker] Warning: Could not auto-commit git changes: ${error}`);
+  }
+}
+
+/**
+ * Copy source project files into the new project directory (V1.2)
+ * Uses rsync to efficiently copy, excluding .git, node_modules, .env
+ */
+function copySourceProject(sourcePath: string, targetPath: string): boolean {
+  try {
+    if (!existsSync(sourcePath)) {
+      console.log(`[Worker] Source project not found: ${sourcePath}`);
+      return false;
+    }
+
+    // Ensure target exists
+    if (!existsSync(targetPath)) {
+      mkdirSync(targetPath, { recursive: true });
+    }
+
+    // Use rsync to copy files, excluding build artifacts and secrets
+    execSync(
+      `rsync -a --exclude='.git' --exclude='node_modules' --exclude='.env' --exclude='dist' --exclude='.next' --exclude='__pycache__' "${sourcePath}/" "${targetPath}/"`,
+      { stdio: 'pipe' }
+    );
+
+    console.log(`[Worker] Copied source project from ${sourcePath} to ${targetPath}`);
+    return true;
+  } catch (error) {
+    console.log(`[Worker] Warning: Failed to copy source project: ${error}`);
+    return false;
   }
 }
 
@@ -315,6 +346,22 @@ export async function spawnWorker(
     projectPath = generated.path;
     category = generated.category;
     setupProjectDirectory(projectPath, category);
+
+    // V1.2: Copy-in from source project if specified
+    if (workItem?.source_project) {
+      const sourceEntry = findProjectBySlug(workItem.source_project);
+      if (sourceEntry) {
+        logger.log(`COPY-IN: Copying from source project "${sourceEntry.slug}" at ${sourceEntry.output_path}`);
+        const copied = copySourceProject(sourceEntry.output_path, projectPath);
+        if (copied) {
+          logger.log(`COPY-IN: Source project copied successfully`);
+        } else {
+          logger.log(`COPY-IN: Warning - source project copy failed, starting fresh`);
+        }
+      } else {
+        logger.log(`COPY-IN: Source project "${workItem.source_project}" not found in registry`);
+      }
+    }
   }
 
   // Build prompt - use self-enhancement prompt for self-enhance tasks
@@ -332,7 +379,7 @@ export async function spawnWorker(
       logger.log(`Strategy: ${strategySelection.strategy.name} (${strategySelection.strategy.id})`);
     }
   }
-  const model = process.env.MODEL || 'claude-sonnet-4-5-20250929';
+  const model = process.env.MODEL || 'claude-sonnet-4-5';
 
   // Determine allowed tools - add Task for self-enhancement (before logging)
   const allowedTools = [...contract.scope.tools_allowed];

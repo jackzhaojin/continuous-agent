@@ -21,6 +21,7 @@ import { reportMilestone } from './notion-reporter.js';
 import { parsePromptMd, updateFrontmatter } from './prompt-md-parser.js';
 import { generateGoalsIndex } from './goal-index-generator.js';
 import { appendProjectMemory, type ProjectMemoryEntry } from './project-memory-store.js';
+import { registerProject, generateProjectSlug, type ProjectRegistryEntry } from './project-registry.js';
 
 const WORKSPACE_DIR = path.join(process.cwd(), 'workspace');
 const LEDGERS_DIR = path.join(process.cwd(), 'ledgers');
@@ -123,6 +124,25 @@ export async function updateTaskState(
         logDeterministic('  Recorded project memory entry');
       } catch (memErr) {
         log(`  Warning: Failed to record project memory: ${memErr}`);
+      }
+
+      // V1.2: Register project in registry for reuse
+      try {
+        if (outputPath) {
+          const regEntry: ProjectRegistryEntry = {
+            slug: generateProjectSlug(item.title),
+            title: item.title,
+            output_path: outputPath,
+            completed: new Date().toISOString().split('T')[0],
+            category: detectProjectCategory(item),
+            capabilities: inferProjectCapabilities(item),
+            reusable: true,
+          };
+          registerProject(regEntry);
+          logDeterministic('  Registered project in registry');
+        }
+      } catch (regErr) {
+        log(`  Warning: Failed to register project: ${regErr}`);
       }
 
       // Track self-improvement completions

@@ -68,6 +68,9 @@ export interface WorkItem {
 
   // V1.2: Goal bundle source path
   source_path?: string;     // Path to goal bundle directory
+
+  // V1.2: Multi-project access - reference to source project for copy-in
+  source_project?: string;    // Slug of source project to copy from
 }
 
 /**

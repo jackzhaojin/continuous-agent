@@ -1,0 +1,15 @@
+# Project Registry - Tracks completed projects for reuse
+# V1.2: Updated automatically on task completion
+# Workers can reference source_project to build on previous work
+
+projects: []
+
+# Example entry:
+# - slug: my-nextjs-app
+#   title: "Build a Next.js App"
+#   output_path: /Users/.../agent-outputs/projects/nextjs/2026-01-25/abc123
+#   completed: "2026-01-25"
+#   category: nextjs
+#   capabilities:
+#     - deliver.nextjs.app.basic
+#   reusable: true
