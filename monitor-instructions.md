@@ -75,7 +75,6 @@ All monitoring state lives in two directories:
 | `workspace/blocked/` | Goals that hit 10 retries | Every check |
 | `workspace/archive/` | Completed/cancelled goals | Occasional |
 | `workspace/needs-you.md` | Items awaiting human input | Every check |
-| `workspace/goals.md` | Auto-generated index (read-only mirror of folder state) | Informational |
 
 ### Worker Output Directory (`agent-outputs/`)
 
@@ -141,6 +140,17 @@ echo "=== Archive ===" && ls /Users/jackjin/dev/continuous-agent/workspace/archi
 # 5. needs-you.md (any blocking items?)
 grep -E "BLOCKING|HIGH" /Users/jackjin/dev/continuous-agent/workspace/needs-you.md 2>/dev/null || echo "No blocking items"
 
+# 5b. Step progress for active multi-step tasks
+echo "=== Step Progress ==="
+find /Users/jackjin/dev/continuous-agent/workspace/in-progress -name "PROMPT.md" 2>/dev/null | while read f; do
+  slug=$(basename $(dirname "$f"))
+  steps_total=$(grep -c "^### Step" "$f" 2>/dev/null || echo 0)
+  steps_done=$(grep -ci "Status.*Complete" "$f" 2>/dev/null || echo 0)
+  if [ "$steps_total" -gt 0 ]; then
+    echo "  $slug: $steps_done/$steps_total steps complete"
+  fi
+done
+
 # 6. Agent-outputs: recent project directories and git activity
 echo "=== Recent Worker Outputs ==="
 find /Users/jackjin/dev/agent-outputs/projects -maxdepth 3 -type d -mmin -60 2>/dev/null | sort
@@ -162,7 +172,7 @@ git -C /Users/jackjin/dev/agent-outputs status --short 2>/dev/null | head -10
 
 ## What Normal Progress Looks Like
 
-### Healthy Iteration Pattern
+### Healthy Iteration Pattern — Simple Task (No Breakdown)
 
 Each loop iteration produces log output following this sequence:
 
@@ -181,6 +191,7 @@ ITERATION N
 
 🤖 [AGENTIC] PHASE 3: Select Work (Priority: P0 > P1 > P2 > P3 > P4)
 🤖 [AGENTIC] Selected TASK: [P3] Some Task Title
+  Complexity estimate: 75 turns (below breakdown threshold)
 
 🤖 [AGENTIC] PHASE 4: Execute Work (Agent SDK Worker)
 
@@ -191,6 +202,48 @@ ITERATION N
 ⚙️ [DETERMINISTIC] PHASE 6: Update State (Success)
 ⚙️ [DETERMINISTIC] Continue immediately (more work may be available)
 ```
+
+### Healthy Iteration Pattern — Complex Task (Auto-Breakdown + Step Execution)
+
+When a task exceeds the complexity threshold (>100 estimated turns), Phase 3b auto-breaks it into steps. The agent then executes one step per iteration:
+
+```
+================================================================================
+ITERATION N (first encounter with complex task)
+================================================================================
+🤖 [AGENTIC] PHASE 3: Select Work
+🤖 [AGENTIC] Selected TASK: [P3] Full-Stack Music Player Platform
+🤖 [AGENTIC] PHASE 3b: Auto-Breakdown
+  Estimated complexity: 225 turns (threshold: 100)
+  Generated 8 steps for "Full-Stack Music Player Platform"
+  Steps written to PROMPT.md — re-selecting to execute step 1
+  Re-selected: Step 1/8: Research existing patterns and plan approach
+
+🤖 [AGENTIC] PHASE 4: Execute Work (Step 1 of 8)
+... worker runs ...
+
+⚙️ [DETERMINISTIC] PHASE 6: Update State (Success)
+  ✓ Step 1 complete
+  Updated step 1 status to "complete" in PROMPT.md
+  7 steps remaining
+⚙️ [DETERMINISTIC] Continue immediately (more work may be available)
+
+================================================================================
+ITERATION N+1 (continues same task, next step)
+================================================================================
+🤖 [AGENTIC] PHASE 3: Select Work
+🤖 [AGENTIC] Selected STEP: [P3] Full-Stack Music Player Platform — Step 2/8: Initialize project with Next.js
+
+🤖 [AGENTIC] PHASE 4: Execute Work (Step 2 of 8)
+...
+```
+
+**Key things to watch in step execution:**
+- After Phase 3b, work-ledger should log `TASK_BREAKDOWN` event
+- Each step completion logs `STEP_COMPLETED` to work-ledger
+- PROMPT.md body should show step status updates (Pending → Complete)
+- When ALL steps complete, the task itself is marked complete (`TASK_COMPLETED`)
+- All steps share the SAME `output_path` — no duplicate project directories
 
 ### Normal Idle Pattern
 
@@ -207,10 +260,24 @@ When no work is available, the agent sleeps 30s (or 60s in dev) between polls:
 ### Normal Goal Lifecycle
 
 1. Goal appears in `workspace/ondeck/{slug}/PROMPT.md`
-2. `goal-scanner.ts` auto-promotes it to `workspace/in-progress/P3/{slug}/`
-3. Agent selects it in Phase 3, executes in Phase 4
-4. On success: moved to `workspace/archive/{slug}/`
-5. On max failure: moved to `workspace/blocked/{slug}/`, entry added to `needs-you.md`
+2. `goal-scanner.ts` auto-promotes it to `workspace/in-progress/P{n}/{slug}/` (based on priority field)
+3. Agent selects it in Phase 3
+4. **If complex (>100 est. turns):** Phase 3b auto-breaks into steps, writes `## Steps` to PROMPT.md
+5. Agent executes work (full task or one step at a time) in Phase 4
+6. On success: PROMPT.md frontmatter set to `status: complete` (stays in `in-progress/P{n}/`)
+7. On max failure (10 retries): bundle directory **moved** to `workspace/blocked/{slug}/`, entry added to `needs-you.md`
+8. On human unblock: bundle directory **moved back** from `blocked/` to `in-progress/P{n}/`
+
+### Normal Multi-Step Task Lifecycle
+
+1. Task selected → Phase 3b estimates complexity → generates 4-9 steps
+2. Steps written to PROMPT.md body as `## Steps` section with `- **Status:** Pending`
+3. `TASK_BREAKDOWN` event logged to work-ledger
+4. Agent re-selects to get Step 1, executes it
+5. On step success: step status updated to `Complete` in PROMPT.md body, `STEP_COMPLETED` logged
+6. Next iteration: agent selects next pending step (same task, same output directory)
+7. Repeat until all steps complete → task marked complete, `TASK_COMPLETED` logged
+8. If a step fails 10 times: step and task marked `blocked`, bundle moved to `blocked/`
 
 ### Normal Rate Limit Handling
 
@@ -316,6 +383,34 @@ git -C <output_path> diff --stat HEAD~1  # Should show real file changes
 
 If the directory exists but git is empty or missing, the worker started but didn't commit its work. The verifier (`git_status_clean`) should have caught this — if the task was marked COMPLETED anyway, there's a validation bug.
 
+### Step Not Progressing (Stuck on Same Step)
+
+For multi-step tasks, the agent should advance through steps across iterations. If the log shows the same step number repeatedly:
+
+```
+ITERATION 5 → Selected STEP: [P3] Music Player — Step 3/8: Database schema
+ITERATION 6 → Selected STEP: [P3] Music Player — Step 3/8: Database schema
+ITERATION 7 → Selected STEP: [P3] Music Player — Step 3/8: Database schema
+```
+
+This means Step 3 is failing and being retried. Check:
+- Work-ledger for `STEP_ATTEMPT_FAILED` events on that step
+- The worker log for the specific error
+- PROMPT.md to verify previous steps show `Status: Complete` (if not, step persistence may be broken)
+
+This is normal up to 10 retries per step. After 10, the step and task should be marked blocked.
+
+### Step Status Not Persisting (Re-Executing Completed Steps)
+
+If the agent re-selects Step 1 after it was already completed, step status persistence is broken:
+
+```
+ITERATION 5 → Step 1 complete → 7 steps remaining
+ITERATION 6 → Selected STEP: Step 1 (should be Step 2!)
+```
+
+Check the PROMPT.md body — if completed steps still show `- **Status:** Pending`, the `updateStepStatusInPromptMd()` function is failing. This is a **HIGH** severity bug — the agent will loop on the same step forever.
+
 ### Agent-Outputs Growing Without Structure
 
 ```bash
@@ -374,6 +469,9 @@ For MEDIUM issues: report to user with diagnosis. The agent may self-correct (ra
 | No progress > 30 min (goals exist) | MEDIUM | Check executive log for stuck phase, report |
 | Completed task has no output | MEDIUM | Report — possible validation bug |
 | Completed task has empty git | MEDIUM | Report — worker started but didn't build |
+| Step status not persisting | HIGH | Report — agent will re-execute completed steps forever |
+| Same step failing > 10 times without blocking | MEDIUM | Check if auto-block worked; report if not |
+| Multi-step task creating duplicate project dirs | MEDIUM | All steps should reuse same output_path |
 | Duplicate project dirs | LOW | Report — retry resume logic may be broken |
 | All tasks blocked | LOW | Report — human needs to respond in needs-you.md |
 | Disk > 90% | LOW | Report — agent-outputs may be filling up |
@@ -435,7 +533,7 @@ The human communication channel is `workspace/needs-you.md`. When you need to no
 - Do NOT restart the agent if the user intentionally stopped it
 - Do NOT push commits from either repo (continuous-agent or agent-outputs)
 - Do NOT take over building tasks — only monitor and intervene
-- Do NOT modify workspace goal files (PROMPT.md, goals.md) — that's the agent's job
+- Do NOT modify workspace goal files (PROMPT.md bundles) — that's the agent's job
 - Do NOT fill in the "Response" column in needs-you.md — only the human responds to the agent's requests
 - You CAN add new `[MONITOR]` rows to the Actions Needed table in needs-you.md — that's how you notify the human
 - Do NOT modify source code while the agent is running (rebuild + restart needed)
@@ -449,6 +547,7 @@ When reporting status checks, use:
 [MONITOR] <time> | PM2: <online|stopped|errored> | Uptime: <elapsed> | Restarts: <N>
   Iteration: <N> | Last work: <time or "never">
   Pipeline: ondeck=<N> | active=<N> | blocked=<N> | archived=<N>
+  Steps: <task-slug> <done>/<total> (if multi-step task active)
   Recent: <last task event from work-ledger>
   Issues: <none | description>
   Action: <none | description>
@@ -499,12 +598,30 @@ When reporting status checks, use:
 **Priority 2 — Process and pipeline health**
 
 4. **PM2 health**: `pm2 describe executive-loop` — check restarts, memory, uptime
-5. **Goal pipeline consistency**: goals in `in-progress/` should have `status: in_progress` in PROMPT.md; `blocked/` should have `status: blocked`
-6. **Work ledger integrity**: last STARTED event should have a corresponding COMPLETED or BLOCKED event (unless currently executing)
-7. **Needs-you.md**: any unanswered BLOCKING items? If items are old (>1 hour), flag to user
+5. **Goal pipeline consistency**:
+   - Goals in `in-progress/` should have `status: pending` or `status: in_progress` in PROMPT.md frontmatter
+   - Goals in `blocked/` should have `status: blocked` in PROMPT.md frontmatter
+   - If a PROMPT.md in `in-progress/` has `status: blocked`, the directory move failed — report this
+6. **Step status consistency** (for multi-step tasks):
+   - Check PROMPT.md body `## Steps` section — completed steps should show `- **Status:** Complete`
+   - Cross-reference with work-ledger: each `STEP_COMPLETED` event should have a matching status in PROMPT.md
+   - If a step shows "Pending" in PROMPT.md but `STEP_COMPLETED` exists in ledger, step persistence is broken — report
+   - Verify all steps for a task share the same `output_path` (no duplicate project dirs)
+   ```bash
+   # Check step status in active multi-step tasks
+   find /Users/jackjin/dev/continuous-agent/workspace/in-progress -name "PROMPT.md" 2>/dev/null | while read f; do
+     if grep -q "^## Steps" "$f"; then
+       slug=$(basename $(dirname "$f"))
+       echo "=== $slug ==="
+       grep -E "^### Step|Status:" "$f"
+     fi
+   done
+   ```
+7. **Work ledger integrity**: last STARTED event should have a corresponding COMPLETED or BLOCKED event (unless currently executing). For multi-step tasks, check for `STEP_COMPLETED` events matching the active step.
+8. **Needs-you.md**: any unanswered BLOCKING items? If items are old (>1 hour), flag to user
 
 **Priority 3 — Resource and rate health**
 
-8. **Rate limit state**: check if recent log lines show cooldown patterns
-9. **Disk usage**: `df -h /Users/jackjin/dev/agent-outputs` — worker outputs can grow large
-10. **Memory**: `pm2 describe executive-loop` — check memory usage vs 1G limit
+9. **Rate limit state**: check if recent log lines show cooldown patterns
+10. **Disk usage**: `df -h /Users/jackjin/dev/agent-outputs` — worker outputs can grow large
+11. **Memory**: `pm2 describe executive-loop` — check memory usage vs 1G limit
