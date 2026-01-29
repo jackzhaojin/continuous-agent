@@ -1,48 +1,80 @@
 ---
-title: Recipe Discovery App UI
+title: Full-Stack Recipe Discovery Platform
 slug: recipe-card-explorer
 priority: P3
 status: pending
-complexity: medium
+complexity: high
 created: 2026-01-28
-tags: [react, tailwind, frontend, ui-ux, cards, filtering]
+tags: [react, nextjs, tailwind, frontend, ui-ux, cards, filtering, api, database, authentication, full-stack, responsive, animation]
 output_path:
 branch:
 ---
 
 ## Problem
 
-Build a recipe browsing/discovery interface that demonstrates card-based layouts, filtering interactions, and modal detail views. All data is mock. Focus is on smooth interaction design — instant search filtering, tag-based navigation, and a polished detail modal that feels native.
+Build a full-stack recipe discovery platform with user accounts, a REST API for recipe management, a SQLite database, and a polished card-based browsing UI. Users can browse, search, filter, save favorites, create their own recipes, and leave ratings. This tests the full delivery pipeline — database design, API endpoints, authentication, and rich interactive frontend with instant search, filtering, modals, and responsive layouts.
 
 ## Definition of Done
 
-- [ ] React + Tailwind project scaffolded with Vite
-- [ ] Grid of recipe cards (12+ recipes) with food image placeholder, title, cook time, difficulty badge
+### Authentication & User System
+- [ ] Login and registration pages with email/password
+- [ ] Session-based authentication with JWT tokens
+- [ ] Protected routes for recipe creation, favorites, and profile
+- [ ] User profile page showing username, recipes created, favorites count
+
+### Database & Schema
+- [ ] SQLite database with better-sqlite3 (or Prisma + SQLite)
+- [ ] Schema: Users, Recipes (title, description, category, difficulty, cookTime, servings, imageUrl, createdBy), Ingredients (recipeId, name, amount, unit), Steps (recipeId, stepNumber, instruction), Favorites (userId, recipeId), Ratings (userId, recipeId, score)
+- [ ] Seed script populating 20+ recipes across categories with realistic ingredients and step descriptions
+- [ ] Migrations or schema initialization script
+
+### API Endpoints
+- [ ] POST /api/auth/register, POST /api/auth/login, POST /api/auth/logout
+- [ ] GET /api/recipes — list recipes with pagination, optional category/difficulty filters
+- [ ] GET /api/recipes/:id — full recipe detail with ingredients, steps, average rating
+- [ ] POST /api/recipes — create recipe (authenticated)
+- [ ] PUT /api/recipes/:id — update recipe (owner only)
+- [ ] DELETE /api/recipes/:id — delete recipe (owner only)
+- [ ] GET /api/recipes/search?q= — full-text search by title, ingredients, description
+- [ ] POST /api/recipes/:id/favorite — toggle favorite
+- [ ] GET /api/favorites — user's favorited recipes
+- [ ] POST /api/recipes/:id/rate — rate a recipe (1-5 stars)
+- [ ] GET /api/users/me/recipes — user's created recipes
+
+### Frontend UI
+- [ ] Browse page: responsive grid of recipe cards (image placeholder, title, cook time, difficulty badge, average rating)
 - [ ] Search bar with instant client-side filtering (debounced, highlights matches)
-- [ ] Category tag bar (Breakfast, Lunch, Dinner, Dessert, Snack) with multi-select filter
+- [ ] Category filter bar (Breakfast, Lunch, Dinner, Dessert, Snack, Vegetarian) with multi-select
 - [ ] Difficulty badges: Easy (green), Medium (yellow), Hard (red) with Tailwind color coding
-- [ ] Cook time indicator with clock icon
+- [ ] Sort options: popularity, cook time, newest, rating
 - [ ] Card hover effect: subtle lift + shadow transition
-- [ ] Click card opens modal with full recipe detail: hero image, ingredient list, numbered steps
-- [ ] Modal has smooth open/close animation (scale + fade)
-- [ ] "Favorite" heart toggle on cards with filled/outline state
+- [ ] Recipe detail page: hero image, ingredient list with checkboxes, numbered steps, cook time, servings, nutritional estimate
+- [ ] Rating component: clickable star rating (1-5) with average display
+- [ ] Favorite heart toggle on cards and detail page
+- [ ] Create recipe form: multi-step wizard (basic info → ingredients → steps → review & submit)
+- [ ] User profile page with tabs: My Recipes, Favorites
+- [ ] Empty states for all pages ("No recipes found", "No favorites yet", etc.)
 - [ ] Responsive: 1 col mobile, 2 col tablet, 3-4 col desktop
-- [ ] Empty state when no recipes match filter ("No recipes found — try different filters")
-- [ ] All mock data with realistic recipe names, ingredients, and step descriptions
+- [ ] Loading skeletons for all async data fetches
+
+### Integration & Polish
+- [ ] All pages fetch from the API (no hardcoded mock in components)
+- [ ] Optimistic UI for favorite toggle and rating
+- [ ] Error boundaries and toast notifications for failed operations
 - [ ] All code compiles, no TypeScript errors
 - [ ] Git committed with clean status
 
 ## Approach
 
-- Vite + React + TypeScript + Tailwind CSS
-- Mock data: 15+ recipes with typed Recipe interface (id, title, category, difficulty, cookTime, ingredients, steps, imageUrl)
-- Image placeholders: Use gradient backgrounds or placeholder service with food category
-- Filtering: useMemo for derived filtered list, useTransition for non-blocking filter updates
-- Modal: Portal-based with backdrop blur, focus trap, Escape to close
-- Animations: Tailwind transition utilities for hover, custom keyframes for modal enter/exit
+- Next.js 14 App Router + TypeScript + Tailwind CSS
+- Database: SQLite via better-sqlite3
+- Auth: Custom JWT with bcrypt
+- Images: Gradient placeholders with category-specific colors
+- Filtering: Server-side for pagination, client-side instant filter for loaded results
+- Forms: React Hook Form with Zod validation for recipe creation
+- Animations: Tailwind transition utilities, custom keyframes for modal enter/exit
 - Layout: CSS Grid with auto-fill and minmax for responsive card grid
-- Favorites: localStorage persistence for heart toggle state
 
 ## Agent Notes
 
-This task is ready for execution — no open questions remain. The scope is well-defined and medium complexity.
+Complex full-stack task with CRUD operations, relational data, user-generated content, and rich UI interactions. Expect 7-9 implementation steps.

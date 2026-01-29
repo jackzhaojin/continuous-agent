@@ -1,46 +1,89 @@
 ---
-title: Conversational Chat Interface
+title: Full-Stack Conversational Chat Application
 slug: chatbot-ui-react
 priority: P2
 status: pending
-complexity: medium
+complexity: high
 created: 2026-01-28
-tags: [react, tailwind, frontend, ui-ux, chatbot]
+tags: [react, nextjs, tailwind, frontend, ui-ux, chatbot, api, database, authentication, full-stack, responsive, animation]
 output_path:
 branch:
 ---
 
 ## Problem
 
-Need a polished chatbot-style conversational UI to demonstrate frontend delivery capability. The interface should feel like a real chat product (think iMessage/WhatsApp quality) but return randomized witty responses instead of real AI. This tests layout composition, animation polish, state management, and responsive design.
+Build a full-stack multi-room chat application with user authentication, conversation persistence, and a polished conversational UI. Users can create accounts, start chat rooms, invite others (simulated), and have persistent conversations. Bot responses are randomized from a curated pool. This tests end-to-end full-stack delivery: database schema design, API development, authentication, real-time-feeling updates, and pixel-perfect chat UI with animations.
 
 ## Definition of Done
 
-- [ ] React + Tailwind project scaffolded with Vite
-- [ ] Message bubble layout with distinct user/bot styling (alignment, color, avatar)
+### Authentication & User System
+- [ ] Login and registration pages with email/password
+- [ ] Session-based authentication with JWT tokens in httpOnly cookies
+- [ ] Protected routes — redirect to login if unauthenticated
+- [ ] User profile page: avatar (generated gradient), username, email, conversations count, member since date
+- [ ] User settings page: display name, theme preference (dark/light), notification toggle
+
+### Database & Schema
+- [ ] SQLite database with better-sqlite3 (or Prisma + SQLite)
+- [ ] Schema: Users (id, username, email, passwordHash, avatarColor, createdAt), Conversations (id, title, createdBy, createdAt, updatedAt), ConversationMembers (conversationId, userId, role), Messages (id, conversationId, senderId, content, type, createdAt), Reactions (messageId, userId, emoji)
+- [ ] Seed script creating 3+ conversations with 20+ messages each, simulating realistic chat flow
+- [ ] Migrations or schema initialization script
+
+### API Endpoints
+- [ ] POST /api/auth/register, POST /api/auth/login, POST /api/auth/logout, GET /api/auth/me
+- [ ] GET /api/conversations — list user's conversations (sorted by last message)
+- [ ] POST /api/conversations — create new conversation (title, initial message)
+- [ ] GET /api/conversations/:id — conversation details with members
+- [ ] GET /api/conversations/:id/messages — paginated messages (newest first, cursor-based)
+- [ ] POST /api/conversations/:id/messages — send message (triggers bot response after delay)
+- [ ] DELETE /api/conversations/:id — delete conversation (owner only)
+- [ ] POST /api/messages/:id/reactions — add emoji reaction to message
+- [ ] DELETE /api/messages/:id/reactions/:emoji — remove reaction
+- [ ] PUT /api/users/me — update profile (display name, theme preference)
+- [ ] GET /api/conversations/:id/search?q= — search within conversation
+
+### Frontend UI
+- [ ] Two-panel layout: conversation sidebar (list + search) and main chat area
+- [ ] Conversation list in sidebar: avatar, title, last message preview, unread indicator, timestamp
+- [ ] Message bubble layout with distinct user/bot styling (alignment, color, rounded corners, avatar)
 - [ ] Typing indicator animation (three bouncing dots) appears before bot responds
-- [ ] Bot selects from a curated pool of 30+ witty/humorous responses (randomized)
-- [ ] Dark/light mode toggle with smooth transition
+- [ ] Bot selects from a curated pool of 50+ witty/humorous responses (categorized: greetings, jokes, questions, observations, reactions)
 - [ ] Auto-scroll to newest message with smooth scroll behavior
-- [ ] Message timestamps (relative: "just now", "2m ago")
-- [ ] Emoji reaction picker on long-press/hover of any message
-- [ ] Mobile-first responsive layout (works on 375px through 1440px)
-- [ ] Input bar with send button, Enter-to-send, and Shift+Enter for newline
+- [ ] Message timestamps (relative: "just now", "2m ago", "Yesterday 3:45 PM")
+- [ ] Message grouping: consecutive messages from same sender collapse avatars
+- [ ] Emoji reaction picker on hover of any message (6 quick reactions + expandable picker)
+- [ ] Dark/light mode toggle with smooth transition (persisted to user settings)
+- [ ] Input bar: send button, Enter-to-send, Shift+Enter for newline, character count
+- [ ] New conversation modal with title input
 - [ ] Empty state with welcome message and suggested quick-reply chips
+- [ ] Search within conversation with highlighted matches
+- [ ] Mobile-first responsive layout (375px through 1440px, sidebar collapses to drawer)
+- [ ] Loading skeletons for conversation list and message history
+- [ ] Scroll-to-top "load more" for older messages (infinite scroll)
+
+### Integration & Polish
+- [ ] All conversations and messages persist via API (no client-only state)
+- [ ] Bot responses arrive after 1-3s simulated delay with typing indicator
+- [ ] Optimistic message sending (appears immediately, confirms on API response)
+- [ ] Error toasts for failed operations (send failure, network error)
+- [ ] Message entrance animations (slide-up + fade-in)
+- [ ] Conversation list updates in real-time when new message arrives (polling every 5s)
 - [ ] All code compiles, no TypeScript errors
 - [ ] Git committed with clean status
 
 ## Approach
 
-- Use Vite + React + TypeScript + Tailwind CSS
-- Component structure: ChatWindow > MessageList > MessageBubble, InputBar, TypingIndicator
-- State: useReducer for message list, useEffect for auto-scroll, setTimeout for simulated bot delay (1-3s random)
-- Response pool: JSON array of categorized responses (greetings, jokes, questions, observations)
-- Dark mode: Tailwind `dark:` classes with CSS variable theme, toggle stored in localStorage
+- Next.js 14 App Router + TypeScript + Tailwind CSS
+- Database: SQLite via better-sqlite3
+- Auth: Custom JWT with bcrypt password hashing
+- Component structure: ConversationSidebar, ChatWindow > MessageList > MessageBubble, InputBar, TypingIndicator
+- State: React Context for active conversation + current user, SWR for data fetching with revalidation
+- Bot delay: POST to API triggers server-side setTimeout → inserts bot message → client polls or refetches
+- Response pool: Server-side JSON array of 50+ categorized responses
+- Dark mode: Tailwind `dark:` classes with user preference from DB
 - Animations: Tailwind + CSS keyframes for typing dots, message entrance (slide-up + fade-in)
-- No external UI library - pure Tailwind for maximum control over aesthetics
+- No WebSocket needed — use SWR polling for "real-time" feel
 
-## Open Questions
+## Agent Notes
 
-- Should quick-reply chips trigger specific response categories or remain random?
-- Include sound effects for message send/receive?
+Complex full-stack chat application with relational data, user system, and demanding UI polish. The chat UI requires careful attention to message grouping, animations, and responsive layout. Expect 7-9 implementation steps.
