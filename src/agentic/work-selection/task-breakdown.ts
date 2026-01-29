@@ -58,6 +58,13 @@ export function estimateComplexity(item: WorkItem): number {
     { pattern: /integrat(e|ion)|migrat(e|ion)/i, multiplier: 1.8 },
     { pattern: /authentication|authorization|security/i, multiplier: 1.6 },
 
+    // Medium-high complexity (1.4-1.6x)
+    { pattern: /dashboard|analytics|data[- ]?viz/i, multiplier: 1.6 },
+    { pattern: /ui|interface|layout|component/i, multiplier: 1.5 },
+    { pattern: /responsive|mobile[- ]first|animation/i, multiplier: 1.3 },
+    { pattern: /react|nextjs|next\.js|vue|angular/i, multiplier: 1.4 },
+    { pattern: /tailwind|styled|css[- ]?in[- ]?js/i, multiplier: 1.2 },
+
     // Medium complexity (1.3-1.5x)
     { pattern: /api|endpoint|crud/i, multiplier: 1.4 },
     { pattern: /database|schema|model/i, multiplier: 1.3 },
@@ -286,79 +293,51 @@ export function reBreakdownStep(
 }
 
 /**
- * Write steps to goals.md index under a task (best-effort, goals.md may not exist)
- * V1.2: goals.md is auto-generated index; PROMPT.md is source of truth
+ * Write steps to a goal bundle's PROMPT.md (V1.2)
+ * Appends a ## Steps section to the end of the PROMPT.md body.
+ * The goal-scanner parses this section on subsequent reads.
  */
-export async function writeStepsToGoals(taskTitle: string, steps: WorkStep[]): Promise<boolean> {
-  const goalsPath = path.join(process.cwd(), 'workspace', 'goals.md');
+export async function writeStepsToPromptMd(
+  bundlePath: string,
+  steps: WorkStep[]
+): Promise<boolean> {
+  const promptPath = path.join(bundlePath, 'PROMPT.md');
 
-  if (!existsSync(goalsPath)) {
-    console.log(`[${new Date().toISOString()}] goals.md not found — skipping legacy step write`);
+  if (!existsSync(promptPath)) {
+    console.log(`[${new Date().toISOString()}] PROMPT.md not found at ${bundlePath} — cannot write steps`);
     return false;
   }
 
   try {
-    let content = await readFile(goalsPath, 'utf-8');
-    
-    // Find the task and insert steps after it
-    const taskPattern = new RegExp(
-      `(###\\s+${escapeRegex(taskTitle)}\\s*\\n(?:- \\*\\*[^\\n]+\\n)*)`,
-      'i'
-    );
+    let content = await readFile(promptPath, 'utf-8');
 
-    const match = content.match(taskPattern);
-    if (!match) {
-      console.log(`[${new Date().toISOString()}] Could not find task "${taskTitle}" in goals.md`);
+    // Don't write if steps section already exists
+    if (/^##\s+Steps$/im.test(content)) {
+      console.log(`[${new Date().toISOString()}] PROMPT.md already has ## Steps section — skipping`);
       return false;
     }
 
-    // Build step markdown
-    const stepsMarkdown = steps.map((step, idx) => {
-      let stepMd = `\n#### Step ${step.step_number + 1}: ${step.title}\n`;
-      stepMd += `- **Status:** ${formatStatus(step.status)}\n`;
-      if (step.description) {
-        stepMd += `- **Description:** ${step.description}\n`;
-      }
-      if (step.dependencies && step.dependencies.length > 0) {
-        stepMd += `- **Dependencies:** Step ${step.dependencies.map(d => d + 1).join(', ')}\n`;
-      }
-      if (step.estimated_turns) {
-        stepMd += `- **Est. Turns:** ${step.estimated_turns}\n`;
-      }
-      return stepMd;
-    }).join('');
+    // Build steps markdown
+    const stepsSection = [
+      '',
+      '## Steps',
+      '',
+      ...steps.flatMap((step) => [
+        `### Step ${step.step_number + 1}: ${step.title}`,
+        `- **Status:** ${formatStatus(step.status)}`,
+        step.description ? `- **Description:** ${step.description}` : '',
+        step.estimated_turns ? `- **Est. Turns:** ${step.estimated_turns}` : '',
+        '',
+      ]).filter(line => line !== ''),
+    ].join('\n');
 
-    // Add breakdown timestamp to task
-    const now = new Date().toISOString().split('T')[0] + ' ' + 
-                new Date().toISOString().split('T')[1].slice(0, 5);
-    const breakdownNote = `- **Breakdown:** Auto-generated on ${now}\n`;
+    content = content.trimEnd() + '\n' + stepsSection + '\n';
 
-    // Update task status to include step info
-    const totalSteps = steps.length;
-    const newStatus = `In Progress (Step 1 of ${totalSteps}, 0% complete)`;
-
-    // Insert steps and update status
-    content = content.replace(
-      taskPattern,
-      (matched) => {
-        // Update status line
-        let updated = matched.replace(
-          /- \*\*Status:\*\*\s*[^\n]+/i,
-          `- **Status:** ${newStatus}`
-        );
-        // Add breakdown note if not present
-        if (!updated.includes('**Breakdown:**')) {
-          updated = updated.trimEnd() + '\n' + breakdownNote;
-        }
-        return updated + stepsMarkdown;
-      }
-    );
-
-    await writeFile(goalsPath, content, 'utf-8');
-    console.log(`[${new Date().toISOString()}] Added ${steps.length} steps to task "${taskTitle}"`);
+    await writeFile(promptPath, content, 'utf-8');
+    console.log(`[${new Date().toISOString()}] Wrote ${steps.length} steps to ${promptPath}`);
     return true;
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] Error writing steps to goals.md:`, error);
+    console.error(`[${new Date().toISOString()}] Error writing steps to PROMPT.md:`, error);
     return false;
   }
 }
@@ -369,13 +348,6 @@ export async function writeStepsToGoals(taskTitle: string, steps: WorkStep[]): P
 function formatStatus(status: WorkStep['status']): string {
   const formatted = status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ');
   return formatted;
-}
-
-/**
- * Escape special regex characters
- */
-function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 /**

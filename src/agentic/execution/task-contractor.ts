@@ -1,7 +1,7 @@
 /**
  * Task Contractor - Creates task contracts from work items
  *
- * Transforms high-level work items from goals.md into detailed
+ * Transforms high-level work items from goal bundles into detailed
  * task contracts that can be executed by worker agents.
  */
 
@@ -349,6 +349,6 @@ function buildLoggingObligations(): string[] {
     'Log all work in work-ledger.jsonl',
     'Capture validation outcomes in reports/validation',
     'Record capability outcomes in capability-ledger.jsonl',
-    'Update goals.md and needs-you.md as needed',
+    'Update needs-you.md as needed',
   ];
 }

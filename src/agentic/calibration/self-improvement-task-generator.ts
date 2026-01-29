@@ -4,7 +4,7 @@
  * Creates goal bundles for self-improvement activities.
  * All tasks are prefixed with [SELF-ENHANCE] for tracking.
  *
- * V1.2: Bundles only — no goals.md writes.
+ * V1.2: Bundles only.
  *
  * AGENTIC: Task creation logic
  */

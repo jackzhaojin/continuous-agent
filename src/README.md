@@ -39,7 +39,7 @@ src/
 │   │   └── evaluations/           # Prompt evaluation results
 │   │
 │   ├── work-selection/            # WHAT to work on (priority reasoning)
-│   │   ├── work-selector.ts       # Parse goals.md, select highest priority work
+│   │   ├── work-selector.ts       # Select highest priority work from goal bundles
 │   │   └── task-breakdown.ts      # Break complex tasks into steps
 │   │
 │   ├── execution/                 # HOW to execute work (agent spawning)
@@ -62,7 +62,7 @@ src/
 └── deterministic/                  # ⚙️ MECHANICAL OPERATIONS
     │
     ├── health-checker.ts          # Check file existence, auth tokens, disk space
-    ├── state-handler.ts           # File I/O for goals.md, needs-you.md
+    ├── state-handler.ts           # File I/O for PROMPT.md bundles, needs-you.md
     ├── validation-handler.ts      # Run verifiers (with agentic interpretation)
     ├── input-processor.ts         # Parse markdown tables in needs-you.md
     ├── queue-processor.ts         # Parse queue.md file

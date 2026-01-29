@@ -50,7 +50,7 @@ export async function recordCompletion(itemTitle: string, outcome: string, relat
 
 /**
  * Create a new goal bundle in drafts/
- * V1.2: New goals start as draft bundles instead of goals.md entries
+ * V1.2: New goals start as draft bundles with PROMPT.md files
  */
 export async function createGoalBundle(
   title: string,

@@ -275,7 +275,7 @@ Calibration and practice prompts for capability validation, idle time practice, 
 Execution guidance prompts for incremental execution, step-by-step work.
 
 ### Work Selection (`work-selection/`)
-Work selection prompts for priority-based work selection from goals.md.
+Work selection prompts for priority-based work selection from goal bundles.
 
 ## Evaluation
 

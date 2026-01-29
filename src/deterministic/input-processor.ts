@@ -131,33 +131,53 @@ function parseNeedsYouResponses(content: string): HumanResponse[] {
 }
 
 /**
- * Update goals.md to unblock a task
+ * Unblock a task in its goal bundle's PROMPT.md
+ * V1.2: Updates PROMPT.md frontmatter status from blocked to pending,
+ * then moves the bundle back from workspace/blocked/ to workspace/in-progress/P{n}/
  */
-async function unblockTaskInGoals(taskTitle: string): Promise<boolean> {
-  const goalsPath = path.join(process.cwd(), 'workspace', 'goals.md');
-
-  if (!existsSync(goalsPath)) {
+async function unblockTaskInBundle(taskTitle: string): Promise<boolean> {
+  // Search for matching bundle in the blocked directory
+  const blockedDir = path.join(process.cwd(), 'workspace', 'blocked');
+  if (!existsSync(blockedDir)) {
     return false;
   }
 
   try {
-    const content = await readFile(goalsPath, 'utf-8');
+    const { readdir, rename, mkdir } = await import('fs/promises');
+    const dirs = await readdir(blockedDir, { withFileTypes: true });
 
-    // Find task by title and update status from Blocked to Pending
-    const titlePattern = new RegExp(
-      `(###\\s+${escapeRegex(taskTitle)}[\\s\\S]*?- \\*\\*Status:\\*\\*)\\s*Blocked`,
-      'i'
-    );
+    for (const dir of dirs) {
+      if (!dir.isDirectory() || dir.name.startsWith('.')) continue;
 
-    if (titlePattern.test(content)) {
-      const updatedContent = content.replace(titlePattern, '$1 Pending');
-      await writeFile(goalsPath, updatedContent, 'utf-8');
-      return true;
+      const bundlePath = path.join(blockedDir, dir.name);
+      const promptPath = path.join(bundlePath, 'PROMPT.md');
+      if (!existsSync(promptPath)) continue;
+
+      const content = await readFile(promptPath, 'utf-8');
+      // Check if this bundle's title matches
+      const titleMatch = content.match(/^title:\s*"?([^"\n]+)"?\s*$/m);
+      if (titleMatch && titleMatch[1].trim() === taskTitle.trim()) {
+        // Update status from blocked to pending
+        const { updateFrontmatter, parsePromptMdContent } = await import('./prompt-md-parser.js');
+        const updated = updateFrontmatter(content, { status: 'pending' });
+        await writeFile(promptPath, updated, 'utf-8');
+
+        // Move bundle back to in-progress directory based on priority
+        const parsed = parsePromptMdContent(updated);
+        const priority = parsed.frontmatter.priority || 'P3';
+        const inProgressDir = path.join(process.cwd(), 'workspace', 'in-progress', priority);
+        await mkdir(inProgressDir, { recursive: true });
+        const destPath = path.join(inProgressDir, dir.name);
+        await rename(bundlePath, destPath);
+
+        console.log(`  Unblocked task "${taskTitle}" — moved from blocked/ to in-progress/${priority}/`);
+        return true;
+      }
     }
 
     return false;
   } catch (error) {
-    console.error(`Failed to unblock task "${taskTitle}" in goals.md:`, error);
+    console.error(`Failed to unblock task "${taskTitle}" in bundle:`, error);
     return false;
   }
 }
@@ -290,14 +310,14 @@ export async function processHumanInputs(): Promise<ProcessedInput> {
         await moveToResolved(response);
       } else {
         // All other response types: unblock the task
-        const unblocked = await unblockTaskInGoals(response.action);
+        const unblocked = await unblockTaskInBundle(response.action);
         if (unblocked) {
-          console.log(`  ✓ Action: Unblocked task in goals.md`);
-          console.log(`  ✓ Task will be retried with fresh context (10 new attempts)`);
+          console.log(`  Action: Unblocked task in goal bundle`);
+          console.log(`  Task will be retried with fresh context (10 new attempts)`);
           tasksUnblocked.push(response.action);
         } else {
-          console.log(`  ⚠️  Warning: Could not find matching task in goals.md`);
-          console.log(`     Task may have been renamed or removed. Check goals.md manually.`);
+          console.log(`  Warning: Could not find matching task in goal bundles`);
+          console.log(`     Task may have been renamed or removed. Check workspace/blocked/ manually.`);
         }
 
         // Move to resolved section

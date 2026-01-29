@@ -22,7 +22,7 @@ export interface HealthStatus {
 
 /**
  * Individual step within a multi-step task
- * Steps are tracked inline in goals.md under parent tasks
+ * Steps are tracked in PROMPT.md under parent tasks
  */
 export interface WorkStep {
   step_number: number;
@@ -39,7 +39,7 @@ export interface WorkStep {
 }
 
 /**
- * Work item from goals.md
+ * Work item from goal bundle
  * Enhanced with step tracking for incremental execution
  */
 export interface WorkItem {
@@ -50,14 +50,14 @@ export interface WorkItem {
   status: 'pending' | 'in_progress' | 'blocked' | 'complete';
 
   // Output persistence - allows resuming work across restarts
-  output_path?: string;     // Project directory for this task (persisted in goals.md)
+  output_path?: string;     // Project directory for this task (persisted in PROMPT.md frontmatter)
 
   // Self-enhancement flag - when true, work modifies the agent itself
   // Detected by [SELF-ENHANCE] prefix in goal title
   selfEnhance?: boolean;
 
   // Branch tracking for self-enhancement tasks
-  // Persisted in goals.md to allow resuming work on same branch
+  // Persisted in PROMPT.md frontmatter to allow resuming work on same branch
   branch?: string;
 
   // Step tracking for multi-step tasks

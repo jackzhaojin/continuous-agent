@@ -18,6 +18,13 @@ import type { HealthStatus, LoopState } from './types.js';
 
 // AGENTIC - AI decision-making
 import { selectWorkWithSteps } from '../agentic/work-selection/work-selector.js';
+import {
+  needsBreakdown,
+  estimateComplexity,
+  generateStaticBreakdown,
+  logBreakdownEvent,
+  writeStepsToPromptMd,
+} from '../agentic/work-selection/task-breakdown.js';
 import { diagnoseFailure } from '../agentic/diagnosis/agentic-diagnosis.js';
 import { classifyIntent } from '../agentic/intelligence/intent-classifier.js';
 import {
@@ -50,9 +57,6 @@ import {
 // SELF-IMPROVEMENT - Idle and scheduled triggers
 import { checkSelfImprovementTriggers } from '../agentic/calibration/self-improvement-triggers.js';
 import { generateSelfImprovementTask } from '../agentic/calibration/self-improvement-task-generator.js';
-
-// V1.2 - Goal index regeneration
-import { generateGoalsIndex } from '../deterministic/goal-index-generator.js';
 
 // Load environment variables
 config();
@@ -177,11 +181,11 @@ async function runIteration(): Promise<IterationResult> {
       logAgentic(`  Self-improvement trigger found: ${selfImprovementTrigger.type}`);
       logAgentic(`  Reason: ${selfImprovementTrigger.reason}`);
 
-      // Generate task in goals.md - will be picked up on next iteration
+      // Generate task bundle - will be picked up on next iteration
       const taskAdded = await generateSelfImprovementTask(selfImprovementTrigger);
 
       if (taskAdded) {
-        logAgentic('  Self-improvement task added to goals.md');
+        logAgentic('  Self-improvement task added');
         // Continue immediately to pick up the new task
         return 'work_completed';
       } else {
@@ -194,15 +198,56 @@ async function runIteration(): Promise<IterationResult> {
     return 'no_work';
   }
 
-  const workItem = selectedWork.task;
-  const currentStep = selectedWork.step;
-  const isStepExecution = selectedWork.type === 'step';
+  let workItem = selectedWork.task;
+  let currentStep = selectedWork.step;
+  let isStepExecution = selectedWork.type === 'step';
 
   if (isStepExecution && currentStep) {
     logAgentic(`Selected STEP: [${workItem.priority}] ${workItem.title}`);
     log(`  Step ${currentStep.step_number + 1}/${workItem.steps?.length}: ${currentStep.title}`);
   } else {
     logAgentic(`Selected TASK: [${workItem.priority}] ${workItem.title}`);
+  }
+
+  // === PHASE 3b: AUTO-BREAKDOWN (if needed) ===
+  // Check if this whole task needs to be broken into steps before execution
+  if (!isStepExecution && needsBreakdown(workItem)) {
+    const estimated = estimateComplexity(workItem);
+    logAgentic(`PHASE 3b: Auto-Breakdown`);
+    log(`  Estimated complexity: ${estimated} turns (threshold: ${process.env.BREAKDOWN_THRESHOLD_TURNS || '100'})`);
+
+    const steps = generateStaticBreakdown(workItem);
+    log(`  Generated ${steps.length} steps for "${workItem.title}"`);
+
+    // Write steps to the bundle's PROMPT.md (V1.2)
+    if (workItem.source_path) {
+      const written = await writeStepsToPromptMd(workItem.source_path, steps);
+      if (written) {
+        logAgentic(`  Steps written to PROMPT.md — re-selecting to execute step 1`);
+
+        // Log breakdown event to work ledger
+        await logBreakdownEvent(workItem.id, workItem.title, steps.length, 'auto');
+
+        // Re-select work — should now find step 1
+        const reselected = await selectWorkWithSteps();
+        if (reselected && reselected.step) {
+          workItem = reselected.task;
+          currentStep = reselected.step;
+          isStepExecution = true;
+          logAgentic(`  Re-selected: Step ${currentStep.step_number + 1}/${workItem.steps?.length}: ${currentStep.title}`);
+        } else {
+          log(`  WARNING: Re-selection after breakdown found no steps — continuing as whole task`);
+        }
+      } else {
+        log(`  Steps not written (already exists or error) — executing as whole task`);
+      }
+    } else {
+      log(`  No source_path on work item — cannot write steps to bundle, executing as whole task`);
+    }
+
+  } else if (!isStepExecution) {
+    const estimated = estimateComplexity(workItem);
+    log(`  Complexity estimate: ${estimated} turns (below breakdown threshold)`);
   }
 
   // Log output_path for resume traceability
@@ -236,7 +281,7 @@ async function runIteration(): Promise<IterationResult> {
   if (isValid && result) {
     logDeterministic('PHASE 6: Update State (Success)');
 
-    // CRITICAL: Persist output_path to goals.md for resume across restarts
+    // CRITICAL: Persist output_path to PROMPT.md for resume across restarts
     // Only write if we have a new path and the task doesn't already have one
     if (result.output_path && !workItem.output_path) {
       logDeterministic('  Persisting output path for future resume...');
@@ -251,9 +296,6 @@ async function runIteration(): Promise<IterationResult> {
 
     // Reset backoff on success
     resetBackoff();
-
-    // V1.2: Regenerate goals.md index from folder tree
-    await generateGoalsIndex();
 
     loopState.last_work_at = new Date().toISOString();
     return 'work_completed';
@@ -288,7 +330,7 @@ async function runIteration(): Promise<IterationResult> {
     retry.output_path = result.output_path;
   }
 
-  // CRITICAL: Also persist to goals.md so we can resume after PM2 restart
+  // CRITICAL: Persist to PROMPT.md so we can resume after PM2 restart
   // This ensures retries AND restarts use the same project directory
   if (result?.output_path && !workItem.output_path) {
     logDeterministic('  Persisting output path for retry/resume...');
@@ -348,9 +390,6 @@ async function runIteration(): Promise<IterationResult> {
     }
     await markTaskBlocked(workItem);
     await writeToNeedsYou(workItem, retry.attempts, retry.lastError, contractId);
-
-    // V1.2: Regenerate goals.md index
-    await generateGoalsIndex();
 
     retryTracker.delete(retryKey);
     return 'work_failed';

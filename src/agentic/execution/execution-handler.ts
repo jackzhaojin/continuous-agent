@@ -50,13 +50,13 @@ function getCurrentStrategy(item: WorkItem): { strategyId: string | null; strate
  * Build retry context for worker
  * AGENTIC: Includes strategy selection and diagnostic fixes
  *
- * IMPORTANT: Prefers item.output_path (from goals.md) over in-memory retry tracker.
+ * IMPORTANT: Prefers item.output_path (from PROMPT.md) over in-memory retry tracker.
  * This allows resuming work on the same project after PM2 restarts.
  */
 function buildRetryContext(item: WorkItem): WorkerRetryContext | undefined {
   const retry = retryTracker.get(item.title);
 
-  // If task has an output_path from goals.md, ALWAYS use it (enables resume)
+  // If task has an output_path from PROMPT.md, ALWAYS use it (enables resume)
   // This is the key fix for persistent project directories across PM2 restarts
   const existingPath = item.output_path || retry?.output_path;
 

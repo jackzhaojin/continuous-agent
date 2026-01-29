@@ -1,16 +1,12 @@
 /**
  * State management - MOSTLY DETERMINISTIC
- * Updates workspace files (goals.md, needs-you.md, ledgers)
+ * Updates workspace files (PROMPT.md bundles, needs-you.md, ledgers)
  */
 
-import { readFile, writeFile, appendFile } from 'fs/promises';
+import { readFile, writeFile, appendFile, rename, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import { execSync } from 'child_process';
 import path from 'path';
-import {
-  updateStepStatus,
-  updateTaskProgressFromSteps,
-} from '../agentic/work-selection/work-selector.js';
 import type { WorkItem, WorkStep } from '../core/types.js';
 import { logDeterministic, log, logAgentic } from '../core/logging.js';
 import {
@@ -20,7 +16,6 @@ import {
 } from './self-improvement-state.js';
 import { reportMilestone } from './notion-reporter.js';
 import { parsePromptMd, updateFrontmatter } from './prompt-md-parser.js';
-import { generateGoalsIndex } from './goal-index-generator.js';
 import { appendProjectMemory, type ProjectMemoryEntry } from './project-memory-store.js';
 import { registerProject, generateProjectSlug, findProjectBySlug, type ProjectRegistryEntry } from './project-registry.js';
 
@@ -28,16 +23,8 @@ const WORKSPACE_DIR = path.join(process.cwd(), 'workspace');
 const LEDGERS_DIR = path.join(process.cwd(), 'ledgers');
 
 /**
- * Escape special regex characters
- * DETERMINISTIC: String manipulation
- */
-function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-/**
  * Update PROMPT.md frontmatter for a goal bundle
- * V1.2: Updates the PROMPT.md file directly instead of regex on goals.md
+ * V1.2: Updates the PROMPT.md file directly
  */
 export async function updatePromptMdStatus(
   sourcePath: string,
@@ -63,8 +50,99 @@ export async function updatePromptMdStatus(
 }
 
 /**
+ * Update a step's status in the ## Steps section of PROMPT.md body
+ * Finds the step by number and updates its - **Status:** line
+ * DETERMINISTIC: File I/O and pattern matching
+ */
+async function updateStepStatusInPromptMd(
+  sourcePath: string,
+  stepNumber: number,
+  newStatus: WorkStep['status']
+): Promise<boolean> {
+  const promptPath = path.join(sourcePath, 'PROMPT.md');
+
+  if (!existsSync(promptPath)) {
+    log(`  Warning: No PROMPT.md at ${promptPath} — cannot update step status`);
+    return false;
+  }
+
+  try {
+    const content = await readFile(promptPath, 'utf-8');
+    const lines = content.split('\n');
+
+    // Find the step header: ### Step N: Title (N is 1-indexed in the file)
+    const stepHeaderPattern = new RegExp(`^#{3,4}\\s+(?:Step\\s+)?${stepNumber + 1}[:.\\s]`, 'i');
+    let foundStep = false;
+    let modified = false;
+
+    for (let i = 0; i < lines.length; i++) {
+      const trimmed = lines[i].trim();
+
+      if (stepHeaderPattern.test(trimmed)) {
+        foundStep = true;
+        continue;
+      }
+
+      // Once we found our step, look for its Status line
+      if (foundStep) {
+        // If we hit another step header or section header, stop
+        if (trimmed.match(/^#{2,4}\s+/)) {
+          break;
+        }
+
+        const statusMatch = trimmed.match(/^([-*]\s*\*\*Status:\*\*\s*).+$/i);
+        if (statusMatch) {
+          const formattedStatus = newStatus.charAt(0).toUpperCase() + newStatus.slice(1).replace('_', ' ');
+          lines[i] = lines[i].replace(/(\*\*Status:\*\*\s*).+$/i, `$1${formattedStatus}`);
+          modified = true;
+          break;
+        }
+      }
+    }
+
+    if (modified) {
+      await writeFile(promptPath, lines.join('\n'), 'utf-8');
+      log(`  Updated step ${stepNumber + 1} status to "${newStatus}" in PROMPT.md`);
+      return true;
+    } else {
+      log(`  Warning: Could not find step ${stepNumber + 1} status line in PROMPT.md`);
+      return false;
+    }
+  } catch (error) {
+    log(`  Failed to update step status in PROMPT.md: ${error}`);
+    return false;
+  }
+}
+
+/**
+ * Move a goal bundle directory to workspace/blocked/
+ * DETERMINISTIC: File I/O
+ */
+async function moveBundleToBlocked(sourcePath: string): Promise<boolean> {
+  const slug = path.basename(sourcePath);
+  const blockedDir = path.join(WORKSPACE_DIR, 'blocked');
+  const destPath = path.join(blockedDir, slug);
+
+  // Don't move if already in blocked/
+  if (sourcePath.includes('/blocked/')) {
+    log(`  Bundle already in blocked/ — skipping move`);
+    return true;
+  }
+
+  try {
+    await mkdir(blockedDir, { recursive: true });
+    await rename(sourcePath, destPath);
+    log(`  Moved bundle to blocked/: ${sourcePath} → ${destPath}`);
+    return true;
+  } catch (error) {
+    log(`  Failed to move bundle to blocked/: ${error}`);
+    return false;
+  }
+}
+
+/**
  * Update task state after execution
- * V1.2: PROMPT.md is the source of truth. goals.md update is best-effort.
+ * V1.2: PROMPT.md is the source of truth.
  * DETERMINISTIC: File I/O and pattern matching
  */
 export async function updateTaskState(
@@ -79,7 +157,7 @@ export async function updateTaskState(
 
   const ledgerPath = path.join(LEDGERS_DIR, 'work-ledger.jsonl');
 
-  // --- V1.2 primary operations (independent of goals.md) ---
+  // --- V1.2 primary operations ---
 
   if (success) {
     // Log to work ledger
@@ -187,28 +265,6 @@ export async function updateTaskState(
     });
   }
 
-  // Legacy: Best-effort update of goals.md (auto-generated index)
-  try {
-    const goalsPath = path.join(WORKSPACE_DIR, 'goals.md');
-    if (existsSync(goalsPath)) {
-      const content = await readFile(goalsPath, 'utf-8');
-      const newStatus = success ? 'Complete' : 'In Progress';
-      const titlePattern = new RegExp(
-        `(###\\s+${escapeRegex(item.title)}[\\s\\S]*?- \\*\\*Status:\\*\\*)\\s*[^\\n]+`,
-        'i'
-      );
-      if (titlePattern.test(content)) {
-        const updatedContent = content.replace(titlePattern, `$1 ${newStatus}`);
-        await writeFile(goalsPath, updatedContent, 'utf-8');
-        log(`  Updated goals.md index: ${item.title} → ${newStatus}`);
-      }
-    }
-  } catch (goalsErr) {
-    log(`  Warning: Failed to update goals.md index: ${goalsErr}`);
-  }
-
-  // Regenerate goals.md index from folder tree
-  await generateGoalsIndex();
 }
 
 /**
@@ -264,7 +320,7 @@ async function requestMultiProjectApproval(item: WorkItem, outputPath: string): 
 
 /**
  * Set the output path for a task
- * V1.2: Updates PROMPT.md frontmatter (source of truth) + goals.md index (best-effort)
+ * V1.2: Updates PROMPT.md frontmatter (source of truth)
  * DETERMINISTIC: File I/O and pattern matching
  */
 export async function setTaskOutputPath(
@@ -282,55 +338,11 @@ export async function setTaskOutputPath(
     }
   }
 
-  // Legacy: Best-effort update of goals.md index
-  const goalsPath = path.join(WORKSPACE_DIR, 'goals.md');
-  if (!existsSync(goalsPath)) {
-    logDeterministic('  goals.md not found — skipping legacy output path update');
-    return true; // PROMPT.md is the source of truth
-  }
-
-  try {
-    let content = await readFile(goalsPath, 'utf-8');
-    const escapedTitle = escapeRegex(taskTitle);
-
-    // Check if Output line already exists for this task
-    const existingOutputPattern = new RegExp(
-      `(###\\s+${escapedTitle}[\\s\\S]*?)(- \\*\\*Output:\\*\\*)\\s*[^\\n]+`,
-      'i'
-    );
-
-    if (existingOutputPattern.test(content)) {
-      content = content.replace(existingOutputPattern, `$1$2 ${outputPath}`);
-      logDeterministic(`  Updated existing Output path in goals.md for "${taskTitle}"`);
-    } else {
-      const addAfterDescPattern = new RegExp(
-        `(###\\s+${escapedTitle}[\\s\\S]*?- \\*\\*Description:\\*\\*\\s*[^\\n]+)`,
-        'i'
-      );
-      const addAfterStatusPattern = new RegExp(
-        `(###\\s+${escapedTitle}[\\s\\S]*?- \\*\\*Status:\\*\\*\\s*[^\\n]+)`,
-        'i'
-      );
-
-      if (addAfterDescPattern.test(content)) {
-        content = content.replace(addAfterDescPattern, `$1\n- **Output:** ${outputPath}`);
-      } else if (addAfterStatusPattern.test(content)) {
-        content = content.replace(addAfterStatusPattern, `$1\n- **Output:** ${outputPath}`);
-      } else {
-        return true; // PROMPT.md was updated, goals.md pattern not found is fine
-      }
-    }
-
-    await writeFile(goalsPath, content, 'utf-8');
-    return true;
-  } catch (error) {
-    log(`  Warning: Failed to update goals.md index output path: ${error}`);
-    return true; // PROMPT.md is the source of truth
-  }
+  return true;
 }
 
 /**
- * Update step state in goals.md
+ * Update step state in PROMPT.md and ledgers
  * DETERMINISTIC: File I/O and pattern matching
  */
 export async function updateStepState(
@@ -348,16 +360,6 @@ export async function updateStepState(
 
   try {
     if (success) {
-      // Update the step status in goals.md
-      // This writes the individual step's status to the file
-      log(`  [DEBUG] About to call updateStepStatus with: "${item.title}", ${step.step_number}, "complete"`);
-      try {
-        await updateStepStatus(item.title, step.step_number, 'complete');
-        log(`  [DEBUG] updateStepStatus returned successfully`);
-      } catch (updateErr) {
-        log(`  [ERROR] updateStepStatus failed: ${updateErr}`);
-      }
-
       // Update the step in the local copy for progress calculation
       const stepToUpdate = item.steps?.[step.step_number];
       if (stepToUpdate) {
@@ -365,8 +367,10 @@ export async function updateStepState(
         stepToUpdate.completed_at = now;
       }
 
-      // Update the parent task's progress status
-      await updateTaskProgressFromSteps(item.title, item.steps || []);
+      // V1.2: Persist step status to PROMPT.md body (## Steps section)
+      if (item.source_path) {
+        await updateStepStatusInPromptMd(item.source_path, step.step_number, 'complete');
+      }
 
       // Log step completion
       const entry = JSON.stringify({
@@ -510,7 +514,7 @@ export async function escalateWithDiagnosis(
 
 /**
  * Mark task as blocked
- * V1.2: PROMPT.md is source of truth. goals.md update is best-effort.
+ * V1.2: PROMPT.md is the source of truth.
  * DETERMINISTIC: File I/O
  */
 export async function markTaskBlocked(item: WorkItem): Promise<void> {
@@ -519,46 +523,32 @@ export async function markTaskBlocked(item: WorkItem): Promise<void> {
   // Report blocked milestone to Notion (fire-and-forget)
   await reportMilestone('Blocked', item);
 
-  // V1.2: Update PROMPT.md (source of truth)
+  // V1.2: Update PROMPT.md (source of truth) and move to blocked directory
   if (item.source_path) {
     await updatePromptMdStatus(item.source_path, { status: 'blocked' });
+    await moveBundleToBlocked(item.source_path);
   }
-
-  // Legacy: Best-effort update of goals.md index
-  try {
-    const goalsPath = path.join(WORKSPACE_DIR, 'goals.md');
-    if (existsSync(goalsPath)) {
-      const content = await readFile(goalsPath, 'utf-8');
-      const titlePattern = new RegExp(
-        `(###\\s+${escapeRegex(item.title)}[\\s\\S]*?- \\*\\*Status:\\*\\*)\\s*[^\\n]+`,
-        'i'
-      );
-      if (titlePattern.test(content)) {
-        const updatedContent = content.replace(titlePattern, `$1 Blocked`);
-        await writeFile(goalsPath, updatedContent, 'utf-8');
-        log(`  Updated goals.md index: ${item.title} → Blocked`);
-      }
-    }
-  } catch (goalsErr) {
-    log(`  Warning: Failed to update goals.md index: ${goalsErr}`);
-  }
-
-  // Regenerate goals.md index from folder tree
-  await generateGoalsIndex();
 }
 
 /**
- * Mark step as blocked in goals.md
+ * Mark step as blocked in PROMPT.md
  * DETERMINISTIC: File I/O
  */
 export async function markStepBlocked(item: WorkItem, stepNumber: number): Promise<void> {
   logDeterministic(`Marking step ${stepNumber + 1} as blocked...`);
 
-  try {
-    await updateStepStatus(item.title, stepNumber, 'blocked');
-    log(`  ✓ Step ${stepNumber + 1} marked as blocked`);
-  } catch (error) {
-    log(`  Failed to mark step as blocked: ${error}`);
+  // V1.2: Update step status in PROMPT.md body, then mark task blocked
+  if (item.source_path) {
+    try {
+      await updateStepStatusInPromptMd(item.source_path, stepNumber, 'blocked');
+      log(`  Step ${stepNumber + 1} marked as blocked in PROMPT.md body`);
+      // Note: markTaskBlocked() is always called after this by the executive loop,
+      // which handles frontmatter update and directory move
+    } catch (error) {
+      log(`  Failed to mark step as blocked: ${error}`);
+    }
+  } else {
+    log(`  No source_path on work item — cannot mark step as blocked`);
   }
 }
 
