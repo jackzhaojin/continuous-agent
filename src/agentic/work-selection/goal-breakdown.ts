@@ -7,7 +7,7 @@
 
 import path from 'path';
 import type { WorkItem, WorkStep } from '../../core/types.js';
-import { createTasksFile, writeTasksJson, tasksJsonExists } from '../../deterministic/tasks-json-handler.js';
+import { createStepsFile, writeStepsJson, stepsJsonExists } from '../../deterministic/steps-json-handler.js';
 import { logBreakdownProgress } from '../../deterministic/progress-log-writer.js';
 
 // Configuration from environment
@@ -92,13 +92,13 @@ export function estimateComplexity(item: WorkItem): number {
 
 /**
  * Check if a task needs automatic breakdown.
- * Checks TASKS.json existence first (primary), then in-memory steps (legacy fallback).
+ * Checks STEPS.json existence first (primary), then in-memory steps (legacy fallback).
  */
 export function needsBreakdown(item: WorkItem): boolean {
   if (!AUTO_BREAKDOWN_ENABLED) return false;
 
-  // Primary: check TASKS.json exists in the bundle
-  if (item.source_path && tasksJsonExists(item.source_path)) return false;
+  // Primary: check STEPS.json exists in the bundle
+  if (item.source_path && stepsJsonExists(item.source_path)) return false;
 
   // Legacy fallback: check in-memory steps
   if (item.steps && item.steps.length > 0) return false;
@@ -299,26 +299,26 @@ export function reBreakdownStep(
 }
 
 /**
- * Write steps to a goal bundle's TASKS.json (source of truth) + PROGRESS_LOG.md.
- * TASKS.json is the only step store -- PROMPT.md is no longer written with ## Steps.
+ * Write steps to a goal bundle's STEPS.json (source of truth) + PROGRESS_LOG.md.
+ * STEPS.json is the only step store -- PROMPT.md is no longer written with ## Steps.
  */
 export async function writeStepsToBundle(
   bundlePath: string,
   steps: WorkStep[],
   trigger: 'auto' | 're-breakdown' = 'auto'
 ): Promise<boolean> {
-  // Guard: don't overwrite if TASKS.json already exists
-  if (tasksJsonExists(bundlePath)) {
-    console.log(`[${new Date().toISOString()}] TASKS.json already exists at ${bundlePath} — skipping write`);
+  // Guard: don't overwrite if STEPS.json already exists
+  if (stepsJsonExists(bundlePath)) {
+    console.log(`[${new Date().toISOString()}] STEPS.json already exists at ${bundlePath} — skipping write`);
     return false;
   }
 
-  // Write TASKS.json (atomic via .tmp + rename)
-  const tasksFile = createTasksFile(steps, trigger);
-  const written = await writeTasksJson(bundlePath, tasksFile);
+  // Write STEPS.json (atomic via .tmp + rename)
+  const tasksFile = createStepsFile(steps, trigger);
+  const written = await writeStepsJson(bundlePath, tasksFile);
 
   if (!written) {
-    console.log(`[${new Date().toISOString()}] Failed to write TASKS.json at ${bundlePath}`);
+    console.log(`[${new Date().toISOString()}] Failed to write STEPS.json at ${bundlePath}`);
     return false;
   }
 
@@ -355,10 +355,10 @@ export async function logBreakdownEvent(
   const ledgerPath = path.join(process.cwd(), 'ledgers', 'work-ledger.jsonl');
   
   const entry = JSON.stringify({
-    event: 'TASK_BREAKDOWN',
+    event: 'GOAL_BREAKDOWN',
     ts: new Date().toISOString(),
-    task_id: taskId,
-    task_title: taskTitle,
+    goal_id: taskId,
+    goal_title: taskTitle,
     steps_created: stepsCreated,
     trigger: trigger,
   });

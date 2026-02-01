@@ -54,8 +54,7 @@ prompts/
 │   ├── needs-you-question-v1.0.0.md
 │   └── needs-you-approval-v1.0.0.md
 │
-├── contracts/                          # Task contract prompts
-│   ├── contract-creation-v1.0.0.md
+├── contracts/                          # Worker contract prompts
 │   ├── risk-assessment-v1.0.0.md
 │   └── dod-creation-v1.0.0.md
 │
@@ -196,7 +195,7 @@ import { loadAndRender } from './prompts/loader.js';
 const { metadata, rendered } = await loadAndRender('worker', 'worker-base', {
   TASK_TITLE: 'Build Next.js app',
   PRIORITY: 'P1',
-  CONTRACT_ID: 'task-abc123',
+  CONTRACT_ID: 'contract-abc123',
   PROJECT_PATH: '/path/to/project',
   TOOLS_ALLOWED: 'Read, Write, Bash',
   MAX_TURNS: 250
@@ -257,7 +256,7 @@ Strategy-specific guidance for different retry approaches (simplify, research, b
 Diagnostic agent prompts for investigating failures, root cause analysis.
 
 ### Intelligence (`intelligence/`)
-Intelligence layer prompts for intent classification, task breakdown, capability assessment.
+Intelligence layer prompts for intent classification, goal breakdown, capability assessment.
 
 ### Validation (`validation/`)
 Validation interpretation prompts for analyzing verifier results, updating capability confidence.
@@ -266,7 +265,7 @@ Validation interpretation prompts for analyzing verifier results, updating capab
 Human communication prompts for needs-you.md entries (blockers, questions, approvals).
 
 ### Contracts (`contracts/`)
-Task contract creation prompts (contract creation, risk assessment, Definition of Done).
+Worker contract prompts (risk assessment, Definition of Done).
 
 ### Calibration (`calibration/`)
 Calibration and practice prompts for capability validation, idle time practice, retrospectives.
@@ -284,7 +283,7 @@ Work selection prompts for priority-based work selection from goal bundles.
 ```typescript
 // Record prompt version used
 await appendToWorkLedger({
-  event: 'TASK_STARTED',
+  event: 'GOAL_STARTED',
   prompt_version: 'worker-base-v1.0.0',
   // ...
 });
@@ -295,17 +294,17 @@ const results = analyzePromptPerformance('worker-base', '1.0.0');
 
 ### Metrics to Track
 
-- **Success rate** - % of tasks completed successfully
-- **Average turns** - How many turns per task
-- **Cost per task** - Token cost per invocation
-- **Retry rate** - How often tasks need retries
+- **Success rate** - % of goals completed successfully
+- **Average turns** - How many turns per goal
+- **Cost per goal** - Token cost per invocation
+- **Retry rate** - How often goals need retries
 - **Capability confidence delta** - Impact on capability learning
 
 ### Baseline Comparison
 
 When testing new prompt version:
-1. Run 10+ tasks with old version (baseline)
-2. Run 10+ tasks with new version (candidate)
+1. Run 10+ goals with old version (baseline)
+2. Run 10+ goals with new version (candidate)
 3. Compare metrics (success rate, turns, cost)
 4. Deploy if new version improves or maintains baseline
 

@@ -19,14 +19,17 @@ import {
   loadSelfImprovementState,
   markRetrospectiveCompleted,
 } from '../../deterministic/self-improvement-state.js';
+import { normalizeLedgerEvent } from '../../core/logging.js';
 
 // === Types ===
 
 interface WorkLedgerEntry {
   event: string;
   ts: string;
-  task_id?: string;
-  task_title?: string;
+  goal_id?: string;
+  goal_title?: string;
+  task_id?: string;    // Legacy field name
+  task_title?: string; // Legacy field name
   title?: string;
   contract_id?: string;
   step_number?: number;
@@ -46,8 +49,10 @@ interface CapabilityLedgerEntry {
   evidence?: string[];
   verifier_id?: string;
   duration_ms?: number;
-  task_id?: string;
-  task_title?: string;
+  goal_id?: string;
+  goal_title?: string;
+  task_id?: string;    // Legacy field name
+  task_title?: string; // Legacy field name
   contract_id?: string;
   capabilities?: string[];
 }
@@ -171,8 +176,8 @@ function analyzeTaskOutcomes(entries: WorkLedgerEntry[]): TaskOutcome[] {
   const tasks = new Map<string, TaskOutcome>();
 
   for (const entry of entries) {
-    const taskId = entry.task_id || '';
-    const title = entry.task_title || entry.title || '';
+    const taskId = entry.goal_id || entry.task_id || '';
+    const title = entry.goal_title || entry.task_title || entry.title || '';
 
     if (!taskId) continue;
 
@@ -191,14 +196,14 @@ function analyzeTaskOutcomes(entries: WorkLedgerEntry[]): TaskOutcome[] {
 
     const task = tasks.get(taskId)!;
 
-    switch (entry.event) {
-      case 'TASK_STARTED':
+    switch (normalizeLedgerEvent(entry.event)) {
+      case 'GOAL_STARTED':
         task.retryCount++;
         if (!task.title && title) {
           task.title = title;
         }
         break;
-      case 'TASK_COMPLETED':
+      case 'GOAL_COMPLETED':
         task.completed = entry.ts;
         task.success = true;
         break;

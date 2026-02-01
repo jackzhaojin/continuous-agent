@@ -9,7 +9,7 @@
  * - Implementation/testing steps get full validation suite
  */
 
-import { runAllVerifiers, summarizeResults, type StepContext, type TaskType } from './verifiers/index.js';
+import { runAllVerifiers, summarizeResults, type StepContext, type GoalType } from './verifiers/index.js';
 import {
   updateCapabilitiesFromVerifierResults,
   DEFAULT_CAPABILITY_MAPPINGS,
@@ -51,7 +51,7 @@ export async function validateWork(
       : undefined;
 
     // Derive task type for verifier routing
-    const taskType: TaskType | undefined = item.skillBuild
+    const goalType: GoalType | undefined = item.skillBuild
       ? 'skill-build'
       : item.selfEnhance
         ? 'self-enhance'
@@ -59,8 +59,8 @@ export async function validateWork(
 
     logDeterministic(`Running verifiers against: ${result.output_path}`);
 
-    if (taskType) {
-      logDeterministic(`  Verifier mode: ${taskType}`);
+    if (goalType) {
+      logDeterministic(`  Verifier mode: ${goalType}`);
     } else if (stepContext) {
       logDeterministic(`  Verifier mode: step ${stepContext.step_number + 1}/${stepContext.total_steps} ("${stepContext.step_title}")`);
     }
@@ -70,7 +70,7 @@ export async function validateWork(
     const verifierResults = await runAllVerifiers(
       { project_path: result.output_path },
       stepContext,
-      taskType
+      goalType
     );
 
     const summary = summarizeResults(verifierResults);

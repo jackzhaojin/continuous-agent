@@ -19,8 +19,9 @@ import { reportMilestone, closeMilestone } from './notion-reporter.js';
 import { parsePromptMd, updateFrontmatter } from './prompt-md-parser.js';
 import { appendProjectMemory, type ProjectMemoryEntry } from './project-memory-store.js';
 import { registerProject, generateProjectSlug, findProjectBySlug, type ProjectRegistryEntry } from './project-registry.js';
-import { readTasksJson, writeTasksJson, updateStepStatus as updateStepInTasksJson, stepId } from './tasks-json-handler.js';
+import { readStepsJson, writeStepsJson, updateStepStatus as updateStepInStepsJson, stepId } from './steps-json-handler.js';
 import { logStepCompletedProgress, logStepBlockedProgress } from './progress-log-writer.js';
+import { appendContractEvent } from './contracts-log-writer.js';
 
 const WORKSPACE_DIR = path.join(process.cwd(), 'workspace');
 const LEDGERS_DIR = path.join(process.cwd(), 'ledgers');
@@ -83,7 +84,7 @@ async function moveBundleToCompleted(sourcePath: string): Promise<boolean> {
  * V1.2: PROMPT.md is the source of truth.
  * DETERMINISTIC: File I/O and pattern matching
  */
-export async function updateTaskState(
+export async function updateGoalState(
   item: WorkItem,
   success: boolean,
   errorInfo?: string,
@@ -91,7 +92,7 @@ export async function updateTaskState(
   contractId?: string,
   workerOutput?: string
 ): Promise<void> {
-  logDeterministic('Updating task state...');
+  logDeterministic('Updating goal state...');
 
   const ledgerPath = path.join(LEDGERS_DIR, 'work-ledger.jsonl');
 
@@ -100,13 +101,23 @@ export async function updateTaskState(
   if (success) {
     // Log to work ledger
     const entry = JSON.stringify({
-      event: 'TASK_COMPLETED',
+      event: 'GOAL_COMPLETED',
       ts: new Date().toISOString(),
-      task_id: item.id,
+      goal_id: item.id,
       title: item.title,
       output_path: outputPath || null,
     });
     await appendFile(ledgerPath, entry + '\n', 'utf-8');
+
+    // Dual-write to per-bundle CONTRACTS.jsonl
+    if (item.source_path && contractId) {
+      await appendContractEvent(item.source_path, {
+        event: 'CONTRACT_COMPLETED',
+        ts: new Date().toISOString(),
+        contract_id: contractId,
+        output_path: outputPath,
+      });
+    }
 
     // Report milestone to Notion (fire-and-forget)
     await reportMilestone('Completed', item, contractId, { outputPath });
@@ -119,7 +130,7 @@ export async function updateTaskState(
     // V1.2: Record project memory entry
     try {
       const memoryEntry: ProjectMemoryEntry = {
-        id: item.id || `task-${Date.now()}`,
+        id: item.id || `contract-${Date.now()}`,
         name: item.title,
         category: detectProjectCategory(item),
         completed: new Date().toISOString().split('T')[0],
@@ -203,6 +214,16 @@ export async function updateTaskState(
     if (contractId) {
       await closeMilestone(contractId);
     }
+
+    // Dual-write failure to per-bundle CONTRACTS.jsonl
+    if (item.source_path && contractId) {
+      await appendContractEvent(item.source_path, {
+        event: 'CONTRACT_FAILED',
+        ts: new Date().toISOString(),
+        contract_id: contractId,
+        error: errorInfo?.slice(0, 500),
+      });
+    }
   }
 
   // V1.2: Update PROMPT.md (source of truth for goal bundles)
@@ -273,10 +294,10 @@ async function requestMultiProjectApproval(item: WorkItem, outputPath: string): 
 
 /**
  * Set the output path for a task
- * V1.2: Updates PROMPT.md frontmatter + TASKS.json (if exists)
+ * V1.2: Updates PROMPT.md frontmatter + STEPS.json (if exists)
  * DETERMINISTIC: File I/O and pattern matching
  */
-export async function setTaskOutputPath(
+export async function setGoalOutputPath(
   taskTitle: string,
   outputPath: string,
   sourcePath?: string
@@ -324,8 +345,8 @@ export async function updateStepState(
       }
 
       if (item.source_path) {
-        // Primary: update TASKS.json (source of truth for step status)
-        await updateStepInTasksJson(item.source_path, stepId(step.step_number), 'complete', {
+        // Primary: update STEPS.json (source of truth for step status)
+        await updateStepInStepsJson(item.source_path, stepId(step.step_number), 'complete', {
           completed_at: now,
           completed_by_contract: contractId,
         });
@@ -346,13 +367,25 @@ export async function updateStepState(
       const entry = JSON.stringify({
         event: 'STEP_COMPLETED',
         ts: now,
-        task_id: item.id,
-        task_title: item.title,
+        goal_id: item.id,
+        goal_title: item.title,
         step_number: step.step_number + 1,
         step_title: step.title,
         output_path: outputPath || null,
       });
       await appendFile(ledgerPath, entry + '\n', 'utf-8');
+
+      // Dual-write step completion to per-bundle CONTRACTS.jsonl
+      if (item.source_path && contractId) {
+        await appendContractEvent(item.source_path, {
+          event: 'CONTRACT_COMPLETED',
+          ts: now,
+          contract_id: contractId,
+          step_id: `step-${step.step_number}`,
+          step_title: step.title,
+          output_path: outputPath,
+        });
+      }
 
       // Write step handoff file for human visibility and next-step context
       if (item.source_path) {
@@ -378,7 +411,7 @@ export async function updateStepState(
         const remainingSteps = item.steps.filter((s) => s.status !== 'complete');
         if (remainingSteps.length === 0) {
           log(`  ✓ All steps complete! Marking task as complete.`);
-          await updateTaskState(item, true, undefined, outputPath, contractId);
+          await updateGoalState(item, true, undefined, outputPath, contractId);
         } else {
           log(`  ${remainingSteps.length} steps remaining`);
         }
@@ -388,13 +421,25 @@ export async function updateStepState(
       const entry = JSON.stringify({
         event: 'STEP_ATTEMPT_FAILED',
         ts: now,
-        task_id: item.id,
-        task_title: item.title,
+        goal_id: item.id,
+        goal_title: item.title,
         step_number: step.step_number + 1,
         step_title: step.title,
         error: errorInfo?.slice(0, 500) || 'Unknown error',
       });
       await appendFile(ledgerPath, entry + '\n', 'utf-8');
+
+      // Dual-write step failure to per-bundle CONTRACTS.jsonl
+      if (item.source_path && contractId) {
+        await appendContractEvent(item.source_path, {
+          event: 'CONTRACT_FAILED',
+          ts: now,
+          contract_id: contractId,
+          step_id: `step-${step.step_number}`,
+          step_title: step.title,
+          error: errorInfo?.slice(0, 500),
+        });
+      }
 
       // Report step failure milestone to Notion (fire-and-forget)
       await reportMilestone('Failed', item, contractId, {
@@ -603,8 +648,8 @@ export async function escalateWithDiagnosis(
  * V1.2: PROMPT.md is the source of truth.
  * DETERMINISTIC: File I/O
  */
-export async function markTaskBlocked(item: WorkItem, contractId?: string): Promise<void> {
-  logDeterministic('Marking task as blocked...');
+export async function markGoalBlocked(item: WorkItem, contractId?: string): Promise<void> {
+  logDeterministic('Marking goal as blocked...');
 
   // Report blocked milestone to Notion (fire-and-forget)
   await reportMilestone('Blocked', item, contractId);
@@ -614,6 +659,15 @@ export async function markTaskBlocked(item: WorkItem, contractId?: string): Prom
     await closeMilestone(contractId);
   }
 
+  // Dual-write blocked event to per-bundle CONTRACTS.jsonl
+  if (item.source_path) {
+    await appendContractEvent(item.source_path, {
+      event: 'CONTRACT_BLOCKED',
+      ts: new Date().toISOString(),
+      contract_id: item.id || 'unknown',
+    });
+  }
+
   // V1.2: Update PROMPT.md (source of truth) — blocked goals stay in-place in in-progress/P{n}/
   if (item.source_path) {
     await updatePromptMdStatus(item.source_path, { status: 'blocked' });
@@ -621,7 +675,7 @@ export async function markTaskBlocked(item: WorkItem, contractId?: string): Prom
 }
 
 /**
- * Mark step as blocked in TASKS.json (primary) + PROMPT.md (legacy) + PROGRESS_LOG.md
+ * Mark step as blocked in STEPS.json (primary) + PROGRESS_LOG.md
  * DETERMINISTIC: File I/O
  */
 export async function markStepBlocked(item: WorkItem, stepNumber: number): Promise<void> {
@@ -630,7 +684,7 @@ export async function markStepBlocked(item: WorkItem, stepNumber: number): Promi
   if (item.source_path) {
     try {
       // Primary: update TASKS.json (source of truth for step status)
-      await updateStepInTasksJson(item.source_path, stepId(stepNumber), 'blocked');
+      await updateStepInStepsJson(item.source_path, stepId(stepNumber), 'blocked');
 
       // Append to PROGRESS_LOG.md
       const stepTitle = item.steps?.[stepNumber]?.title || `Step ${stepNumber + 1}`;
@@ -642,8 +696,17 @@ export async function markStepBlocked(item: WorkItem, stepNumber: number): Promi
         stepTitle,
       );
 
+      // Dual-write step blocked to per-bundle CONTRACTS.jsonl
+      await appendContractEvent(item.source_path, {
+        event: 'CONTRACT_BLOCKED',
+        ts: new Date().toISOString(),
+        contract_id: item.id || 'unknown',
+        step_id: stepId(stepNumber),
+        step_title: item.steps?.[stepNumber]?.title,
+      });
+
       log(`  Step ${stepNumber + 1} marked as blocked`);
-      // Note: markTaskBlocked() is always called after this by the executive loop,
+      // Note: markGoalBlocked() is always called after this by the executive loop,
       // which handles frontmatter update and directory move
     } catch (error) {
       log(`  Failed to mark step as blocked: ${error}`);

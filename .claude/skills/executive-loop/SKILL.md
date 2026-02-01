@@ -11,7 +11,7 @@ Central orchestrator that runs continuously, selecting and delegating work to wo
 ## Loop Phases
 
 1. **Health check** - Verify GitHub API, disk space, tools (node, npm, git)
-2. **Check inputs** - Read goals.md and queue.md for work items
+2. **Check inputs** - Read needs-you.md responses and queue.md for new work
 3. **Select work** - Pick highest priority eligible item (P0 > P1 > P2 > P3 > P4)
 4. **Create contract** - Build task contract with goal, DoD, scope, max_turns
 5. **Execute/delegate** - Small tasks: execute directly. Large: spawn worker
@@ -33,5 +33,5 @@ Always respect the 8 hard limits from `workspace/constitution.md`:
 
 ## Key Files
 
-Read: `workspace/goals.md`, `workspace/queue.md`, `workspace/constitution.md`
+Read: `workspace/in-progress/`, `workspace/ondeck/`, `workspace/queue.md`, `workspace/constitution.md`
 Write: `workspace/progress.md`, `workspace/needs-you.md`, `ledgers/*.jsonl`

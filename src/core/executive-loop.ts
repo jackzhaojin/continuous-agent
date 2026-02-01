@@ -24,12 +24,12 @@ import {
   generateStaticBreakdown,
   logBreakdownEvent,
   writeStepsToBundle,
-} from '../agentic/work-selection/task-breakdown.js';
+} from '../agentic/work-selection/goal-breakdown.js';
 import { diagnoseFailure } from '../agentic/diagnosis/agentic-diagnosis.js';
 import { classifyIntent } from '../agentic/intelligence/intent-classifier.js';
 import {
   executeWork,
-  inferCapabilitiesFromTask,
+  inferCapabilitiesFromGoal,
   logCapabilityAttempt,
   logCapabilityResult,
   logWorkStart,
@@ -44,18 +44,17 @@ import { createGoalBundle } from '../deterministic/workspace-writers.js';
 import { appendInputLog } from '../deterministic/inputs-log.js';
 import { isRateLimitError, isInCooldown, enterCooldown, resetBackoff } from '../deterministic/backoff-manager.js';
 import { validateWork } from '../deterministic/validation-handler.js';
-import { regenerateGoalsIndex } from '../deterministic/goals-index-generator.js';
 import {
-  updateTaskState,
+  updateGoalState,
   updateStepState,
   writeToNeedsYou,
   escalateWithDiagnosis,
-  markTaskBlocked,
+  markGoalBlocked,
   markStepBlocked,
-  setTaskOutputPath,
+  setGoalOutputPath,
   commitOutputsMonorepo,
 } from '../deterministic/state-handler.js';
-import { incrementStepRetryCount, readStepRetryCount, stepId as makeStepId } from '../deterministic/tasks-json-handler.js';
+import { incrementStepRetryCount, readStepRetryCount, stepId as makeStepId } from '../deterministic/steps-json-handler.js';
 
 // SELF-IMPROVEMENT - Idle and scheduled triggers
 import { checkSelfImprovementTriggers } from '../agentic/calibration/self-improvement-triggers.js';
@@ -75,7 +74,7 @@ const loopState: LoopState = {
   running: true,
   iteration: 0,
   last_work_at: null,
-  current_task: null,
+  current_contract: null,
 };
 
 // Track day boundary for daily summary generation
@@ -147,22 +146,15 @@ async function runIteration(): Promise<IterationResult> {
     return 'unhealthy';
   }
 
-  // Regenerate goals.md index from bundles (human-readable checkbox view)
-  try {
-    await regenerateGoalsIndex();
-  } catch (e) {
-    log(`  Goals index generation failed (non-blocking): ${e}`);
-  }
-
   // === PHASE 2: CHECK HUMAN INPUTS ===
   logAgentic('PHASE 2: Process Human Inputs');
   const inputsProcessed = await processHumanInputs();
 
   if (inputsProcessed.responsesFound > 0) {
     log(`  Processed ${inputsProcessed.responsesFound} human response(s)`);
-    log(`  Unblocked tasks: ${inputsProcessed.tasksUnblocked.join(', ') || 'none'}`);
+    log(`  Unblocked goals: ${inputsProcessed.tasksUnblocked.join(', ') || 'none'}`);
 
-    // Reset retry tracker for unblocked tasks
+    // Reset retry tracker for unblocked goals
     const retryTracker = getRetryTracker();
     for (const taskTitle of inputsProcessed.tasksUnblocked) {
       retryTracker.delete(taskTitle);
@@ -190,7 +182,7 @@ async function runIteration(): Promise<IterationResult> {
         });
       }
     }
-    log(`  Ingested ${createdCount} task(s) from queue as draft bundles`);
+    log(`  Ingested ${createdCount} goal(s) from queue as draft bundles`);
   }
 
   // === PHASE 3: SELECT WORK ===
@@ -225,11 +217,11 @@ async function runIteration(): Promise<IterationResult> {
       const taskAdded = await generateSelfImprovementTask(selfImprovementTrigger);
 
       if (taskAdded) {
-        logAgentic('  Self-improvement task added');
-        // Continue immediately to pick up the new task
+        logAgentic('  Self-improvement goal added');
+        // Continue immediately to pick up the new goal
         return 'work_completed';
       } else {
-        logAgentic('  Self-improvement task already exists or failed to add');
+        logAgentic('  Self-improvement goal already exists or failed to add');
       }
     } else {
       logAgentic('  No self-improvement triggers ready');
@@ -238,7 +230,7 @@ async function runIteration(): Promise<IterationResult> {
     return 'no_work';
   }
 
-  let workItem = selectedWork.task;
+  let workItem = selectedWork.goal;
   let currentStep = selectedWork.step;
   let isStepExecution = selectedWork.type === 'step';
 
@@ -246,7 +238,7 @@ async function runIteration(): Promise<IterationResult> {
     logAgentic(`Selected STEP: [${workItem.priority}] ${workItem.title}`);
     log(`  Step ${currentStep.step_number + 1}/${workItem.steps?.length}: ${currentStep.title}`);
   } else {
-    logAgentic(`Selected TASK: [${workItem.priority}] ${workItem.title}`);
+    logAgentic(`Selected GOAL: [${workItem.priority}] ${workItem.title}`);
   }
 
   // === PHASE 3b: AUTO-BREAKDOWN (if needed) ===
@@ -259,11 +251,11 @@ async function runIteration(): Promise<IterationResult> {
     const steps = generateStaticBreakdown(workItem);
     log(`  Generated ${steps.length} steps for "${workItem.title}"`);
 
-    // Write steps to the bundle: TASKS.json (primary) + PROMPT.md (legacy)
+    // Write steps to the bundle: STEPS.json (source of truth)
     if (workItem.source_path) {
       const written = await writeStepsToBundle(workItem.source_path, steps);
       if (written) {
-        logAgentic(`  Steps written to TASKS.json — re-selecting to execute step 1`);
+        logAgentic(`  Steps written to STEPS.json — re-selecting to execute step 1`);
 
         // Log breakdown event to work ledger
         await logBreakdownEvent(workItem.id, workItem.title, steps.length, 'auto');
@@ -271,18 +263,18 @@ async function runIteration(): Promise<IterationResult> {
         // Re-select work — should now find step 1
         const reselected = await selectWorkWithSteps();
         if (reselected && reselected.step) {
-          workItem = reselected.task;
+          workItem = reselected.goal;
           currentStep = reselected.step;
           isStepExecution = true;
           logAgentic(`  Re-selected: Step ${currentStep.step_number + 1}/${workItem.steps?.length}: ${currentStep.title}`);
         } else {
-          log(`  WARNING: Re-selection after breakdown found no steps — continuing as whole task`);
+          log(`  WARNING: Re-selection after breakdown found no steps — continuing as whole goal`);
         }
       } else {
-        log(`  Steps not written (already exists or error) — executing as whole task`);
+        log(`  Steps not written (already exists or error) — executing as whole goal`);
       }
     } else {
-      log(`  No source_path on work item — cannot write steps to bundle, executing as whole task`);
+      log(`  No source_path on work item — cannot write steps to bundle, executing as whole goal`);
     }
 
   } else if (!isStepExecution) {
@@ -296,14 +288,14 @@ async function runIteration(): Promise<IterationResult> {
   }
 
   // === PHASE 4: EXECUTE WORK ===
-  const contractId = `task-${Date.now()}`;
-  loopState.current_task = contractId;
+  const contractId = `contract-${Date.now()}`;
+  loopState.current_contract = contractId;
 
   logAgentic('PHASE 4: Execute Work (Agent SDK Worker)');
 
   // Log capability attempt
   const intent = await classifyIntent(workItem);
-  const capabilities = inferCapabilitiesFromTask(workItem, intent);
+  const capabilities = inferCapabilitiesFromGoal(workItem, intent);
   await logCapabilityAttempt(workItem, capabilities);
   await logWorkStart(workItem, currentStep, contractId);
 
@@ -325,16 +317,16 @@ async function runIteration(): Promise<IterationResult> {
     // Only write if we have a new path and the task doesn't already have one
     if (result.output_path && !workItem.output_path) {
       logDeterministic('  Persisting output path for future resume...');
-      const persisted = await setTaskOutputPath(workItem.title, result.output_path, workItem.source_path);
+      const persisted = await setGoalOutputPath(workItem.title, result.output_path, workItem.source_path);
       if (!persisted) {
-        log('  Warning: output_path not persisted — task may not resume correctly after restart');
+        log('  Warning: output_path not persisted — goal may not resume correctly after restart');
       }
     }
 
     if (isStepExecution && currentStep) {
       await updateStepState(workItem, currentStep, true, undefined, result.output_path, contractId);
     } else {
-      await updateTaskState(workItem, true, undefined, result.output_path, contractId, result.output);
+      await updateGoalState(workItem, true, undefined, result.output_path, contractId, result.output);
     }
 
     // Commit worker output to agent-outputs monorepo
@@ -357,12 +349,12 @@ async function runIteration(): Promise<IterationResult> {
 
   let retry = retryTracker.get(retryKey);
   if (!retry) {
-    // Seed retry count from TASKS.json if available (survives PM2 restarts)
+    // Seed retry count from STEPS.json if available (survives PM2 restarts)
     let persistedRetryCount = 0;
     if (isStepExecution && currentStep && workItem.source_path) {
       persistedRetryCount = await readStepRetryCount(workItem.source_path, makeStepId(currentStep.step_number));
       if (persistedRetryCount > 0) {
-        log(`  Seeded retry count from TASKS.json: ${persistedRetryCount}`);
+        log(`  Seeded retry count from STEPS.json: ${persistedRetryCount}`);
       }
     }
     retry = {
@@ -379,7 +371,7 @@ async function runIteration(): Promise<IterationResult> {
   retry.lastError = result?.errors.join(', ') || 'Unknown error';
   retry.lastAttemptAt = new Date().toISOString();
 
-  // Persist retry count to TASKS.json (survives PM2 restarts)
+  // Persist retry count to STEPS.json (survives PM2 restarts)
   if (isStepExecution && currentStep && workItem.source_path) {
     await incrementStepRetryCount(workItem.source_path, makeStepId(currentStep.step_number));
   }
@@ -393,7 +385,7 @@ async function runIteration(): Promise<IterationResult> {
   // This ensures retries AND restarts use the same project directory
   if (result?.output_path && !workItem.output_path) {
     logDeterministic('  Persisting output path for retry/resume...');
-    const persisted = await setTaskOutputPath(workItem.title, result.output_path, workItem.source_path);
+    const persisted = await setGoalOutputPath(workItem.title, result.output_path, workItem.source_path);
     if (!persisted) {
       log('  Warning: output_path not persisted — retries may not resume correctly after restart');
     }
@@ -423,7 +415,7 @@ async function runIteration(): Promise<IterationResult> {
       if (isStepExecution && currentStep) {
         await markStepBlocked(workItem, currentStep.step_number);
       }
-      await markTaskBlocked(workItem, contractId);
+      await markGoalBlocked(workItem, contractId);
       await escalateWithDiagnosis(workItem, retry.attempts, diagnosis.diagnosis, contractId);
 
       retryTracker.delete(retryKey);
@@ -450,7 +442,7 @@ async function runIteration(): Promise<IterationResult> {
     if (isStepExecution && currentStep) {
       await markStepBlocked(workItem, currentStep.step_number);
     }
-    await markTaskBlocked(workItem, contractId);
+    await markGoalBlocked(workItem, contractId);
     await writeToNeedsYou(workItem, retry.attempts, retry.lastError, contractId);
 
     retryTracker.delete(retryKey);

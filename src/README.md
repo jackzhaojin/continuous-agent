@@ -40,12 +40,11 @@ src/
 │   │
 │   ├── work-selection/            # WHAT to work on (priority reasoning)
 │   │   ├── work-selector.ts       # Select highest priority work from goal bundles
-│   │   └── task-breakdown.ts      # Break complex tasks into steps
+│   │   └── goal-breakdown.ts      # Break complex goals into steps
 │   │
 │   ├── execution/                 # HOW to execute work (agent spawning)
 │   │   ├── worker-spawner.ts      # Spawn Agent SDK workers
-│   │   ├── execution-handler.ts   # Execute work with retry logic
-│   │   └── task-contractor.ts     # Create task contracts with DoD
+│   │   └── execution-handler.ts   # Execute work with retry logic
 │   │
 │   ├── diagnosis/                 # WHY things fail (investigation)
 │   │   └── agentic-diagnosis.ts   # Spawn diagnostic agents to investigate failures

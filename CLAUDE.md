@@ -8,6 +8,16 @@ This is a **continuously-running autonomous agent** that finds and executes work
 
 **Key Philosophy:** The agent is autonomous by default. It acts, builds, and ships without waiting for permission, except when hitting constitutional hard limits. Human interaction happens asynchronously via `workspace/needs-you.md`.
 
+## Glossary
+
+| Term | Meaning |
+|------|---------|
+| **Goal** | A unit of work the agent pursues (previously called "task"). Stored as a goal bundle in `workspace/`. |
+| **Step** | A sub-unit of a goal, created when a goal is too complex for a single worker session. Tracked in `STEPS.json`. |
+| **Contract** | A scoped work agreement given to a worker: prompt, tools allowed, Definition of Done, turn budget. ID prefix: `contract-`. |
+| **Worker** | A spawned Claude Agent SDK session that executes a contract. Runs in `agent-outputs/`. |
+| **Goal Bundle** | A directory containing `PROMPT.md` (frontmatter + description), `STEPS.json` (step definitions), and `PROGRESS_LOG.md`. |
+
 ## Build & Run Commands
 
 ```bash
@@ -57,14 +67,14 @@ npm run build  # Rebuild only - changes take effect on next natural restart
   - NO application code, NO project outputs
 
 - **`agent-outputs/`** (sibling directory) - ALL worker outputs
-  - Isolated project directories: `agent-outputs/projects/{category}/{date}/{task-slug}/`
+  - Isolated project directories: `agent-outputs/projects/{category}/{date}/{goal-slug}/`
   - Real codebases with their own git history
   - Workers NEVER write to the agent codebase
   - **API keys are copied:** Each worker gets a copy of `.env` from agent repo
 
 This separation is enforced by **Constitution Article I, Section 6** (zero tolerance violation).
 
-**EXCEPTION: Self-Enhancement Tasks** - Tasks prefixed with `[SELF-ENHANCE]` in goals.md are routed to the self-enhancer subagent which works in the continuous-agent codebase. See "Self-Enhancement Workflow" below.
+**EXCEPTION: Self-Enhancement Goals** - Goals prefixed with `[SELF-ENHANCE]` are routed to the self-enhancer subagent which works in the continuous-agent codebase. See "Self-Enhancement Workflow" below.
 
 ## Self-Enhancement Workflow
 
@@ -72,7 +82,7 @@ The agent can modify its own infrastructure code through a special self-enhancem
 
 ### How It Works
 
-1. **Tag-based Detection**: Tasks in `goals.md` prefixed with `[SELF-ENHANCE]` are recognized as self-enhancement tasks
+1. **Tag-based Detection**: Goals prefixed with `[SELF-ENHANCE]` are recognized as self-enhancement goals
 2. **Special Routing**: Worker spawner routes these to the agent codebase instead of agent-outputs
 3. **Subagent Delegation**: Uses the `self-enhancer` subagent (`.claude/agents/self-enhancer.md`) via Task tool
 4. **Staged Changes**: All changes are made on a branch for human review before merge
@@ -88,7 +98,7 @@ The agent can modify its own infrastructure code through a special self-enhancem
 - **Branch:** self-enhance/improve-retry-logic
 ```
 
-**Branch Tracking:** When a self-enhancement task starts, the self-enhancer updates `goals.md` with a `**Branch:**` field. This allows the agent to resume work on the same branch across restarts, preventing duplicate branches.
+**Branch Tracking:** When a self-enhancement goal starts, the self-enhancer updates `PROMPT.md` with a `branch:` frontmatter field. This allows the agent to resume work on the same branch across restarts, preventing duplicate branches.
 
 ### What Can Be Modified
 
@@ -104,7 +114,7 @@ The agent can modify its own infrastructure code through a special self-enhancem
 ### Self-Enhancement Workflow
 
 ```
-1. Create branch: self-enhance/<task-slug>
+1. Create branch: self-enhance/<goal-slug>
 2. Make changes
 3. Run: npm run typecheck && npm run build
 4. Commit with clear message
@@ -189,20 +199,20 @@ source_project:          # V1.2: slug of source project to copy from
 1. **Health Check** - GitHub auth, disk space, dependencies; regenerates `goals.md` index from bundles
 2. **Check Inputs** - Process human responses from `needs-you.md`
 3. **Select Work** - Scans goal bundles by priority (P0 > P1 > P2 > P3 > P4), falls back to legacy goals.md if no bundles exist
-4. **Create Task Contract** - Scope, risk level, Definition of Done
+4. **Create Worker Contract** - Scope, risk level, Definition of Done
 5. **Execute** - Spawn Agent SDK worker with intelligent prompting
 6. **Validate** - Run verifiers on worker's output directory (NOT agent infrastructure)
 7. **Update State** - Update goal bundle status, needs-you.md, ledgers
 8. **Continue or Sleep** - Immediately continue if work exists, sleep only when idle
 
-### Incremental Execution (Multi-Step Tasks)
+### Incremental Execution (Multi-Step Goals)
 
-Complex tasks (>100 estimated turns) are automatically broken down into steps:
+Complex goals (>100 estimated turns) are automatically broken down into steps:
 
-- **Automatic Breakdown:** `task-breakdown.ts` generates 2-4 steps when `estimateComplexity()` exceeds threshold
+- **Automatic Breakdown:** `goal-breakdown.ts` generates 2-4 steps when `estimateComplexity()` exceeds threshold
 - **Step Execution:** Each step is executed independently with max 100 turns per step
-- **Progress Tracking:** Steps are tracked in **TASKS.json** (machine-readable source of truth) + **PROGRESS_LOG.md** (append-only timeline).
-- **Shared Output:** All steps for a task write to the SAME project directory
+- **Progress Tracking:** Steps are tracked in **STEPS.json** (machine-readable source of truth) + **PROGRESS_LOG.md** (append-only timeline).
+- **Shared Output:** All steps for a goal write to the SAME project directory
 - **Configuration:**
   - `BREAKDOWN_THRESHOLD_TURNS=100` - Trigger breakdown if estimated > 100 turns
   - `MAX_TURNS_PER_STEP=100` - Max turns per step (MINIMUM 100)
@@ -212,12 +222,12 @@ Complex tasks (>100 estimated turns) are automatically broken down into steps:
 ```
 workspace/in-progress/P2/my-goal/
   PROMPT.md          # Content only (problem, DoD, approach)
-  TASKS.json         # Machine-readable step definitions + status (source of truth)
+  STEPS.json         # Machine-readable step definitions + status (source of truth)
   PROGRESS_LOG.md    # Append-only human-readable timeline
   step-1-handoff.md  # Per-step handoff context (still written during transition)
 ```
 
-**TASKS.json schema:**
+**STEPS.json schema:**
 ```json
 {
   "version": 1,
@@ -234,27 +244,26 @@ workspace/in-progress/P2/my-goal/
       "dependencies": [],
       "estimated_turns": 80,
       "completed_at": "2026-01-29T05:59:42Z",
-      "completed_by_contract": "task-1769665492207"
+      "completed_by_contract": "contract-1769665492207"
     }
   ]
 }
 ```
 
 **Read/write strategy:**
-- **Reads:** TASKS.json first, falls back to `## Steps` in PROMPT.md body (legacy migration)
-- **Writes:** TASKS.json (primary) + PROGRESS_LOG.md (append-only)
-- **Migration:** Run `npx tsx scripts/migrate-steps-to-tasks-json.ts` to convert existing bundles
+- **Reads:** STEPS.json first, falls back to TASKS.json for backward compat
+- **Writes:** STEPS.json (primary) + PROGRESS_LOG.md (append-only)
+- **Migration:** Run `npx tsx scripts/migrate-steps-to-steps-json.ts` to convert existing bundles
 
 ### Key Modules
 
 **Agentic Layer** (`src/agentic/`) - AI decision-making:
-- `work-selection/work-selector.ts` - Selects highest priority unblocked task (goal bundles first, legacy goals.md fallback)
-- `work-selection/goal-scanner.ts` - Scans workspace folder tree for goal bundles, reads TASKS.json (primary) or PROMPT.md (fallback), auto-promotes ondeck goals
-- `work-selection/task-breakdown.ts` - Automatic breakdown of complex tasks into steps; `writeStepsToBundle()` writes TASKS.json + PROMPT.md + PROGRESS_LOG.md
-- `execution/task-contractor.ts` - Creates task contracts with DoD and constraints
+- `work-selection/work-selector.ts` - Selects highest priority unblocked goal (goal bundles first, legacy goals.md fallback)
+- `work-selection/goal-scanner.ts` - Scans workspace folder tree for goal bundles, reads STEPS.json (primary) or PROMPT.md (fallback), auto-promotes ondeck goals
+- `work-selection/goal-breakdown.ts` - Automatic breakdown of complex goals into steps; `writeStepsToBundle()` writes STEPS.json + PROGRESS_LOG.md
 - `execution/worker-spawner.ts` - Spawns Claude Agent SDK sessions with prompts, copies `.env` to worker directory
 - `execution/execution-handler.ts` - Orchestrates work execution with retry tracking
-- `intelligence/intent-classifier.ts` - Classifies tasks as outcome_only vs what_and_how
+- `intelligence/intent-classifier.ts` - Classifies goals as outcome_only vs what_and_how
 - `intelligence/strategy-selector.ts` - Chooses different strategies per retry
 - `intelligence/prompt-builder.ts` - Builds context-rich prompts with retry history
 - `diagnosis/agentic-diagnosis.ts` - Analyzes failures to determine next actions
@@ -267,8 +276,8 @@ workspace/in-progress/P2/my-goal/
 - `health-checker.ts` - Validates auth, tools, disk space
 - `input-processor.ts` - Parses human responses from needs-you.md
 - `prompt-md-parser.ts` - Parses PROMPT.md files (YAML frontmatter + markdown body)
-- `state-handler.ts` - Updates goal bundles (TASKS.json + PROMPT.md + PROGRESS_LOG.md), needs-you.md, ledgers; multi-project patch generation
-- `tasks-json-handler.ts` - Read/write/update TASKS.json files (atomic writes via temp+rename)
+- `state-handler.ts` - Updates goal bundles (STEPS.json + PROMPT.md + PROGRESS_LOG.md), needs-you.md, ledgers; multi-project patch generation
+- `steps-json-handler.ts` - Read/write/update STEPS.json files (atomic writes via temp+rename)
 - `progress-log-writer.ts` - Append-only PROGRESS_LOG.md writer for goal bundles
 - `validation-handler.ts` - Runs verifiers on worker output
 - `verifiers/` - Deterministic checks (git-clean, node-build, docs-complete)
@@ -294,7 +303,7 @@ workspace/in-progress/P2/my-goal/
 - `workspace/project-registry.yml` - Tracks completed projects for reuse (V1.2: multi-project access)
 
 **Append-only ledgers (JSONL):**
-- `ledgers/work-ledger.jsonl` - Task events (STARTED, COMPLETED, BLOCKED, STEP_STARTED, STEP_COMPLETED)
+- `ledgers/work-ledger.jsonl` - Goal events (GOAL_STARTED, GOAL_COMPLETED, GOAL_BLOCKED, STEP_STARTED, STEP_COMPLETED)
   - Each entry includes `contract_id` linking to worker log
 - `ledgers/capability-ledger.jsonl` - Capability attempts and results
   - Each entry includes `contract_id` linking to worker log
@@ -302,14 +311,14 @@ workspace/in-progress/P2/my-goal/
 - `ledgers/executive-{date}.log` - Daily executive loop logs
 - `ledgers/{yyyy-mm-dd}/worker-{contract_id}.log` - Worker execution logs (organized by date)
 
-**Tracing tasks to worker logs:**
+**Tracing goals to worker logs:**
 ```bash
-# Find contract_id for a task in work ledger
+# Find contract_id for a goal in work ledger
 grep "Build Next.js" ledgers/work-ledger.jsonl | jq -r '.contract_id'
-# Output: task-b25db16e
+# Output: contract-b25db16e
 
 # View detailed worker log
-cat ledgers/2026-01-25/worker-task-b25db16e.log
+cat ledgers/2026-01-25/worker-contract-b25db16e.log
 ```
 
 **IMPORTANT:** The `ledgers/` directory is **version controlled** and committed to git for full audit traceability.
@@ -359,14 +368,14 @@ When the agent blocks after 10 retries, it writes to `workspace/needs-you.md`:
 - `[APPROVED]` - Grant permission with optional details
 - `[DECISION]` - Provide a choice/direction
 - `[INFO]` - Supply requested information
-- `[SKIP]` - Cancel this task entirely
+- `[SKIP]` - Cancel this goal entirely
 
-The agent automatically detects responses in Phase 2, unblocks tasks in `goals.md`, resets retry counters, and logs interactions to `work-ledger.jsonl`.
+The agent automatically detects responses in Phase 2, unblocks goals, resets retry counters, and logs interactions to `work-ledger.jsonl`.
 
 ## Retry & Strategy System
 
 **Retry Tracker** (in-memory Map):
-- Tracks attempts per task (max 10 per Constitution)
+- Tracks attempts per goal (max 10 per Constitution)
 - **Persists output_path** from first attempt so retries continue working on the SAME project
 - After each failure, `strategy-selector.ts` picks a DIFFERENT approach
 - Retry context passed to worker includes: attempts, strategies tried, last error, existing project path
@@ -391,7 +400,7 @@ if (retry.attempts >= 10) {
 
 **CRITICAL:** Verifiers run in the **worker's output directory** (`result.output_path`), NOT the agent infrastructure directory. This was a bug that was fixed - verifiers must check the actual work output in `agent-outputs/`.
 
-Verifiers run after each task and return structured evidence:
+Verifiers run after each goal and return structured evidence:
 
 ```typescript
 {
@@ -432,7 +441,7 @@ UNHEALTHY_SLEEP_SECONDS=60  # Sleep when system unhealthy before retrying
 
 # Incremental execution
 BREAKDOWN_THRESHOLD_TURNS=100  # Trigger breakdown if estimated > 100 turns
-AUTO_BREAKDOWN_ENABLED=true    # Enable automatic task breakdown
+AUTO_BREAKDOWN_ENABLED=true    # Enable automatic goal breakdown
 
 # Third-party API keys (copied to each worker's .env)
 NOTION_API_KEY=                # Notion integration key
@@ -596,24 +605,23 @@ continuous-agent/
 │   │   ├── types.ts            # Shared interfaces
 │   │   └── logging.ts          # Structured logging
 │   ├── agentic/                # AI decision-making (LLM-powered)
-│   │   ├── work-selection/     # Task selection & breakdown
+│   │   ├── work-selection/     # Goal selection & breakdown
 │   │   │   ├── work-selector.ts  # Selects work from goal bundles (fallback: goals.md)
 │   │   │   ├── goal-scanner.ts   # Scans workspace folders, auto-promotes ondeck goals
-│   │   │   └── task-breakdown.ts # Complex task decomposition
+│   │   │   └── goal-breakdown.ts # Complex goal decomposition
 │   │   ├── execution/          # Worker spawning
 │   │   │   ├── worker-spawner.ts # Agent SDK integration, .env copying
-│   │   │   ├── task-contractor.ts # Creates task contracts
 │   │   │   └── execution-handler.ts # Orchestrates execution
 │   │   ├── intelligence/       # Intent classification, strategy selection
 │   │   ├── diagnosis/          # Failure analysis
 │   │   ├── learning/           # Capability confidence updates
-│   │   ├── calibration/        # Self-improvement triggers and task generation
+│   │   ├── calibration/        # Self-improvement triggers and goal generation
 │   │   └── prompts/            # Prompt templates organized by category (loader.ts + subdirs)
 │   └── deterministic/          # Mechanical operations (no LLM)
 │       ├── health-checker.ts   # System health validation
 │       ├── input-processor.ts  # Parses needs-you.md responses
 │       ├── prompt-md-parser.ts # Parses PROMPT.md frontmatter + body
-│       ├── tasks-json-handler.ts # TASKS.json read/write/update (atomic writes)
+│       ├── steps-json-handler.ts # STEPS.json read/write/update (atomic writes)
 │       ├── progress-log-writer.ts # Append-only PROGRESS_LOG.md writer
 │       ├── state-handler.ts    # Updates goal bundles, needs-you.md
 │       ├── validation-handler.ts # Runs verifiers
@@ -638,7 +646,7 @@ continuous-agent/
 │   └── completed/              # Successfully completed goals
 
 ├── ledgers/                    # Append-only logs (version controlled)
-│   ├── work-ledger.jsonl       # Task events
+│   ├── work-ledger.jsonl       # Goal events
 │   ├── capability-ledger.jsonl # Capability results
 │   └── executive-{date}.log    # Daily execution logs
 
@@ -669,7 +677,7 @@ continuous-agent/
 
 **Agent vs Worker:**
 - **Agent** = This codebase (executive loop, orchestration)
-- **Worker** = Spawned Agent SDK session for a specific task
+- **Worker** = Spawned Agent SDK session for a specific goal/step
 
 **Capability Types:**
 - **Technical** = Tool operation (git.commit, npm.install)
@@ -708,13 +716,13 @@ tail -20 ledgers/work-ledger.jsonl
 
 **Common issues:**
 - Worker fails immediately → Check auth tokens in `.env`
-- Task marked Blocked → Check `needs-you.md` for details, add human response
+- Goal marked Blocked → Check `needs-you.md` for details, add human response
 - Build fails → Run `npm run typecheck` for detailed errors
 - Retry loops → Check `strategy-selector.ts` is picking different strategies
 - Verifiers checking wrong directory → Ensure verifiers use `result.output_path`, not `process.cwd()`
 - TypeScript errors → Run `npm install` to ensure `@types/node` is installed
-- Steps lost on restart → Check TASKS.json exists in the bundle; if only `## Steps` in PROMPT.md, run migration: `npx tsx scripts/migrate-steps-to-tasks-json.ts`
-- Step status not updating → Check TASKS.json is writable; `tasks-json-handler.ts` uses atomic temp+rename writes
+- Steps lost on restart → Check STEPS.json exists in the bundle; if only `## Steps` in PROMPT.md, run migration: `npx tsx scripts/migrate-steps-to-steps-json.ts`
+- Step status not updating → Check STEPS.json is writable; `steps-json-handler.ts` uses atomic temp+rename writes
 - Self-enhance steps repeat → Title prefix must be preserved (not stripped) for regex matching in `updateStepStatus`
 - PM2 running stale code → Verify `ecosystem.config.cjs` script path points to `dist/core/executive-loop.js`
 - No work selected → Check `workspace/in-progress/P{0-4}/` for goal bundles with `status: pending` in PROMPT.md; also check `workspace/ondeck/` for goals awaiting auto-promotion

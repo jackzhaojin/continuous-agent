@@ -13,8 +13,9 @@ import { logAgentic, log } from '../../core/logging.js';
 import { reportMilestone } from '../../deterministic/notion-reporter.js';
 import { readPreviousStepHandoff } from '../../deterministic/state-handler.js';
 import { incrementOutcomeCount } from '../../deterministic/self-improvement-state.js';
-import { updateStepStatus as updateStepInTasksJson, stepId } from '../../deterministic/tasks-json-handler.js';
+import { updateStepStatus as updateStepInStepsJson, stepId } from '../../deterministic/steps-json-handler.js';
 import { logStepStartedProgress } from '../../deterministic/progress-log-writer.js';
+import { appendContractEvent } from '../../deterministic/contracts-log-writer.js';
 
 const LEDGERS_DIR = path.join(process.cwd(), 'ledgers');
 
@@ -208,8 +209,8 @@ export async function executeWork(
     log(`  Spawning Agent SDK worker...`);
     const result = await spawnWorker(
       {
-        id: currentTask || `task-${Date.now()}`,
-        goal: scopedItem.description || item.description,
+        id: currentTask || `contract-${Date.now()}`,
+        prompt: scopedItem.description || item.description,
         scope: {
           repos_allowed: ['agent-outputs'],
           tools_allowed: [
@@ -272,7 +273,7 @@ export async function executeWork(
  * Infer capabilities being exercised from task
  * AGENTIC: Uses heuristics to map task → capabilities
  */
-export function inferCapabilitiesFromTask(item: WorkItem, intent: { type: string }): string[] {
+export function inferCapabilitiesFromGoal(item: WorkItem, intent: { type: string }): string[] {
   const capabilities: string[] = [];
 
   // Map task patterns to capabilities
@@ -316,8 +317,8 @@ export async function logCapabilityAttempt(item: WorkItem, capabilities: string[
   const entry = JSON.stringify({
     event: 'CAPABILITY_ATTEMPT',
     ts: new Date().toISOString(),
-    task_id: item.id,
-    task_title: item.title,
+    goal_id: item.id,
+    goal_title: item.title,
     capabilities,
   });
   await appendFile(ledgerPath, entry + '\n', 'utf-8');
@@ -336,9 +337,9 @@ export async function logCapabilityResult(
   const entry = JSON.stringify({
     event: 'CAPABILITY_RESULT',
     ts: new Date().toISOString(),
-    task_id: item.id,
+    goal_id: item.id,
     contract_id: contractId,
-    task_title: item.title,
+    goal_title: item.title,
     capabilities,
     result: success ? 'PASS' : 'FAIL',
   });
@@ -354,7 +355,7 @@ export async function logCapabilityResult(
 
 /**
  * Log work start event.
- * Also updates TASKS.json step status to in_progress and appends to PROGRESS_LOG.md.
+ * Also updates STEPS.json step status to in_progress and appends to PROGRESS_LOG.md.
  */
 export async function logWorkStart(
   item: WorkItem,
@@ -367,24 +368,35 @@ export async function logWorkStart(
     ? JSON.stringify({
         event: 'STEP_STARTED',
         ts: now,
-        task_id: item.id,
+        goal_id: item.id,
         contract_id: contractId,
-        task_title: item.title,
+        goal_title: item.title,
         step_number: step.step_number + 1,
         step_title: step.title,
       })
     : JSON.stringify({
-        event: 'TASK_STARTED',
+        event: 'GOAL_STARTED',
         ts: now,
-        task_id: item.id,
+        goal_id: item.id,
         contract_id: contractId,
         title: item.title,
       });
   await appendFile(ledgerPath, entry + '\n', 'utf-8');
 
-  // Update TASKS.json + PROGRESS_LOG.md for step starts
+  // Dual-write to per-bundle CONTRACTS.jsonl
+  if (item.source_path) {
+    await appendContractEvent(item.source_path, {
+      event: 'CONTRACT_STARTED',
+      ts: now,
+      contract_id: contractId,
+      step_id: step ? `step-${step.step_number}` : undefined,
+      step_title: step?.title,
+    });
+  }
+
+  // Update STEPS.json + PROGRESS_LOG.md for step starts
   if (step && item.source_path) {
-    await updateStepInTasksJson(item.source_path, stepId(step.step_number), 'in_progress', {
+    await updateStepInStepsJson(item.source_path, stepId(step.step_number), 'in_progress', {
       started_at: now,
     });
 

@@ -21,38 +21,12 @@ export interface HealthStatus {
 }
 
 /**
- * Machine-readable step definition stored in TASKS.json (source of truth)
- * Replaces fragile regex-based ## Steps parsing from PROMPT.md
- */
-export interface TaskStep {
-  id: string;              // Stable identifier (e.g., "step-0")
-  order: number;           // Execution order (0-based)
-  title: string;
-  description: string;
-  status: 'pending' | 'in_progress' | 'complete' | 'blocked';
-  dependencies: string[];  // IDs of steps this depends on
-  estimated_turns: number;
-  started_at?: string;
-  completed_at?: string;
-  completed_by_contract?: string;
-  re_breakdown_count?: number;
-  retry_count?: number;    // Persisted retry attempts (survives PM2 restarts)
-}
-
-/**
- * TASKS.json file schema — per-bundle source of truth for step tracking
- */
-export interface TasksFile {
-  version: number;
-  created_at: string;
-  trigger: 'auto' | 're-breakdown' | 'manual';
-  revision: number;        // Bumped on every write
-  steps: TaskStep[];
-}
-
-/**
- * Individual step within a multi-step task
- * Steps are tracked in TASKS.json per goal bundle (source of truth)
+ * Individual step within a multi-step goal.
+ * Used at runtime in the executive loop and stored in STEPS.json per goal bundle.
+ *
+ * The runtime shape uses `step_number` (numeric) while the on-disk STEPS.json shape
+ * uses `id` (string like "step-0") + `order`. Both sets of fields are present here;
+ * runtime code primarily uses `step_number`, while STEPS.json I/O uses `id`/`order`.
  */
 export interface WorkStep {
   step_number: number;
@@ -67,6 +41,22 @@ export interface WorkStep {
   started_at?: string;
   re_breakdown_count?: number; // Track re-breakdowns for exit code 1 handling
   retry_count?: number;        // Persisted retry attempts (survives PM2 restarts)
+  completed_by_contract?: string;
+  // On-disk STEPS.json fields (optional at runtime)
+  id?: string;                  // Stable identifier (e.g., "step-0")
+  order?: number;               // Execution order (0-based, mirrors step_number)
+}
+
+/**
+ * STEPS.json file schema — per-bundle source of truth for step tracking
+ * (Reads STEPS.json first, falls back to TASKS.json for backward compat)
+ */
+export interface StepsFile {
+  version: number;
+  created_at: string;
+  trigger: 'auto' | 're-breakdown' | 'manual';
+  revision: number;        // Bumped on every write
+  steps: WorkStep[];
 }
 
 /**
@@ -110,12 +100,12 @@ export interface WorkItem {
 }
 
 /**
- * Task contract for worker delegation
+ * Worker contract for worker delegation
  * Defines the scope and expectations for a worker agent
  */
-export interface TaskContract {
+export interface WorkerContract {
   id: string;
-  goal: string;
+  prompt: string;
   scope: {
     repos_allowed: string[];
     tools_allowed: string[];
@@ -148,5 +138,5 @@ export interface LoopState {
   running: boolean;
   iteration: number;
   last_work_at: string | null;
-  current_task: string | null;
+  current_contract: string | null;
 }
