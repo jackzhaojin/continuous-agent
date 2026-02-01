@@ -85,7 +85,12 @@ export interface WorkItem {
   // Detected by [SELF-ENHANCE] prefix in goal title
   selfEnhance?: boolean;
 
-  // Branch tracking for self-enhancement tasks
+  // Skill-build flag - when true, worker builds a Claude Code skill
+  // Detected by [SKILL-BUILD] prefix in goal title
+  // Routes to agent codebase (like selfEnhance) and uses skill-builder subagent
+  skillBuild?: boolean;
+
+  // Branch tracking for self-enhancement and skill-build tasks
   // Persisted in PROMPT.md frontmatter to allow resuming work on same branch
   branch?: string;
 

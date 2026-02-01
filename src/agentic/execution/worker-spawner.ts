@@ -268,6 +268,128 @@ Report the self-enhancer's results:
 }
 
 /**
+ * Build prompt for skill-build tasks
+ * Instructs the worker to delegate to the skill-builder subagent
+ * and then test the skill via the Skill tool in a build→test→fix loop
+ */
+function buildSkillBuildPrompt(contract: TaskContract, workItem: WorkItem): string {
+  // Use existing branch if tracked, otherwise generate new one
+  const isResume = !!workItem.branch;
+  const branchName = workItem.branch || `skill-build/${contract.id.replace('task-', '')}`;
+
+  const resumeInstructions = isResume
+    ? `## RESUMING EXISTING WORK
+
+**This skill build has already started.** A branch exists: \`${branchName}\`
+
+You MUST:
+1. Check out the existing branch: \`git checkout ${branchName}\`
+2. Review what skill files have already been created (check git log, .claude/skills/)
+3. Continue from where the previous work left off
+4. Do NOT create a new branch - continue on the existing one
+
+`
+    : `## STARTING NEW SKILL BUILD
+
+This is a new skill build task. You will:
+1. Create branch: \`${branchName}\`
+2. Build the skill using the skill-builder subagent
+3. Test the skill using the Skill tool
+4. Fix and iterate until the skill works end-to-end
+5. Commit and report for human review
+
+`;
+
+  return `# Skill Build Task: ${workItem.title}
+
+You are building a **new Claude Code skill** — a reusable instruction set that lives in \`.claude/skills/\`.
+
+## Task Details
+- **Priority:** ${workItem.priority}
+- **Contract:** ${contract.id}
+- **Branch:** ${branchName}
+- **Status:** ${isResume ? 'RESUMING existing work' : 'NEW skill build'}
+
+## Description
+${workItem.description || 'No description provided'}
+
+## Definition of Done
+${contract.definition_of_done.map((item, i) => `${i + 1}. ${item}`).join('\n')}
+
+${resumeInstructions}
+## Build → Test → Fix Loop
+
+Follow this iterative process:
+
+### 1. BUILD: Delegate to the skill-builder subagent
+
+Use the Task tool to delegate skill creation:
+\`\`\`
+Use the skill-builder subagent to: ${workItem.title}
+
+Branch: ${branchName}
+Resume: ${isResume ? 'YES - continue existing work' : 'NO - start fresh'}
+
+${workItem.description || ''}
+\`\`\`
+
+The skill-builder will:
+- Research existing skills as references
+- Create the SKILL.md with proper frontmatter
+- Add any supporting files (scripts, templates, references)
+- Run format validation
+- Commit the skill to the branch
+
+### 2. TEST: Invoke the newly created skill
+
+After the skill-builder finishes, test the skill yourself:
+
+1. **Load the skill** using the Skill tool — invoke it by name
+2. **Follow the skill's instructions** for a minimal test case
+3. **Verify the outputs** match expectations
+4. **Check edge cases** and error handling
+
+### 3. FIX: Iterate if the test failed
+
+If the skill doesn't work:
+1. Identify what failed and why
+2. Delegate back to the skill-builder with specific feedback:
+   \`\`\`
+   Use the skill-builder to fix the {skill-name} skill:
+
+   Issue: {what failed}
+   Expected: {what should happen}
+   Actual: {what happened}
+   \`\`\`
+3. Re-test after the fix
+4. Repeat up to 5 iterations
+
+### 4. FINALIZE: Once the skill passes
+
+After the skill works end-to-end:
+1. Ensure all files are committed
+2. Verify the branch has clean git status
+3. Report results
+
+## CRITICAL REMINDERS
+- Skills live in \`.claude/skills/{name}/SKILL.md\` in the agent codebase
+- You are working in the agent codebase (continuous-agent), NOT agent-outputs
+- The skill-builder subagent handles file creation; you handle testing
+- Test the skill YOURSELF using the Skill tool after creation
+- Maximum 5 build→test→fix iterations before reporting a blocker
+- NEVER modify workspace/constitution.md
+
+## Output
+Report:
+- Branch name: ${branchName}
+- Skill name and path
+- Test results (format + functional)
+- Number of iterations needed
+- Summary of what the skill does
+`;
+}
+
+/**
  * Build the system prompt for a worker agent
  * Now uses intelligent prompt builder with research phase and strategy context
  */
@@ -315,12 +437,13 @@ export async function spawnWorker(
   // Create logger for this worker
   const logger = createWorkerLogger(contract.id);
 
-  // Check if this is a self-enhancement task
+  // Check if this is a self-enhancement or skill-build task
   const isSelfEnhance = workItem?.selfEnhance === true;
+  const isSkillBuild = workItem?.skillBuild === true;
 
   // DEBUG: Log what we receive
   console.log(`[Worker] DEBUG: retryContext received:`, retryContext ? JSON.stringify(retryContext) : 'undefined');
-  console.log(`[Worker] DEBUG: selfEnhance:`, isSelfEnhance);
+  console.log(`[Worker] DEBUG: selfEnhance:`, isSelfEnhance, 'skillBuild:', isSkillBuild);
 
   // For retries, reuse existing project path to continue work on same project
   // For first attempt, generate new project path
@@ -334,6 +457,12 @@ export async function spawnWorker(
     category = 'self-enhance';
     logger.log(`SELF-ENHANCE: Working in agent codebase: ${projectPath}`);
     console.log(`[Worker] SELF-ENHANCE: Working in agent codebase: ${projectPath}`);
+  } else if (isSkillBuild) {
+    // Skill building: work in the agent codebase (skills live in .claude/skills/)
+    projectPath = AGENT_BASE;
+    category = 'skill-build';
+    logger.log(`SKILL-BUILD: Working in agent codebase: ${projectPath}`);
+    console.log(`[Worker] SKILL-BUILD: Working in agent codebase: ${projectPath}`);
   } else if (retryContext?.existingProjectPath) {
     projectPath = retryContext.existingProjectPath;
     category = detectCategory(contract.goal);
@@ -364,10 +493,12 @@ export async function spawnWorker(
     }
   }
 
-  // Build prompt - use self-enhancement prompt for self-enhance tasks
+  // Build prompt - use specialized prompts for self-enhance and skill-build tasks
   let prompt: string;
   if (isSelfEnhance && workItem) {
     prompt = buildSelfEnhancePrompt(contract, workItem);
+  } else if (isSkillBuild && workItem) {
+    prompt = buildSkillBuildPrompt(contract, workItem);
   } else {
     prompt = await buildWorkerPrompt(contract, projectPath, workItem, retryContext);
   }
@@ -381,9 +512,9 @@ export async function spawnWorker(
   }
   const model = process.env.MODEL || 'claude-sonnet-4-5';
 
-  // Determine allowed tools - add Task for self-enhancement (before logging)
+  // Determine allowed tools - add Task for self-enhancement and skill-build (before logging)
   const allowedTools = [...contract.scope.tools_allowed];
-  if (isSelfEnhance && !allowedTools.includes('Task')) {
+  if ((isSelfEnhance || isSkillBuild) && !allowedTools.includes('Task')) {
     allowedTools.push('Task');
   }
 

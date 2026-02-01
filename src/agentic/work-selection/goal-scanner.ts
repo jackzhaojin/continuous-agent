@@ -279,6 +279,7 @@ async function bundleToWorkItemAsync(bundle: GoalBundle): Promise<WorkItem> {
   const { frontmatter, body } = bundle.promptMd;
 
   const selfEnhance = /^\[SELF-ENHANCE\]/i.test(frontmatter.title);
+  const skillBuild = /^\[SKILL-BUILD\]/i.test(frontmatter.title);
 
   // Parse status from frontmatter
   let status: WorkItem['status'] = 'pending';
@@ -327,6 +328,7 @@ async function bundleToWorkItemAsync(bundle: GoalBundle): Promise<WorkItem> {
     status,
     output_path: (frontmatter.output_path as string) || undefined,
     selfEnhance,
+    skillBuild,
     branch: (frontmatter.branch as string) || undefined,
     steps: steps.length > 0 ? steps : undefined,
     current_step,
