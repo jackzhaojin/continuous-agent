@@ -295,7 +295,7 @@ async function runIteration(): Promise<IterationResult> {
   }
 
   // === PHASE 4: EXECUTE WORK ===
-  const contractId = `task-${Date.now()}`;
+  const contractId = `contract-${Date.now()}`;
   loopState.current_contract = contractId;
 
   logAgentic('PHASE 4: Execute Work (Agent SDK Worker)');

@@ -75,7 +75,7 @@ function detectCategory(goal: string): string {
 function generateProjectPath(contract: WorkerContract): { path: string; category: string } {
   const today = new Date().toISOString().split('T')[0]; // 2025-01-25
   const category = detectCategory(contract.prompt);
-  const slug = contract.id.replace('task-', '');
+  const slug = contract.id.replace('contract-', '');
 
   return {
     path: path.join(AGENT_OUTPUTS_BASE, 'projects', category, today, slug),
@@ -195,7 +195,7 @@ export interface WorkerRetryContext {
 function buildSelfEnhancePrompt(contract: WorkerContract, workItem: WorkItem): string {
   // Use existing branch if tracked, otherwise generate new one
   const isResume = !!workItem.branch;
-  const branchName = workItem.branch || `self-enhance/${contract.id.replace('task-', '')}`;
+  const branchName = workItem.branch || `self-enhance/${contract.id.replace('contract-', '')}`;
 
   const resumeInstructions = isResume
     ? `## RESUMING EXISTING WORK
@@ -275,7 +275,7 @@ Report the self-enhancer's results:
 function buildSkillBuildPrompt(contract: WorkerContract, workItem: WorkItem): string {
   // Use existing branch if tracked, otherwise generate new one
   const isResume = !!workItem.branch;
-  const branchName = workItem.branch || `skill-build/${contract.id.replace('task-', '')}`;
+  const branchName = workItem.branch || `skill-build/${contract.id.replace('contract-', '')}`;
 
   const resumeInstructions = isResume
     ? `## RESUMING EXISTING WORK

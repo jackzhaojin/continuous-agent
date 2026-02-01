@@ -113,7 +113,7 @@ export async function updateGoalState(
     // V1.2: Record project memory entry
     try {
       const memoryEntry: ProjectMemoryEntry = {
-        id: item.id || `task-${Date.now()}`,
+        id: item.id || `contract-${Date.now()}`,
         name: item.title,
         category: detectProjectCategory(item),
         completed: new Date().toISOString().split('T')[0],

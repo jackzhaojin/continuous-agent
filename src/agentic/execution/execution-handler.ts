@@ -208,7 +208,7 @@ export async function executeWork(
     log(`  Spawning Agent SDK worker...`);
     const result = await spawnWorker(
       {
-        id: currentTask || `task-${Date.now()}`,
+        id: currentTask || `contract-${Date.now()}`,
         prompt: scopedItem.description || item.description,
         scope: {
           repos_allowed: ['agent-outputs'],
