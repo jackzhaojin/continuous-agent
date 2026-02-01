@@ -357,8 +357,8 @@ export async function logBreakdownEvent(
   const entry = JSON.stringify({
     event: 'GOAL_BREAKDOWN',
     ts: new Date().toISOString(),
-    task_id: taskId,
-    task_title: taskTitle,
+    goal_id: taskId,
+    goal_title: taskTitle,
     steps_created: stepsCreated,
     trigger: trigger,
   });

@@ -101,7 +101,7 @@ export async function updateGoalState(
     const entry = JSON.stringify({
       event: 'GOAL_COMPLETED',
       ts: new Date().toISOString(),
-      task_id: item.id,
+      goal_id: item.id,
       title: item.title,
       output_path: outputPath || null,
     });
@@ -335,8 +335,8 @@ export async function updateStepState(
       const entry = JSON.stringify({
         event: 'STEP_COMPLETED',
         ts: now,
-        task_id: item.id,
-        task_title: item.title,
+        goal_id: item.id,
+        goal_title: item.title,
         step_number: step.step_number + 1,
         step_title: step.title,
         output_path: outputPath || null,
@@ -372,8 +372,8 @@ export async function updateStepState(
       const entry = JSON.stringify({
         event: 'STEP_ATTEMPT_FAILED',
         ts: now,
-        task_id: item.id,
-        task_title: item.title,
+        goal_id: item.id,
+        goal_title: item.title,
         step_number: step.step_number + 1,
         step_title: step.title,
         error: errorInfo?.slice(0, 500) || 'Unknown error',

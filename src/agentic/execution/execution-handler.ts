@@ -316,8 +316,8 @@ export async function logCapabilityAttempt(item: WorkItem, capabilities: string[
   const entry = JSON.stringify({
     event: 'CAPABILITY_ATTEMPT',
     ts: new Date().toISOString(),
-    task_id: item.id,
-    task_title: item.title,
+    goal_id: item.id,
+    goal_title: item.title,
     capabilities,
   });
   await appendFile(ledgerPath, entry + '\n', 'utf-8');
@@ -336,9 +336,9 @@ export async function logCapabilityResult(
   const entry = JSON.stringify({
     event: 'CAPABILITY_RESULT',
     ts: new Date().toISOString(),
-    task_id: item.id,
+    goal_id: item.id,
     contract_id: contractId,
-    task_title: item.title,
+    goal_title: item.title,
     capabilities,
     result: success ? 'PASS' : 'FAIL',
   });
@@ -367,16 +367,16 @@ export async function logWorkStart(
     ? JSON.stringify({
         event: 'STEP_STARTED',
         ts: now,
-        task_id: item.id,
+        goal_id: item.id,
         contract_id: contractId,
-        task_title: item.title,
+        goal_title: item.title,
         step_number: step.step_number + 1,
         step_title: step.title,
       })
     : JSON.stringify({
         event: 'GOAL_STARTED',
         ts: now,
-        task_id: item.id,
+        goal_id: item.id,
         contract_id: contractId,
         title: item.title,
       });
