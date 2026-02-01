@@ -82,7 +82,7 @@ async function moveBundleToCompleted(sourcePath: string): Promise<boolean> {
  * V1.2: PROMPT.md is the source of truth.
  * DETERMINISTIC: File I/O and pattern matching
  */
-export async function updateTaskState(
+export async function updateGoalState(
   item: WorkItem,
   success: boolean,
   errorInfo?: string,
@@ -265,7 +265,7 @@ async function requestMultiProjectApproval(item: WorkItem, outputPath: string): 
  * V1.2: Updates PROMPT.md frontmatter + TASKS.json (if exists)
  * DETERMINISTIC: File I/O and pattern matching
  */
-export async function setTaskOutputPath(
+export async function setGoalOutputPath(
   taskTitle: string,
   outputPath: string,
   sourcePath?: string
@@ -362,7 +362,7 @@ export async function updateStepState(
         const remainingSteps = item.steps.filter((s) => s.status !== 'complete');
         if (remainingSteps.length === 0) {
           log(`  ✓ All steps complete! Marking task as complete.`);
-          await updateTaskState(item, true, undefined, outputPath, contractId);
+          await updateGoalState(item, true, undefined, outputPath, contractId);
         } else {
           log(`  ${remainingSteps.length} steps remaining`);
         }
@@ -582,7 +582,7 @@ export async function escalateWithDiagnosis(
  * V1.2: PROMPT.md is the source of truth.
  * DETERMINISTIC: File I/O
  */
-export async function markTaskBlocked(item: WorkItem): Promise<void> {
+export async function markGoalBlocked(item: WorkItem): Promise<void> {
   logDeterministic('Marking task as blocked...');
 
   // Report blocked milestone to Notion (fire-and-forget)
@@ -617,7 +617,7 @@ export async function markStepBlocked(item: WorkItem, stepNumber: number): Promi
       );
 
       log(`  Step ${stepNumber + 1} marked as blocked`);
-      // Note: markTaskBlocked() is always called after this by the executive loop,
+      // Note: markGoalBlocked() is always called after this by the executive loop,
       // which handles frontmatter update and directory move
     } catch (error) {
       log(`  Failed to mark step as blocked: ${error}`);

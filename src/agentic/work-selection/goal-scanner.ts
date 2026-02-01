@@ -380,7 +380,7 @@ export async function buildSelectableWorkFromBundles(): Promise<SelectableWork[]
 
         selectableWork.push({
           type: 'step',
-          task: workItem,
+          goal: workItem,
           step,
           priority: workItem.priority,
         });
@@ -388,8 +388,8 @@ export async function buildSelectableWorkFromBundles(): Promise<SelectableWork[]
       }
     } else {
       selectableWork.push({
-        type: 'task',
-        task: workItem,
+        type: 'goal',
+        goal: workItem,
         priority: workItem.priority,
       });
     }
@@ -435,8 +435,8 @@ export async function getDraftResearchTasks(): Promise<SelectableWork[]> {
       // Mark as research task with capped scope
       workItem.description = `[RESEARCH ONLY] ${workItem.description}`;
       researchTasks.push({
-        type: 'task',
-        task: workItem,
+        type: 'goal',
+        goal: workItem,
         priority: 'P4',
       });
     }

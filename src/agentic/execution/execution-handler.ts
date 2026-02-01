@@ -272,7 +272,7 @@ export async function executeWork(
  * Infer capabilities being exercised from task
  * AGENTIC: Uses heuristics to map task → capabilities
  */
-export function inferCapabilitiesFromTask(item: WorkItem, intent: { type: string }): string[] {
+export function inferCapabilitiesFromGoal(item: WorkItem, intent: { type: string }): string[] {
   const capabilities: string[] = [];
 
   // Map task patterns to capabilities

@@ -29,7 +29,7 @@ import { diagnoseFailure } from '../agentic/diagnosis/agentic-diagnosis.js';
 import { classifyIntent } from '../agentic/intelligence/intent-classifier.js';
 import {
   executeWork,
-  inferCapabilitiesFromTask,
+  inferCapabilitiesFromGoal,
   logCapabilityAttempt,
   logCapabilityResult,
   logWorkStart,
@@ -46,13 +46,13 @@ import { isRateLimitError, isInCooldown, enterCooldown, resetBackoff } from '../
 import { validateWork } from '../deterministic/validation-handler.js';
 import { regenerateGoalsIndex } from '../deterministic/goals-index-generator.js';
 import {
-  updateTaskState,
+  updateGoalState,
   updateStepState,
   writeToNeedsYou,
   escalateWithDiagnosis,
-  markTaskBlocked,
+  markGoalBlocked,
   markStepBlocked,
-  setTaskOutputPath,
+  setGoalOutputPath,
 } from '../deterministic/state-handler.js';
 import { incrementStepRetryCount, readStepRetryCount, stepId as makeStepId } from '../deterministic/steps-json-handler.js';
 
@@ -237,7 +237,7 @@ async function runIteration(): Promise<IterationResult> {
     return 'no_work';
   }
 
-  let workItem = selectedWork.task;
+  let workItem = selectedWork.goal;
   let currentStep = selectedWork.step;
   let isStepExecution = selectedWork.type === 'step';
 
@@ -270,7 +270,7 @@ async function runIteration(): Promise<IterationResult> {
         // Re-select work — should now find step 1
         const reselected = await selectWorkWithSteps();
         if (reselected && reselected.step) {
-          workItem = reselected.task;
+          workItem = reselected.goal;
           currentStep = reselected.step;
           isStepExecution = true;
           logAgentic(`  Re-selected: Step ${currentStep.step_number + 1}/${workItem.steps?.length}: ${currentStep.title}`);
@@ -302,7 +302,7 @@ async function runIteration(): Promise<IterationResult> {
 
   // Log capability attempt
   const intent = await classifyIntent(workItem);
-  const capabilities = inferCapabilitiesFromTask(workItem, intent);
+  const capabilities = inferCapabilitiesFromGoal(workItem, intent);
   await logCapabilityAttempt(workItem, capabilities);
   await logWorkStart(workItem, currentStep, contractId);
 
@@ -324,7 +324,7 @@ async function runIteration(): Promise<IterationResult> {
     // Only write if we have a new path and the task doesn't already have one
     if (result.output_path && !workItem.output_path) {
       logDeterministic('  Persisting output path for future resume...');
-      const persisted = await setTaskOutputPath(workItem.title, result.output_path, workItem.source_path);
+      const persisted = await setGoalOutputPath(workItem.title, result.output_path, workItem.source_path);
       if (!persisted) {
         log('  Warning: output_path not persisted — task may not resume correctly after restart');
       }
@@ -333,7 +333,7 @@ async function runIteration(): Promise<IterationResult> {
     if (isStepExecution && currentStep) {
       await updateStepState(workItem, currentStep, true, undefined, result.output_path, contractId);
     } else {
-      await updateTaskState(workItem, true, undefined, result.output_path, contractId, result.output);
+      await updateGoalState(workItem, true, undefined, result.output_path, contractId, result.output);
     }
 
     // Reset backoff on success
@@ -389,7 +389,7 @@ async function runIteration(): Promise<IterationResult> {
   // This ensures retries AND restarts use the same project directory
   if (result?.output_path && !workItem.output_path) {
     logDeterministic('  Persisting output path for retry/resume...');
-    const persisted = await setTaskOutputPath(workItem.title, result.output_path, workItem.source_path);
+    const persisted = await setGoalOutputPath(workItem.title, result.output_path, workItem.source_path);
     if (!persisted) {
       log('  Warning: output_path not persisted — retries may not resume correctly after restart');
     }
@@ -419,7 +419,7 @@ async function runIteration(): Promise<IterationResult> {
       if (isStepExecution && currentStep) {
         await markStepBlocked(workItem, currentStep.step_number);
       }
-      await markTaskBlocked(workItem);
+      await markGoalBlocked(workItem);
       await escalateWithDiagnosis(workItem, retry.attempts, diagnosis.diagnosis, contractId);
 
       retryTracker.delete(retryKey);
@@ -446,7 +446,7 @@ async function runIteration(): Promise<IterationResult> {
     if (isStepExecution && currentStep) {
       await markStepBlocked(workItem, currentStep.step_number);
     }
-    await markTaskBlocked(workItem);
+    await markGoalBlocked(workItem);
     await writeToNeedsYou(workItem, retry.attempts, retry.lastError, contractId);
 
     retryTracker.delete(retryKey);

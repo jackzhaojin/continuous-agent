@@ -8,8 +8,8 @@ export type { WorkStep };
  * Selectable work - either a full task or a step within a task
  */
 export interface SelectableWork {
-  type: 'task' | 'step';
-  task: WorkItem;
+  type: 'goal' | 'step';
+  goal: WorkItem;
   step?: WorkStep;
   priority: 'P0' | 'P1' | 'P2' | 'P3' | 'P4';
 }
@@ -26,9 +26,9 @@ export async function selectWorkWithSteps(): Promise<SelectableWork | null> {
     if (bundleWork.length > 0) {
       const selected = bundleWork[0];
       if (selected.type === 'step') {
-        console.log(`[${new Date().toISOString()}] [Bundle] Selected step: [${selected.priority}] ${selected.task.title} - Step ${selected.step!.step_number + 1}: ${selected.step!.title}`);
+        console.log(`[${new Date().toISOString()}] [Bundle] Selected step: [${selected.priority}] ${selected.goal.title} - Step ${selected.step!.step_number + 1}: ${selected.step!.title}`);
       } else {
-        console.log(`[${new Date().toISOString()}] [Bundle] Selected task: [${selected.priority}] ${selected.task.title}`);
+        console.log(`[${new Date().toISOString()}] [Bundle] Selected goal: [${selected.priority}] ${selected.goal.title}`);
       }
       return selected;
     }
@@ -36,7 +36,7 @@ export async function selectWorkWithSteps(): Promise<SelectableWork | null> {
     // Check drafts for research tasks
     const researchTasks = await getDraftResearchTasks();
     if (researchTasks.length > 0) {
-      console.log(`[${new Date().toISOString()}] [Bundle] Selected draft research: ${researchTasks[0].task.title}`);
+      console.log(`[${new Date().toISOString()}] [Bundle] Selected draft research: ${researchTasks[0].goal.title}`);
       return researchTasks[0];
     }
   } catch (error) {

@@ -770,7 +770,7 @@ export async function verifySkillFormat(config: VerifierConfig): Promise<Verifie
 /**
  * Task type for routing validation logic
  */
-export type TaskType = 'standard' | 'skill-build' | 'self-enhance';
+export type GoalType = 'standard' | 'skill-build' | 'self-enhance';
 
 /**
  * Run applicable verifiers for a project based on step context and task type
@@ -789,7 +789,7 @@ export type TaskType = 'standard' | 'skill-build' | 'self-enhance';
 export async function runAllVerifiers(
   config: VerifierConfig,
   step?: StepContext,
-  taskType?: TaskType
+  taskType?: GoalType
 ): Promise<VerifierResult[]> {
   const results: VerifierResult[] = [];
 

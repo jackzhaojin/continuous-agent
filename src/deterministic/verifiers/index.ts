@@ -20,7 +20,7 @@ export {
   type VerifierResult,
   type VerifierConfig,
   type StepContext,
-  type TaskType,
+  type GoalType,
 } from './core-verifiers.js';
 
 export {

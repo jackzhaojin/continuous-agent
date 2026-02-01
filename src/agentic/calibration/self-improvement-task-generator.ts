@@ -19,7 +19,7 @@ import { createGoalBundle } from '../../deterministic/workspace-writers.js';
  */
 export async function generateSelfImprovementTask(trigger: SelfImprovementTrigger): Promise<boolean> {
   try {
-    const task = buildTask(trigger);
+    const task = buildGoal(trigger);
     const priorityDir = path.join(process.cwd(), 'workspace', 'in-progress', trigger.priority);
 
     const result = await createGoalBundle(task.title, task.description, priorityDir);
@@ -37,13 +37,13 @@ export async function generateSelfImprovementTask(trigger: SelfImprovementTrigge
   }
 }
 
-interface Task {
+interface SelfImprovementGoal {
   title: string;
   description: string;
   skillId?: string;
 }
 
-function buildTask(trigger: SelfImprovementTrigger): Task {
+function buildGoal(trigger: SelfImprovementTrigger): SelfImprovementGoal {
   switch (trigger.type) {
     case 'practice':
       return {
