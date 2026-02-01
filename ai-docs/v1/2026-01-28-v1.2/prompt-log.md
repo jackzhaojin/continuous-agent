@@ -82,3 +82,89 @@
 
 -> Response: Appended prompts 5-11 covering gap fixes, complexity expansion, monitor update, PM2 start, and P2 ondeck move.
 -> Action: Updated prompt-log.md. ✅
+
+## Session 3: Notion Setup & PR Review (Feb 1, 2026)
+
+### Prompt 12: Check PRs (2:30 PM)
+
+> Can you use gh and see that we have 3 PRs?
+
+→ Response: Listed 3 open PRs: #4 (subscription usage guide), #3 (skill-builder system), #2 (Notion API research).
+→ Action: Ran `gh pr list`. Informational only.
+
+### Prompt 13: Validate and Merge PR #2 (2:32 PM)
+
+> let's go with PR2 - can you checkout the branch and validate its original plan and work?
+
+→ Response: Checked out PR #2 branch, traced back to original goal bundle (workspace/archive/notion-integration-poc, P1, completed Jan 26). Validated: TypeScript compiles, script runs, follows two-repo rule, no credentials in code, doc matches script behavior. Found the PR is a follow-up deliverable from the POC — setup script + research runbook.
+→ Action: Checkout, `gh pr view`, `git diff`, `tsc --noEmit`, Explore agent for goal bundle. Full validation report.
+
+### Prompt 14: Merge PR #2 (2:40 PM)
+
+> ya let's merge into main like PR is saying we should
+
+→ Response: Clean fast-forward merge, pushed to origin, PR auto-closed as MERGED.
+→ Action: `git checkout main && git merge`, `git push origin main`. PR #2 closed. ✅
+
+### Prompt 15: Notion Setup Walkthrough (2:42 PM)
+
+> OK - since notion will be a huge part of this interaction... walk me through this step by step
+
+→ Response: Started step-by-step Notion workspace setup from the runbook. Guided through creating integration, saving API key, creating parent page.
+→ Action: Searched for existing Notion MCP servers (found official `@notionhq/notion-mcp-server`). Updated `.env` with API key.
+
+### Prompt 16: Chrome MCP Troubleshooting (2:50 PM)
+
+> Actually - can you do this? you have my chrome mcp... try again to use claude code chrome mcp
+
+→ Response: Chrome extension not connecting. Triaged: found native host configured correctly (v2.1.19), extension installed (v1.0.41), but discovered two competing `--claude-in-chrome-mcp` processes from two Claude Code sessions fighting over the single extension connection.
+→ Action: Checked native messaging hosts, extension dirs, process list. Root cause: two Claude Code sessions with `--dangerously-skip-permissions` running simultaneously.
+
+### Prompt 17: Notion Page Setup (3:05 PM)
+
+> OK I created a https://www.notion.so/Continuous-Agent-2fa321bd663180c3a5f8d24194225963 page... and created a dashboard page https://www.notion.so/Agent-Dashboard-2fa321bd663180c185e2dd402b1bb3ed under
+
+→ Response: User created Continuous Agent parent page + Agent Dashboard child page. Connected integration to both.
+→ Action: Ran `npx tsx scripts/setup-notion-workspace.ts 2fa321bd663180c185e2dd402b1bb3ed --write-env`. Created Milestones DB (8 properties verified), Summaries page, test row, updated `.env`. All passed. ✅
+
+### Prompt 18: Document Notion Layout (3:20 PM)
+
+> OOK - since notion will be a huge part of this interaction, it's important for notion pages and design layouts to be documented in an AI readable way. Figure out a place in continuous-agent, and update CLAUDE.md to reference it
+
+→ Response: Created living reference doc for Notion workspace structure. Updated CLAUDE.md with Notion Reporting section, env vars, and documentation links.
+→ Action: Created `ai-docs/notion/workspace-layout.md`. Updated CLAUDE.md (3 edits: env vars, Notion Reporting section, Documentation Locations + File Structure). ✅
+
+### Prompt 19: Sanity Check & Wire Weekly Summary (3:30 PM)
+
+> (Follow-up from doc update) Also close any gaps — expectation is agent writes to Notion as planned in 1.2. Also write adhoc test scripts.
+
+→ Response: Found `reportWeeklySummary()` implemented but never called (dead code). Wired it into executive loop (Sunday check). Verified all other reporting paths connected. Created 3 ad-hoc test scripts, all passed against live Notion.
+→ Action: Updated `executive-loop.ts` (weekly boundary check on Sundays). Created `tests/adhoc/test-notion-milestone.ts`, `test-notion-daily-summary.ts`, `test-notion-weekly-summary.ts`. `npm run build` clean. ✅
+
+### Prompt 20: Backfill Historical Data (3:40 PM)
+
+> Can we do a retroactive run? based on our local non updated stuff... can you tell me where those are? maybe write a script and get data in Notion manually based on old data
+
+→ Response: Found 258 entries in `ledgers/work-ledger.jsonl` spanning Jan 25-29, covering 11 tasks. Created backfill script with dry-run mode. Dry run showed 104 milestone rows to write.
+→ Action: Created `tests/adhoc/backfill-notion-from-ledger.ts`. Dry run preview: 6 Started, 5 Completed, 42 Step Completed, 50 Failed, 1 Blocked.
+
+### Prompt 21: Execute Backfill (3:45 PM)
+
+> ya let's go! tell me which pages to test in notion, give me links after execution
+
+→ Response: Executed backfill — 104/104 rows written, zero failures. Provided Notion links for verification.
+→ Action: Ran `backfill-notion-from-ledger.ts --execute`. All 104 rows written to Agent Milestones DB. ✅
+
+### Prompt 22: Create January Summary (3:50 PM)
+
+> Can you manually create an agent summary for Jan?
+
+→ Response: Created retroactive January 2026 summaries page with monthly overview, 3 daily summaries (Jan 25/26/29), and a weekly summary child page with narrative of the agent's first week.
+→ Action: Created `tests/adhoc/create-january-summary.ts`, executed it. Page + 3 daily summaries + weekly child page all created in Notion. ✅
+
+### Prompt 23: Conversation Logger (3:53 PM)
+
+> /conversation-logger to prompt-log.md
+
+→ Response: Logged prompts 12-23 covering PR review/merge, Notion setup, Chrome MCP triage, documentation, weekly summary wiring, ad-hoc tests, backfill, and January summary creation.
+→ Action: Appended to prompt-log.md. ✅

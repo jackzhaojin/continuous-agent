@@ -77,6 +77,7 @@ const loopState: LoopState = {
 
 // Track day boundary for daily summary generation
 let lastReportedDay: string | null = null;
+let lastReportedWeek: string | null = null;
 
 /**
  * Check if system is healthy enough to work
@@ -117,6 +118,21 @@ async function runIteration(): Promise<IterationResult> {
     }
   }
   lastReportedDay = today;
+
+  // Check if week boundary crossed (Sunday) - generate weekly summary
+  const now = new Date();
+  const isSunday = now.getDay() === 0;
+  const currentWeek = `${now.getFullYear()}-W${String(Math.ceil((Math.floor((now.getTime() - new Date(now.getFullYear(), 0, 1).getTime()) / 86400000) + new Date(now.getFullYear(), 0, 1).getDay() + 1) / 7)).padStart(2, '0')}`;
+  if (isSunday && lastReportedWeek !== currentWeek) {
+    logDeterministic('Weekly boundary detected (Sunday) - generating weekly summary');
+    try {
+      const { reportWeeklySummary } = await import('../deterministic/notion-reporter.js');
+      await reportWeeklySummary(path.join(process.cwd(), 'ledgers'));
+      lastReportedWeek = currentWeek;
+    } catch (e) {
+      log(`  Weekly summary generation failed (non-blocking): ${e}`);
+    }
+  }
 
   // === PHASE 1: HEALTH CHECK ===
   logDeterministic('PHASE 1: Health Check');

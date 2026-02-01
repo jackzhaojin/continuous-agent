@@ -33,7 +33,6 @@ type MilestoneEvent = 'Started' | 'Completed' | 'Failed' | 'Blocked' | 'Step Com
 interface MilestoneExtra {
   outputPath?: string;
   errorSummary?: string;
-  durationMinutes?: number;
   stepTitle?: string;
   stepNumber?: number;
 }
@@ -73,12 +72,6 @@ export async function reportMilestone(
         date: { start: new Date().toISOString() },
       },
     };
-
-    if (extra?.durationMinutes !== undefined) {
-      properties['Duration'] = {
-        number: extra.durationMinutes,
-      };
-    }
 
     if (contractId) {
       properties['Contract ID'] = {

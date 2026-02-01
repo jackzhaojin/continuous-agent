@@ -436,9 +436,29 @@ AUTO_BREAKDOWN_ENABLED=true    # Enable automatic task breakdown
 
 # Third-party API keys (copied to each worker's .env)
 NOTION_API_KEY=                # Notion integration key
+
+# Notion Reporting (set by scripts/setup-notion-workspace.ts)
+NOTION_DATABASE_ID=            # Agent Milestones database ID
+NOTION_MONTHLY_PAGE_ID=        # Current month's summaries page ID
+NOTION_REPORTING_ENABLED=true  # Kill switch for all Notion writes
 ```
 
 **API Key Management:** The `.env` file is automatically copied to each worker's project directory by `worker-spawner.ts`. This allows workers to access third-party APIs without exposing credentials in git.
+
+## Notion Reporting
+
+The agent reports milestone events and summaries to Notion. This is fire-and-forget — failures are logged but never block the agent. Local JSONL ledgers remain the source of truth.
+
+**Workspace layout and database schema:** `ai-docs/notion/workspace-layout.md`
+
+**What gets reported:**
+- **Milestone events** → rows in the Agent Milestones database (Started, Completed, Failed, Blocked, Step Completed)
+- **Daily summaries** → heading blocks appended to the monthly summaries page
+- **Weekly summaries** → child pages under the monthly summaries page
+
+**Monthly rotation:** At the start of each month, create a new summaries page in Notion and update `NOTION_MONTHLY_PAGE_ID` in `.env`. The milestones database persists across months.
+
+**Setup:** Run `npx tsx scripts/setup-notion-workspace.ts <PARENT_PAGE_ID> --write-env` (see `ai-docs/v1/2026-01-28-v1.2/notion-api-automation.md` for full runbook).
 
 ## Code Modification Guidelines
 
@@ -642,6 +662,7 @@ continuous-agent/
 │   ├── definitions/            # Verifier YAML configs (git-status-clean, node-build, etc.)
 │   └── run-verifier.sh         # Shell runner for verifiers
 └── ai-docs/                    # PRDs, specs, feature docs
+    └── notion/                 # Notion workspace layout, schema, page IDs
 ```
 
 ## Important Distinctions
@@ -704,5 +725,7 @@ tail -20 ledgers/work-ledger.jsonl
 - **PRD:** `ai-docs/v1/init/continuous-executive-agent-v1-prd.md`
 - **Constitution:** `workspace/constitution.md`
 - **Features:** `ai-docs/features/` (human-interaction, etc.)
+- **Notion workspace layout:** `ai-docs/notion/workspace-layout.md` (page hierarchy, database schema, IDs, data flow)
+- **Notion setup runbook:** `ai-docs/v1/2026-01-28-v1.2/notion-api-automation.md`
 - **Claude Code Skills:** `.claude/skills/{skill-name}/SKILL.md`
 - **Agent Capabilities:** `capabilities/*.yml`
