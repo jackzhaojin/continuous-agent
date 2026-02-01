@@ -10,10 +10,9 @@
  * 4. Priority re-evaluation logic
  */
 
-import { selectWork, selectWorkWithSteps, getAllWorkItems } from '../../../src/work-selector.js';
-import { needsBreakdown, estimateComplexity, generateStaticBreakdown } from '../../../src/task-breakdown.js';
-import { createTaskContract } from '../../../src/task-contractor.js';
-import type { WorkItem, WorkStep } from '../../../src/types.js';
+import { selectWorkWithSteps } from '../../../src/agentic/work-selection/work-selector.js';
+import { needsBreakdown, estimateComplexity, generateStaticBreakdown } from '../../../src/agentic/work-selection/task-breakdown.js';
+import type { WorkItem, WorkStep } from '../../../src/core/types.js';
 
 // ANSI colors for output
 const GREEN = '\x1b[32m';
@@ -28,30 +27,10 @@ function info(msg: string) { console.log(`${CYAN}ℹ INFO${RESET}: ${msg}`); }
 function section(msg: string) { console.log(`\n${YELLOW}=== ${msg} ===${RESET}`); }
 
 // ============================================================
-// Test 1: Parse actual goals.md and check for step support
+// Test 1: (Removed — relied on deleted getAllWorkItems)
 // ============================================================
 async function testGoalsFileParsing() {
-  section('Test 1: Goals.md Parsing');
-  
-  const items = await getAllWorkItems();
-  
-  if (items.length === 0) {
-    fail('No work items found in goals.md');
-    return false;
-  }
-  
-  pass(`Found ${items.length} work items in goals.md`);
-  
-  for (const item of items) {
-    info(`  [${item.priority}] ${item.title} - Status: ${item.status}`);
-    if (item.steps && item.steps.length > 0) {
-      info(`    Has ${item.steps.length} steps:`);
-      for (const step of item.steps) {
-        info(`      Step ${step.step_number + 1}: ${step.title} (${step.status})`);
-      }
-    }
-  }
-  
+  section('Test 1: (Skipped — legacy goals.md parsing removed)');
   return true;
 }
 
@@ -60,16 +39,8 @@ async function testGoalsFileParsing() {
 // ============================================================
 async function testStepAwareSelection() {
   section('Test 2: Step-Aware Work Selection');
-  
-  // Test old API still works
-  const oldResult = await selectWork();
-  if (oldResult) {
-    pass(`selectWork() returns: [${oldResult.priority}] ${oldResult.title}`);
-  } else {
-    info('selectWork() returned null (no available work)');
-  }
-  
-  // Test new step-aware API
+
+  // Test step-aware API
   const newResult = await selectWorkWithSteps();
   if (newResult) {
     if (newResult.type === 'step' && newResult.step) {
@@ -208,55 +179,10 @@ function testStaticBreakdown() {
 }
 
 // ============================================================
-// Test 5: Task contract creation with steps
+// Test 5: (Removed — relied on deleted createTaskContract)
 // ============================================================
 function testTaskContractWithStep() {
-  section('Test 5: Task Contract Creation (with Step)');
-  
-  const mockItem: WorkItem = {
-    id: 'test-contract',
-    priority: 'P2',
-    title: 'Build API Service',
-    description: 'Create a REST API with authentication',
-    status: 'in_progress',
-    steps: [
-      { step_number: 0, title: 'Research API patterns', description: 'Analyze best practices', status: 'complete', estimated_turns: 80 },
-      { step_number: 1, title: 'Implement auth endpoints', description: 'Build login/logout', status: 'in_progress', estimated_turns: 120, dependencies: [0] },
-      { step_number: 2, title: 'Build CRUD endpoints', description: 'Create resource APIs', status: 'pending', estimated_turns: 100, dependencies: [1] },
-    ],
-    current_step: 1,
-  };
-  
-  // Test contract without step (single-step task behavior)
-  const contractNoStep = createTaskContract(mockItem);
-  info(`Contract without step:`);
-  info(`  Max turns: ${contractNoStep.max_turns}`);
-  
-  // Test contract with specific step
-  const currentStep = mockItem.steps![1];
-  const contractWithStep = createTaskContract(mockItem, ['.'], currentStep);
-  
-  info(`Contract with step ${currentStep.step_number + 1}:`);
-  info(`  Max turns: ${contractWithStep.max_turns}`);
-  info(`  Goal preview: ${contractWithStep.goal.split('\n').slice(0, 3).join(' ').slice(0, 100)}...`);
-  
-  // Verify step budget is used
-  const maxTurnsPerStep = parseInt(process.env.MAX_TURNS_PER_STEP || '100', 10);
-  const maxTurns = parseInt(process.env.MAX_TURNS || '250', 10);
-  
-  if (contractWithStep.max_turns <= maxTurnsPerStep + 50) {
-    pass(`Step contract uses step budget (${contractWithStep.max_turns} turns, expected ~${currentStep.estimated_turns || maxTurnsPerStep})`);
-  } else {
-    fail(`Step contract should use step budget, got ${contractWithStep.max_turns} turns`);
-  }
-  
-  // Verify goal includes step context
-  if (contractWithStep.goal.includes('Step 2 of 3') || contractWithStep.goal.includes('Step 2')) {
-    pass('Step contract goal includes step number context');
-  } else {
-    fail('Step contract goal should include step number');
-  }
-  
+  section('Test 5: (Skipped — task-contractor removed)');
   return true;
 }
 
