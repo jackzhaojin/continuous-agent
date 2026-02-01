@@ -20,6 +20,7 @@ import { appendProjectMemory, type ProjectMemoryEntry } from './project-memory-s
 import { registerProject, generateProjectSlug, findProjectBySlug, type ProjectRegistryEntry } from './project-registry.js';
 import { readStepsJson, writeStepsJson, updateStepStatus as updateStepInStepsJson, stepId } from './steps-json-handler.js';
 import { logStepCompletedProgress, logStepBlockedProgress } from './progress-log-writer.js';
+import { appendContractEvent } from './contracts-log-writer.js';
 
 const WORKSPACE_DIR = path.join(process.cwd(), 'workspace');
 const LEDGERS_DIR = path.join(process.cwd(), 'ledgers');
@@ -107,6 +108,16 @@ export async function updateGoalState(
     });
     await appendFile(ledgerPath, entry + '\n', 'utf-8');
 
+    // Dual-write to per-bundle CONTRACTS.jsonl
+    if (item.source_path && contractId) {
+      await appendContractEvent(item.source_path, {
+        event: 'CONTRACT_COMPLETED',
+        ts: new Date().toISOString(),
+        contract_id: contractId,
+        output_path: outputPath,
+      });
+    }
+
     // Report milestone to Notion (fire-and-forget)
     await reportMilestone('Completed', item, contractId, { outputPath });
 
@@ -192,6 +203,16 @@ export async function updateGoalState(
     await reportMilestone('Failed', item, contractId, {
       errorSummary: errorInfo,
     });
+
+    // Dual-write failure to per-bundle CONTRACTS.jsonl
+    if (item.source_path && contractId) {
+      await appendContractEvent(item.source_path, {
+        event: 'CONTRACT_FAILED',
+        ts: new Date().toISOString(),
+        contract_id: contractId,
+        error: errorInfo?.slice(0, 500),
+      });
+    }
   }
 
   // V1.2: Update PROMPT.md (source of truth for goal bundles)
@@ -343,6 +364,18 @@ export async function updateStepState(
       });
       await appendFile(ledgerPath, entry + '\n', 'utf-8');
 
+      // Dual-write step completion to per-bundle CONTRACTS.jsonl
+      if (item.source_path && contractId) {
+        await appendContractEvent(item.source_path, {
+          event: 'CONTRACT_COMPLETED',
+          ts: now,
+          contract_id: contractId,
+          step_id: `step-${step.step_number}`,
+          step_title: step.title,
+          output_path: outputPath,
+        });
+      }
+
       // Write step handoff file for human visibility and next-step context
       if (item.source_path) {
         await writeStepHandoff(item, step, outputPath, contractId);
@@ -379,6 +412,18 @@ export async function updateStepState(
         error: errorInfo?.slice(0, 500) || 'Unknown error',
       });
       await appendFile(ledgerPath, entry + '\n', 'utf-8');
+
+      // Dual-write step failure to per-bundle CONTRACTS.jsonl
+      if (item.source_path && contractId) {
+        await appendContractEvent(item.source_path, {
+          event: 'CONTRACT_FAILED',
+          ts: now,
+          contract_id: contractId,
+          step_id: `step-${step.step_number}`,
+          step_title: step.title,
+          error: errorInfo?.slice(0, 500),
+        });
+      }
 
       // Report step failure milestone to Notion (fire-and-forget)
       await reportMilestone('Failed', item, contractId, {
@@ -588,6 +633,15 @@ export async function markGoalBlocked(item: WorkItem): Promise<void> {
   // Report blocked milestone to Notion (fire-and-forget)
   await reportMilestone('Blocked', item);
 
+  // Dual-write blocked event to per-bundle CONTRACTS.jsonl
+  if (item.source_path) {
+    await appendContractEvent(item.source_path, {
+      event: 'CONTRACT_BLOCKED',
+      ts: new Date().toISOString(),
+      contract_id: item.id || 'unknown',
+    });
+  }
+
   // V1.2: Update PROMPT.md (source of truth) — blocked goals stay in-place in in-progress/P{n}/
   if (item.source_path) {
     await updatePromptMdStatus(item.source_path, { status: 'blocked' });
@@ -615,6 +669,15 @@ export async function markStepBlocked(item: WorkItem, stepNumber: number): Promi
         item.steps?.length || 1,
         stepTitle,
       );
+
+      // Dual-write step blocked to per-bundle CONTRACTS.jsonl
+      await appendContractEvent(item.source_path, {
+        event: 'CONTRACT_BLOCKED',
+        ts: new Date().toISOString(),
+        contract_id: item.id || 'unknown',
+        step_id: stepId(stepNumber),
+        step_title: item.steps?.[stepNumber]?.title,
+      });
 
       log(`  Step ${stepNumber + 1} marked as blocked`);
       // Note: markGoalBlocked() is always called after this by the executive loop,

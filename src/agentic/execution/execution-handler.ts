@@ -15,6 +15,7 @@ import { readPreviousStepHandoff } from '../../deterministic/state-handler.js';
 import { incrementOutcomeCount } from '../../deterministic/self-improvement-state.js';
 import { updateStepStatus as updateStepInStepsJson, stepId } from '../../deterministic/steps-json-handler.js';
 import { logStepStartedProgress } from '../../deterministic/progress-log-writer.js';
+import { appendContractEvent } from '../../deterministic/contracts-log-writer.js';
 
 const LEDGERS_DIR = path.join(process.cwd(), 'ledgers');
 
@@ -381,6 +382,17 @@ export async function logWorkStart(
         title: item.title,
       });
   await appendFile(ledgerPath, entry + '\n', 'utf-8');
+
+  // Dual-write to per-bundle CONTRACTS.jsonl
+  if (item.source_path) {
+    await appendContractEvent(item.source_path, {
+      event: 'CONTRACT_STARTED',
+      ts: now,
+      contract_id: contractId,
+      step_id: step ? `step-${step.step_number}` : undefined,
+      step_title: step?.title,
+    });
+  }
 
   // Update STEPS.json + PROGRESS_LOG.md for step starts
   if (step && item.source_path) {
