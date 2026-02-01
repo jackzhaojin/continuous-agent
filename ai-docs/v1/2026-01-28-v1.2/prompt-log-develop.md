@@ -222,3 +222,35 @@
 
 -> Response: Appended Session 6 to prompt-log-develop.md.
 -> Action: Updated `ai-docs/v1/2026-01-28-v1.2/prompt-log-develop.md`. ✅
+
+---
+
+## Session 7: Notion Task Closure Tracking (Feb 1, 2026)
+
+### Prompt 22: Implement Notion closeMilestone Plan (5:50 PM)
+
+> Implement the following plan: Notion Task Closure Tracking — Add closeMilestone() function that queries for "Started" row by Contract ID and updates it with end date + duration. Wire into all 5 terminal paths in state-handler.ts. Pass contractId to markTaskBlocked in executive-loop.ts. Update workspace-layout.md docs.
+
+-> Response: Implemented closeMilestone() in notion-reporter.ts, wired 5 call sites in state-handler.ts, updated markTaskBlocked signature, passed contractId in executive-loop.ts, updated docs.
+-> Action: Modified 4 files (notion-reporter.ts, state-handler.ts, executive-loop.ts, workspace-layout.md). Typecheck + build clean. ✅
+
+### Prompt 23: Build Ad-Hoc Tests for closeMilestone (6:00 PM)
+
+> As much as you can, build some adhoc testing to this notion capability in '/Users/jackjin/dev/continuous-agent-develop/tests/adhoc' and call it 2026-02-01-notion-endtask. fix things along the way
+
+-> Response: Created 3-part test suite (structural, live API, SDK integration — 38 tests total). Discovered and fixed 3 issues: SDK dataSources.query endpoint not supported by Notion API (rewrote to raw fetch), Duration property missing from DB (added via setup script), .env had empty NOTION_DATABASE_ID/MONTHLY_PAGE_ID (populated from docs).
+-> Action: Created 6 files in tests/adhoc/2026-02-01-notion-endtask/. Fixed closeMilestone to use raw fetch + databases/query endpoint. Added Duration property to Notion DB. Populated .env IDs. Rebuilt. All 38 tests pass. ✅
+
+### Prompt 24: Commit + Merge Main into Develop (6:40 PM)
+
+> Let's commit, and merge main into this branch
+
+-> Response: Committed feature on `b7aec65`, merged origin/main into develop on `bb65c84`. Resolved 5 merge conflicts from main's terminology cleanup (markTaskBlocked→markGoalBlocked, setTaskOutputPath→setGoalOutputPath). Kept both contractId additions and new appendContractEvent calls.
+-> Action: `git commit` (10 files), `git merge origin/main`, resolved 5 conflicts in executive-loop.ts + state-handler.ts. Typecheck + build clean. ✅
+
+### Prompt 25: Log Session (6:53 PM)
+
+> /conversation-logger into prompt-log-develop.md
+
+-> Response: Appended Session 7 to prompt-log-develop.md.
+-> Action: Updated `ai-docs/v1/2026-01-28-v1.2/prompt-log-develop.md`. ✅
