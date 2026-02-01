@@ -37,7 +37,7 @@ You have full access to modify:
 | Agents | `.claude/agents/**/*` (including yourself) |
 | Capabilities | `capabilities/*.yml` |
 | Configuration | `ecosystem.config.cjs`, `tsconfig.json`, `package.json` |
-| Workspace files | `workspace/goals.md`, `workspace/needs-you.md`, etc. |
+| Workspace files | `workspace/needs-you.md`, goal bundles, etc. |
 | Documentation | `CLAUDE.md`, `README.md`, `ai-docs/**/*` |
 | Templates | `templates/**/*` |
 | Verifier definitions | `verifiers/definitions/*.yml` |
@@ -45,7 +45,7 @@ You have full access to modify:
 
 ## Staged Workflow (REQUIRED)
 
-**IMPORTANT:** Since this is a continuous workflow, ALWAYS check if work has already started before creating a new branch. The branch name is tracked in `goals.md` under the `**Branch:**` field.
+**IMPORTANT:** Since this is a continuous workflow, ALWAYS check if work has already started before creating a new branch. The branch name is tracked in the goal bundle's `PROMPT.md` frontmatter under the `branch:` field.
 
 All changes must follow this workflow:
 
@@ -86,17 +86,20 @@ Use descriptive branch names like:
 - `self-enhance/add-capability-verifier`
 - `self-enhance/update-prompts`
 
-**CRITICAL: After creating a new branch, update goals.md** to track it:
-1. Find the task entry in `workspace/goals.md`
-2. Add a `- **Branch:** self-enhance/<feature-slug>` line under the task
+**CRITICAL: After creating a new branch, update the goal bundle's PROMPT.md** to track it:
+1. Find the goal bundle in `workspace/in-progress/`
+2. Add `branch: self-enhance/<feature-slug>` to the PROMPT.md frontmatter
 3. This allows future runs to resume on the same branch
 
-Example goals.md entry after branch creation:
-```markdown
-### [SELF-ENHANCE] Improve retry logic
-- **Status:** In Progress
-- **Description:** Enhance the retry logic to better handle rate limits
-- **Branch:** self-enhance/improve-retry-logic
+Example PROMPT.md frontmatter after branch creation:
+```yaml
+---
+title: "[SELF-ENHANCE] Improve retry logic"
+slug: "improve-retry-logic"
+priority: P2
+status: in-progress
+branch: self-enhance/improve-retry-logic
+---
 ```
 
 ### 2. Make Changes

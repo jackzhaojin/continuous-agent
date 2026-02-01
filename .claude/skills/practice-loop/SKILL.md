@@ -24,7 +24,7 @@ Run practice tasks when idle to improve skill confidence.
 
 ## Workflow
 
-1. **Identify target** - Scan goals.md for required skills, find lowest confidence skill needed by highest priority goal
+1. **Identify target** - Scan goal bundles for required skills, find lowest confidence skill needed by highest priority goal
 
 2. **Create practice task** - Use safe location `~/dev/agent-outputs/practice/`
 

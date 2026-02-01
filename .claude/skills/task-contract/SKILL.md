@@ -14,8 +14,8 @@ Agreement between Executive and Worker defining what needs to be done and how su
 
 ```yaml
 task_contract:
-  id: "task-YYYY-MM-DD-NNN"
-  source_goal: "Title from goals.md"
+  id: "contract-YYYY-MM-DD-NNN"
+  source_goal: "Title from goal bundle PROMPT.md"
   priority: "P0|P1|P2|P3|P4"
   intent_type: "outcome_only|what_only|what_and_how"
   research_required: true|false

@@ -6,7 +6,7 @@ description: |
 
 # Work Selection
 
-Select the next eligible work item from goals.md.
+Select the next eligible work item from goal bundles in `workspace/`.
 
 ## Priority Order
 
@@ -19,7 +19,7 @@ Select the next eligible work item from goals.md.
 ## Selection Algorithm
 
 ```
-1. Parse goals.md for all work items
+1. Scan goal bundles in workspace/in-progress/ and workspace/ondeck/
 2. Filter: status = "Not Started" OR "In Progress"
 3. Sort by priority (P0 first)
 4. For each candidate:
