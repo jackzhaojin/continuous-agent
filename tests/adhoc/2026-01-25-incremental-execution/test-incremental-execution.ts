@@ -11,7 +11,7 @@
  */
 
 import { selectWorkWithSteps } from '../../../src/agentic/work-selection/work-selector.js';
-import { needsBreakdown, estimateComplexity, generateStaticBreakdown } from '../../../src/agentic/work-selection/task-breakdown.js';
+import { needsBreakdown, estimateComplexity, generateStaticBreakdown } from '../../../src/agentic/work-selection/goal-breakdown.js';
 import type { WorkItem, WorkStep } from '../../../src/core/types.js';
 
 // ANSI colors for output

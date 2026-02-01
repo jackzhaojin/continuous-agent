@@ -1,13 +1,13 @@
 #!/usr/bin/env npx tsx
 /**
- * Migration Script: Convert existing ## Steps in PROMPT.md → TASKS.json
+ * Migration Script: Convert existing ## Steps in PROMPT.md → STEPS.json
  *
  * Scans all goal bundles for PROMPT.md files with a ## Steps section
- * but no TASKS.json, and generates a TASKS.json from the parsed steps.
+ * but no STEPS.json, and generates a STEPS.json from the parsed steps.
  *
  * Also creates an initial PROGRESS_LOG.md with a migration entry.
  *
- * IDEMPOTENT: Safe to re-run. Skips bundles that already have TASKS.json.
+ * IDEMPOTENT: Safe to re-run. Skips bundles that already have STEPS.json.
  * Does NOT remove ## Steps from PROMPT.md (kept during transition).
  *
  * Usage:
@@ -110,7 +110,7 @@ async function listGoalDirs(dirPath: string): Promise<string[]> {
 }
 
 async function migrate(): Promise<void> {
-  console.log(`Migration: ## Steps → TASKS.json${DRY_RUN ? ' (DRY RUN)' : ''}`);
+  console.log(`Migration: ## Steps → STEPS.json${DRY_RUN ? ' (DRY RUN)' : ''}`);
   console.log('='.repeat(60));
 
   const allBundleDirs: string[] = [];
@@ -131,14 +131,14 @@ async function migrate(): Promise<void> {
   for (const bundleDir of allBundleDirs) {
     const slug = path.basename(bundleDir);
     const promptPath = path.join(bundleDir, 'PROMPT.md');
-    const tasksJsonPath = path.join(bundleDir, 'TASKS.json');
+    const stepsJsonPath = path.join(bundleDir, 'STEPS.json');
     const progressLogPath = path.join(bundleDir, 'PROGRESS_LOG.md');
 
     if (!existsSync(promptPath)) continue;
 
-    // Skip if TASKS.json already exists (idempotent)
-    if (existsSync(tasksJsonPath)) {
-      console.log(`  SKIP  ${slug} (TASKS.json already exists)`);
+    // Skip if STEPS.json already exists (idempotent)
+    if (existsSync(stepsJsonPath)) {
+      console.log(`  SKIP  ${slug} (STEPS.json already exists)`);
       skipped++;
       continue;
     }
@@ -159,9 +159,9 @@ async function migrate(): Promise<void> {
       continue;
     }
 
-    // Build TASKS.json
+    // Build STEPS.json
     const now = new Date().toISOString();
-    const tasksFile = {
+    const stepsFile = {
       version: 1,
       created_at: now,
       trigger: 'auto' as const,
@@ -185,8 +185,8 @@ async function migrate(): Promise<void> {
         console.log(`    Step ${s.number}: ${s.title} [${s.status}]`);
       }
     } else {
-      // Write TASKS.json
-      await writeFile(tasksJsonPath, JSON.stringify(tasksFile, null, 2) + '\n', 'utf-8');
+      // Write STEPS.json
+      await writeFile(stepsJsonPath, JSON.stringify(stepsFile, null, 2) + '\n', 'utf-8');
 
       // Create PROGRESS_LOG.md if it doesn't exist
       if (!existsSync(progressLogPath)) {
@@ -194,7 +194,7 @@ async function migrate(): Promise<void> {
         const logContent = `# Progress Log
 
 ## ${now} | Migration
-Migrated ${parsedSteps.length} steps from PROMPT.md ## Steps section to TASKS.json.
+Migrated ${parsedSteps.length} steps from PROMPT.md ## Steps section to STEPS.json.
 ${completedCount} steps already completed at time of migration.
 
 `;

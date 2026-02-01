@@ -18,7 +18,7 @@ import { reportMilestone } from './notion-reporter.js';
 import { parsePromptMd, updateFrontmatter } from './prompt-md-parser.js';
 import { appendProjectMemory, type ProjectMemoryEntry } from './project-memory-store.js';
 import { registerProject, generateProjectSlug, findProjectBySlug, type ProjectRegistryEntry } from './project-registry.js';
-import { readTasksJson, writeTasksJson, updateStepStatus as updateStepInTasksJson, stepId } from './tasks-json-handler.js';
+import { readStepsJson, writeStepsJson, updateStepStatus as updateStepInStepsJson, stepId } from './steps-json-handler.js';
 import { logStepCompletedProgress, logStepBlockedProgress } from './progress-log-writer.js';
 
 const WORKSPACE_DIR = path.join(process.cwd(), 'workspace');
@@ -314,7 +314,7 @@ export async function updateStepState(
 
       if (item.source_path) {
         // Primary: update TASKS.json (source of truth for step status)
-        await updateStepInTasksJson(item.source_path, stepId(step.step_number), 'complete', {
+        await updateStepInStepsJson(item.source_path, stepId(step.step_number), 'complete', {
           completed_at: now,
           completed_by_contract: contractId,
         });
@@ -604,7 +604,7 @@ export async function markStepBlocked(item: WorkItem, stepNumber: number): Promi
   if (item.source_path) {
     try {
       // Primary: update TASKS.json (source of truth for step status)
-      await updateStepInTasksJson(item.source_path, stepId(stepNumber), 'blocked');
+      await updateStepInStepsJson(item.source_path, stepId(stepNumber), 'blocked');
 
       // Append to PROGRESS_LOG.md
       const stepTitle = item.steps?.[stepNumber]?.title || `Step ${stepNumber + 1}`;

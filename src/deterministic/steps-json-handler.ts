@@ -1,9 +1,12 @@
 /**
- * TASKS.json Handler - DETERMINISTIC
+ * STEPS.json Handler - DETERMINISTIC
  *
- * All read/write/update logic for TASKS.json files inside goal bundles.
- * TASKS.json is the machine-readable source of truth for step tracking,
+ * All read/write/update logic for STEPS.json files inside goal bundles.
+ * STEPS.json is the machine-readable source of truth for step tracking,
  * replacing the fragile regex-based ## Steps parsing from PROMPT.md.
+ *
+ * Reads: STEPS.json first, falls back to TASKS.json for backward compat.
+ * Writes: Always STEPS.json.
  *
  * Writes are atomic (temp file + rename) to prevent data loss.
  */
@@ -15,14 +18,22 @@ import type { StepsFile, WorkStep } from '../core/types.js';
 import { log } from '../core/logging.js';
 import { appendProgressEntry } from './progress-log-writer.js';
 
-const TASKS_FILENAME = 'TASKS.json';
+const STEPS_FILENAME = 'STEPS.json';
+const LEGACY_FILENAME = 'TASKS.json';
 
 /**
- * Read TASKS.json from a goal bundle directory.
- * Returns null if the file doesn't exist or is malformed.
+ * Read STEPS.json from a goal bundle directory.
+ * Falls back to TASKS.json for backward compatibility.
+ * Returns null if neither file exists or is malformed.
  */
-export async function readTasksJson(bundlePath: string): Promise<StepsFile | null> {
-  const filePath = path.join(bundlePath, TASKS_FILENAME);
+export async function readStepsJson(bundlePath: string): Promise<StepsFile | null> {
+  // Try STEPS.json first
+  let filePath = path.join(bundlePath, STEPS_FILENAME);
+
+  // Fall back to TASKS.json for backward compat
+  if (!existsSync(filePath)) {
+    filePath = path.join(bundlePath, LEGACY_FILENAME);
+  }
 
   if (!existsSync(filePath)) {
     return null;
@@ -46,12 +57,12 @@ export async function readTasksJson(bundlePath: string): Promise<StepsFile | nul
 }
 
 /**
- * Write TASKS.json to a goal bundle directory.
+ * Write STEPS.json to a goal bundle directory.
  * Uses atomic write (temp file + rename) to prevent partial writes.
  * Bumps the revision counter on every write.
  */
-export async function writeTasksJson(bundlePath: string, tasksFile: StepsFile): Promise<boolean> {
-  const filePath = path.join(bundlePath, TASKS_FILENAME);
+export async function writeStepsJson(bundlePath: string, tasksFile: StepsFile): Promise<boolean> {
+  const filePath = path.join(bundlePath, STEPS_FILENAME);
   const tmpPath = filePath + '.tmp';
 
   try {
@@ -64,7 +75,7 @@ export async function writeTasksJson(bundlePath: string, tasksFile: StepsFile): 
     await writeFile(tmpPath, content, 'utf-8');
     await rename(tmpPath, filePath);
 
-    log(`  Wrote TASKS.json (rev ${tasksFile.revision}, ${tasksFile.steps.length} steps) to ${bundlePath}`);
+    log(`  Wrote STEPS.json (rev ${tasksFile.revision}, ${tasksFile.steps.length} steps) to ${bundlePath}`);
     return true;
   } catch (error) {
     log(`  Error writing TASKS.json at ${filePath}: ${error}`);
@@ -80,14 +91,15 @@ export async function writeTasksJson(bundlePath: string, tasksFile: StepsFile): 
 }
 
 /**
- * Check if a TASKS.json file exists in the bundle directory.
+ * Check if a STEPS.json (or legacy TASKS.json) file exists in the bundle directory.
  */
-export function tasksJsonExists(bundlePath: string): boolean {
-  return existsSync(path.join(bundlePath, TASKS_FILENAME));
+export function stepsJsonExists(bundlePath: string): boolean {
+  return existsSync(path.join(bundlePath, STEPS_FILENAME)) ||
+         existsSync(path.join(bundlePath, LEGACY_FILENAME));
 }
 
 /**
- * Update a single step's status in TASKS.json.
+ * Update a single step's status in STEPS.json.
  * Reads, modifies, and atomically writes back.
  */
 export async function updateStepStatus(
@@ -96,15 +108,15 @@ export async function updateStepStatus(
   newStatus: WorkStep['status'],
   extras?: Partial<Pick<WorkStep, 'started_at' | 'completed_at' | 'completed_by_contract'>>
 ): Promise<boolean> {
-  const tasksFile = await readTasksJson(bundlePath);
-  if (!tasksFile) {
-    log(`  Cannot update step ${stepId}: no TASKS.json at ${bundlePath}`);
+  const stepsFile = await readStepsJson(bundlePath);
+  if (!stepsFile) {
+    log(`  Cannot update step ${stepId}: no STEPS.json at ${bundlePath}`);
     return false;
   }
 
-  const step = tasksFile.steps.find(s => s.id === stepId);
+  const step = stepsFile.steps.find(s => s.id === stepId);
   if (!step) {
-    log(`  Cannot update step ${stepId}: not found in TASKS.json`);
+    log(`  Cannot update step ${stepId}: not found in STEPS.json`);
     return false;
   }
 
@@ -113,47 +125,47 @@ export async function updateStepStatus(
   if (extras?.completed_at) step.completed_at = extras.completed_at;
   if (extras?.completed_by_contract) step.completed_by_contract = extras.completed_by_contract;
 
-  return writeTasksJson(bundlePath, tasksFile);
+  return writeStepsJson(bundlePath, stepsFile);
 }
 
 /**
- * Increment the retry_count for a step in TASKS.json.
+ * Increment the retry_count for a step in STEPS.json.
  * Used to persist retry attempts across PM2 restarts.
  */
 export async function incrementStepRetryCount(
   bundlePath: string,
   targetStepId: string
 ): Promise<number> {
-  const tasksFile = await readTasksJson(bundlePath);
-  if (!tasksFile) {
-    log(`  Cannot increment retry_count for ${targetStepId}: no TASKS.json at ${bundlePath}`);
+  const stepsFile = await readStepsJson(bundlePath);
+  if (!stepsFile) {
+    log(`  Cannot increment retry_count for ${targetStepId}: no STEPS.json at ${bundlePath}`);
     return 0;
   }
 
-  const step = tasksFile.steps.find(s => s.id === targetStepId);
+  const step = stepsFile.steps.find(s => s.id === targetStepId);
   if (!step) {
-    log(`  Cannot increment retry_count for ${targetStepId}: not found in TASKS.json`);
+    log(`  Cannot increment retry_count for ${targetStepId}: not found in STEPS.json`);
     return 0;
   }
 
   step.retry_count = (step.retry_count || 0) + 1;
-  await writeTasksJson(bundlePath, tasksFile);
+  await writeStepsJson(bundlePath, stepsFile);
 
   return step.retry_count;
 }
 
 /**
- * Read the retry_count for a step from TASKS.json.
+ * Read the retry_count for a step from STEPS.json.
  * Returns 0 if not found or not set.
  */
 export async function readStepRetryCount(
   bundlePath: string,
   targetStepId: string
 ): Promise<number> {
-  const tasksFile = await readTasksJson(bundlePath);
-  if (!tasksFile) return 0;
+  const stepsFile = await readStepsJson(bundlePath);
+  if (!stepsFile) return 0;
 
-  const step = tasksFile.steps.find(s => s.id === targetStepId);
+  const step = stepsFile.steps.find(s => s.id === targetStepId);
   return step?.retry_count || 0;
 }
 
@@ -235,8 +247,8 @@ export async function migrateFromPromptMd(
   body: string,
   parseStepsFromBody: (body: string) => WorkStep[]
 ): Promise<WorkStep[] | null> {
-  // Don't migrate if TASKS.json already exists
-  if (tasksJsonExists(bundlePath)) {
+  // Don't migrate if STEPS.json (or TASKS.json) already exists
+  if (stepsJsonExists(bundlePath)) {
     return null;
   }
 
@@ -245,13 +257,13 @@ export async function migrateFromPromptMd(
     return null;
   }
 
-  log(`  Migrating ${steps.length} steps from PROMPT.md to TASKS.json at ${bundlePath}`);
+  log(`  Migrating ${steps.length} steps from PROMPT.md to STEPS.json at ${bundlePath}`);
 
-  // Write TASKS.json
-  const tasksFile = createStepsFile(steps, 'auto');
-  const written = await writeTasksJson(bundlePath, tasksFile);
+  // Write STEPS.json
+  const stepsFile = createStepsFile(steps, 'auto');
+  const written = await writeStepsJson(bundlePath, stepsFile);
   if (!written) {
-    log(`  Migration failed: could not write TASKS.json`);
+    log(`  Migration failed: could not write STEPS.json`);
     return null;
   }
 
@@ -273,7 +285,7 @@ export async function migrateFromPromptMd(
   // Append migration event to PROGRESS_LOG.md
   await appendProgressEntry(bundlePath, {
     eventType: 'Breakdown',
-    details: `Migrated ${steps.length} steps from PROMPT.md to TASKS.json (one-time migration)`,
+    details: `Migrated ${steps.length} steps from PROMPT.md to STEPS.json (one-time migration)`,
   });
 
   return steps;

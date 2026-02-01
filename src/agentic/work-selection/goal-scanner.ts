@@ -9,7 +9,7 @@ import path from 'path';
 import { parsePromptMd, type PromptMdFile } from '../../deterministic/prompt-md-parser.js';
 import type { WorkItem, WorkStep } from '../../core/types.js';
 import type { SelectableWork } from './work-selector.js';
-import { readTasksJson, stepsJsonToWorkSteps, migrateFromPromptMd } from '../../deterministic/tasks-json-handler.js';
+import { readStepsJson, stepsJsonToWorkSteps, migrateFromPromptMd } from '../../deterministic/steps-json-handler.js';
 
 const WORKSPACE_DIR = path.join(process.cwd(), 'workspace');
 
@@ -273,7 +273,7 @@ function parseStepsFromBody(body: string): WorkStep[] {
 
 /**
  * Convert a GoalBundle to a WorkItem.
- * Reads steps from TASKS.json (primary) with fallback to PROMPT.md body (legacy).
+ * Reads steps from STEPS.json (primary) with fallback to PROMPT.md body (legacy).
  */
 async function bundleToWorkItemAsync(bundle: GoalBundle): Promise<WorkItem> {
   const { frontmatter, body } = bundle.promptMd;
@@ -292,9 +292,9 @@ async function bundleToWorkItemAsync(bundle: GoalBundle): Promise<WorkItem> {
     status = 'complete';
   }
 
-  // Primary: read steps from TASKS.json
+  // Primary: read steps from STEPS.json
   let steps: WorkStep[] = [];
-  const tasksFile = await readTasksJson(bundle.sourcePath);
+  const tasksFile = await readStepsJson(bundle.sourcePath);
   if (tasksFile && tasksFile.steps.length > 0) {
     steps = stepsJsonToWorkSteps(tasksFile.steps);
   } else {

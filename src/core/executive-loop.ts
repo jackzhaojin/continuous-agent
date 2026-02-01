@@ -24,7 +24,7 @@ import {
   generateStaticBreakdown,
   logBreakdownEvent,
   writeStepsToBundle,
-} from '../agentic/work-selection/task-breakdown.js';
+} from '../agentic/work-selection/goal-breakdown.js';
 import { diagnoseFailure } from '../agentic/diagnosis/agentic-diagnosis.js';
 import { classifyIntent } from '../agentic/intelligence/intent-classifier.js';
 import {
@@ -54,7 +54,7 @@ import {
   markStepBlocked,
   setTaskOutputPath,
 } from '../deterministic/state-handler.js';
-import { incrementStepRetryCount, readStepRetryCount, stepId as makeStepId } from '../deterministic/tasks-json-handler.js';
+import { incrementStepRetryCount, readStepRetryCount, stepId as makeStepId } from '../deterministic/steps-json-handler.js';
 
 // SELF-IMPROVEMENT - Idle and scheduled triggers
 import { checkSelfImprovementTriggers } from '../agentic/calibration/self-improvement-triggers.js';

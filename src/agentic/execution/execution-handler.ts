@@ -13,7 +13,7 @@ import { logAgentic, log } from '../../core/logging.js';
 import { reportMilestone } from '../../deterministic/notion-reporter.js';
 import { readPreviousStepHandoff } from '../../deterministic/state-handler.js';
 import { incrementOutcomeCount } from '../../deterministic/self-improvement-state.js';
-import { updateStepStatus as updateStepInTasksJson, stepId } from '../../deterministic/tasks-json-handler.js';
+import { updateStepStatus as updateStepInStepsJson, stepId } from '../../deterministic/steps-json-handler.js';
 import { logStepStartedProgress } from '../../deterministic/progress-log-writer.js';
 
 const LEDGERS_DIR = path.join(process.cwd(), 'ledgers');
@@ -384,7 +384,7 @@ export async function logWorkStart(
 
   // Update TASKS.json + PROGRESS_LOG.md for step starts
   if (step && item.source_path) {
-    await updateStepInTasksJson(item.source_path, stepId(step.step_number), 'in_progress', {
+    await updateStepInStepsJson(item.source_path, stepId(step.step_number), 'in_progress', {
       started_at: now,
     });
 

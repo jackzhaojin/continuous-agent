@@ -12,7 +12,7 @@ import { writeFile } from 'fs/promises';
 import path from 'path';
 import { parsePromptMd } from './prompt-md-parser.js';
 import { log } from '../core/logging.js';
-import { readTasksJson } from './tasks-json-handler.js';
+import { readStepsJson } from './steps-json-handler.js';
 
 const WORKSPACE_DIR = path.join(process.cwd(), 'workspace');
 const GOALS_MD_PATH = path.join(WORKSPACE_DIR, 'goals.md');
@@ -120,7 +120,7 @@ async function readGoal(goalDir: string, slug: string, priority: string): Promis
 
     // Primary: read steps from TASKS.json
     let steps: GoalSummary['steps'] = [];
-    const tasksFile = await readTasksJson(goalDir);
+    const tasksFile = await readStepsJson(goalDir);
     if (tasksFile && tasksFile.steps.length > 0) {
       steps = tasksFile.steps.map(ts => ({
         number: (ts.order ?? ts.step_number) + 1,
