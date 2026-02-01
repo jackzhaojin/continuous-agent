@@ -56,6 +56,11 @@ function estimateMaxTurns(workItem: WorkItem, step?: WorkStep): number {
   // Single-step task: use full MAX_TURNS budget (proven to work)
   const maxTurnsEnv = MAX_TURNS;
 
+  // Skill-build tasks need full budget for build→test→fix iterations
+  if (workItem.skillBuild) {
+    return maxTurnsEnv;
+  }
+
   // Use both title and description for keyword analysis
   const text = `${workItem.title} ${workItem.description || ''}`.toLowerCase();
 
@@ -104,6 +109,11 @@ function estimateMaxTurns(workItem: WorkItem, step?: WorkStep): number {
  * Determine which tools to allow based on task type
  */
 function determineAllowedTools(workItem: WorkItem): string[] {
+  // Skill-build tasks need Task tool for subagent delegation + web access for research
+  if (workItem.skillBuild) {
+    return [...EXTENDED_TOOLS, 'Task'];
+  }
+
   // Use both title and description for keyword analysis
   const text = `${workItem.title} ${workItem.description || ''}`.toLowerCase();
 
@@ -247,6 +257,17 @@ function generateDefinitionOfDone(workItem: WorkItem, step?: WorkStep): string[]
   
   const dod: string[] = [];
 
+  // Skill-build specific DoD
+  if (workItem.skillBuild) {
+    dod.push('SKILL.md has valid frontmatter (name ≤64 chars, description ≤1024 chars)');
+    dod.push('Skill has been invoked via Skill tool and instructions are coherent');
+    dod.push('All referenced files (scripts, templates, references) exist');
+    dod.push('Scripts are executable (chmod +x)');
+    dod.push('Skill tested end-to-end with at least one scenario');
+    dod.push('All changes committed to branch');
+    return dod;
+  }
+
   // Common requirements
   dod.push('All changes compile without TypeScript errors');
   dod.push('No new linting warnings introduced');
@@ -336,6 +357,9 @@ function inferRequiredSkills(workItem: WorkItem, step?: WorkStep): string[] {
   }
   if (text.includes('document') || text.includes('readme') || text.includes('docs')) {
     skills.push('comm.documentation');
+  }
+  if (text.includes('skill') || workItem.skillBuild) {
+    skills.push('deliver.claude.skill');
   }
   if (skills.length === 0) {
     skills.push('general.task_execution');

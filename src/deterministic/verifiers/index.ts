@@ -14,11 +14,13 @@ export {
   verifyNodeTest,
   verifyLintPass,
   verifyDocsChecklist,
+  verifySkillFormat,
   runAllVerifiers,
   summarizeResults,
   type VerifierResult,
   type VerifierConfig,
   type StepContext,
+  type TaskType,
 } from './core-verifiers.js';
 
 export {

@@ -571,9 +571,216 @@ export async function verifyDocsChecklist(config: VerifierConfig): Promise<Verif
 }
 
 /**
- * Run applicable verifiers for a project based on step context
+ * Verifier 9: skill_format
+ * Validates Claude Code skill directories under {project_path}/.claude/skills/
+ * Checks SKILL.md existence, frontmatter validity, and script executability.
+ */
+export async function verifySkillFormat(config: VerifierConfig): Promise<VerifierResult> {
+  const start = Date.now();
+  const { project_path } = config;
+  const skillsDir = path.join(project_path, '.claude', 'skills');
+
+  if (!existsSync(skillsDir)) {
+    return {
+      verifier_id: 'skill_format',
+      result: 'FAIL',
+      message: 'No .claude/skills/ directory found',
+      evidence: { skills_dir_exists: false },
+      duration_ms: Date.now() - start,
+    };
+  }
+
+  const issues: string[] = [];
+  const checked: string[] = [];
+
+  // Find skill directories (immediate subdirectories of .claude/skills/)
+  let skillDirs: string[];
+  try {
+    const entries = readdirSync(skillsDir, { withFileTypes: true });
+    skillDirs = entries
+      .filter(e => e.isDirectory() && !e.name.startsWith('.') && !e.name.startsWith('_'))
+      .map(e => e.name);
+  } catch {
+    return {
+      verifier_id: 'skill_format',
+      result: 'FAIL',
+      message: 'Failed to read .claude/skills/ directory',
+      evidence: { read_error: true },
+      duration_ms: Date.now() - start,
+    };
+  }
+
+  if (skillDirs.length === 0) {
+    return {
+      verifier_id: 'skill_format',
+      result: 'FAIL',
+      message: 'No skill directories found in .claude/skills/',
+      evidence: { skill_count: 0 },
+      duration_ms: Date.now() - start,
+    };
+  }
+
+  const ALLOWED_FRONTMATTER_KEYS = new Set(['name', 'description', 'license', 'allowed-tools', 'metadata']);
+
+  for (const skillName of skillDirs) {
+    const skillDir = path.join(skillsDir, skillName);
+    checked.push(skillName);
+
+    // Check SKILL.md exists
+    const skillMdPath = path.join(skillDir, 'SKILL.md');
+    if (!existsSync(skillMdPath)) {
+      issues.push(`${skillName}: Missing SKILL.md`);
+      continue;
+    }
+
+    // Parse frontmatter
+    let content: string;
+    try {
+      content = readFileSync(skillMdPath, 'utf-8');
+    } catch {
+      issues.push(`${skillName}: Failed to read SKILL.md`);
+      continue;
+    }
+
+    const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
+    if (!fmMatch) {
+      issues.push(`${skillName}: No YAML frontmatter found in SKILL.md`);
+      continue;
+    }
+
+    // Simple YAML key-value parsing (avoids needing js-yaml import here)
+    const fmLines = fmMatch[1].split('\n');
+    const frontmatter: Record<string, string> = {};
+    let currentKey = '';
+    let currentValue = '';
+    let inMultiline = false;
+
+    for (const line of fmLines) {
+      const keyMatch = line.match(/^(\w[\w-]*):\s*(.*)/);
+      if (keyMatch && !inMultiline) {
+        if (currentKey) frontmatter[currentKey] = currentValue.trim();
+        currentKey = keyMatch[1];
+        const val = keyMatch[2].trim();
+        if (val === '|' || val === '>') {
+          inMultiline = true;
+          currentValue = '';
+        } else {
+          currentValue = val;
+          inMultiline = false;
+        }
+      } else if (inMultiline && line.match(/^\s/)) {
+        currentValue += (currentValue ? '\n' : '') + line.trimStart();
+      } else if (inMultiline && !line.match(/^\s/) && line.trim() !== '') {
+        // End of multiline block
+        frontmatter[currentKey] = currentValue.trim();
+        const newKeyMatch = line.match(/^(\w[\w-]*):\s*(.*)/);
+        if (newKeyMatch) {
+          currentKey = newKeyMatch[1];
+          const val = newKeyMatch[2].trim();
+          if (val === '|' || val === '>') {
+            inMultiline = true;
+            currentValue = '';
+          } else {
+            currentValue = val;
+            inMultiline = false;
+          }
+        }
+      }
+    }
+    if (currentKey) frontmatter[currentKey] = currentValue.trim();
+
+    // Validate name
+    if (!frontmatter['name']) {
+      issues.push(`${skillName}: Missing 'name' in frontmatter`);
+    } else {
+      const name = frontmatter['name'];
+      if (name.length > 64) {
+        issues.push(`${skillName}: 'name' exceeds 64 characters (${name.length})`);
+      }
+      if (!/^[a-z][a-z0-9-]*[a-z0-9]$/.test(name) && name.length > 1) {
+        // Allow single char names too
+        if (!/^[a-z]$/.test(name)) {
+          issues.push(`${skillName}: 'name' must be lowercase with hyphens, no leading/trailing/consecutive hyphens`);
+        }
+      }
+      if (/--/.test(frontmatter['name'])) {
+        issues.push(`${skillName}: 'name' contains consecutive hyphens`);
+      }
+    }
+
+    // Validate description
+    if (!frontmatter['description']) {
+      issues.push(`${skillName}: Missing 'description' in frontmatter`);
+    } else {
+      if (frontmatter['description'].length > 1024) {
+        issues.push(`${skillName}: 'description' exceeds 1024 characters`);
+      }
+      if (/<[^>]+>/.test(frontmatter['description'])) {
+        issues.push(`${skillName}: 'description' contains angle brackets (potential HTML/injection)`);
+      }
+    }
+
+    // Check for disallowed frontmatter keys
+    for (const key of Object.keys(frontmatter)) {
+      if (!ALLOWED_FRONTMATTER_KEYS.has(key)) {
+        issues.push(`${skillName}: Unknown frontmatter key '${key}'`);
+      }
+    }
+
+    // Check scripts are executable (if scripts/ dir exists)
+    const scriptsDir = path.join(skillDir, 'scripts');
+    if (existsSync(scriptsDir)) {
+      try {
+        const scriptEntries = readdirSync(scriptsDir, { withFileTypes: true });
+        for (const entry of scriptEntries) {
+          if (!entry.isFile() || entry.name.startsWith('.')) continue;
+          try {
+            const { stdout } = await execAsync(`test -x "${path.join(scriptsDir, entry.name)}" && echo "OK" || echo "NO"`, {
+              timeout: 5000,
+            });
+            if (stdout.trim() !== 'OK') {
+              issues.push(`${skillName}: scripts/${entry.name} is not executable`);
+            }
+          } catch {
+            issues.push(`${skillName}: Failed to check scripts/${entry.name} executability`);
+          }
+        }
+      } catch {
+        issues.push(`${skillName}: Failed to read scripts/ directory`);
+      }
+    }
+  }
+
+  const allPassing = issues.length === 0;
+
+  return {
+    verifier_id: 'skill_format',
+    result: allPassing ? 'PASS' : 'FAIL',
+    message: allPassing
+      ? `All ${checked.length} skill(s) pass format validation`
+      : `${issues.length} issue(s) found across ${checked.length} skill(s)`,
+    evidence: {
+      skills_checked: checked,
+      issues,
+    },
+    duration_ms: Date.now() - start,
+  };
+}
+
+/**
+ * Task type for routing validation logic
+ */
+export type TaskType = 'standard' | 'skill-build' | 'self-enhance';
+
+/**
+ * Run applicable verifiers for a project based on step context and task type
  *
- * Step-aware validation:
+ * Task-type routing:
+ * - skill-build: git clean + skill format only
+ * - self-enhance: git clean + node build only
+ * - standard: step-aware validation (research/setup/implementation)
+ *
+ * Step-aware validation (standard tasks):
  * - Research steps: Only check git clean and that some output exists
  * - Setup steps: Check git clean, files created, npm install works
  * - Implementation/Testing: Full validation suite
@@ -581,9 +788,24 @@ export async function verifyDocsChecklist(config: VerifierConfig): Promise<Verif
  */
 export async function runAllVerifiers(
   config: VerifierConfig,
-  step?: StepContext
+  step?: StepContext,
+  taskType?: TaskType
 ): Promise<VerifierResult[]> {
   const results: VerifierResult[] = [];
+
+  // Task-type routing: skill-build and self-enhance have specialised verifier sets
+  if (taskType === 'skill-build') {
+    results.push(await verifyGitStatusClean(config));
+    results.push(await verifySkillFormat(config));
+    return results;
+  }
+
+  if (taskType === 'self-enhance') {
+    results.push(await verifyGitStatusClean(config));
+    results.push(await verifyNodeBuild(config));
+    return results;
+  }
+
   const stepType = getStepType(step);
 
   // Git status clean is ALWAYS required - work must be committed

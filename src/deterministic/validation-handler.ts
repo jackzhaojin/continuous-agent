@@ -9,7 +9,7 @@
  * - Implementation/testing steps get full validation suite
  */
 
-import { runAllVerifiers, summarizeResults, type StepContext } from './verifiers/index.js';
+import { runAllVerifiers, summarizeResults, type StepContext, type TaskType } from './verifiers/index.js';
 import {
   updateCapabilitiesFromVerifierResults,
   DEFAULT_CAPABILITY_MAPPINGS,
@@ -50,17 +50,27 @@ export async function validateWork(
         }
       : undefined;
 
-    if (stepContext) {
+    // Derive task type for verifier routing
+    const taskType: TaskType | undefined = item.skillBuild
+      ? 'skill-build'
+      : item.selfEnhance
+        ? 'self-enhance'
+        : undefined;
+
+    if (taskType) {
+      logDeterministic(`Running ${taskType} verifiers on worker output...`);
+    } else if (stepContext) {
       logDeterministic(`Running verifiers for step ${stepContext.step_number + 1}/${stepContext.total_steps}: "${stepContext.step_title}"`);
     } else {
       logDeterministic('Running verifiers on worker output...');
     }
 
     // DETERMINISTIC: Run verifiers (mechanical checks)
-    // Pass step context for step-aware validation
+    // Pass step context and task type for routing
     const verifierResults = await runAllVerifiers(
       { project_path: result.output_path },
-      stepContext
+      stepContext,
+      taskType
     );
 
     const summary = summarizeResults(verifierResults);

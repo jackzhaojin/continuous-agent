@@ -293,7 +293,10 @@ async function runIteration(): Promise<IterationResult> {
     // Only write if we have a new path and the task doesn't already have one
     if (result.output_path && !workItem.output_path) {
       logDeterministic('  Persisting output path for future resume...');
-      await setTaskOutputPath(workItem.title, result.output_path, workItem.source_path);
+      const persisted = await setTaskOutputPath(workItem.title, result.output_path, workItem.source_path);
+      if (!persisted) {
+        log('  Warning: output_path not persisted — task may not resume correctly after restart');
+      }
     }
 
     if (isStepExecution && currentStep) {
@@ -342,7 +345,10 @@ async function runIteration(): Promise<IterationResult> {
   // This ensures retries AND restarts use the same project directory
   if (result?.output_path && !workItem.output_path) {
     logDeterministic('  Persisting output path for retry/resume...');
-    await setTaskOutputPath(workItem.title, result.output_path, workItem.source_path);
+    const persisted = await setTaskOutputPath(workItem.title, result.output_path, workItem.source_path);
+    if (!persisted) {
+      log('  Warning: output_path not persisted — retries may not resume correctly after restart');
+    }
   }
 
   retryTracker.set(retryKey, retry);

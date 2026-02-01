@@ -279,6 +279,7 @@ async function bundleToWorkItemAsync(bundle: GoalBundle): Promise<WorkItem> {
   const { frontmatter, body } = bundle.promptMd;
 
   const selfEnhance = /^\[SELF-ENHANCE\]/i.test(frontmatter.title);
+  const skillBuild = /^\[SKILL-BUILD\]/i.test(frontmatter.title);
 
   // Parse status from frontmatter
   let status: WorkItem['status'] = 'pending';
@@ -327,6 +328,7 @@ async function bundleToWorkItemAsync(bundle: GoalBundle): Promise<WorkItem> {
     status,
     output_path: (frontmatter.output_path as string) || undefined,
     selfEnhance,
+    skillBuild,
     branch: (frontmatter.branch as string) || undefined,
     steps: steps.length > 0 ? steps : undefined,
     current_step,
@@ -352,7 +354,13 @@ export async function buildSelectableWorkFromBundles(): Promise<SelectableWork[]
     if (bundle.state !== 'in-progress') continue;
     if (!bundle.priority) continue;
 
-    const workItem = await bundleToWorkItemAsync(bundle);
+    let workItem: WorkItem;
+    try {
+      workItem = await bundleToWorkItemAsync(bundle);
+    } catch (error) {
+      console.log(`[GoalScanner] Failed to convert bundle "${bundle.slug}" to work item: ${error}`);
+      continue;
+    }
 
     // Skip completed or blocked
     if (workItem.status === 'complete' || workItem.status === 'blocked') continue;
@@ -407,7 +415,13 @@ export async function getDraftResearchTasks(): Promise<SelectableWork[]> {
     }
 
     if (!hasReferences) {
-      const workItem = await bundleToWorkItemAsync(bundle);
+      let workItem: WorkItem;
+      try {
+        workItem = await bundleToWorkItemAsync(bundle);
+      } catch (error) {
+        console.log(`[GoalScanner] Failed to convert draft bundle "${bundle.slug}" to work item: ${error}`);
+        continue;
+      }
       workItem.status = 'pending';
       // Mark as research task with capped scope
       workItem.description = `[RESEARCH ONLY] ${workItem.description}`;

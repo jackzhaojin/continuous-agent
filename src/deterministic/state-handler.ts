@@ -278,6 +278,9 @@ export async function setTaskOutputPath(
     if (updated) {
       logDeterministic(`  Updated PROMPT.md output_path for "${taskTitle}"`);
     }
+  } else {
+    log(`  Warning: No source_path for "${taskTitle}" — output_path not persisted to PROMPT.md`);
+    return false;
   }
 
   return true;

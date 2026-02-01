@@ -287,6 +287,9 @@ export function inferCapabilitiesFromTask(item: WorkItem, intent: { type: string
   if (goalLower.includes('react')) {
     capabilities.push('deliver.react.component');
   }
+  if (item.skillBuild || goalLower.includes('skill')) {
+    capabilities.push('deliver.claude.skill');
+  }
 
   // Technical capabilities
   if (goalLower.includes('git')) {

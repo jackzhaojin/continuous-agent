@@ -485,3 +485,59 @@ capabilities:
       - "Network timeout handling"
     last_validated: null
     last_used: null
+
+  # =============================================================================
+  # Claude Code Skill Delivery
+  # =============================================================================
+  - id: deliver.claude.skill
+    name: "Claude Code Skill Delivery"
+    description: "Deliver a tested Claude Code skill with SKILL.md, optional scripts, templates, and references"
+    confidence: 30
+    maturity: Declared
+    scope:
+      includes:
+        - "SKILL.md creation with valid frontmatter"
+        - "Supporting scripts and templates"
+        - "Reference materials"
+        - "Build-test-fix iteration loop"
+        - "Format and functional validation"
+      excludes:
+        - "Skills requiring external paid APIs without approval"
+        - "Skills that modify constitution.md"
+        - "Skills for other AI platforms"
+    requires_capabilities:
+      technical:
+        - file.read_write
+        - git.branch_commit
+        - bash.script_execution
+        - yaml.parse_manipulate
+      functional:
+        - reason.decomposition
+        - reason.debugging.discipline
+        - comm.documentation
+    dod_template:
+      required:
+        - "SKILL.md has valid frontmatter (name ≤64 chars, description ≤1024 chars)"
+        - "Instructions are self-contained and actionable"
+        - "Skill invokable via Skill tool"
+        - "All referenced files exist"
+        - "Tested end-to-end with at least one scenario"
+        - "Committed to git on a branch"
+      recommended:
+        - "Error handling documented"
+        - "Multiple test scenarios validated"
+        - "Supporting scripts are executable"
+        - "References to existing skill patterns"
+    evidence:
+      successes: 0
+      failures: 0
+      last_success: null
+      last_failure: null
+    common_failure_modes:
+      - "Invalid frontmatter format"
+      - "Description exceeds 1024 char limit"
+      - "Referenced scripts not executable"
+      - "Instructions assume context not available to skill reader"
+      - "Skill not discoverable due to missing trigger phrases"
+    last_validated: null
+    last_used: null

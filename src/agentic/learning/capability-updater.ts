@@ -230,4 +230,5 @@ export const DEFAULT_CAPABILITY_MAPPINGS: Record<string, string[]> = {
   node_test: ['node.npm.run_script'],
   lint_pass: ['node.npm.run_script'],
   docs_checklist: ['comm.documentation'],
+  skill_format: ['deliver.claude.skill'],
 };
