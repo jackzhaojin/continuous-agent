@@ -354,7 +354,13 @@ export async function buildSelectableWorkFromBundles(): Promise<SelectableWork[]
     if (bundle.state !== 'in-progress') continue;
     if (!bundle.priority) continue;
 
-    const workItem = await bundleToWorkItemAsync(bundle);
+    let workItem: WorkItem;
+    try {
+      workItem = await bundleToWorkItemAsync(bundle);
+    } catch (error) {
+      console.log(`[GoalScanner] Failed to convert bundle "${bundle.slug}" to work item: ${error}`);
+      continue;
+    }
 
     // Skip completed or blocked
     if (workItem.status === 'complete' || workItem.status === 'blocked') continue;
@@ -409,7 +415,13 @@ export async function getDraftResearchTasks(): Promise<SelectableWork[]> {
     }
 
     if (!hasReferences) {
-      const workItem = await bundleToWorkItemAsync(bundle);
+      let workItem: WorkItem;
+      try {
+        workItem = await bundleToWorkItemAsync(bundle);
+      } catch (error) {
+        console.log(`[GoalScanner] Failed to convert draft bundle "${bundle.slug}" to work item: ${error}`);
+        continue;
+      }
       workItem.status = 'pending';
       // Mark as research task with capped scope
       workItem.description = `[RESEARCH ONLY] ${workItem.description}`;

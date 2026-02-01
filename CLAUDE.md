@@ -201,7 +201,7 @@ Complex tasks (>100 estimated turns) are automatically broken down into steps:
 
 - **Automatic Breakdown:** `task-breakdown.ts` generates 2-4 steps when `estimateComplexity()` exceeds threshold
 - **Step Execution:** Each step is executed independently with max 100 turns per step
-- **Progress Tracking:** Steps are tracked in **TASKS.json** (machine-readable source of truth) + **PROGRESS_LOG.md** (append-only timeline). Legacy `## Steps` in PROMPT.md is still written during transition.
+- **Progress Tracking:** Steps are tracked in **TASKS.json** (machine-readable source of truth) + **PROGRESS_LOG.md** (append-only timeline).
 - **Shared Output:** All steps for a task write to the SAME project directory
 - **Configuration:**
   - `BREAKDOWN_THRESHOLD_TURNS=100` - Trigger breakdown if estimated > 100 turns
@@ -240,9 +240,9 @@ workspace/in-progress/P2/my-goal/
 }
 ```
 
-**Dual-read/write strategy (transition period):**
-- **Reads:** TASKS.json first, falls back to `## Steps` in PROMPT.md body
-- **Writes:** TASKS.json (primary) + PROMPT.md `## Steps` (legacy) + PROGRESS_LOG.md (append-only)
+**Read/write strategy:**
+- **Reads:** TASKS.json first, falls back to `## Steps` in PROMPT.md body (legacy migration)
+- **Writes:** TASKS.json (primary) + PROGRESS_LOG.md (append-only)
 - **Migration:** Run `npx tsx scripts/migrate-steps-to-tasks-json.ts` to convert existing bundles
 
 ### Key Modules

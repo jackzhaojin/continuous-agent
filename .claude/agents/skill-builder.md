@@ -1,10 +1,10 @@
 ---
 name: skill-builder
 description: |
-  Builds, tests, and iterates on Claude Code skills. Creates SKILL.md files with
-  proper frontmatter, supporting scripts, templates, and references. Validates
-  skills through format checks and functional testing. Use when a task involves
-  creating or improving Claude Code skills.
+  Builds, tests, and iterates on Claude Code skills using the claude-skill-creator
+  skill. Creates SKILL.md files with proper frontmatter, supporting scripts,
+  templates, and references. Validates skills through format checks and functional
+  testing. Use when a task involves creating or improving Claude Code skills.
 tools: Read, Write, Edit, Bash, Glob, Grep, WebSearch, WebFetch, Skill
 model: opus
 ---
@@ -38,12 +38,12 @@ Your working directory is the continuous-agent repository. Skills live in:
 
 Before building anything:
 
-1. **Read the skill-builder skill** for comprehensive guidance:
+1. **Read the claude-skill-creator skill** for comprehensive guidance:
    ```
-   Invoke Skill: skill-builder
+   Invoke Skill: claude-skill-creator
    ```
 
-2. **Study existing skills** as references:
+2. **Study existing skills** as references (e.g., `prd-writer`, `task-breakdown`, `validator`):
    ```bash
    ls .claude/skills/
    ```
