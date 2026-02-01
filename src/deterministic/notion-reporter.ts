@@ -12,17 +12,19 @@ import type { WorkItem } from '../core/types.js';
 import { logDeterministic, log } from '../core/logging.js';
 
 // === CONFIGURATION ===
-const NOTION_API_KEY = process.env.NOTION_API_KEY;
-const NOTION_DATABASE_ID = process.env.NOTION_DATABASE_ID;
-const NOTION_MONTHLY_PAGE_ID = process.env.NOTION_MONTHLY_PAGE_ID;
-const NOTION_REPORTING_ENABLED = process.env.NOTION_REPORTING_ENABLED !== 'false';
+// Read env vars lazily (not at module load time) because this module is statically
+// imported before dotenv config() runs in executive-loop.ts.
+function getApiKey(): string | undefined { return process.env.NOTION_API_KEY; }
+function getDatabaseId(): string | undefined { return process.env.NOTION_DATABASE_ID; }
+function getMonthlyPageId(): string | undefined { return process.env.NOTION_MONTHLY_PAGE_ID; }
+function isReportingEnabled(): boolean { return process.env.NOTION_REPORTING_ENABLED !== 'false'; }
 
 let notionClient: Client | null = null;
 
 function getNotionClient(): Client | null {
-  if (!NOTION_REPORTING_ENABLED || !NOTION_API_KEY) return null;
+  if (!isReportingEnabled() || !getApiKey()) return null;
   if (!notionClient) {
-    notionClient = new Client({ auth: NOTION_API_KEY });
+    notionClient = new Client({ auth: getApiKey() });
   }
   return notionClient;
 }
@@ -52,7 +54,7 @@ export async function reportMilestone(
 ): Promise<void> {
   try {
     const client = getNotionClient();
-    if (!client || !NOTION_DATABASE_ID) return;
+    if (!client || !getDatabaseId()) return;
 
     const title = extra?.stepTitle
       ? `${workItem.title} - ${extra.stepTitle}`
@@ -92,7 +94,7 @@ export async function reportMilestone(
     }
 
     await client.pages.create({
-      parent: { database_id: NOTION_DATABASE_ID },
+      parent: { database_id: getDatabaseId()! },
       properties: properties as Parameters<Client['pages']['create']>[0]['properties'],
     });
 
@@ -202,7 +204,7 @@ function computeStats(entries: LedgerEntry[]): {
 export async function reportDailySummary(ledgerDir: string): Promise<void> {
   try {
     const client = getNotionClient();
-    if (!client || !NOTION_MONTHLY_PAGE_ID) return;
+    if (!client || !getMonthlyPageId()) return;
 
     const today = new Date().toISOString().split('T')[0];
     const ledgerPath = path.join(ledgerDir, 'work-ledger.jsonl');
@@ -279,7 +281,7 @@ export async function reportDailySummary(ledgerDir: string): Promise<void> {
     }
 
     await client.blocks.children.append({
-      block_id: NOTION_MONTHLY_PAGE_ID,
+      block_id: getMonthlyPageId()!,
       children: blocks as Parameters<Client['blocks']['children']['append']>[0]['children'],
     });
 
@@ -300,7 +302,7 @@ export async function reportDailySummary(ledgerDir: string): Promise<void> {
 export async function reportWeeklySummary(ledgerDir: string): Promise<void> {
   try {
     const client = getNotionClient();
-    if (!client || !NOTION_MONTHLY_PAGE_ID) return;
+    if (!client || !getMonthlyPageId()) return;
 
     const now = new Date();
     const endDate = now.toISOString().split('T')[0];
@@ -401,7 +403,7 @@ export async function reportWeeklySummary(ledgerDir: string): Promise<void> {
     }
 
     await client.pages.create({
-      parent: { page_id: NOTION_MONTHLY_PAGE_ID },
+      parent: { page_id: getMonthlyPageId()! },
       properties: {
         title: {
           title: [{ text: { content: pageTitle } }],

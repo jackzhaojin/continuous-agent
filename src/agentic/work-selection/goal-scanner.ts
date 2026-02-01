@@ -366,9 +366,18 @@ export async function buildSelectableWorkFromBundles(): Promise<SelectableWork[]
     if (workItem.status === 'complete' || workItem.status === 'blocked') continue;
 
     if (workItem.steps && workItem.steps.length > 0) {
-      // Multi-step: find first available step
+      // Multi-step: find first available step whose dependencies are all complete
       for (const step of workItem.steps) {
         if (step.status === 'complete' || step.status === 'blocked') continue;
+
+        // Check if all dependencies are complete before selecting this step
+        if (step.dependencies && step.dependencies.length > 0) {
+          const allDepsComplete = step.dependencies.every(depNum =>
+            workItem.steps![depNum]?.status === 'complete'
+          );
+          if (!allDepsComplete) continue;
+        }
+
         selectableWork.push({
           type: 'step',
           task: workItem,

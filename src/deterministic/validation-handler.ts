@@ -57,12 +57,12 @@ export async function validateWork(
         ? 'self-enhance'
         : undefined;
 
+    logDeterministic(`Running verifiers against: ${result.output_path}`);
+
     if (taskType) {
-      logDeterministic(`Running ${taskType} verifiers on worker output...`);
+      logDeterministic(`  Verifier mode: ${taskType}`);
     } else if (stepContext) {
-      logDeterministic(`Running verifiers for step ${stepContext.step_number + 1}/${stepContext.total_steps}: "${stepContext.step_title}"`);
-    } else {
-      logDeterministic('Running verifiers on worker output...');
+      logDeterministic(`  Verifier mode: step ${stepContext.step_number + 1}/${stepContext.total_steps} ("${stepContext.step_title}")`);
     }
 
     // DETERMINISTIC: Run verifiers (mechanical checks)
@@ -75,7 +75,7 @@ export async function validateWork(
 
     const summary = summarizeResults(verifierResults);
 
-    log(`  Verifier results: ${summary.pass_count} passed, ${summary.fail_count} failed`);
+    log(`  Verifier results: ${summary.pass_count} passed, ${summary.fail_count} failed (path: ${result.output_path})`);
 
     // AGENTIC: Interpret results and decide if work passes
     // Not just PASS/FAIL, but understanding WHY and if it's acceptable

@@ -117,6 +117,47 @@ export async function updateStepStatus(
 }
 
 /**
+ * Increment the retry_count for a step in TASKS.json.
+ * Used to persist retry attempts across PM2 restarts.
+ */
+export async function incrementStepRetryCount(
+  bundlePath: string,
+  targetStepId: string
+): Promise<number> {
+  const tasksFile = await readTasksJson(bundlePath);
+  if (!tasksFile) {
+    log(`  Cannot increment retry_count for ${targetStepId}: no TASKS.json at ${bundlePath}`);
+    return 0;
+  }
+
+  const step = tasksFile.steps.find(s => s.id === targetStepId);
+  if (!step) {
+    log(`  Cannot increment retry_count for ${targetStepId}: not found in TASKS.json`);
+    return 0;
+  }
+
+  step.retry_count = (step.retry_count || 0) + 1;
+  await writeTasksJson(bundlePath, tasksFile);
+
+  return step.retry_count;
+}
+
+/**
+ * Read the retry_count for a step from TASKS.json.
+ * Returns 0 if not found or not set.
+ */
+export async function readStepRetryCount(
+  bundlePath: string,
+  targetStepId: string
+): Promise<number> {
+  const tasksFile = await readTasksJson(bundlePath);
+  if (!tasksFile) return 0;
+
+  const step = tasksFile.steps.find(s => s.id === targetStepId);
+  return step?.retry_count || 0;
+}
+
+/**
  * Convert WorkStep[] (legacy) to TaskStep[] for TASKS.json.
  */
 export function workStepsToTaskSteps(workSteps: WorkStep[]): TaskStep[] {
@@ -131,6 +172,7 @@ export function workStepsToTaskSteps(workSteps: WorkStep[]): TaskStep[] {
     started_at: ws.started_at,
     completed_at: ws.completed_at,
     re_breakdown_count: ws.re_breakdown_count,
+    retry_count: ws.retry_count,
   }));
 }
 
@@ -153,6 +195,7 @@ export function taskStepsToWorkSteps(taskSteps: TaskStep[]): WorkStep[] {
     started_at: ts.started_at,
     completed_at: ts.completed_at,
     re_breakdown_count: ts.re_breakdown_count,
+    retry_count: ts.retry_count,
   }));
 }
 

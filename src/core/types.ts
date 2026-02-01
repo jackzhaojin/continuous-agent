@@ -36,6 +36,7 @@ export interface TaskStep {
   completed_at?: string;
   completed_by_contract?: string;
   re_breakdown_count?: number;
+  retry_count?: number;    // Persisted retry attempts (survives PM2 restarts)
 }
 
 /**
@@ -65,6 +66,7 @@ export interface WorkStep {
   completed_at?: string;
   started_at?: string;
   re_breakdown_count?: number; // Track re-breakdowns for exit code 1 handling
+  retry_count?: number;        // Persisted retry attempts (survives PM2 restarts)
 }
 
 /**

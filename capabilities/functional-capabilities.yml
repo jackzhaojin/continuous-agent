@@ -365,8 +365,8 @@ capabilities:
   - id: comm.documentation
     name: Documentation
     description: Create clear, useful documentation for work performed
-    confidence: 15
-    maturity: Reliable
+    confidence: 0
+    maturity: Demonstrated
     scope:
       includes:
         - README creation
@@ -393,10 +393,10 @@ capabilities:
         - Jargon without explanation
     evidence:
       successes: 69
-      failures: 27
+      failures: 35
       last_success: null
       last_failure: null
-      last_validated: '2026-01-29'
+      last_validated: '2026-02-01'
     common_failure_modes:
       - Documentation drift from code
       - Assumed knowledge

@@ -379,6 +379,13 @@ export async function updateStepState(
         error: errorInfo?.slice(0, 500) || 'Unknown error',
       });
       await appendFile(ledgerPath, entry + '\n', 'utf-8');
+
+      // Report step failure milestone to Notion (fire-and-forget)
+      await reportMilestone('Failed', item, contractId, {
+        stepTitle: step.title,
+        stepNumber: step.step_number + 1,
+        errorSummary: errorInfo?.slice(0, 200) || 'Unknown error',
+      });
     }
   } catch (error) {
     log(`  Failed to update step state: ${error}`);
@@ -521,6 +528,8 @@ export async function writeToNeedsYou(
       content = content.replace(/\| \*None\* \| \| \| \| \|/, '');
       await writeFile(needsYouPath, content, 'utf-8');
       log(`  ✓ Added entry to needs-you.md`);
+    } else {
+      log(`  Warning: needs-you.md actions table format not matched — entry not written. Check table header/separator.`);
     }
   } catch (error) {
     log(`  Failed to write to needs-you.md: ${error}`);
@@ -560,6 +569,8 @@ export async function escalateWithDiagnosis(
       content = content.replace(/\| \*None\* \| \| \| \| \|/, '');
       await writeFile(needsYouPath, content, 'utf-8');
       log(`  ✓ Escalated to needs-you.md with diagnostic`);
+    } else {
+      log(`  Warning: needs-you.md actions table format not matched — diagnostic not written. Check table header/separator.`);
     }
   } catch (error) {
     log(`  Failed to escalate to needs-you.md: ${error}`);
@@ -620,6 +631,21 @@ export async function markStepBlocked(item: WorkItem, stepNumber: number): Promi
  * Extract features built from worker output
  * DETERMINISTIC: Simple heuristic keyword matching on output text
  */
+/**
+ * Patterns that indicate meta-text from worker output rather than actual feature descriptions.
+ * These are conversational AI responses, not meaningful feature entries.
+ */
+const META_TEXT_PREFIXES = [
+  'perfect', 'let me', "i've successfully", "here's", 'great', 'now let',
+  'i will', 'i can', 'sure', 'okay', 'done', 'alright', 'excellent',
+  'looks like', 'the project', 'this is', 'we have', 'i just',
+];
+
+function isMetaText(line: string): boolean {
+  const lower = line.trim().toLowerCase();
+  return META_TEXT_PREFIXES.some(prefix => lower.startsWith(prefix));
+}
+
 function extractFeaturesFromOutput(output?: string): string[] {
   if (!output) return [];
   const features: string[] = [];
@@ -632,8 +658,10 @@ function extractFeaturesFromOutput(output?: string): string[] {
       lower.includes('built') ||
       lower.includes('added feature')
     ) {
-      const clean = line.trim().slice(0, 100);
-      if (clean.length > 10) features.push(clean);
+      const clean = line.trim().slice(0, 200);
+      if (clean.length < 20 || clean.length > 150) continue; // Skip too short or too long
+      if (isMetaText(clean)) continue; // Skip conversational meta-text
+      features.push(clean.slice(0, 100));
     }
     if (features.length >= 5) break;
   }

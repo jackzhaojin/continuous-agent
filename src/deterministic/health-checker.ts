@@ -1,5 +1,8 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { readdir, readFile, rename, mkdir } from 'fs/promises';
+import { existsSync } from 'fs';
+import path from 'path';
 import { runIntegrityVerifier } from './verifiers/index.js';
 
 const execAsync = promisify(exec);
@@ -139,6 +142,57 @@ async function checkReferenceIntegrity(): Promise<HealthCheck> {
 }
 
 /**
+ * Housekeep completed bundles that are still in in-progress/.
+ * Scans in-progress/P{0-4}/ for bundles with status: complete in PROMPT.md
+ * frontmatter and moves them to completed/.
+ * DETERMINISTIC: File I/O only.
+ */
+export async function housekeepCompletedBundles(): Promise<string[]> {
+  const workspaceDir = path.join(process.cwd(), 'workspace');
+  const moved: string[] = [];
+
+  for (const priority of ['P0', 'P1', 'P2', 'P3', 'P4']) {
+    const priorityDir = path.join(workspaceDir, 'in-progress', priority);
+    if (!existsSync(priorityDir)) continue;
+
+    let entries;
+    try {
+      entries = await readdir(priorityDir, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+
+    for (const entry of entries) {
+      if (!entry.isDirectory() || entry.name.startsWith('.') || entry.name.startsWith('_')) continue;
+
+      const promptPath = path.join(priorityDir, entry.name, 'PROMPT.md');
+      if (!existsSync(promptPath)) continue;
+
+      try {
+        const content = await readFile(promptPath, 'utf-8');
+        // Check for status: complete in frontmatter
+        const statusMatch = content.match(/^status:\s*['"]?complete['"]?\s*$/mi);
+        if (!statusMatch) continue;
+
+        const completedDir = path.join(workspaceDir, 'completed');
+        const destPath = path.join(completedDir, entry.name);
+
+        if (existsSync(destPath)) continue; // Already exists in completed/
+
+        await mkdir(completedDir, { recursive: true });
+        await rename(path.join(priorityDir, entry.name), destPath);
+        moved.push(entry.name);
+        console.log(`[HealthCheck] Housekeep: moved completed bundle "${entry.name}" from in-progress/${priority}/ to completed/`);
+      } catch {
+        // Ignore individual bundle errors
+      }
+    }
+  }
+
+  return moved;
+}
+
+/**
  * Run all health checks and return overall status
  */
 export async function checkHealth(): Promise<HealthStatus> {
@@ -149,6 +203,16 @@ export async function checkHealth(): Promise<HealthStatus> {
   checks.push(await checkDiskSpace());
   checks.push(checkNodeVersion());
   checks.push(await checkReferenceIntegrity());
+
+  // Housekeep completed bundles still sitting in in-progress/
+  try {
+    const movedBundles = await housekeepCompletedBundles();
+    if (movedBundles.length > 0) {
+      console.log(`[HealthCheck] Housekeeping: moved ${movedBundles.length} completed bundle(s) to completed/`);
+    }
+  } catch (e) {
+    console.log(`[HealthCheck] Housekeeping failed (non-blocking): ${e}`);
+  }
 
   // Determine overall status
   const failCount = checks.filter(c => c.status === 'fail').length;

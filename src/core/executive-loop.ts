@@ -54,6 +54,7 @@ import {
   markStepBlocked,
   setTaskOutputPath,
 } from '../deterministic/state-handler.js';
+import { incrementStepRetryCount, readStepRetryCount, stepId as makeStepId } from '../deterministic/tasks-json-handler.js';
 
 // SELF-IMPROVEMENT - Idle and scheduled triggers
 import { checkSelfImprovementTriggers } from '../agentic/calibration/self-improvement-triggers.js';
@@ -352,8 +353,16 @@ async function runIteration(): Promise<IterationResult> {
 
   let retry = retryTracker.get(retryKey);
   if (!retry) {
+    // Seed retry count from TASKS.json if available (survives PM2 restarts)
+    let persistedRetryCount = 0;
+    if (isStepExecution && currentStep && workItem.source_path) {
+      persistedRetryCount = await readStepRetryCount(workItem.source_path, makeStepId(currentStep.step_number));
+      if (persistedRetryCount > 0) {
+        log(`  Seeded retry count from TASKS.json: ${persistedRetryCount}`);
+      }
+    }
     retry = {
-      attempts: 0,
+      attempts: persistedRetryCount,
       lastError: '',
       strategies: [],
       lastAttemptAt: '',
@@ -365,6 +374,11 @@ async function runIteration(): Promise<IterationResult> {
   retry.attempts++;
   retry.lastError = result?.errors.join(', ') || 'Unknown error';
   retry.lastAttemptAt = new Date().toISOString();
+
+  // Persist retry count to TASKS.json (survives PM2 restarts)
+  if (isStepExecution && currentStep && workItem.source_path) {
+    await incrementStepRetryCount(workItem.source_path, makeStepId(currentStep.step_number));
+  }
 
   // Store output_path in memory for retries within this session
   if (result?.output_path && !retry.output_path) {

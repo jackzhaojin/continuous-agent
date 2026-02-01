@@ -49,6 +49,8 @@ This document tracks items requiring human attention, decisions, or actions.
 
 | Item | Resolution | Resolved Date |
 |------|------------|---------------|
+| -------- | ---------- | 2026-02-01 |
+| -------- | ---------- | 2026-02-01 |
 | [SELF-ENHANCE] Self-Enhance Human Interface | Merged to main | 2026-01-26 |
 
 ---

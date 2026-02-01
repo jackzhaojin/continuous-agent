@@ -1,7 +1,7 @@
 ---
 title: "[SKILL-BUILD] Playwright Demo Video Skill"
 slug: "playwright-demo-skill"
-priority: P2
+priority: P1
 status: pending
 complexity: high
 created: "2026-02-01"
