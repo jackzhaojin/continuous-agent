@@ -147,3 +147,28 @@
 
 -> Response: Appended Session 3 to existing prompt-log.
 -> Action: Updated `ai-docs/v1/2026-01-28-v1.2/prompt-log.md`.
+
+---
+
+## Session 4: Skill-Builder Integration on develop (Feb 1, 2026)
+
+### Prompt 13: Implement Skill-Builder Integration Plan (3:30 PM)
+
+> Implement the following plan: Fully Integrate Skill-Builder System — 5 chunks: fix skill-builder agent reference, fix setTaskOutputPath silent failure, guard bundleToWorkItemAsync against corrupted bundles, add skill-format verifier + wire validation routing, documentation fixes (delete monitor-instructions.md, fix CLAUDE.md dual-write claims).
+
+-> Response: Implemented all 5 chunks. Added `verifySkillFormat()` verifier, `TaskType` routing in `runAllVerifiers`, wired validation-handler, fixed silent failures, added try-catch guards, updated agent refs to `claude-skill-creator`.
+-> Action: Modified 8 files, deleted `monitor-instructions.md`. `npm run typecheck` + `npm run build` clean. ✅
+
+### Prompt 14: Merge PR and Sync develop (3:50 PM)
+
+> OK I committed and pushed. Also merge the PR using gh which will merge into main (do not switch to main), then switch to develop, and fast merge from main.
+
+-> Response: Merged PR #3 into main, switched to develop, fast-forward merged from origin/main.
+-> Action: `gh pr merge 3 --merge`, `git checkout develop && git merge origin/main --ff-only`. ✅
+
+### Prompt 15: Log Session (3:53 PM)
+
+> /conversation-logger to prompt-log-develop.md
+
+-> Response: Appended Session 4 to existing prompt-log-develop.md.
+-> Action: Updated `ai-docs/v1/2026-01-28-v1.2/prompt-log-develop.md`. ✅
