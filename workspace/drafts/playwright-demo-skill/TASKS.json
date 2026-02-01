@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "created_at": "2026-02-01T20:53:00Z",
+  "trigger": "manual",
+  "revision": 1,
+  "steps": [
+    {
+      "id": "step-0",
+      "order": 0,
+      "title": "Research caption extraction and timestamp estimation",
+      "description": "Read all reference files thoroughly (especially demo-video-pipeline-spec-v2.md and the 3 pipeline scripts). Research how to generically extract showCaption()/caption() calls from any Playwright spec file and estimate their video timestamps by tracing waitForTimeout chains. Evaluate AST parsing (ts-morph or @babel/parser) vs regex extraction. Prototype the extraction on highlights-with-captions.spec.ts. Document findings and chosen approach. Also research auto-discover mode: how to read a project's routes, components, and data-testid attributes to generate a demo spec automatically.",
+      "status": "pending",
+      "dependencies": [],
+      "estimated_turns": 80
+    },
+    {
+      "id": "step-1",
+      "order": 1,
+      "title": "Build SKILL.md and pipeline scripts",
+      "description": "Use the claude-skill-creator skill to build .claude/skills/playwright-demo/SKILL.md with proper frontmatter. Create the pipeline scripts: (1) extract-captions.mjs — generic caption+timestamp extraction from any spec, (2) generate-voice.mjs — per-caption ElevenLabs TTS with caching and voice continuity, (3) merge-video.mjs — freeze-frame merge algorithm (generalized from merge-highlights-v2.mjs), (4) add-music.mjs — background music overlay, (5) run-pipeline.mjs — orchestrator that chains all steps. Create templates directory with: caption overlay CSS+functions, demo helpers (pause/scroll/viewport/dragAndDrop), playwright video recording config. SKILL.md must document both auto-discover and guided modes.",
+      "status": "pending",
+      "dependencies": ["step-0"],
+      "estimated_turns": 100
+    },
+    {
+      "id": "step-2",
+      "order": 2,
+      "title": "Integration test against harness-v2-test",
+      "description": "Test the full pipeline end-to-end against /Users/jackjin/dev/harness-v2-test. Run the caption extraction on highlights-with-captions.spec.ts and verify it extracts all 21 captions with correct timestamps. Run the TTS generation (use cached audio from demo/audio/highlights/ — do NOT call ElevenLabs API if cached files exist). Run the freeze-frame merge and verify zero audio overlaps. Run the music overlay. Verify final MP4 is produced. Fix any issues found. Run quick_validate.py on the skill.",
+      "status": "pending",
+      "dependencies": ["step-1"],
+      "estimated_turns": 80
+    },
+    {
+      "id": "step-3",
+      "order": 3,
+      "title": "Polish and iterate on auto-discover mode",
+      "description": "Test the auto-discover mode: point the skill at harness-v2-test without providing specific demo instructions. Verify it reads the project structure, identifies key pages and features (dashboard stats, charts, projects table, kanban board, dark mode, responsive design), and generates a reasonable demo spec. Compare the auto-generated spec quality to the manually written highlights-with-captions.spec.ts. Iterate on the discovery logic. Ensure guided mode also works (user says 'demo the kanban drag-and-drop' and gets a focused spec). Final validation: clean run producing MP4.",
+      "status": "pending",
+      "dependencies": ["step-2"],
+      "estimated_turns": 80
+    }
+  ]
+}
