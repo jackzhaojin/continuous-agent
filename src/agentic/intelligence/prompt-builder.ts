@@ -5,7 +5,7 @@
  * All prompts now loaded from markdown files with individual versioning.
  */
 
-import type { TaskContract, WorkItem } from '../../core/types.js';
+import type { WorkerContract, WorkItem } from '../../core/types.js';
 import { classifyIntent, type IntentClassification } from './intent-classifier.js';
 import { selectStrategy } from './strategy-selector.js';
 import { composePrompts } from '../prompts/loader.js';
@@ -22,7 +22,7 @@ interface RetryContext {
  * Build a comprehensive worker prompt with full intelligence context
  */
 export async function buildIntelligentPrompt(
-  contract: TaskContract,
+  contract: WorkerContract,
   item: WorkItem,
   projectPath: string,
   retryContext?: RetryContext
@@ -153,7 +153,7 @@ You are running low on retries. Be strategic:
  * Build a minimal prompt for simple tasks (when intent is what_and_how)
  */
 export async function buildSimplePrompt(
-  contract: TaskContract,
+  contract: WorkerContract,
   projectPath: string
 ): Promise<string> {
   // For simple tasks, just use the base worker prompt
@@ -161,7 +161,7 @@ export async function buildSimplePrompt(
     'worker',
     'worker-base',
     {
-      TASK_TITLE: contract.goal,
+      TASK_TITLE: contract.prompt,
       PRIORITY: 'P1',
       CONTRACT_ID: contract.id,
       PROJECT_PATH: projectPath,

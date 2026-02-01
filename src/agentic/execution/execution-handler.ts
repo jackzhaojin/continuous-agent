@@ -209,7 +209,7 @@ export async function executeWork(
     const result = await spawnWorker(
       {
         id: currentTask || `task-${Date.now()}`,
-        goal: scopedItem.description || item.description,
+        prompt: scopedItem.description || item.description,
         scope: {
           repos_allowed: ['agent-outputs'],
           tools_allowed: [

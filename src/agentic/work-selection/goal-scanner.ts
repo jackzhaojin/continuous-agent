@@ -9,7 +9,7 @@ import path from 'path';
 import { parsePromptMd, type PromptMdFile } from '../../deterministic/prompt-md-parser.js';
 import type { WorkItem, WorkStep } from '../../core/types.js';
 import type { SelectableWork } from './work-selector.js';
-import { readTasksJson, taskStepsToWorkSteps, migrateFromPromptMd } from '../../deterministic/tasks-json-handler.js';
+import { readTasksJson, stepsJsonToWorkSteps, migrateFromPromptMd } from '../../deterministic/tasks-json-handler.js';
 
 const WORKSPACE_DIR = path.join(process.cwd(), 'workspace');
 
@@ -296,7 +296,7 @@ async function bundleToWorkItemAsync(bundle: GoalBundle): Promise<WorkItem> {
   let steps: WorkStep[] = [];
   const tasksFile = await readTasksJson(bundle.sourcePath);
   if (tasksFile && tasksFile.steps.length > 0) {
-    steps = taskStepsToWorkSteps(tasksFile.steps);
+    steps = stepsJsonToWorkSteps(tasksFile.steps);
   } else {
     // Legacy fallback: parse steps from PROMPT.md body + one-time migration
     const migrated = await migrateFromPromptMd(bundle.sourcePath, body, parseStepsFromBody);

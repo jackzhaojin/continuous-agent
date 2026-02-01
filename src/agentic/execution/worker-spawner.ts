@@ -11,7 +11,7 @@ import { mkdirSync, existsSync, copyFileSync, createWriteStream } from 'fs';
 import { execSync } from 'child_process';
 import os from 'os';
 import path from 'path';
-import type { TaskContract, WorkerResult, WorkItem } from '../../core/types.js';
+import type { WorkerContract, WorkerResult, WorkItem } from '../../core/types.js';
 import { buildIntelligentPrompt, buildSimplePrompt } from '../intelligence/prompt-builder.js';
 import { classifyIntent } from '../intelligence/intent-classifier.js';
 import { selectStrategy } from '../intelligence/strategy-selector.js';
@@ -72,9 +72,9 @@ function detectCategory(goal: string): string {
  * Generate a project directory path based on task metadata
  * Structure: projects/{category}/{date}/{slug}
  */
-function generateProjectPath(contract: TaskContract): { path: string; category: string } {
+function generateProjectPath(contract: WorkerContract): { path: string; category: string } {
   const today = new Date().toISOString().split('T')[0]; // 2025-01-25
-  const category = detectCategory(contract.goal);
+  const category = detectCategory(contract.prompt);
   const slug = contract.id.replace('task-', '');
 
   return {
@@ -192,7 +192,7 @@ export interface WorkerRetryContext {
  * Instructs the worker to delegate to the self-enhancer subagent
  * Handles both new tasks and resuming existing work on a branch
  */
-function buildSelfEnhancePrompt(contract: TaskContract, workItem: WorkItem): string {
+function buildSelfEnhancePrompt(contract: WorkerContract, workItem: WorkItem): string {
   // Use existing branch if tracked, otherwise generate new one
   const isResume = !!workItem.branch;
   const branchName = workItem.branch || `self-enhance/${contract.id.replace('task-', '')}`;
@@ -272,7 +272,7 @@ Report the self-enhancer's results:
  * Instructs the worker to delegate to the skill-builder subagent
  * and then test the skill via the Skill tool in a build→test→fix loop
  */
-function buildSkillBuildPrompt(contract: TaskContract, workItem: WorkItem): string {
+function buildSkillBuildPrompt(contract: WorkerContract, workItem: WorkItem): string {
   // Use existing branch if tracked, otherwise generate new one
   const isResume = !!workItem.branch;
   const branchName = workItem.branch || `skill-build/${contract.id.replace('task-', '')}`;
@@ -394,7 +394,7 @@ Report:
  * Now uses intelligent prompt builder with research phase and strategy context
  */
 async function buildWorkerPrompt(
-  contract: TaskContract,
+  contract: WorkerContract,
   projectPath: string,
   workItem?: WorkItem,
   retryContext?: WorkerRetryContext
@@ -425,7 +425,7 @@ async function buildWorkerPrompt(
  * @returns WorkerResult with success status, output, and any artifacts/errors
  */
 export async function spawnWorker(
-  contract: TaskContract,
+  contract: WorkerContract,
   workItem?: WorkItem,
   retryContext?: WorkerRetryContext
 ): Promise<WorkerResult> {
@@ -465,7 +465,7 @@ export async function spawnWorker(
     console.log(`[Worker] SKILL-BUILD: Working in agent codebase: ${projectPath}`);
   } else if (retryContext?.existingProjectPath) {
     projectPath = retryContext.existingProjectPath;
-    category = detectCategory(contract.goal);
+    category = detectCategory(contract.prompt);
     logger.log(`RESUME: Using existing project path: ${projectPath}`);
     console.log(`[Worker] RESUME: Using existing project path: ${projectPath}`);
   } else {

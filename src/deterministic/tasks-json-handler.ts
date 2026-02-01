@@ -11,7 +11,7 @@
 import { readFile, writeFile, rename } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
-import type { TasksFile, TaskStep, WorkStep } from '../core/types.js';
+import type { StepsFile, WorkStep } from '../core/types.js';
 import { log } from '../core/logging.js';
 import { appendProgressEntry } from './progress-log-writer.js';
 
@@ -21,7 +21,7 @@ const TASKS_FILENAME = 'TASKS.json';
  * Read TASKS.json from a goal bundle directory.
  * Returns null if the file doesn't exist or is malformed.
  */
-export async function readTasksJson(bundlePath: string): Promise<TasksFile | null> {
+export async function readTasksJson(bundlePath: string): Promise<StepsFile | null> {
   const filePath = path.join(bundlePath, TASKS_FILENAME);
 
   if (!existsSync(filePath)) {
@@ -30,7 +30,7 @@ export async function readTasksJson(bundlePath: string): Promise<TasksFile | nul
 
   try {
     const raw = await readFile(filePath, 'utf-8');
-    const parsed = JSON.parse(raw) as TasksFile;
+    const parsed = JSON.parse(raw) as StepsFile;
 
     // Basic validation
     if (!parsed.version || !Array.isArray(parsed.steps)) {
@@ -50,7 +50,7 @@ export async function readTasksJson(bundlePath: string): Promise<TasksFile | nul
  * Uses atomic write (temp file + rename) to prevent partial writes.
  * Bumps the revision counter on every write.
  */
-export async function writeTasksJson(bundlePath: string, tasksFile: TasksFile): Promise<boolean> {
+export async function writeTasksJson(bundlePath: string, tasksFile: StepsFile): Promise<boolean> {
   const filePath = path.join(bundlePath, TASKS_FILENAME);
   const tmpPath = filePath + '.tmp';
 
@@ -93,8 +93,8 @@ export function tasksJsonExists(bundlePath: string): boolean {
 export async function updateStepStatus(
   bundlePath: string,
   stepId: string,
-  newStatus: TaskStep['status'],
-  extras?: Partial<Pick<TaskStep, 'started_at' | 'completed_at' | 'completed_by_contract'>>
+  newStatus: WorkStep['status'],
+  extras?: Partial<Pick<WorkStep, 'started_at' | 'completed_at' | 'completed_by_contract'>>
 ): Promise<boolean> {
   const tasksFile = await readTasksJson(bundlePath);
   if (!tasksFile) {
@@ -158,60 +158,62 @@ export async function readStepRetryCount(
 }
 
 /**
- * Convert WorkStep[] (legacy) to TaskStep[] for TASKS.json.
+ * Convert runtime WorkStep[] to STEPS.json on-disk shape.
+ * Adds `id` and `order` fields, converts numeric dependencies to string IDs.
  */
-export function workStepsToTaskSteps(workSteps: WorkStep[]): TaskStep[] {
+export function workStepsToStepsJson(workSteps: WorkStep[]): WorkStep[] {
   return workSteps.map((ws) => ({
+    ...ws,
     id: `step-${ws.step_number}`,
     order: ws.step_number,
-    title: ws.title,
     description: ws.description || '',
     status: ws.status === 'in_progress' ? 'in_progress' : ws.status,
-    dependencies: (ws.dependencies || []).map(d => `step-${d}`),
     estimated_turns: ws.estimated_turns || 100,
-    started_at: ws.started_at,
-    completed_at: ws.completed_at,
-    re_breakdown_count: ws.re_breakdown_count,
-    retry_count: ws.retry_count,
   }));
 }
 
 /**
- * Convert TaskStep[] (TASKS.json) to WorkStep[] (runtime).
+ * Convert STEPS.json on-disk shape to runtime WorkStep[].
+ * Populates `step_number` from `order`, resolves string dependency IDs to numbers.
  */
-export function taskStepsToWorkSteps(taskSteps: TaskStep[]): WorkStep[] {
-  return taskSteps.map((ts) => ({
-    step_number: ts.order,
+export function stepsJsonToWorkSteps(diskSteps: WorkStep[]): WorkStep[] {
+  return diskSteps.map((ts) => ({
+    step_number: ts.order ?? ts.step_number,
     title: ts.title,
     description: ts.description,
     status: ts.status,
-    dependencies: ts.dependencies
-      .map(dep => {
-        const match = dep.match(/^step-(\d+)$/);
-        return match ? parseInt(match[1], 10) : -1;
-      })
-      .filter(n => n >= 0),
+    dependencies: Array.isArray(ts.dependencies)
+      ? ts.dependencies.map(dep => {
+          if (typeof dep === 'number') return dep;
+          // Handle string deps like "step-0" from legacy TASKS.json files
+          const match = String(dep).match(/^step-(\d+)$/);
+          return match ? parseInt(match[1], 10) : -1;
+        }).filter(n => n >= 0)
+      : [],
     estimated_turns: ts.estimated_turns,
     started_at: ts.started_at,
     completed_at: ts.completed_at,
+    completed_by_contract: ts.completed_by_contract,
     re_breakdown_count: ts.re_breakdown_count,
     retry_count: ts.retry_count,
+    id: ts.id,
+    order: ts.order,
   }));
 }
 
 /**
- * Create a fresh TasksFile from WorkStep[].
+ * Create a fresh StepsFile from WorkStep[].
  */
-export function createTasksFile(
+export function createStepsFile(
   workSteps: WorkStep[],
-  trigger: TasksFile['trigger'] = 'auto'
-): TasksFile {
+  trigger: StepsFile['trigger'] = 'auto'
+): StepsFile {
   return {
     version: 1,
     created_at: new Date().toISOString(),
     trigger,
     revision: 0,
-    steps: workStepsToTaskSteps(workSteps),
+    steps: workStepsToStepsJson(workSteps),
   };
 }
 
@@ -246,7 +248,7 @@ export async function migrateFromPromptMd(
   log(`  Migrating ${steps.length} steps from PROMPT.md to TASKS.json at ${bundlePath}`);
 
   // Write TASKS.json
-  const tasksFile = createTasksFile(steps, 'auto');
+  const tasksFile = createStepsFile(steps, 'auto');
   const written = await writeTasksJson(bundlePath, tasksFile);
   if (!written) {
     log(`  Migration failed: could not write TASKS.json`);

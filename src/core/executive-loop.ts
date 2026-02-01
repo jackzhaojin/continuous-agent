@@ -74,7 +74,7 @@ const loopState: LoopState = {
   running: true,
   iteration: 0,
   last_work_at: null,
-  current_task: null,
+  current_contract: null,
 };
 
 // Track day boundary for daily summary generation
@@ -296,7 +296,7 @@ async function runIteration(): Promise<IterationResult> {
 
   // === PHASE 4: EXECUTE WORK ===
   const contractId = `task-${Date.now()}`;
-  loopState.current_task = contractId;
+  loopState.current_contract = contractId;
 
   logAgentic('PHASE 4: Execute Work (Agent SDK Worker)');
 

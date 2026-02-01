@@ -7,7 +7,7 @@
 
 import path from 'path';
 import type { WorkItem, WorkStep } from '../../core/types.js';
-import { createTasksFile, writeTasksJson, tasksJsonExists } from '../../deterministic/tasks-json-handler.js';
+import { createStepsFile, writeTasksJson, tasksJsonExists } from '../../deterministic/tasks-json-handler.js';
 import { logBreakdownProgress } from '../../deterministic/progress-log-writer.js';
 
 // Configuration from environment
@@ -314,7 +314,7 @@ export async function writeStepsToBundle(
   }
 
   // Write TASKS.json (atomic via .tmp + rename)
-  const tasksFile = createTasksFile(steps, trigger);
+  const tasksFile = createStepsFile(steps, trigger);
   const written = await writeTasksJson(bundlePath, tasksFile);
 
   if (!written) {

@@ -123,7 +123,7 @@ async function readGoal(goalDir: string, slug: string, priority: string): Promis
     const tasksFile = await readTasksJson(goalDir);
     if (tasksFile && tasksFile.steps.length > 0) {
       steps = tasksFile.steps.map(ts => ({
-        number: ts.order + 1,
+        number: (ts.order ?? ts.step_number) + 1,
         title: ts.title,
         status: ts.status === 'in_progress' ? 'in_progress' : ts.status,
       }));
