@@ -58,6 +58,7 @@ import {
 // SELF-IMPROVEMENT - Idle and scheduled triggers
 import { checkSelfImprovementTriggers } from '../agentic/calibration/self-improvement-triggers.js';
 import { generateSelfImprovementTask } from '../agentic/calibration/self-improvement-task-generator.js';
+import { runWeeklyRetrospective } from '../agentic/calibration/retrospective.js';
 
 // Load environment variables
 config();
@@ -205,7 +206,20 @@ async function runIteration(): Promise<IterationResult> {
       logAgentic(`  Self-improvement trigger found: ${selfImprovementTrigger.type}`);
       logAgentic(`  Reason: ${selfImprovementTrigger.reason}`);
 
-      // Generate task bundle - will be picked up on next iteration
+      // Handle retrospective directly (batch analysis, no worker needed)
+      if (selfImprovementTrigger.type === 'retrospective') {
+        logAgentic('  Running weekly retrospective inline...');
+        const reportPath = await runWeeklyRetrospective();
+        if (reportPath) {
+          logAgentic(`  Retrospective complete: ${reportPath}`);
+          return 'work_completed';
+        } else {
+          logAgentic('  Retrospective failed (non-blocking)');
+          return 'no_work';
+        }
+      }
+
+      // For other self-improvement types, generate task bundle
       const taskAdded = await generateSelfImprovementTask(selfImprovementTrigger);
 
       if (taskAdded) {
