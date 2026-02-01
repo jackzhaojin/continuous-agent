@@ -172,3 +172,53 @@
 
 -> Response: Appended Session 4 to existing prompt-log-develop.md.
 -> Action: Updated `ai-docs/v1/2026-01-28-v1.2/prompt-log-develop.md`. ✅
+
+---
+
+## Session 5: Terminology Cleanup Spec (Feb 1, 2026)
+
+### Prompt 16: Explain Contract vs Task vs Goal (4:45 PM)
+
+> Explain to me really quick - what's a contract, what's a task, and what's a goal, maybe i've been using them all too interchangeable, i think i might have confused AI and myself. Do a deep dive in both AI docs and code, and tell me what it's currently doing, and what it should be doing. Don't change anything yet.
+
+-> Response: Deep audit found "Task" is overloaded across 3 concepts (goal, step, contract). `task-contractor.ts` is 379 lines of dead code. `TaskStep` and `WorkStep` duplicate the same concept. Ledger events, function names, and TASKS.json all conflate goal/step/contract.
+-> Action: Launched task-researcher subagent for exhaustive code audit across types.ts, executive-loop.ts, state-handler.ts, work-selector.ts, goal-scanner.ts, task-contractor.ts, and all related modules.
+
+### Prompt 17: Write Complete Spec (5:00 PM)
+
+> Give me a complete specification for this defect and put it in '/Users/jackjin/dev/continuous-agent-develop/ai-docs/v1/2026-01-28-v1.2' for me, i'll build it in another claude code session
+
+-> Response: Created 10-phase terminology cleanup spec with exact file paths, line numbers, function renames, type renames, ledger event migrations, and backward compatibility plan.
+-> Action: Created `ai-docs/v1/2026-01-28-v1.2/terminology-cleanup-spec.md`. Launched second researcher for every grep/line-number detail across the codebase.
+
+### Prompt 18: Add Goal Packet Model + Deprecate goals.md (5:20 PM)
+
+> Also I really prefer each goal's step and contracts to be tracked in each folder such as 'workspace/in-progress/P3/music-player-ui' and not in 'workspace/goals.md'. I think it's best to keep all the goal related things in a "packet". Let's add it to the spec as well. Ideally goals.md should ideally be deprecated completely, nothing should be reading or writing to it. The 5 folders should be source of truth.
+
+-> Response: Audit confirmed zero readers of goals.md in src/. Added 3 major sections to spec: Goal Packet Model (CONTRACTS.jsonl per goal), Deprecate goals.md (delete generator + file + update 5 stale skill/agent docs), updated glossary to include Goal Packet as first-class concept. Phases 11-12 added.
+-> Action: Updated `terminology-cleanup-spec.md` with Goal Packet design, CONTRACTS.jsonl schema, goals.md deprecation plan, updated backward compat + validation criteria. Spec now 650 lines, 12 phases.
+
+### Prompt 19: Log Session (5:41 PM)
+
+> /conversation-logger to prompt-log-develop.md
+
+-> Response: Appended Session 5 to prompt-log-develop.md.
+-> Action: Updated `ai-docs/v1/2026-01-28-v1.2/prompt-log-develop.md`. ✅
+
+---
+
+## Session 6: Merge + Agent-Outputs Commit Bug Fix (Feb 1, 2026)
+
+### Prompt 20: Merge main into develop + Triage Uncommitted Files (5:40 PM)
+
+> merge from main into develop, then do a bit of triaging, i feeel like what used to commit code stopped working in target directoroy, we now have 50 uncommitted source code.
+
+-> Response: Merged main→develop (fast-forward, terminology cleanup commit). Root cause: workers commit in per-project .git repos but nothing commits to agent-outputs monorepo. Added `commitOutputsMonorepo()` to state-handler.ts, wired into executive-loop Phase 6. Manually committed 48 dirty files in agent-outputs.
+-> Action: Modified `src/deterministic/state-handler.ts` (new function), `src/core/executive-loop.ts` (import + call). Typecheck + build clean. ✅
+
+### Prompt 21: Log Session (5:56 PM)
+
+> /conversation-logger to prompt-log-develop.md
+
+-> Response: Appended Session 6 to prompt-log-develop.md.
+-> Action: Updated `ai-docs/v1/2026-01-28-v1.2/prompt-log-develop.md`. ✅

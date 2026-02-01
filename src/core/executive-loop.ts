@@ -53,6 +53,7 @@ import {
   markTaskBlocked,
   markStepBlocked,
   setTaskOutputPath,
+  commitOutputsMonorepo,
 } from '../deterministic/state-handler.js';
 import { incrementStepRetryCount, readStepRetryCount, stepId as makeStepId } from '../deterministic/tasks-json-handler.js';
 
@@ -335,6 +336,9 @@ async function runIteration(): Promise<IterationResult> {
     } else {
       await updateTaskState(workItem, true, undefined, result.output_path, contractId, result.output);
     }
+
+    // Commit worker output to agent-outputs monorepo
+    commitOutputsMonorepo(workItem.title, result.output_path);
 
     // Reset backoff on success
     resetBackoff();

@@ -6,6 +6,7 @@
 import { readFile, writeFile, appendFile, rename, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import { execSync } from 'child_process';
+import os from 'os';
 import path from 'path';
 import type { WorkItem, WorkStep } from '../core/types.js';
 import { logDeterministic, log, logAgentic } from '../core/logging.js';
@@ -721,4 +722,51 @@ function inferProjectCapabilities(item: WorkItem): string[] {
   if (text.includes('npm') || text.includes('package')) capabilities.push('npm.install');
 
   return capabilities.length > 0 ? capabilities : ['general.implementation'];
+}
+
+/**
+ * Commit worker output to the agent-outputs monorepo.
+ * Workers commit inside their own per-project .git repos, but those changes
+ * are not reflected in the parent monorepo. This function stages and commits
+ * any dirty files in agent-outputs after task/step execution.
+ *
+ * DETERMINISTIC: Shell commands, no LLM.
+ */
+export function commitOutputsMonorepo(taskTitle: string, outputPath?: string): void {
+  const agentOutputsRoot = process.env.AGENT_OUTPUTS_PATH
+    || path.join(os.homedir(), 'dev', 'agent-outputs');
+
+  if (!existsSync(path.join(agentOutputsRoot, '.git'))) {
+    log(`  Warning: agent-outputs is not a git repo at ${agentOutputsRoot} — skipping monorepo commit`);
+    return;
+  }
+
+  try {
+    const status = execSync('git status --porcelain', {
+      cwd: agentOutputsRoot,
+      encoding: 'utf-8',
+    }).trim();
+
+    if (!status) {
+      logDeterministic('  agent-outputs monorepo already clean — no commit needed');
+      return;
+    }
+
+    const fileCount = status.split('\n').length;
+    logDeterministic(`  Committing ${fileCount} file(s) to agent-outputs monorepo...`);
+
+    execSync('git add -A', { cwd: agentOutputsRoot, stdio: 'pipe' });
+
+    // Truncate title for commit message
+    const shortTitle = taskTitle.length > 80 ? taskTitle.slice(0, 77) + '...' : taskTitle;
+    const message = `Auto-commit: ${shortTitle}`;
+    execSync(`git commit -m ${JSON.stringify(message)}`, {
+      cwd: agentOutputsRoot,
+      stdio: 'pipe',
+    });
+
+    logDeterministic(`  Committed to agent-outputs monorepo: ${message}`);
+  } catch (error) {
+    log(`  Warning: Failed to commit to agent-outputs monorepo: ${error}`);
+  }
 }
