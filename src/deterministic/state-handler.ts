@@ -90,7 +90,7 @@ export async function updateGoalState(
   contractId?: string,
   workerOutput?: string
 ): Promise<void> {
-  logDeterministic('Updating task state...');
+  logDeterministic('Updating goal state...');
 
   const ledgerPath = path.join(LEDGERS_DIR, 'work-ledger.jsonl');
 
@@ -262,7 +262,7 @@ async function requestMultiProjectApproval(item: WorkItem, outputPath: string): 
 
 /**
  * Set the output path for a task
- * V1.2: Updates PROMPT.md frontmatter + TASKS.json (if exists)
+ * V1.2: Updates PROMPT.md frontmatter + STEPS.json (if exists)
  * DETERMINISTIC: File I/O and pattern matching
  */
 export async function setGoalOutputPath(
@@ -313,7 +313,7 @@ export async function updateStepState(
       }
 
       if (item.source_path) {
-        // Primary: update TASKS.json (source of truth for step status)
+        // Primary: update STEPS.json (source of truth for step status)
         await updateStepInStepsJson(item.source_path, stepId(step.step_number), 'complete', {
           completed_at: now,
           completed_by_contract: contractId,
@@ -583,7 +583,7 @@ export async function escalateWithDiagnosis(
  * DETERMINISTIC: File I/O
  */
 export async function markGoalBlocked(item: WorkItem): Promise<void> {
-  logDeterministic('Marking task as blocked...');
+  logDeterministic('Marking goal as blocked...');
 
   // Report blocked milestone to Notion (fire-and-forget)
   await reportMilestone('Blocked', item);
@@ -595,7 +595,7 @@ export async function markGoalBlocked(item: WorkItem): Promise<void> {
 }
 
 /**
- * Mark step as blocked in TASKS.json (primary) + PROMPT.md (legacy) + PROGRESS_LOG.md
+ * Mark step as blocked in STEPS.json (primary) + PROGRESS_LOG.md
  * DETERMINISTIC: File I/O
  */
 export async function markStepBlocked(item: WorkItem, stepNumber: number): Promise<void> {

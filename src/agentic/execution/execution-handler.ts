@@ -354,7 +354,7 @@ export async function logCapabilityResult(
 
 /**
  * Log work start event.
- * Also updates TASKS.json step status to in_progress and appends to PROGRESS_LOG.md.
+ * Also updates STEPS.json step status to in_progress and appends to PROGRESS_LOG.md.
  */
 export async function logWorkStart(
   item: WorkItem,
@@ -382,7 +382,7 @@ export async function logWorkStart(
       });
   await appendFile(ledgerPath, entry + '\n', 'utf-8');
 
-  // Update TASKS.json + PROGRESS_LOG.md for step starts
+  // Update STEPS.json + PROGRESS_LOG.md for step starts
   if (step && item.source_path) {
     await updateStepInStepsJson(item.source_path, stepId(step.step_number), 'in_progress', {
       started_at: now,

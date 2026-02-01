@@ -118,7 +118,7 @@ async function readGoal(goalDir: string, slug: string, priority: string): Promis
   try {
     const { frontmatter, body } = await parsePromptMd(promptPath);
 
-    // Primary: read steps from TASKS.json
+    // Primary: read steps from STEPS.json
     let steps: GoalSummary['steps'] = [];
     const tasksFile = await readStepsJson(goalDir);
     if (tasksFile && tasksFile.steps.length > 0) {
