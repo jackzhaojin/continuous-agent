@@ -168,3 +168,47 @@
 
 → Response: Logged prompts 12-23 covering PR review/merge, Notion setup, Chrome MCP triage, documentation, weekly summary wiring, ad-hoc tests, backfill, and January summary creation.
 → Action: Appended to prompt-log.md. ✅
+
+## Session 4: V1.2 Defect Fixes & Validation (Feb 1, 2026)
+
+### Prompt 24: Fix Notion Timeline (4:00 PM)
+
+> (Earlier session — timeline backfill fix and Notion duration property cleanup)
+
+→ Response: Fixed timeline backfill script to update milestone rows with date ranges, removed Duration property.
+→ Action: Created `fix-timeline-backfill.ts`, updated Notion rows.
+
+### Prompt 25: Implement V1.2 Defect Fixes (4:30 PM)
+
+> Implement the following plan: Fix 7 defects found during V1.2 monitoring. Ordered by severity — HIGH fixes first, then MEDIUM, then LOW. [Full 7-fix plan covering: needs-you.md separator, step dependency violation, step failure Notion reporting, retry counter persistence, verifier path logging, project memory data quality, housekeep completed bundles]
+
+→ Response: Implemented all 7 fixes across 7 source files (184 insertions). `typecheck` and `build` both clean.
+→ Action: Updated `needs-you.md`, `state-handler.ts`, `goal-scanner.ts`, `types.ts`, `tasks-json-handler.ts`, `executive-loop.ts`, `validation-handler.ts`, `health-checker.ts`. ✅
+
+### Prompt 26: Stop PM2 (5:00 PM)
+
+> did we restart? if not stop the pm2
+
+→ Response: PM2 was not restarted during fixes (per CLAUDE.md policy). Stopped executive-loop process.
+→ Action: `pm2 stop executive-loop`. ✅
+
+### Prompt 27: Validate Fixes with Adhoc Tests (5:05 PM)
+
+> Can you validate this without running? do some impl in tests/adhoc, also move existing notion tests into 2026-02-01-notion-adhoc, create 2026-02-01-defect-round-1 and do some adhoc testing
+
+→ Response: Moved 6 Notion test files to `2026-02-01-notion-adhoc/`. Created 7 test files + runner in `2026-02-01-defect-round-1/`. All 47 assertions passed across all 7 fixes.
+→ Action: Created test files for each fix (regex, step deps, Notion reporting, retry persistence, verifier logging, feature extraction, housekeep bundles). `bash run-all.sh` — all green. ✅
+
+### Prompt 28: Merge to Main (5:30 PM)
+
+> I didn't realize we're not on main, merge into main
+
+→ Response: Fast-forward merged `self-enhance/1769984242039` into `main`. 42 files changed, 2024 insertions. Clean merge, no conflicts.
+→ Action: `git checkout main && git merge self-enhance/1769984242039`. ✅
+
+### Prompt 29: Conversation Logger (5:42 PM)
+
+> /conversation-logger to prompt-log.md
+
+→ Response: Logged prompts 24-29 covering defect fixes, PM2 stop, adhoc test creation, and merge to main.
+→ Action: Appended to prompt-log.md. ✅
