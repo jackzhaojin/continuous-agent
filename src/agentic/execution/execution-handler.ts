@@ -12,6 +12,7 @@ import type { WorkItem, WorkerResult, WorkStep } from '../../core/types.js';
 import { logAgentic, log } from '../../core/logging.js';
 import { reportMilestone } from '../../deterministic/notion-reporter.js';
 import { readPreviousStepHandoff } from '../../deterministic/state-handler.js';
+import { incrementOutcomeCount } from '../../deterministic/self-improvement-state.js';
 import { updateStepStatus as updateStepInTasksJson, stepId } from '../../deterministic/tasks-json-handler.js';
 import { logStepStartedProgress } from '../../deterministic/progress-log-writer.js';
 
@@ -342,6 +343,13 @@ export async function logCapabilityResult(
     result: success ? 'PASS' : 'FAIL',
   });
   await appendFile(ledgerPath, entry + '\n', 'utf-8');
+
+  // Track outcome count for retrospective triggering (after 10+ outcomes)
+  try {
+    await incrementOutcomeCount();
+  } catch {
+    // Non-blocking: don't fail capability logging if state file has issues
+  }
 }
 
 /**
