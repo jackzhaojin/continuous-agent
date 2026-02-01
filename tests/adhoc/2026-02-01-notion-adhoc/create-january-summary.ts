@@ -110,16 +110,16 @@ function parseLedgerByDay(): Map<string, DayStats> {
     const day = days.get(date)!;
     day.entries++;
 
-    const taskName = (entry.title || entry.task_title || '') as string;
+    const taskName = (entry.title || (entry as Record<string, unknown>).goal_title || entry.task_title || '') as string;
     if (taskName) day.tasks.add(taskName);
 
     const event = entry.event as string;
     switch (event) {
-      case 'TASK_STARTED': day.started++; break;
-      case 'TASK_COMPLETED': day.completed++; if (taskName) day.completedTasks.add(taskName); break;
-      case 'TASK_ATTEMPT_FAILED': case 'STEP_ATTEMPT_FAILED': day.failed++; break;
+      case 'TASK_STARTED': case 'GOAL_STARTED': day.started++; break;
+      case 'TASK_COMPLETED': case 'GOAL_COMPLETED': day.completed++; if (taskName) day.completedTasks.add(taskName); break;
+      case 'TASK_ATTEMPT_FAILED': case 'GOAL_ATTEMPT_FAILED': case 'STEP_ATTEMPT_FAILED': day.failed++; break;
       case 'STEP_COMPLETED': day.stepCompleted++; break;
-      case 'TASK_BLOCKED': day.blocked++; break;
+      case 'TASK_BLOCKED': case 'GOAL_BLOCKED': day.blocked++; break;
     }
   }
 

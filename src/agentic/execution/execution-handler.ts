@@ -374,7 +374,7 @@ export async function logWorkStart(
         step_title: step.title,
       })
     : JSON.stringify({
-        event: 'TASK_STARTED',
+        event: 'GOAL_STARTED',
         ts: now,
         task_id: item.id,
         contract_id: contractId,

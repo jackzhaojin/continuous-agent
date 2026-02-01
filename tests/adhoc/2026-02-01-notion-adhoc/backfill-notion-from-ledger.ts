@@ -48,13 +48,17 @@ if (!DATABASE_ID) { console.error('NOTION_DATABASE_ID not found'); process.exit(
 
 // ── Event mapping ──────────────────────────────────────────────────────────
 
-// Map ledger events to Notion milestone events
+// Map ledger events to Notion milestone events (supports both old TASK_ and new GOAL_ prefixes)
 const EVENT_MAP: Record<string, string> = {
   TASK_STARTED: 'Started',
+  GOAL_STARTED: 'Started',
   TASK_COMPLETED: 'Completed',
+  GOAL_COMPLETED: 'Completed',
   TASK_ATTEMPT_FAILED: 'Failed',
+  GOAL_ATTEMPT_FAILED: 'Failed',
   STEP_ATTEMPT_FAILED: 'Failed',
   TASK_BLOCKED: 'Blocked',
+  GOAL_BLOCKED: 'Blocked',
   STEP_COMPLETED: 'Step Completed',
 };
 
@@ -124,7 +128,7 @@ function entryToRow(entry: LedgerEntry): NotionRow | null {
   const notionEvent = EVENT_MAP[entry.event];
   if (!notionEvent) return null;
 
-  const taskTitle = entry.title || entry.task_title || 'Unknown Task';
+  const taskTitle = entry.title || entry.goal_title || entry.task_title || 'Unknown Task';
   const title = entry.step_title
     ? `${taskTitle} - ${entry.step_title}`
     : taskTitle;

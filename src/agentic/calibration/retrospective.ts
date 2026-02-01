@@ -19,6 +19,7 @@ import {
   loadSelfImprovementState,
   markRetrospectiveCompleted,
 } from '../../deterministic/self-improvement-state.js';
+import { normalizeLedgerEvent } from '../../core/logging.js';
 
 // === Types ===
 
@@ -191,14 +192,14 @@ function analyzeTaskOutcomes(entries: WorkLedgerEntry[]): TaskOutcome[] {
 
     const task = tasks.get(taskId)!;
 
-    switch (entry.event) {
-      case 'TASK_STARTED':
+    switch (normalizeLedgerEvent(entry.event)) {
+      case 'GOAL_STARTED':
         task.retryCount++;
         if (!task.title && title) {
           task.title = title;
         }
         break;
-      case 'TASK_COMPLETED':
+      case 'GOAL_COMPLETED':
         task.completed = entry.ts;
         task.success = true;
         break;

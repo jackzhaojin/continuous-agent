@@ -96,3 +96,36 @@ export function closeLogStream(): void {
   currentLogStream = null;
   currentLogDate = null;
 }
+
+/**
+ * Normalize legacy ledger event names to the new Goal/Step/Contract terminology.
+ * Used by ledger readers to handle both old (TASK_*) and new (GOAL_*) entries.
+ */
+const LEGACY_EVENT_MAP: Record<string, string> = {
+  'TASK_STARTED': 'GOAL_STARTED',
+  'TASK_COMPLETED': 'GOAL_COMPLETED',
+  'TASK_BREAKDOWN': 'GOAL_BREAKDOWN',
+};
+
+export function normalizeLedgerEvent(event: string): string {
+  return LEGACY_EVENT_MAP[event] || event;
+}
+
+/**
+ * Normalize legacy ledger field names to the new terminology.
+ * Returns an object with both old and new field names resolved.
+ */
+export function normalizeLedgerEntry(entry: Record<string, unknown>): Record<string, unknown> {
+  const normalized = { ...entry };
+  if (normalized.event) {
+    normalized.event = normalizeLedgerEvent(normalized.event as string);
+  }
+  // Normalize field names: task_id → goal_id, task_title → goal_title
+  if (normalized.task_id && !normalized.goal_id) {
+    normalized.goal_id = normalized.task_id;
+  }
+  if (normalized.task_title && !normalized.goal_title) {
+    normalized.goal_title = normalized.task_title;
+  }
+  return normalized;
+}

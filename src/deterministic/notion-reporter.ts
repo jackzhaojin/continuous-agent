@@ -9,7 +9,7 @@ import { readFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 import type { WorkItem } from '../core/types.js';
-import { logDeterministic, log } from '../core/logging.js';
+import { logDeterministic, log, normalizeLedgerEvent } from '../core/logging.js';
 
 // === CONFIGURATION ===
 // Read env vars lazily (not at module load time) because this module is statically
@@ -110,8 +110,10 @@ interface LedgerEntry {
   event: string;
   ts: string;
   task_id?: string;
+  goal_id?: string;
   title?: string;
   task_title?: string;
+  goal_title?: string;
   contract_id?: string;
   output_path?: string;
   step_number?: number;
@@ -161,17 +163,17 @@ function computeStats(entries: LedgerEntry[]): {
   const uniqueTasks = new Set<string>();
 
   for (const entry of entries) {
-    const taskName = entry.title || entry.task_title || 'unknown';
+    const taskName = entry.title || entry.goal_title || entry.task_title || 'unknown';
     uniqueTasks.add(taskName);
 
-    switch (entry.event) {
-      case 'TASK_STARTED':
+    switch (normalizeLedgerEvent(entry.event)) {
+      case 'GOAL_STARTED':
         tasksStarted++;
         break;
-      case 'TASK_COMPLETED':
+      case 'GOAL_COMPLETED':
         tasksCompleted++;
         break;
-      case 'TASK_FAILED':
+      case 'GOAL_FAILED':
         tasksFailed++;
         break;
       case 'STEP_COMPLETED':

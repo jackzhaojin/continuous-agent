@@ -355,7 +355,7 @@ export async function logBreakdownEvent(
   const ledgerPath = path.join(process.cwd(), 'ledgers', 'work-ledger.jsonl');
   
   const entry = JSON.stringify({
-    event: 'TASK_BREAKDOWN',
+    event: 'GOAL_BREAKDOWN',
     ts: new Date().toISOString(),
     task_id: taskId,
     task_title: taskTitle,

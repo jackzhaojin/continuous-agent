@@ -67,14 +67,16 @@ function computeTaskTimings(): Map<string, TaskTiming> {
       const e = JSON.parse(trimmed) as Record<string, unknown>;
       const event = e.event as string;
       const ts = e.ts as string;
-      const title = (e.title || e.task_title || '') as string;
+      const title = (e.title || e.goal_title || e.task_title || '') as string;
       const stepTitle = (e.step_title || '') as string;
 
       if (!title || !ts) continue;
 
-      // We care about events that mark start/end of work
-      if (!['TASK_STARTED', 'TASK_COMPLETED', 'STEP_STARTED', 'STEP_COMPLETED',
-            'TASK_ATTEMPT_FAILED', 'STEP_ATTEMPT_FAILED', 'TASK_BLOCKED'].includes(event)) continue;
+      // We care about events that mark start/end of work (support both old TASK_ and new GOAL_ prefixes)
+      if (!['TASK_STARTED', 'GOAL_STARTED', 'TASK_COMPLETED', 'GOAL_COMPLETED',
+            'STEP_STARTED', 'STEP_COMPLETED',
+            'TASK_ATTEMPT_FAILED', 'GOAL_ATTEMPT_FAILED', 'STEP_ATTEMPT_FAILED',
+            'TASK_BLOCKED', 'GOAL_BLOCKED'].includes(event)) continue;
 
       // Build the full title as it appears in Notion
       const notionTitle = stepTitle ? `${title} - ${stepTitle}` : title;

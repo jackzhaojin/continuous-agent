@@ -99,7 +99,7 @@ export async function updateGoalState(
   if (success) {
     // Log to work ledger
     const entry = JSON.stringify({
-      event: 'TASK_COMPLETED',
+      event: 'GOAL_COMPLETED',
       ts: new Date().toISOString(),
       task_id: item.id,
       title: item.title,
