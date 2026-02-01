@@ -423,7 +423,7 @@ async function runIteration(): Promise<IterationResult> {
       if (isStepExecution && currentStep) {
         await markStepBlocked(workItem, currentStep.step_number);
       }
-      await markTaskBlocked(workItem);
+      await markTaskBlocked(workItem, contractId);
       await escalateWithDiagnosis(workItem, retry.attempts, diagnosis.diagnosis, contractId);
 
       retryTracker.delete(retryKey);
@@ -450,7 +450,7 @@ async function runIteration(): Promise<IterationResult> {
     if (isStepExecution && currentStep) {
       await markStepBlocked(workItem, currentStep.step_number);
     }
-    await markTaskBlocked(workItem);
+    await markTaskBlocked(workItem, contractId);
     await writeToNeedsYou(workItem, retry.attempts, retry.lastError, contractId);
 
     retryTracker.delete(retryKey);

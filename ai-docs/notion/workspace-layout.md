@@ -54,7 +54,8 @@ Every agent event (task started, completed, failed, blocked, step completed) pro
 | Title | title | Task name (e.g., "Build Next.js App") |
 | Event | select | `Started` (blue), `Completed` (green), `Failed` (red), `Blocked` (orange), `Step Completed` (purple) |
 | Priority | select | `P0` (red), `P1` (orange), `P2` (yellow), `P3` (blue), `P4` (gray) |
-| Timestamp | date | ISO datetime with optional end date for date ranges (used by Timeline view) |
+| Timestamp | date | ISO datetime; date range (start + end) when milestone is closed via `closeMilestone()` |
+| Duration | number | Task/step duration in minutes, populated when milestone is closed |
 | Contract ID | rich_text | Worker log reference (e.g., `task-b25db16e`) |
 | Output Path | rich_text | Absolute path to project output directory |
 | Error Summary | rich_text | First 200 chars of error message (empty on success) |
@@ -84,14 +85,20 @@ A new summaries page should be created each month. Update `NOTION_MONTHLY_PAGE_I
 
 ```
 Executive Loop
-  ├── Phase 5 (Execute):  reportMilestone('Started', ...)     → Milestones DB row
+  ├── Phase 5 (Execute):  reportMilestone('Started', ...)     → Milestones DB row (start date only)
   ├── Phase 6 (Success):  reportMilestone('Completed', ...)   → Milestones DB row
+  │                        closeMilestone(contractId)          → Updates Started row: end date + duration
   │                        reportMilestone('Step Completed')   → Milestones DB row
+  │                        closeMilestone(contractId)          → Updates Started row: end date + duration
   ├── Phase 6 (Failure):  reportMilestone('Failed', ...)      → Milestones DB row
+  │                        closeMilestone(contractId)          → Updates Started row: end date + duration
   ├── Phase 6 (Blocked):  reportMilestone('Blocked', ...)     → Milestones DB row
+  │                        closeMilestone(contractId)          → Updates Started row: end date + duration
   ├── Day boundary:        reportDailySummary()                → Blocks on Monthly Page
   └── Weekly (Sunday):     reportWeeklySummary()               → Child page under Monthly Page
 ```
+
+**Milestone closure:** When a task/step terminates (completed, failed, or blocked), `closeMilestone()` queries for the original "Started" row by Contract ID and updates it with an end date and duration in minutes. This turns Started rows into lifecycle rows with date ranges, enabling Notion Timeline views. Separate event rows (Completed/Failed/Blocked) are preserved as an audit trail.
 
 All Notion writes are fire-and-forget. Failures are logged but never block the agent. Local JSONL ledgers remain the source of truth.
 

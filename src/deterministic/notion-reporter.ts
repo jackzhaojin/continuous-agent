@@ -104,6 +104,98 @@ export async function reportMilestone(
   }
 }
 
+// === MILESTONE CLOSURE ===
+
+/**
+ * Close a previously-reported "Started" milestone by adding an end date and duration.
+ * Queries the Milestones DB for the Started row matching the given contractId,
+ * then updates its Timestamp (date range) and Duration (minutes).
+ *
+ * Uses raw fetch against the Notion REST API (v2022-06-28) for the query step because
+ * the SDK v5.8.0 maps database queries to the /data_sources/ endpoint which the Notion
+ * API does not yet support. The update step uses the SDK's pages.update() which works fine.
+ *
+ * Fire-and-forget: logs errors but never throws.
+ * DETERMINISTIC: Mechanical API call with structured data.
+ */
+export async function closeMilestone(contractId: string): Promise<void> {
+  try {
+    const client = getNotionClient();
+    const dbId = getDatabaseId();
+    const apiKey = getApiKey();
+    if (!client || !dbId || !apiKey || !contractId) return;
+
+    // Query for the Started row via raw REST API (SDK dataSources.query uses unsupported endpoint)
+    const queryRes = await fetch(`https://api.notion.com/v1/databases/${dbId}/query`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'Notion-Version': '2022-06-28',
+      },
+      body: JSON.stringify({
+        filter: {
+          and: [
+            { property: 'Contract ID', rich_text: { equals: contractId } },
+            { property: 'Event', select: { equals: 'Started' } },
+          ],
+        },
+        page_size: 1,
+      }),
+    });
+
+    if (!queryRes.ok) {
+      log(`  Notion milestone closure: query failed HTTP ${queryRes.status}`);
+      return;
+    }
+
+    const queryData = (await queryRes.json()) as {
+      results: Array<{
+        id: string;
+        properties: Record<string, unknown>;
+      }>;
+    };
+
+    if (queryData.results.length === 0) {
+      log(`  Notion milestone closure: no Started row found for ${contractId} (Notion may have been down at start)`);
+      return;
+    }
+
+    const page = queryData.results[0];
+
+    // Extract existing start timestamp from the page properties
+    const timestampProp = page.properties['Timestamp'] as { date?: { start?: string } } | undefined;
+    const existingStart = timestampProp?.date?.start;
+
+    if (!existingStart) {
+      log(`  Notion milestone closure: no start date found on Started row for ${contractId}`);
+      return;
+    }
+
+    // Calculate duration in minutes
+    const startTime = new Date(existingStart).getTime();
+    const endTime = Date.now();
+    const durationMinutes = Math.round((endTime - startTime) / 60000);
+
+    // Update the page with end date and duration (SDK pages.update works fine)
+    await client.pages.update({
+      page_id: page.id,
+      properties: {
+        Timestamp: {
+          date: { start: existingStart, end: new Date(endTime).toISOString() },
+        },
+        Duration: {
+          number: durationMinutes,
+        },
+      } as Parameters<Client['pages']['update']>[0]['properties'],
+    });
+
+    logDeterministic(`  Notion milestone closed: ${contractId} (${durationMinutes} min)`);
+  } catch (e) {
+    log(`  Notion milestone closure failed (non-blocking): ${e}`);
+  }
+}
+
 // === LEDGER PARSING ===
 
 interface LedgerEntry {

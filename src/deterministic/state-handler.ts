@@ -15,7 +15,7 @@ import {
   markRetrospectiveCompleted,
   markReferenceRefreshCompleted,
 } from './self-improvement-state.js';
-import { reportMilestone } from './notion-reporter.js';
+import { reportMilestone, closeMilestone } from './notion-reporter.js';
 import { parsePromptMd, updateFrontmatter } from './prompt-md-parser.js';
 import { appendProjectMemory, type ProjectMemoryEntry } from './project-memory-store.js';
 import { registerProject, generateProjectSlug, findProjectBySlug, type ProjectRegistryEntry } from './project-registry.js';
@@ -111,6 +111,11 @@ export async function updateTaskState(
     // Report milestone to Notion (fire-and-forget)
     await reportMilestone('Completed', item, contractId, { outputPath });
 
+    // Close the Started milestone row with end date + duration
+    if (contractId) {
+      await closeMilestone(contractId);
+    }
+
     // V1.2: Record project memory entry
     try {
       const memoryEntry: ProjectMemoryEntry = {
@@ -193,6 +198,11 @@ export async function updateTaskState(
     await reportMilestone('Failed', item, contractId, {
       errorSummary: errorInfo,
     });
+
+    // Close the Started milestone row with end date + duration
+    if (contractId) {
+      await closeMilestone(contractId);
+    }
   }
 
   // V1.2: Update PROMPT.md (source of truth for goal bundles)
@@ -356,6 +366,11 @@ export async function updateStepState(
         outputPath,
       });
 
+      // Close the Started milestone row with end date + duration
+      if (contractId) {
+        await closeMilestone(contractId);
+      }
+
       log(`  ✓ Step ${step.step_number + 1} complete`);
 
       // Check if this was the last step
@@ -387,6 +402,11 @@ export async function updateStepState(
         stepNumber: step.step_number + 1,
         errorSummary: errorInfo?.slice(0, 200) || 'Unknown error',
       });
+
+      // Close the Started milestone row with end date + duration
+      if (contractId) {
+        await closeMilestone(contractId);
+      }
     }
   } catch (error) {
     log(`  Failed to update step state: ${error}`);
@@ -583,11 +603,16 @@ export async function escalateWithDiagnosis(
  * V1.2: PROMPT.md is the source of truth.
  * DETERMINISTIC: File I/O
  */
-export async function markTaskBlocked(item: WorkItem): Promise<void> {
+export async function markTaskBlocked(item: WorkItem, contractId?: string): Promise<void> {
   logDeterministic('Marking task as blocked...');
 
   // Report blocked milestone to Notion (fire-and-forget)
-  await reportMilestone('Blocked', item);
+  await reportMilestone('Blocked', item, contractId);
+
+  // Close the Started milestone row with end date + duration
+  if (contractId) {
+    await closeMilestone(contractId);
+  }
 
   // V1.2: Update PROMPT.md (source of truth) — blocked goals stay in-place in in-progress/P{n}/
   if (item.source_path) {
