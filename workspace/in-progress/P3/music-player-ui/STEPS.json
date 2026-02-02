@@ -2,7 +2,7 @@
   "version": 1,
   "created_at": "2026-01-29T10:49:19.692Z",
   "trigger": "auto",
-  "revision": 16,
+  "revision": 25,
   "steps": [
     {
       "id": "step-0",
@@ -49,55 +49,68 @@
       "order": 3,
       "title": "Implement authentication system",
       "description": "Set up user authentication with JWT or session-based auth. Create login/logout/register flows.",
-      "status": "pending",
+      "status": "complete",
       "dependencies": [
         "step-2"
       ],
-      "estimated_turns": 120
+      "estimated_turns": 120,
+      "started_at": "2026-02-02T01:46:58.237Z",
+      "completed_at": "2026-02-02T01:55:17.453Z",
+      "completed_by_contract": "contract-1769996818236"
     },
     {
       "id": "step-4",
       "order": 4,
       "title": "Build core API endpoints",
       "description": "Implement main API routes with CRUD operations. Add validation and error handling.",
-      "status": "pending",
+      "status": "complete",
       "dependencies": [
         "step-3"
       ],
-      "estimated_turns": 130
+      "estimated_turns": 130,
+      "started_at": "2026-02-02T01:55:20.719Z",
+      "completed_at": "2026-02-02T02:03:53.508Z",
+      "completed_by_contract": "contract-1769997320719"
     },
     {
       "id": "step-5",
       "order": 5,
       "title": "Create UI components and pages",
       "description": "Build React components for the user interface. Create main pages and navigation.",
-      "status": "pending",
+      "status": "complete",
       "dependencies": [
         "step-4"
       ],
-      "estimated_turns": 140
+      "estimated_turns": 140,
+      "started_at": "2026-02-02T02:03:56.101Z",
+      "completed_at": "2026-02-02T02:14:41.563Z",
+      "completed_by_contract": "contract-1769997836101"
     },
     {
       "id": "step-6",
       "order": 6,
       "title": "Integration and feature completion",
       "description": "Connect all components, ensure data flow works end-to-end. Add any missing features.",
-      "status": "pending",
+      "status": "complete",
       "dependencies": [
         "step-5"
       ],
-      "estimated_turns": 100
+      "estimated_turns": 100,
+      "started_at": "2026-02-02T02:14:44.147Z",
+      "completed_at": "2026-02-02T02:25:55.341Z",
+      "completed_by_contract": "contract-1769998484146"
     },
     {
       "id": "step-7",
       "order": 7,
       "title": "Testing and quality assurance",
       "description": "Write unit tests, integration tests. Fix bugs and edge cases.",
-      "status": "pending",
+      "status": "in_progress",
       "dependencies": [
         "step-6"
       ],
-      "estimated_turns": 100
+      "estimated_turns": 100,
+      "started_at": "2026-02-02T02:25:57.212Z"
     }
   ]
 }

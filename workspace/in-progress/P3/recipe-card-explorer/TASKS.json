@@ -63,12 +63,14 @@
       "order": 4,
       "title": "Build core API endpoints",
       "description": "Implement main API routes with CRUD operations. Add validation and error handling.",
-      "status": "blocked",
+      "status": "complete",
       "dependencies": [
         "step-3"
       ],
       "estimated_turns": 130,
-      "started_at": "2026-01-29T11:50:51.592Z"
+      "started_at": "2026-01-29T11:50:51.592Z",
+      "completed_at": "2026-01-29T11:49:27.000Z",
+      "completed_by_contract": "task-1769686890379"
     },
     {
       "id": "step-5",
@@ -102,15 +104,12 @@
       "id": "step-7",
       "order": 7,
       "title": "Testing and quality assurance",
-      "description": "Write unit tests, integration tests. Fix bugs and edge cases.",
-      "status": "complete",
+      "description": "Write unit tests, integration tests. Fix bugs and edge cases. Known issue: useSearchParams() in search page needs Suspense boundary wrapping for Next.js static generation.",
+      "status": "pending",
       "dependencies": [
         "step-6"
       ],
-      "estimated_turns": 100,
-      "started_at": "2026-02-01T22:08:16.706Z",
-      "completed_at": "2026-02-01T22:17:20.497Z",
-      "completed_by_contract": "task-1769983696705"
+      "estimated_turns": 100
     }
   ]
 }

@@ -215,6 +215,7 @@ export async function executeWork(
           repos_allowed: ['agent-outputs'],
           tools_allowed: [
             'Skill',
+            'Task',
             'Read',
             'Write',
             'Edit',

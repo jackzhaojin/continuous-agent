@@ -7,7 +7,7 @@
  */
 
 import { query, type SDKMessage, type SDKResultMessage } from '@anthropic-ai/claude-agent-sdk';
-import { mkdirSync, existsSync, copyFileSync, createWriteStream } from 'fs';
+import { mkdirSync, existsSync, copyFileSync, cpSync, createWriteStream } from 'fs';
 import { execSync } from 'child_process';
 import os from 'os';
 import path from 'path';
@@ -24,6 +24,9 @@ const AGENT_OUTPUTS_BASE = process.env.AGENT_OUTPUTS_PATH || path.join(os.homedi
 const AGENT_BASE = process.env.AGENT_PATH || path.join(os.homedir(), 'dev', 'continuous-agent');
 const TEMPLATES_DIR = path.join(AGENT_BASE, 'templates');
 const LEDGERS_DIR = path.join(AGENT_BASE, 'ledgers');
+
+// Worker-facing Claude files (skills + agents) to copy into each worker's project
+const CLAUDE_FILES_DIR = path.join(AGENT_BASE, 'claude-files-to-output');
 
 /**
  * Create a logger for a specific worker contract
@@ -173,6 +176,27 @@ function copySourceProject(sourcePath: string, targetPath: string): boolean {
   } catch (error) {
     console.log(`[Worker] Warning: Failed to copy source project: ${error}`);
     return false;
+  }
+}
+
+/**
+ * Copy worker-facing Claude files (skills + agents) into the worker's project.
+ * Sources from claude-files-to-output/ in the agent repo.
+ * Called AFTER source project copy so curated files always win.
+ * Skipped for self-enhance/skill-build workers (they use the agent repo directly).
+ */
+function copyClaudeFilesToOutput(projectPath: string): void {
+  if (!existsSync(CLAUDE_FILES_DIR)) {
+    console.log(`[Worker] Warning: claude-files-to-output/ not found, skipping skill/agent copy`);
+    return;
+  }
+
+  const destDir = path.join(projectPath, '.claude');
+  try {
+    cpSync(CLAUDE_FILES_DIR, destDir, { recursive: true });
+    console.log(`[Worker] Copied worker-facing skills and agents to ${destDir}`);
+  } catch (error) {
+    console.log(`[Worker] Warning: Failed to copy claude files to output: ${error}`);
   }
 }
 
@@ -493,6 +517,12 @@ export async function spawnWorker(
     }
   }
 
+  // Copy worker-facing Claude files (skills + agents) to output projects
+  // Skip for self-enhance/skill-build — they work in the agent repo which already has .claude/
+  if (!isSelfEnhance && !isSkillBuild) {
+    copyClaudeFilesToOutput(projectPath);
+  }
+
   // Build prompt - use specialized prompts for self-enhance and skill-build tasks
   let prompt: string;
   if (isSelfEnhance && workItem) {
@@ -512,7 +542,9 @@ export async function spawnWorker(
   }
   const model = process.env.MODEL || 'claude-sonnet-4-5';
 
-  // Determine allowed tools - add Task for self-enhancement and skill-build (before logging)
+  // Determine allowed tools
+  // Task is included by default for all workers (subagent delegation to task-researcher, code-validator).
+  // This guard ensures it's present for self-enhance/skill-build even if default changes.
   const allowedTools = [...contract.scope.tools_allowed];
   if ((isSelfEnhance || isSkillBuild) && !allowedTools.includes('Task')) {
     allowedTools.push('Task');
