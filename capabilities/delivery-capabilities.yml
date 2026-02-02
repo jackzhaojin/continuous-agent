@@ -450,7 +450,7 @@ capabilities:
   - id: deliver.claude.skill
     name: Claude Code Skill Delivery
     description: Deliver a tested Claude Code skill with SKILL.md, optional scripts, templates, and references
-    confidence: 65
+    confidence: 75
     maturity: Reliable
     scope:
       includes:
@@ -487,7 +487,7 @@ capabilities:
         - Supporting scripts are executable
         - References to existing skill patterns
     evidence:
-      successes: 5
+      successes: 6
       failures: 1
       last_success: null
       last_failure: null
