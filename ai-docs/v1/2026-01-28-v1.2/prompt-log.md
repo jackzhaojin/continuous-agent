@@ -212,3 +212,124 @@
 
 → Response: Logged prompts 24-29 covering defect fixes, PM2 stop, adhoc test creation, and merge to main.
 → Action: Appended to prompt-log.md. ✅
+
+## Session 5: Two-Tier Claude Files & Notion Fixes (Feb 1, 2026)
+
+### Prompt 30: Implement Two-Tier Claude Files Plan (9:35 PM)
+
+> Implement the following plan: # Plan: Two-Tier Claude Files — Infrastructure vs Worker-Facing. Create `claude-files-to-output/` at the agent repo root with worker-facing skills and agents. Copy it to each worker's `.claude/` directory before execution. Keep `.claude/` in the agent repo for infrastructure-only concerns. [Full plan with categorization of 7 worker-facing skills, 6 infrastructure skills, 2 worker-facing agents, 2 infrastructure agents, 4 to delete]
+
+→ Response: Implemented full plan — moved 7 skills + 2 agents to `claude-files-to-output/`, deleted 2 unused skills, added `copyClaudeFilesToOutput()` to worker-spawner, added `Task` tool to all workers, updated gitignore template.
+→ Action: Modified `worker-spawner.ts`, `execution-handler.ts`, `templates/gitignore-universal`. Moved files via `git mv`. Build clean. ✅
+
+### Prompt 31: Does This Work for Existing Projects? (9:50 PM)
+
+> OK I committed - does this work for existing running projects? or just new ones? if i add more stuff to '/Users/jackjin/dev/continuous-agent/claude-files-to-output', does it like, rsync over?
+
+→ Response: Only new projects + next step of multi-step goals. `cpSync` overwrites on each spawn but doesn't retroactively update in-flight workers. Not rsync — full recursive copy.
+→ Action: Code analysis only, no changes.
+
+### Prompt 32: Restart PM2 (9:52 PM)
+
+> Ya that should be fine, can you restart pm2?
+
+→ Response: Restarted PM2, online with PID 76154.
+→ Action: `pm2 restart executive-loop`. ✅
+
+### Prompt 33: Monitor Closely (9:53 PM)
+
+> OK - let's monitor very closely on this, make sure it's going as expected, and agents we're copying over is being copied over
+
+→ Response: Confirmed `.claude/` directory was copied to recipe-card-explorer project at worker spawn time. All 7 skills + 2 agents present, no infrastructure skills leaked. Agent idle (no pending work).
+→ Action: Inspected `agent-outputs/projects/nextjs/2026-01-29/1769685367609/.claude/` — full contents verified. ✅
+
+### Prompt 34: CWD Confirmation (10:00 PM)
+
+> In this case, just making sure CWD is in '/Users/jackjin/dev/agent-outputs/projects/nextjs/2026-01-29/1769685367609' and not the recipe-discovery-platform subdirectory?
+
+→ Response: Confirmed CWD is the contract-level directory, not the app subdirectory. `.claude/` correctly placed at CWD level.
+→ Action: Code analysis of `worker-spawner.ts` query() call.
+
+### Prompt 35: Keep Monitoring Every 10 Min (10:05 PM)
+
+> Can you keep monitor and triage if issues come up? every 10 min please
+
+→ Response: Set up 10-min monitoring. Agent idle, looping normally. Executive log rolled over to Feb 2 UTC date. No errors.
+→ Action: Background monitoring tasks with PM2 status, executive logs, worker logs, error logs.
+
+### Prompt 36: What Happened to Self-Improvement Goals? (10:10 PM)
+
+> didn't we have ai or an ai at somepoint opened a P4 and started working to self learn?
+
+→ Response: Self-improvement triggers were deliberately restricted — only weekly retrospective auto-triggers. Practice loops and reference refresh disabled per previous preference. Agent burned through all work (music-player steps 4-8, recipe-card step 8, retrospective) and is legitimately idle.
+→ Action: Read `self-improvement-triggers.ts`, `self-improvement-state.json`, work ledger. ✅
+
+### Prompt 37: Move Playwright Demo Skill to On Deck (10:15 PM)
+
+> Cool, let's move '/Users/jackjin/dev/continuous-agent/workspace/drafts/playwright-demo-skill' to on deck
+
+→ Response: Moved to ondeck. Goal scanner auto-promoted to `in-progress/P1/`. Worker spawned immediately — contract-1770001514759 executing step 1 (research caption extraction) as `[SKILL-BUILD]` task.
+→ Action: `mv` drafts → ondeck. Agent picked up within one loop cycle. ✅
+
+### Prompt 38: Monitor Everything (10:20 PM)
+
+> Yes, monitor everything you can first, then space it out and do the same detailed monitoring every 10 min
+
+→ Response: Found bug — skill-builder subagent trying to read `.claude/skills/claude-skill-creator/SKILL.md` which was moved to `claude-files-to-output/`. Skill-build workers have CWD = agent repo and we skip the copy for them. 6 failed retries before step-0 eventually completed.
+→ Action: Deep monitoring of STEPS.json, CONTRACTS.jsonl, PROGRESS_LOG.md, PM2 logs. Identified the `claude-skill-creator` misclassification. ⚠️
+
+### Prompt 39: Fix It and Restart (10:35 PM)
+
+> Let's fix it and restart? if we need to?
+
+→ Response: Moved `claude-skill-creator` back to `.claude/skills/` (infrastructure). Rebuilt, restarted PM2.
+→ Action: `cp -R` back to `.claude/skills/`, `rm -rf` from `claude-files-to-output/skills/`, `npm run build`, `pm2 restart`. ✅
+
+### Prompt 40: Maybe It Can Be Part of Both? (10:40 PM)
+
+> maybe it can be part of both?
+
+→ Response: Good idea — copied `claude-skill-creator` to both locations. Infrastructure needs it for skill-builder, workers may need it for skill-build tasks in output projects.
+→ Action: `cp -R` to `claude-files-to-output/skills/` as well. ✅
+
+### Prompt 41: Keep Monitoring, Be Vigilant (10:45 PM)
+
+> Great - keep monitoring and look for errors like this, be vigilant and do thorough checks every 10 minutes
+
+→ Response: All 4 steps completed. Goal stuck in `in-progress/P1/` — PM2 restart interrupted finalization. Scanner says "No goal bundles found" because all steps complete but goal never moved to `completed/`. Pre-existing edge case.
+→ Action: Manually moved to `completed/`. Set up 10-min monitoring. ✅
+
+### Prompt 42: Notion Updates Are Weird (11:15 PM)
+
+> Notion updates are still weird and unreliable, do a deep triage [screenshot of Agent Milestones showing many orphaned "Started" rows]
+
+→ Response: Deep triage found root cause — each retry generates a new contract ID and creates a "Started" row, but `closeMilestone()` is never called on failure in the retry path. Only success/blocking closes rows. All intermediate retries stay "Started" forever.
+→ Action: Explore subagent analyzed `notion-reporter.ts`, `state-handler.ts`, `executive-loop.ts`. Traced all code paths. ✅
+
+### Prompt 43: Fix the Notion Issue (11:30 PM)
+
+> Yes please! [to implementing the fix]
+
+→ Response: Added `closeMilestone(contractId, 'Failed', { errorSummary })` in the failure path of `executive-loop.ts`, right after logging the failed attempt. Now every failed retry closes its Notion row.
+→ Action: Added import for `closeMilestone`, added call at line 400. `npm run build` clean. `pm2 restart`. ✅
+
+### Prompt 44: Shutdown PM2 (11:45 PM)
+
+> Since we don't have anything else let's shutdown pm2
+
+→ Response: Stopped executive-loop.
+→ Action: `pm2 stop executive-loop`. ✅
+
+### Prompt 45: Clean Up Notion Duplicates (11:50 PM)
+
+> Can you do a query into our notion db and fix the duplicate entries? [screenshot of Notion showing orphaned rows]
+
+→ Response: Queried all 154 rows, identified 25 orphaned "Started" rows (retries that were never closed). Archived all 25 via Notion API. 0 failures. Kept 12 paired "Started" rows that have matching completion rows.
+→ Action: Python script — paginated query, grouped by (goal, step), identified orphans, archived via PATCH. ✅
+
+### Prompt 46: Conversation Logger (12:12 AM)
+
+> /conversation-logger to prompt-log.md
+
+→ Response: Logged prompts 30-46 covering two-tier claude files implementation, monitoring, bug fixes, Notion triage, and cleanup.
+→ Action: Appended to prompt-log.md. ✅
