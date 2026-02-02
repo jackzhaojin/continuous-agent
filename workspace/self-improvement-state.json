@@ -1,8 +1,9 @@
 {
   "last_practice_at": null,
   "last_retrospective_at": "2026-02-02T00:55:43.162Z",
-  "last_reference_refresh_at": null,
+  "last_reference_refresh_at": "2026-02-02T01:30:00.000Z",
   "practice_count": 0,
   "retrospective_count": 1,
-  "outcomes_since_last_retro": 0
+  "outcomes_since_last_retro": 1,
+  "recent_practice_capabilities": []
 }
