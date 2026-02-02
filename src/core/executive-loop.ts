@@ -54,6 +54,7 @@ import {
   setGoalOutputPath,
   commitOutputsMonorepo,
 } from '../deterministic/state-handler.js';
+import { closeMilestone } from '../deterministic/notion-reporter.js';
 import { incrementStepRetryCount, readStepRetryCount, stepId as makeStepId } from '../deterministic/steps-json-handler.js';
 
 // SELF-IMPROVEMENT - Idle and scheduled triggers
@@ -395,6 +396,11 @@ async function runIteration(): Promise<IterationResult> {
 
   log(`  Attempt ${retry.attempts}/${MAX_RETRIES} failed`);
   log(`  Error: ${retry.lastError.slice(0, 200)}`);
+
+  // Close this attempt's Notion milestone row as "Failed" so it doesn't stay "Started" forever
+  await closeMilestone(contractId, 'Failed', {
+    errorSummary: retry.lastError.slice(0, 200) || 'Worker failed',
+  });
 
   // === PHASE 7: AGENTIC DIAGNOSIS (after 3 failures) ===
   if (retry.attempts >= 3) {
