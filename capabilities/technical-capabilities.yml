@@ -6,7 +6,7 @@ capabilities:
   - id: git.branch_commit
     name: Git Branch and Commit
     description: Create branches, stage changes, and commit with proper messages
-    confidence: 0
+    confidence: 14
     maturity: Demonstrated
     scope:
       includes:
@@ -31,7 +31,7 @@ capabilities:
       failures: 82
       last_success: null
       last_failure: null
-      last_validated: '2026-02-01'
+      last_validated: '2026-02-02'
     common_failure_modes:
       - Attempting to commit without staging
       - Branch name conflicts
@@ -137,7 +137,7 @@ capabilities:
   - id: node.npm.install
     name: NPM Package Installation
     description: Install npm packages and manage dependencies
-    confidence: 0
+    confidence: 11
     maturity: Demonstrated
     scope:
       includes:
@@ -162,7 +162,7 @@ capabilities:
       failures: 45
       last_success: null
       last_failure: null
-      last_validated: '2026-02-01'
+      last_validated: '2026-02-02'
     common_failure_modes:
       - Network connectivity issues
       - Peer dependency conflicts
@@ -173,7 +173,7 @@ capabilities:
   - id: node.npm.run_script
     name: NPM Script Execution
     description: Run npm scripts defined in package.json
-    confidence: 30
+    confidence: 34
     maturity: Demonstrated
     scope:
       includes:
@@ -196,7 +196,7 @@ capabilities:
       failures: 131
       last_success: null
       last_failure: null
-      last_validated: '2026-02-01'
+      last_validated: '2026-02-02'
     common_failure_modes:
       - Missing dependencies
       - Script not found in package.json
@@ -207,7 +207,7 @@ capabilities:
   - id: nextjs.build.basic
     name: Next.js Basic Build
     description: Build Next.js applications for production
-    confidence: 20
+    confidence: 17
     maturity: Demonstrated
     scope:
       includes:
@@ -231,7 +231,7 @@ capabilities:
       failures: 82
       last_success: null
       last_failure: null
-      last_validated: '2026-02-01'
+      last_validated: '2026-02-02'
     common_failure_modes:
       - TypeScript type errors
       - ESLint errors blocking build

@@ -346,19 +346,19 @@ export function shouldReBreakdown(step: WorkStep, turnsUsed: number): boolean {
  * Log breakdown event to work ledger
  */
 export async function logBreakdownEvent(
-  taskId: string,
-  taskTitle: string,
+  goalId: string,
+  goalTitle: string,
   stepsCreated: number,
   trigger: 'auto' | 're-breakdown'
 ): Promise<void> {
   const { appendFile } = await import('fs/promises');
   const ledgerPath = path.join(process.cwd(), 'ledgers', 'work-ledger.jsonl');
-  
+
   const entry = JSON.stringify({
     event: 'GOAL_BREAKDOWN',
     ts: new Date().toISOString(),
-    goal_id: taskId,
-    goal_title: taskTitle,
+    goal_id: goalId,
+    goal_title: goalTitle,
     steps_created: stepsCreated,
     trigger: trigger,
   });

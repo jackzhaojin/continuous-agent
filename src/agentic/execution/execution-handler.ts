@@ -154,7 +154,7 @@ ${previousHandoff.slice(0, 3000)}
 export async function executeWork(
   item: WorkItem,
   step?: WorkStep,
-  currentTask?: string
+  contractId?: string
 ): Promise<WorkerResult | null> {
   logAgentic(`Executing: ${item.title}${step ? ` - Step ${step.step_number + 1}` : ''}`);
 
@@ -209,7 +209,7 @@ export async function executeWork(
     log(`  Spawning Agent SDK worker...`);
     const result = await spawnWorker(
       {
-        id: currentTask || `contract-${Date.now()}`,
+        id: contractId || `contract-${Date.now()}`,
         prompt: scopedItem.description || item.description,
         scope: {
           repos_allowed: ['agent-outputs'],

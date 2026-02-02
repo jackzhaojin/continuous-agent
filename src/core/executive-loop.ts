@@ -152,13 +152,13 @@ async function runIteration(): Promise<IterationResult> {
 
   if (inputsProcessed.responsesFound > 0) {
     log(`  Processed ${inputsProcessed.responsesFound} human response(s)`);
-    log(`  Unblocked goals: ${inputsProcessed.tasksUnblocked.join(', ') || 'none'}`);
+    log(`  Unblocked goals: ${inputsProcessed.goalsUnblocked.join(', ') || 'none'}`);
 
     // Reset retry tracker for unblocked goals
     const retryTracker = getRetryTracker();
-    for (const taskTitle of inputsProcessed.tasksUnblocked) {
-      retryTracker.delete(taskTitle);
-      logAgentic(`  Reset retry counter for: "${taskTitle}"`);
+    for (const goalTitle of inputsProcessed.goalsUnblocked) {
+      retryTracker.delete(goalTitle);
+      logAgentic(`  Reset retry counter for: "${goalTitle}"`);
     }
   }
 

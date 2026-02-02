@@ -466,7 +466,7 @@ The agent reports milestone events and summaries to Notion. This is fire-and-for
 
 **What gets reported:**
 - **Milestone events** → rows in the Agent Milestones database (Started, Completed, Failed, Blocked, Step Completed)
-- **Milestone closure** → `closeMilestone()` updates the Started row with end date and duration when a goal completes/fails
+- **Milestone closure** → `closeMilestone()` updates the Started row's Timestamp to a date range (start + end) when a goal completes/fails
 - **Daily summaries** → heading blocks appended to the monthly summaries page
 - **Weekly summaries** → child pages under the monthly summaries page
 

@@ -26,10 +26,10 @@ const TEMPLATES_DIR = path.join(AGENT_BASE, 'templates');
 const LEDGERS_DIR = path.join(AGENT_BASE, 'ledgers');
 
 /**
- * Create a logger for a specific worker task
- * Logs are organized by date: ledgers/{yyyy-mm-dd}/worker-{task-id}.log
+ * Create a logger for a specific worker contract
+ * Logs are organized by date: ledgers/{yyyy-mm-dd}/worker-{contract-id}.log
  */
-function createWorkerLogger(taskId: string): { log: (msg: string) => void; close: () => void } {
+function createWorkerLogger(contractId: string): { log: (msg: string) => void; close: () => void } {
   // Create date-based subdirectory
   const today = new Date().toISOString().split('T')[0]; // yyyy-mm-dd
   const dateDir = path.join(LEDGERS_DIR, today);
@@ -38,13 +38,13 @@ function createWorkerLogger(taskId: string): { log: (msg: string) => void; close
     mkdirSync(dateDir, { recursive: true });
   }
 
-  const logFile = path.join(dateDir, `worker-${taskId}.log`);
+  const logFile = path.join(dateDir, `worker-${contractId}.log`);
   const stream = createWriteStream(logFile, { flags: 'a' });
 
   return {
     log: (msg: string) => {
       const line = `[${new Date().toISOString()}] ${msg}`;
-      console.log(`[Worker ${taskId}] ${msg}`);
+      console.log(`[Worker ${contractId}] ${msg}`);
       stream.write(line + '\n');
     },
     close: () => stream.end(),

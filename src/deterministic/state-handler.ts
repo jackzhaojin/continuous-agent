@@ -293,12 +293,12 @@ async function requestMultiProjectApproval(item: WorkItem, outputPath: string): 
 }
 
 /**
- * Set the output path for a task
+ * Set the output path for a goal
  * V1.2: Updates PROMPT.md frontmatter + STEPS.json (if exists)
  * DETERMINISTIC: File I/O and pattern matching
  */
 export async function setGoalOutputPath(
-  taskTitle: string,
+  goalTitle: string,
   outputPath: string,
   sourcePath?: string
 ): Promise<boolean> {
@@ -308,10 +308,10 @@ export async function setGoalOutputPath(
     // V1.2: Update PROMPT.md frontmatter (source of truth)
     const updated = await updatePromptMdStatus(sourcePath, { output_path: outputPath });
     if (updated) {
-      logDeterministic(`  Updated PROMPT.md output_path for "${taskTitle}"`);
+      logDeterministic(`  Updated PROMPT.md output_path for "${goalTitle}"`);
     }
   } else {
-    log(`  Warning: No source_path for "${taskTitle}" — output_path not persisted to PROMPT.md`);
+    log(`  Warning: No source_path for "${goalTitle}" — output_path not persisted to PROMPT.md`);
     return false;
   }
 
@@ -820,7 +820,7 @@ function inferProjectCapabilities(item: WorkItem): string[] {
  *
  * DETERMINISTIC: Shell commands, no LLM.
  */
-export function commitOutputsMonorepo(taskTitle: string, outputPath?: string): void {
+export function commitOutputsMonorepo(goalTitle: string, outputPath?: string): void {
   const agentOutputsRoot = process.env.AGENT_OUTPUTS_PATH
     || path.join(os.homedir(), 'dev', 'agent-outputs');
 
@@ -846,7 +846,7 @@ export function commitOutputsMonorepo(taskTitle: string, outputPath?: string): v
     execSync('git add -A', { cwd: agentOutputsRoot, stdio: 'pipe' });
 
     // Truncate title for commit message
-    const shortTitle = taskTitle.length > 80 ? taskTitle.slice(0, 77) + '...' : taskTitle;
+    const shortTitle = goalTitle.length > 80 ? goalTitle.slice(0, 77) + '...' : goalTitle;
     const message = `Auto-commit: ${shortTitle}`;
     execSync(`git commit -m ${JSON.stringify(message)}`, {
       cwd: agentOutputsRoot,

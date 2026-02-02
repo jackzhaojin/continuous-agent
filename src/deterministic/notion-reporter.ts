@@ -56,13 +56,9 @@ export async function reportMilestone(
     const client = getNotionClient();
     if (!client || !getDatabaseId()) return;
 
-    const title = extra?.stepTitle
-      ? `${workItem.title} - ${extra.stepTitle}`
-      : workItem.title;
-
     const properties: Record<string, unknown> = {
-      Title: {
-        title: [{ text: { content: title } }],
+      Goal: {
+        title: [{ text: { content: workItem.title } }],
       },
       Event: {
         select: { name: event },
@@ -74,6 +70,12 @@ export async function reportMilestone(
         date: { start: new Date().toISOString() },
       },
     };
+
+    if (extra?.stepTitle) {
+      properties['Step'] = {
+        rich_text: [{ text: { content: extra.stepTitle } }],
+      };
+    }
 
     if (contractId) {
       properties['Contract ID'] = {
@@ -98,7 +100,10 @@ export async function reportMilestone(
       properties: properties as Parameters<Client['pages']['create']>[0]['properties'],
     });
 
-    logDeterministic(`  Notion milestone reported: ${event} - ${title}`);
+    const logTitle = extra?.stepTitle
+      ? `${workItem.title} - ${extra.stepTitle}`
+      : workItem.title;
+    logDeterministic(`  Notion milestone reported: ${event} - ${logTitle}`);
   } catch (e) {
     log(`  Notion milestone report failed (non-blocking): ${e}`);
   }
@@ -172,25 +177,19 @@ export async function closeMilestone(contractId: string): Promise<void> {
       return;
     }
 
-    // Calculate duration in minutes
-    const startTime = new Date(existingStart).getTime();
-    const endTime = Date.now();
-    const durationMinutes = Math.round((endTime - startTime) / 60000);
+    // Update the page with end date (Timestamp becomes a date range)
+    const endTime = new Date().toISOString();
 
-    // Update the page with end date and duration (SDK pages.update works fine)
     await client.pages.update({
       page_id: page.id,
       properties: {
         Timestamp: {
-          date: { start: existingStart, end: new Date(endTime).toISOString() },
-        },
-        Duration: {
-          number: durationMinutes,
+          date: { start: existingStart, end: endTime },
         },
       } as Parameters<Client['pages']['update']>[0]['properties'],
     });
 
-    logDeterministic(`  Notion milestone closed: ${contractId} (${durationMinutes} min)`);
+    logDeterministic(`  Notion milestone closed: ${contractId} (${existingStart} → ${endTime})`);
   } catch (e) {
     log(`  Notion milestone closure failed (non-blocking): ${e}`);
   }
@@ -241,49 +240,49 @@ function parseLedgerEntries(content: string, startDate: string, endDate: string)
  * Compute summary statistics from ledger entries.
  */
 function computeStats(entries: LedgerEntry[]): {
-  tasksStarted: number;
-  tasksCompleted: number;
-  tasksFailed: number;
+  goalsStarted: number;
+  goalsCompleted: number;
+  goalsFailed: number;
   stepsCompleted: number;
   totalEntries: number;
-  uniqueTasks: Set<string>;
+  uniqueGoals: Set<string>;
 } {
-  let tasksStarted = 0;
-  let tasksCompleted = 0;
-  let tasksFailed = 0;
+  let goalsStarted = 0;
+  let goalsCompleted = 0;
+  let goalsFailed = 0;
   let stepsCompleted = 0;
-  const uniqueTasks = new Set<string>();
+  const uniqueGoals = new Set<string>();
 
   for (const entry of entries) {
-    const taskName = entry.title || entry.goal_title || entry.task_title || 'unknown';
-    uniqueTasks.add(taskName);
+    const goalName = entry.title || entry.goal_title || entry.task_title || 'unknown';
+    uniqueGoals.add(goalName);
 
     switch (normalizeLedgerEvent(entry.event)) {
       case 'GOAL_STARTED':
-        tasksStarted++;
+        goalsStarted++;
         break;
       case 'GOAL_COMPLETED':
-        tasksCompleted++;
+        goalsCompleted++;
         break;
       case 'GOAL_FAILED':
-        tasksFailed++;
+        goalsFailed++;
         break;
       case 'STEP_COMPLETED':
         stepsCompleted++;
         break;
       case 'STEP_ATTEMPT_FAILED':
-        tasksFailed++;
+        goalsFailed++;
         break;
     }
   }
 
   return {
-    tasksStarted,
-    tasksCompleted,
-    tasksFailed,
+    goalsStarted,
+    goalsCompleted,
+    goalsFailed,
     stepsCompleted,
     totalEntries: entries.length,
-    uniqueTasks,
+    uniqueGoals,
   };
 }
 
@@ -336,11 +335,11 @@ export async function reportDailySummary(ledgerDir: string): Promise<void> {
               type: 'text' as const,
               text: {
                 content: [
-                  `Tasks touched: ${stats.uniqueTasks.size}`,
-                  `Tasks started: ${stats.tasksStarted}`,
-                  `Tasks completed: ${stats.tasksCompleted}`,
+                  `Goals touched: ${stats.uniqueGoals.size}`,
+                  `Goals started: ${stats.goalsStarted}`,
+                  `Goals completed: ${stats.goalsCompleted}`,
                   `Steps completed: ${stats.stepsCompleted}`,
-                  `Failures/retries: ${stats.tasksFailed}`,
+                  `Failures/retries: ${stats.goalsFailed}`,
                   `Total ledger entries: ${stats.totalEntries}`,
                 ].join('\n'),
               },
@@ -355,9 +354,9 @@ export async function reportDailySummary(ledgerDir: string): Promise<void> {
       },
     ];
 
-    // Add task list
-    const taskNames = Array.from(stats.uniqueTasks);
-    if (taskNames.length > 0) {
+    // Add goal list
+    const goalNames = Array.from(stats.uniqueGoals);
+    if (goalNames.length > 0) {
       blocks.push({
         object: 'block' as const,
         type: 'paragraph' as const,
@@ -366,7 +365,7 @@ export async function reportDailySummary(ledgerDir: string): Promise<void> {
             {
               type: 'text' as const,
               text: {
-                content: `Tasks: ${taskNames.join(', ')}`,
+                content: `Goals: ${goalNames.join(', ')}`,
               },
             },
           ],
@@ -442,11 +441,11 @@ export async function reportWeeklySummary(ledgerDir: string): Promise<void> {
               text: {
                 content: [
                   `Period: ${startDate} to ${endDate}`,
-                  `Unique tasks touched: ${stats.uniqueTasks.size}`,
-                  `Tasks started: ${stats.tasksStarted}`,
-                  `Tasks completed: ${stats.tasksCompleted}`,
+                  `Unique goals touched: ${stats.uniqueGoals.size}`,
+                  `Goals started: ${stats.goalsStarted}`,
+                  `Goals completed: ${stats.goalsCompleted}`,
                   `Steps completed: ${stats.stepsCompleted}`,
-                  `Failures/retries: ${stats.tasksFailed}`,
+                  `Failures/retries: ${stats.goalsFailed}`,
                   `Total ledger entries: ${stats.totalEntries}`,
                 ].join('\n'),
               },
@@ -461,22 +460,24 @@ export async function reportWeeklySummary(ledgerDir: string): Promise<void> {
       },
     ];
 
-    // Add task breakdown
-    const taskNames = Array.from(stats.uniqueTasks);
-    if (taskNames.length > 0) {
+    // Add goal breakdown
+    const goalNames = Array.from(stats.uniqueGoals);
+    if (goalNames.length > 0) {
       children.push({
         object: 'block' as const,
         type: 'heading_2' as const,
         heading_2: {
-          rich_text: [{ type: 'text' as const, text: { content: 'Tasks Worked On' } }],
+          rich_text: [{ type: 'text' as const, text: { content: 'Goals Worked On' } }],
         },
       } as typeof children[number]);
 
-      for (const taskName of taskNames) {
-        const taskEntries = entries.filter(
-          (e) => (e.title || e.task_title) === taskName
+      for (const goalName of goalNames) {
+        const goalEntries = entries.filter(
+          (e) => (e.title || e.goal_title || e.task_title) === goalName
         );
-        const completed = taskEntries.some((e) => e.event === 'TASK_COMPLETED');
+        const completed = goalEntries.some((e) =>
+          normalizeLedgerEvent(e.event) === 'GOAL_COMPLETED'
+        );
         const status = completed ? 'Completed' : 'In Progress';
 
         children.push({
@@ -487,7 +488,7 @@ export async function reportWeeklySummary(ledgerDir: string): Promise<void> {
               {
                 type: 'text' as const,
                 text: {
-                  content: `- ${taskName} [${status}]`,
+                  content: `- ${goalName} [${status}]`,
                 },
               },
             ],

@@ -25,7 +25,7 @@ export interface HumanResponse {
 
 interface ProcessedInput {
   responsesFound: number;
-  tasksUnblocked: string[];
+  goalsUnblocked: string[];
 }
 
 /**
@@ -131,10 +131,10 @@ function parseNeedsYouResponses(content: string): HumanResponse[] {
 }
 
 /**
- * Unblock a task in its goal bundle's PROMPT.md
+ * Unblock a goal in its goal bundle's PROMPT.md
  * Blocked goals stay in-place in workspace/in-progress/P{n}/ — just update status from blocked to pending.
  */
-async function unblockTaskInBundle(taskTitle: string): Promise<boolean> {
+async function unblockGoalInBundle(goalTitle: string): Promise<boolean> {
   const workspaceDir = path.join(process.cwd(), 'workspace');
 
   try {
@@ -157,7 +157,7 @@ async function unblockTaskInBundle(taskTitle: string): Promise<boolean> {
         const content = await readFile(promptPath, 'utf-8');
         // Check if this bundle's title matches
         const titleMatch = content.match(/^title:\s*"?([^"\n]+)"?\s*$/m);
-        if (titleMatch && titleMatch[1].trim() === taskTitle.trim()) {
+        if (titleMatch && titleMatch[1].trim() === goalTitle.trim()) {
           // Verify it's actually blocked
           const statusMatch = content.match(/^status:\s*(\S+)/m);
           if (statusMatch && statusMatch[1].toLowerCase() !== 'blocked') continue;
@@ -167,7 +167,7 @@ async function unblockTaskInBundle(taskTitle: string): Promise<boolean> {
           const updated = updateFrontmatter(content, { status: 'pending' });
           await writeFile(promptPath, updated, 'utf-8');
 
-          console.log(`  Unblocked task "${taskTitle}" in in-progress/${priority}/ (status set to pending)`);
+          console.log(`  Unblocked goal "${goalTitle}" in in-progress/${priority}/ (status set to pending)`);
           return true;
         }
       }
@@ -175,7 +175,7 @@ async function unblockTaskInBundle(taskTitle: string): Promise<boolean> {
 
     return false;
   } catch (error) {
-    console.error(`Failed to unblock task "${taskTitle}" in bundle:`, error);
+    console.error(`Failed to unblock goal "${goalTitle}" in bundle:`, error);
     return false;
   }
 }
@@ -261,7 +261,7 @@ export async function processHumanInputs(): Promise<ProcessedInput> {
   const needsYouPath = path.join(process.cwd(), 'workspace', 'needs-you.md');
 
   if (!existsSync(needsYouPath)) {
-    return { responsesFound: 0, tasksUnblocked: [] };
+    return { responsesFound: 0, goalsUnblocked: [] };
   }
 
   try {
@@ -269,10 +269,10 @@ export async function processHumanInputs(): Promise<ProcessedInput> {
     const responses = parseNeedsYouResponses(content);
 
     if (responses.length === 0) {
-      return { responsesFound: 0, tasksUnblocked: [] };
+      return { responsesFound: 0, goalsUnblocked: [] };
     }
 
-    const tasksUnblocked: string[] = [];
+    const goalsUnblocked: string[] = [];
 
     for (const response of responses) {
       console.log(`[${new Date().toISOString()}] Processing human response: ${response.action}`);
@@ -308,13 +308,13 @@ export async function processHumanInputs(): Promise<ProcessedInput> {
         await moveToResolved(response);
       } else {
         // All other response types: unblock the task
-        const unblocked = await unblockTaskInBundle(response.action);
+        const unblocked = await unblockGoalInBundle(response.action);
         if (unblocked) {
-          console.log(`  Action: Unblocked task in goal bundle`);
-          console.log(`  Task will be retried with fresh context (10 new attempts)`);
-          tasksUnblocked.push(response.action);
+          console.log(`  Action: Unblocked goal in bundle`);
+          console.log(`  Goal will be retried with fresh context (10 new attempts)`);
+          goalsUnblocked.push(response.action);
         } else {
-          console.log(`  Warning: Could not find matching task in goal bundles`);
+          console.log(`  Warning: Could not find matching goal in bundles`);
           console.log(`     Task may have been renamed or removed. Check workspace/blocked/ manually.`);
         }
 
@@ -325,11 +325,11 @@ export async function processHumanInputs(): Promise<ProcessedInput> {
 
     return {
       responsesFound: responses.length,
-      tasksUnblocked,
+      goalsUnblocked,
     };
   } catch (error) {
     console.error(`Failed to process human inputs:`, error);
-    return { responsesFound: 0, tasksUnblocked: [] };
+    return { responsesFound: 0, goalsUnblocked: [] };
   }
 }
 
