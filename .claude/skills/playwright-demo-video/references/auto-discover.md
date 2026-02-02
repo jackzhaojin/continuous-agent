@@ -178,3 +178,51 @@ When data-testid is not available:
   "totalEstimatedTime": 36
 }
 ```
+
+## Validation Results (harness-v2-test)
+
+Tested against the Project Management Dashboard (React + Vite + Tailwind CSS + Recharts):
+
+### Auto-Discover Results
+- **Framework:** React + Vite (detected correctly)
+- **Routes:** 6 detected (/, /projects, /tasks, /team, /settings, /components)
+- **Features:** 9 detected:
+  - Data Visualization (Recharts charts with tooltips)
+  - Stat Cards (4 interactive metric cards)
+  - Sortable Data Table (search, sort, pagination)
+  - Kanban Board (drag-and-drop task cards)
+  - Dark Mode (theme toggle)
+  - Forms & Input (task forms, invite modal)
+  - Navigation (sidebar with 7 nav links)
+  - Responsive Design (Tailwind breakpoints)
+  - Settings & Preferences (profile, notifications, accent colors)
+- **Estimated demo time:** ~83s
+
+### Pipeline Compatibility
+- **Caption extraction:** 20 captions extracted from auto-generated spec (vs 21 from manual spec)
+- **Timestamps:** Monotonically increasing, 0-72s range
+- **Playwright run:** PASSED (78s video, 5.8MB WebM)
+
+### Guided Mode Validation
+- `--focus kanban`: 1 feature matched, 21.6s test run -- PASS
+- `--focus "dark mode"`: 1 feature matched -- PASS
+- `--focus charts`: 1 feature matched -- PASS
+- `--focus drag`: 1 feature matched (Kanban Board) -- PASS
+- `--focus nonexistent`: Falls back to all features with warning -- PASS
+
+### Comparison: Auto vs Manual Spec
+| Metric | Manual (highlights-with-captions) | Auto-Generated |
+|--------|-----------------------------------|---------------|
+| Captions | 21 | 20 |
+| Estimated duration | ~95s | ~83s |
+| Actual video | 95.7s | 78s |
+| Features covered | 6 sections | 9 sections |
+| Kanban drag-and-drop | Yes | Yes |
+| Chart tooltip hover | Yes | Yes |
+| Column sorting | Yes | Yes |
+| Project creation form | Yes (detailed) | No (generic forms section) |
+| Search typing demo | Yes (natural typing) | No |
+
+The auto-generated spec achieves ~80% quality of the hand-crafted manual spec,
+covering more features but with less polish per section. The generated spec is
+fully compatible with the extract-captions -> generate-voice -> merge-video -> add-music pipeline.

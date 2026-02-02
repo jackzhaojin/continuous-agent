@@ -54,18 +54,65 @@ User has a Playwright spec with `showCaption()`/`caption()` calls.
 
 ### Mode 2: Auto-Discover (Generate Spec from Project)
 
-Read the project codebase to generate a demo spec automatically.
+Scan a project's source code and generate a demo spec automatically.
 See [references/auto-discover.md](references/auto-discover.md) for detailed patterns.
 
-1. Detect framework from package.json
-2. Scan routes, pages, navigation structure
-3. Extract data-testid attributes from components
-4. Generate Playwright demo spec with captions
-5. Run guided mode pipeline on generated spec
+**Steps:**
+
+1. Run auto-discover to generate spec and feature inventory:
+   ```bash
+   node scripts/auto-discover.mjs <project-dir> [options]
+
+   Options:
+     --output, -o <path>      Output spec file (default: <project>/demo/auto-demo.spec.ts)
+     --inventory <path>       Output feature inventory JSON
+     --focus <feature>        Guided mode: focus on specific feature (kanban, charts, etc.)
+     --project-name <name>    Override project name
+     --dry-run                Print without writing files
+     --inventory-only         Only output feature inventory
+   ```
+2. Review the generated spec -- adjust captions and timing as needed
+3. Copy templates into the target project (helpers.ts, caption-overlay.ts, playwright.video.config.ts)
+4. Record the video: `npx playwright test --config=playwright.video.config.ts --grep @auto-demo`
+5. Run the pipeline on generated spec + recorded video
+
+**What auto-discover detects:**
+
+| Feature | Detection Method | Demo Section |
+|---------|-----------------|--------------|
+| Framework | package.json dependencies | Tech stack label |
+| Routes | React Router `<Route>`, Next.js pages/app, nav configs | Page navigation |
+| Stat cards | `testId` prop, `data-testid="stat-*"` | Hover interaction |
+| Charts | Recharts/Chart.js/D3 imports + chart test IDs | Scroll + tooltip hover |
+| Data tables | `data-testid="*-table"`, sort indicators | Sort column headers |
+| Kanban board | `kanban-*` test IDs, draggable attributes | Drag-and-drop cards |
+| Dark mode | `theme-toggle` test ID, appearance settings | Toggle + navigate |
+| Forms | `*-form`, `*-input`, `invite-*` test IDs | Show section |
+| Responsive | Tailwind CSS detected | Mobile/tablet/desktop |
+| Settings | Profile, notification, accent color test IDs | Navigate + interact |
+
+**Guided mode:** Pass `--focus <feature>` to generate a spec focused on a single feature. The focus string matches against feature category, label, and description. If no match is found, falls back to full discovery with a warning.
+
+```bash
+# Full demo (all features)
+node scripts/auto-discover.mjs ./my-project
+
+# Focused on kanban drag-and-drop
+node scripts/auto-discover.mjs ./my-project --focus kanban
+
+# Focused on dark mode
+node scripts/auto-discover.mjs ./my-project --focus "dark mode"
+
+# Focused on data visualization
+node scripts/auto-discover.mjs ./my-project --focus charts
+```
 
 ## Pipeline Architecture
 
 ```
+Project source code
+  |  auto-discover       Scan framework, routes, features, test IDs
+  v                      Generate Playwright spec with captions
 Playwright spec (*.spec.ts)
   |  extract-captions    Parse showCaption()/caption() -> JSON manifest
   v                      Estimate timestamps from waitForTimeout chains
@@ -81,6 +128,34 @@ Final demo.mp4
 ## Pipeline Scripts
 
 All scripts live in `scripts/` and use Node.js builtins only (zero npm dependencies).
+
+### scripts/auto-discover.mjs
+
+Scan a project to detect features and generate a Playwright demo spec.
+
+```bash
+node scripts/auto-discover.mjs <project-dir> [options]
+
+Options:
+  --output, -o <path>      Output spec file (default: <project>/demo/auto-demo.spec.ts)
+  --inventory <path>       Feature inventory JSON output
+  --focus <feature>        Guided mode: focus on specific feature
+  --project-name <name>    Override project name
+  --base-url <url>         Dev server URL (default: http://localhost:5173)
+  --dry-run                Print without writing files
+  --inventory-only         Only output feature inventory
+  --helpers-dir <path>     Directory containing helpers.ts
+```
+
+**Discovery pipeline:**
+1. Read `package.json` to detect framework (React, Next.js, Vue, Angular, Svelte) and build tool
+2. Scan for `<Route>` definitions, navItems configs, and file-based routes
+3. Grep `data-testid` attributes and `testId` props across all components
+4. Detect dynamic test ID patterns (template literals like `` data-testid={`nav-${var}`} ``)
+5. Categorize features by demo impact: charts > tables > kanban > dark mode > forms > navigation > responsive > settings
+6. Generate a Playwright spec with caption calls compatible with the extract-captions pipeline
+
+**Output:** Feature inventory JSON + Playwright spec file ready for recording.
 
 ### scripts/extract-captions.mjs
 
