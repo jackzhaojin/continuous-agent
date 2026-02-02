@@ -2,8 +2,8 @@
 # Single source of truth for all external references
 # Per PRD Reference Management Addendum
 
-version: "1.3"
-last_verified: "2026-01-29T12:00:00Z"
+version: "1.4"
+last_verified: "2026-02-01T12:00:00Z"
 
 references:
   # ===================================================================
@@ -24,7 +24,7 @@ references:
 
     # Lifecycle
     acquired_at: "2026-01-24T00:00:00Z"
-    last_refresh: "2026-01-29T12:00:00Z"
+    last_refresh: "2026-02-01T12:00:00Z"
     refresh_policy: manual
 
     # Purpose
@@ -37,8 +37,9 @@ references:
       - SDKResultMessage processing (success/error subtypes)
       - Authentication patterns (CLAUDE_CODE_OAUTH_TOKEN, ANTHROPIC_API_KEY)
       - Configuration options (model, maxTurns, cwd, allowedTools, settingSources)
-      SDK VERSION: Updated to ^0.2.23 (was ^0.1.30)
-      LOCAL ADAPTATION: Uses short model aliases (claude-sonnet-4-5) vs upstream dated IDs
+      SDK VERSION: Updated to ^0.2.29 (was ^0.2.23, originally ^0.1.30)
+      LOCAL ADAPTATION: Uses short model aliases (claude-opus-4-5) vs upstream dated IDs
+      UPSTREAM STATUS: No new upstream changes; upstream still on ^0.1.30 with dated model IDs
     skills_using:
       - node.npm.install
       - node.npm.run_script
@@ -60,7 +61,7 @@ references:
 
     # Lifecycle
     acquired_at: "2026-01-24T00:00:00Z"
-    last_refresh: "2026-01-29T12:00:00Z"
+    last_refresh: "2026-02-01T12:00:00Z"
     refresh_policy: manual
 
     # Purpose
@@ -72,8 +73,9 @@ references:
       - cwd must point to project root for .claude/skills/ discovery
       - Skills are loaded from ~/.claude/skills/ (user) and .claude/skills/ (project)
       - SKILL.md format with frontmatter and instructions
-      SDK VERSION: Updated to ^0.2.23 (was ^0.1.30)
+      SDK VERSION: Updated to ^0.2.29 (was ^0.2.23, originally ^0.1.30)
       LOCAL ADAPTATION: Uses short model aliases (claude-sonnet-4-5) vs upstream dated IDs
+      UPSTREAM STATUS: No new upstream changes; upstream still on ^0.1.30 with dated model IDs
     skills_using:
       - node.npm.install
 
@@ -93,7 +95,7 @@ references:
 
     # Lifecycle
     acquired_at: "2026-01-25T00:00:00Z"
-    last_refresh: "2026-01-29T12:00:00Z"
+    last_refresh: "2026-02-01T12:00:00Z"
     refresh_policy: manual
 
     # Purpose
@@ -111,7 +113,9 @@ references:
       - Subagents CANNOT spawn other subagents (no nesting)
       - Agent priority: CLI flag > project > user > plugin
       VALIDATED: 4/4 core tests + user-level agent invocation (jack-web-build-and-test-v1)
-      SDK VERSION: Updated to ^0.2.23 (was ^0.1.0)
+      SDK VERSION: Updated to ^0.2.29 (was ^0.2.23, originally ^0.1.0)
+      SDK 0.2.x NOTES: systemPrompt replaces customSystemPrompt/appendSystemPrompt;
+        settingSources must be explicit; subagents can be defined inline via agents option
     skills_using:
       - node.npm.install
 
