@@ -1,6 +1,6 @@
 # Notion Workspace Layout
 
-**Last updated:** 2026-02-01
+**Last updated:** 2026-02-02
 **Workspace:** Jack Jin's Space
 
 This is the living reference for the agent's Notion workspace structure. Update this file when pages, databases, or properties change.
@@ -47,7 +47,7 @@ NOTION_REPORTING_ENABLED=true                           # Kill switch for all No
 
 ## Agent Milestones Database Schema
 
-Every agent event (goal started, completed, failed, blocked, step completed) produces one row.
+Each contract produces exactly ONE row. It is created at start ("Started") and updated in-place when the contract terminates (to "Completed", "Failed", "Blocked", or "Step Completed").
 
 | Property | Type | Values / Format |
 |----------|------|----------------|
@@ -85,20 +85,16 @@ A new summaries page should be created each month. Update `NOTION_MONTHLY_PAGE_I
 
 ```
 Executive Loop
-  ├── Phase 5 (Execute):  reportMilestone('Started', ...)     → Milestones DB row (start date only)
-  ├── Phase 6 (Success):  reportMilestone('Completed', ...)   → Milestones DB row
-  │                        closeMilestone(contractId)          → Updates Started row: Timestamp → date range
-  │                        reportMilestone('Step Completed')   → Milestones DB row
-  │                        closeMilestone(contractId)          → Updates Started row: Timestamp → date range
-  ├── Phase 6 (Failure):  reportMilestone('Failed', ...)      → Milestones DB row
-  │                        closeMilestone(contractId)          → Updates Started row: Timestamp → date range
-  ├── Phase 6 (Blocked):  reportMilestone('Blocked', ...)     → Milestones DB row
-  │                        closeMilestone(contractId)          → Updates Started row: Timestamp → date range
-  ├── Day boundary:        reportDailySummary()                → Blocks on Monthly Page
-  └── Weekly (Sunday):     reportWeeklySummary()               → Child page under Monthly Page
+  ├── Phase 5 (Execute):  reportMilestone('Started', ...)               → Creates Milestones DB row (start date only)
+  ├── Phase 6 (Success):  closeMilestone(contractId, 'Completed', ...)  → Updates row: Event→Completed, adds end date + output path
+  │                        closeMilestone(contractId, 'Step Completed')  → Updates row: Event→Step Completed, adds end date + output path
+  ├── Phase 6 (Failure):  closeMilestone(contractId, 'Failed', ...)     → Updates row: Event→Failed, adds end date + error summary
+  ├── Phase 6 (Blocked):  closeMilestone(contractId, 'Blocked')         → Updates row: Event→Blocked, adds end date
+  ├── Day boundary:        reportDailySummary()                          → Blocks on Monthly Page
+  └── Weekly (Sunday):     reportWeeklySummary()                         → Child page under Monthly Page
 ```
 
-**Milestone closure:** When a goal/step terminates (completed, failed, or blocked), `closeMilestone()` queries for the original "Started" row by Contract ID and updates its Timestamp from a single date to a date range (start + end). This turns Started rows into lifecycle rows with date ranges, enabling Notion Timeline views. Separate event rows (Completed/Failed/Blocked) are preserved as an audit trail.
+**Single-row lifecycle:** Each contract has exactly one row in the Milestones DB. `reportMilestone('Started', ...)` creates the row at contract start. When the contract terminates, `closeMilestone()` queries for that row by Contract ID and updates it in-place: changes Event status (Started to Completed/Failed/Blocked/Step Completed), extends Timestamp to a date range (start + end), and adds Output Path or Error Summary as applicable. This produces clean one-row-per-contract data, enabling Notion Timeline views and board grouping by final status.
 
 All Notion writes are fire-and-forget. Failures are logged but never block the agent. Local JSONL ledgers remain the source of truth.
 

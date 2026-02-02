@@ -71,11 +71,10 @@ export async function reportMilestone(
       },
     };
 
-    if (extra?.stepTitle) {
-      properties['Step'] = {
-        rich_text: [{ text: { content: extra.stepTitle } }],
-      };
-    }
+    // Always populate Step — every contract should have a step
+    properties['Step'] = {
+      rich_text: [{ text: { content: extra?.stepTitle || 'Full execution' } }],
+    };
 
     if (contractId) {
       properties['Contract ID'] = {
@@ -112,9 +111,12 @@ export async function reportMilestone(
 // === MILESTONE CLOSURE ===
 
 /**
- * Close a previously-reported "Started" milestone by adding an end date and duration.
+ * Close a previously-reported "Started" milestone by updating it in-place.
  * Queries the Milestones DB for the Started row matching the given contractId,
- * then updates its Timestamp (date range) and Duration (minutes).
+ * then updates: Event (to final status), Timestamp (date range), Output Path, Error Summary.
+ *
+ * This replaces the old pattern of creating separate "Completed"/"Failed"/"Blocked" rows.
+ * Each contract now has exactly ONE row in Notion — created at start, updated at close.
  *
  * Uses raw fetch against the Notion REST API (v2022-06-28) for the query step because
  * the SDK v5.8.0 maps database queries to the /data_sources/ endpoint which the Notion
@@ -123,7 +125,11 @@ export async function reportMilestone(
  * Fire-and-forget: logs errors but never throws.
  * DETERMINISTIC: Mechanical API call with structured data.
  */
-export async function closeMilestone(contractId: string): Promise<void> {
+export async function closeMilestone(
+  contractId: string,
+  finalEvent?: MilestoneEvent,
+  extra?: MilestoneExtra
+): Promise<void> {
   try {
     const client = getNotionClient();
     const dbId = getDatabaseId();
@@ -140,10 +146,7 @@ export async function closeMilestone(contractId: string): Promise<void> {
       },
       body: JSON.stringify({
         filter: {
-          and: [
-            { property: 'Contract ID', rich_text: { equals: contractId } },
-            { property: 'Event', select: { equals: 'Started' } },
-          ],
+          property: 'Contract ID', rich_text: { equals: contractId },
         },
         page_size: 1,
       }),
@@ -162,7 +165,7 @@ export async function closeMilestone(contractId: string): Promise<void> {
     };
 
     if (queryData.results.length === 0) {
-      log(`  Notion milestone closure: no Started row found for ${contractId} (Notion may have been down at start)`);
+      log(`  Notion milestone closure: no row found for ${contractId} (Notion may have been down at start)`);
       return;
     }
 
@@ -177,19 +180,40 @@ export async function closeMilestone(contractId: string): Promise<void> {
       return;
     }
 
-    // Update the page with end date (Timestamp becomes a date range)
+    // Build update properties: timestamp range + optional event/output/error
     const endTime = new Date().toISOString();
+    const updateProps: Record<string, unknown> = {
+      Timestamp: {
+        date: { start: existingStart, end: endTime },
+      },
+    };
+
+    // Update Event status (e.g., Started → Completed)
+    if (finalEvent) {
+      updateProps['Event'] = { select: { name: finalEvent } };
+    }
+
+    // Add output path
+    if (extra?.outputPath) {
+      updateProps['Output Path'] = {
+        rich_text: [{ text: { content: extra.outputPath } }],
+      };
+    }
+
+    // Add error summary
+    if (extra?.errorSummary) {
+      updateProps['Error Summary'] = {
+        rich_text: [{ text: { content: extra.errorSummary.slice(0, 200) } }],
+      };
+    }
 
     await client.pages.update({
       page_id: page.id,
-      properties: {
-        Timestamp: {
-          date: { start: existingStart, end: endTime },
-        },
-      } as Parameters<Client['pages']['update']>[0]['properties'],
+      properties: updateProps as Parameters<Client['pages']['update']>[0]['properties'],
     });
 
-    logDeterministic(`  Notion milestone closed: ${contractId} (${existingStart} → ${endTime})`);
+    const eventLabel = finalEvent ? ` [${finalEvent}]` : '';
+    logDeterministic(`  Notion milestone closed: ${contractId}${eventLabel} (${existingStart} → ${endTime})`);
   } catch (e) {
     log(`  Notion milestone closure failed (non-blocking): ${e}`);
   }

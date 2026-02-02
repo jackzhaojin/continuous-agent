@@ -15,7 +15,7 @@ import {
   markRetrospectiveCompleted,
   markReferenceRefreshCompleted,
 } from './self-improvement-state.js';
-import { reportMilestone, closeMilestone } from './notion-reporter.js';
+import { closeMilestone } from './notion-reporter.js';
 import { parsePromptMd, updateFrontmatter } from './prompt-md-parser.js';
 import { appendProjectMemory, type ProjectMemoryEntry } from './project-memory-store.js';
 import { registerProject, generateProjectSlug, findProjectBySlug, type ProjectRegistryEntry } from './project-registry.js';
@@ -119,12 +119,9 @@ export async function updateGoalState(
       });
     }
 
-    // Report milestone to Notion (fire-and-forget)
-    await reportMilestone('Completed', item, contractId, { outputPath });
-
-    // Close the Started milestone row with end date + duration
+    // Close the Started milestone row: update to Completed with output path
     if (contractId) {
-      await closeMilestone(contractId);
+      await closeMilestone(contractId, 'Completed', { outputPath });
     }
 
     // V1.2: Record project memory entry
@@ -205,14 +202,9 @@ export async function updateGoalState(
       }
     }
   } else {
-    // Report failure milestone to Notion (fire-and-forget)
-    await reportMilestone('Failed', item, contractId, {
-      errorSummary: errorInfo,
-    });
-
-    // Close the Started milestone row with end date + duration
+    // Close the Started milestone row: update to Failed with error summary
     if (contractId) {
-      await closeMilestone(contractId);
+      await closeMilestone(contractId, 'Failed', { errorSummary: errorInfo });
     }
 
     // Dual-write failure to per-bundle CONTRACTS.jsonl
@@ -392,16 +384,9 @@ export async function updateStepState(
         await writeStepHandoff(item, step, outputPath, contractId);
       }
 
-      // Report step completion milestone to Notion (fire-and-forget)
-      await reportMilestone('Step Completed', item, contractId, {
-        stepTitle: step.title,
-        stepNumber: step.step_number + 1,
-        outputPath,
-      });
-
-      // Close the Started milestone row with end date + duration
+      // Close the Started milestone row: update to Step Completed with output path
       if (contractId) {
-        await closeMilestone(contractId);
+        await closeMilestone(contractId, 'Step Completed', { outputPath });
       }
 
       log(`  ✓ Step ${step.step_number + 1} complete`);
@@ -441,16 +426,11 @@ export async function updateStepState(
         });
       }
 
-      // Report step failure milestone to Notion (fire-and-forget)
-      await reportMilestone('Failed', item, contractId, {
-        stepTitle: step.title,
-        stepNumber: step.step_number + 1,
-        errorSummary: errorInfo?.slice(0, 200) || 'Unknown error',
-      });
-
-      // Close the Started milestone row with end date + duration
+      // Close the Started milestone row: update to Failed with error summary
       if (contractId) {
-        await closeMilestone(contractId);
+        await closeMilestone(contractId, 'Failed', {
+          errorSummary: errorInfo?.slice(0, 200) || 'Unknown error',
+        });
       }
     }
   } catch (error) {
@@ -648,15 +628,12 @@ export async function escalateWithDiagnosis(
  * V1.2: PROMPT.md is the source of truth.
  * DETERMINISTIC: File I/O
  */
-export async function markGoalBlocked(item: WorkItem, contractId?: string): Promise<void> {
+export async function markGoalBlocked(item: WorkItem, contractId?: string, stepTitle?: string): Promise<void> {
   logDeterministic('Marking goal as blocked...');
 
-  // Report blocked milestone to Notion (fire-and-forget)
-  await reportMilestone('Blocked', item, contractId);
-
-  // Close the Started milestone row with end date + duration
+  // Close the Started milestone row: update to Blocked
   if (contractId) {
-    await closeMilestone(contractId);
+    await closeMilestone(contractId, 'Blocked');
   }
 
   // Dual-write blocked event to per-bundle CONTRACTS.jsonl
