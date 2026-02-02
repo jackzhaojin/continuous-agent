@@ -2,8 +2,8 @@
 # Single source of truth for all external references
 # Per PRD Reference Management Addendum
 
-version: "1.5"
-last_verified: "2026-02-02T01:30:00Z"
+version: "1.6"
+last_verified: "2026-02-02T02:00:00Z"
 
 references:
   # ===================================================================
@@ -24,7 +24,7 @@ references:
 
     # Lifecycle
     acquired_at: "2026-01-24T00:00:00Z"
-    last_refresh: "2026-02-02T01:30:00Z"
+    last_refresh: "2026-02-02T02:00:00Z"
     refresh_policy: manual
 
     # Purpose
@@ -61,7 +61,7 @@ references:
 
     # Lifecycle
     acquired_at: "2026-01-24T00:00:00Z"
-    last_refresh: "2026-02-02T01:30:00Z"
+    last_refresh: "2026-02-02T02:00:00Z"
     refresh_policy: manual
 
     # Purpose
@@ -95,7 +95,7 @@ references:
 
     # Lifecycle
     acquired_at: "2026-01-25T00:00:00Z"
-    last_refresh: "2026-02-02T01:30:00Z"
+    last_refresh: "2026-02-02T02:00:00Z"
     refresh_policy: manual
 
     # Purpose

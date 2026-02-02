@@ -1,0 +1,3 @@
+{"event":"CONTRACT_STARTED","ts":"2026-02-02T01:01:55.124Z","contract_id":"contract-1769994115124"}
+{"event":"CONTRACT_STARTED","ts":"2026-02-02T01:07:05.281Z","contract_id":"contract-1769994425280"}
+{"event":"CONTRACT_COMPLETED","ts":"2026-02-02T01:10:10.049Z","contract_id":"contract-1769994425280","output_path":"/Users/jackjin/dev/continuous-agent"}

@@ -28,7 +28,7 @@ capabilities:
       - commit_exists
     evidence:
       successes: 49
-      failures: 83
+      failures: 84
       last_success: null
       last_failure: null
       last_validated: '2026-02-02'
@@ -173,7 +173,7 @@ capabilities:
   - id: node.npm.run_script
     name: NPM Script Execution
     description: Run npm scripts defined in package.json
-    confidence: 44
+    confidence: 54
     maturity: Demonstrated
     scope:
       includes:
@@ -192,7 +192,7 @@ capabilities:
       - script_exit_code
       - expected_output_patterns
     evidence:
-      successes: 184
+      successes: 185
       failures: 131
       last_success: null
       last_failure: null
@@ -207,7 +207,7 @@ capabilities:
   - id: nextjs.build.basic
     name: Next.js Basic Build
     description: Build Next.js applications for production
-    confidence: 27
+    confidence: 37
     maturity: Demonstrated
     scope:
       includes:
@@ -227,7 +227,7 @@ capabilities:
       - build_success
       - dot_next_directory_exists
     evidence:
-      successes: 25
+      successes: 26
       failures: 82
       last_success: null
       last_failure: null
