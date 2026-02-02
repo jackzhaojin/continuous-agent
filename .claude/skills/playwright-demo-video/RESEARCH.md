@@ -147,10 +147,11 @@ const captionRegex = /caption\(page,\s*['"](.+?)['"](?:,\s*(\d+))?\)/g;
 const hideCaptionRegex = /hideCaption\(page\)/g;
 ```
 
-Testing against the highlights-with-captions.spec.ts:
-- `showCaptionRegex` matches 14 captions correctly
-- `captionRegex` matches 7 captions correctly (the `caption()` standalone calls)
+Testing against the highlights-with-captions.spec.ts (inside the test block only, excluding function definitions):
+- `showCaptionRegex` matches 15 captions correctly
+- `captionRegex` matches 6 captions correctly (the `caption()` standalone calls, including the multiline outro with DOTALL flag)
 - Total: 21 captions extracted with correct text
+- Note: The simple regex without DOTALL misses the multiline `caption()` at lines 317-321; using `/s` flag or pre-normalizing whitespace resolves this
 
 For Part B (timestamp estimation), regex becomes fragile:
 
@@ -531,7 +532,7 @@ The skill should document:
 
 To validate the regex approach, here is what extraction against the reference spec file yields:
 
-**showCaption matches (14):**
+**showCaption matches (15):**
 1. Line 110: "Interactive stat cards show key metrics at a glance."
 2. Line 129: "Data visualization powered by Recharts."
 3. Line 134: "Hover tooltips reveal exact data points."
@@ -545,9 +546,10 @@ To validate the regex approach, here is what extraction against the reference sp
 11. Line 252: "And from In Progress to Done."
 12. Line 272: "Every chart and card adapts to the dark palette."
 13. Line 299: "Mobile at 375px -- everything adapts."
-14. Line 304/309: "Tablet..." and "Back to desktop..."
+14. Line 304: "Tablet -- the sidebar collapses to icons."
+15. Line 309: "Back to desktop -- full layout restored."
 
-**caption() matches (7):**
+**caption() matches (6):**
 1. Line 107: "Welcome to ProjectHub..." (3500ms)
 2. Line 169: "Next -- the Projects page." (2000ms)
 3. Line 226: "The Kanban board..." (3000ms)
