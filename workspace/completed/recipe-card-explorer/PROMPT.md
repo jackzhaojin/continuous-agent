@@ -1,7 +1,7 @@
 ---
 title: Full-Stack Recipe Discovery Platform
 slug: recipe-card-explorer
-status: in-progress
+status: complete
 priority: P3
 complexity: high
 created: 2026-01-28T00:00:00.000Z

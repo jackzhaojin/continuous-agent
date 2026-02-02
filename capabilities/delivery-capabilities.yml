@@ -1,32 +1,23 @@
-# Delivery Capabilities Registry
-# End-to-end outcome delivery capabilities for the Continuous Executive Agent
-# Version: 1.0.0
-# Last Updated: 2026-01-24
-
 metadata:
   category: delivery
-  description: "End-to-end outcome delivery capabilities representing complete deliverables"
-  version: "1.0.0"
-
+  description: End-to-end outcome delivery capabilities representing complete deliverables
+  version: 1.0.0
 capabilities:
-  # =============================================================================
-  # Static Site Delivery
-  # =============================================================================
   - id: deliver.site.static
-    name: "Static Site Delivery"
-    description: "Deliver a complete static website from scratch to deployment"
+    name: Static Site Delivery
+    description: Deliver a complete static website from scratch to deployment
     confidence: 85
     maturity: Demonstrated
     scope:
       includes:
-        - "HTML/CSS/JS static sites"
-        - "Basic build tooling setup"
-        - "Static hosting deployment"
-        - "Asset optimization"
+        - HTML/CSS/JS static sites
+        - Basic build tooling setup
+        - Static hosting deployment
+        - Asset optimization
       excludes:
-        - "Dynamic server-side rendering"
-        - "Database integration"
-        - "Complex authentication"
+        - Dynamic server-side rendering
+        - Database integration
+        - Complex authentication
     requires_capabilities:
       technical:
         - file.read_write
@@ -37,46 +28,42 @@ capabilities:
         - comm.documentation
     dod_template:
       required:
-        - "Site builds without errors"
-        - "All pages render correctly"
-        - "Assets load properly"
-        - "Site deployed and accessible"
+        - Site builds without errors
+        - All pages render correctly
+        - Assets load properly
+        - Site deployed and accessible
       recommended:
-        - "Performance score > 80"
-        - "Mobile responsive"
-        - "Basic SEO meta tags"
+        - Performance score > 80
+        - Mobile responsive
+        - Basic SEO meta tags
     evidence:
       successes: 0
       failures: 0
       last_success: null
       last_failure: null
     common_failure_modes:
-      - "Asset path resolution issues"
-      - "Build configuration errors"
-      - "Deployment credential issues"
+      - Asset path resolution issues
+      - Build configuration errors
+      - Deployment credential issues
     last_validated: null
     last_used: null
-
-  # =============================================================================
-  # Next.js Application Delivery
-  # =============================================================================
   - id: deliver.nextjs.app.basic
-    name: "Basic Next.js Application Delivery"
-    description: "Deliver a functional Next.js application with basic features"
+    name: Basic Next.js Application Delivery
+    description: Deliver a functional Next.js application with basic features
     confidence: 70
     maturity: Demonstrated
     scope:
       includes:
-        - "Next.js project setup"
-        - "Basic routing (App Router)"
-        - "Simple data fetching"
-        - "Component development"
-        - "Local development workflow"
+        - Next.js project setup
+        - Basic routing (App Router)
+        - Simple data fetching
+        - Component development
+        - Local development workflow
       excludes:
-        - "Production optimization"
-        - "Complex state management"
-        - "Authentication systems"
-        - "Database integration"
+        - Production optimization
+        - Complex state management
+        - Authentication systems
+        - Database integration
     requires_capabilities:
       technical:
         - node.npm.install
@@ -92,44 +79,43 @@ capabilities:
         - comm.documentation
     dod_template:
       required:
-        - "Application starts without errors"
-        - "All routes are accessible"
-        - "TypeScript compiles cleanly"
-        - "Basic styling applied"
-        - "Git repository initialized"
+        - Application starts without errors
+        - All routes are accessible
+        - TypeScript compiles cleanly
+        - Basic styling applied
+        - Git repository initialized
       recommended:
-        - "ESLint passes"
-        - "Basic tests exist"
-        - "README with setup instructions"
+        - ESLint passes
+        - Basic tests exist
+        - README with setup instructions
     evidence:
       successes: 0
       failures: 0
       last_success: null
       last_failure: null
     common_failure_modes:
-      - "Dependency version conflicts"
-      - "TypeScript configuration issues"
-      - "Server/client component misuse"
-      - "Build errors from linting"
+      - Dependency version conflicts
+      - TypeScript configuration issues
+      - Server/client component misuse
+      - Build errors from linting
     last_validated: null
     last_used: null
-
   - id: deliver.nextjs.app.production
-    name: "Production Next.js Application Delivery"
-    description: "Deliver a production-ready Next.js application with full CI/CD"
+    name: Production Next.js Application Delivery
+    description: Deliver a production-ready Next.js application with full CI/CD
     confidence: 50
     maturity: Declared
     scope:
       includes:
-        - "Production build optimization"
-        - "CI/CD pipeline setup"
-        - "Environment configuration"
-        - "Error monitoring setup"
-        - "Performance optimization"
+        - Production build optimization
+        - CI/CD pipeline setup
+        - Environment configuration
+        - Error monitoring setup
+        - Performance optimization
       excludes:
-        - "Custom infrastructure"
-        - "Complex scaling requirements"
-        - "Multi-region deployment"
+        - Custom infrastructure
+        - Complex scaling requirements
+        - Multi-region deployment
     requires_capabilities:
       technical:
         - node.npm.install
@@ -148,48 +134,44 @@ capabilities:
         - comm.documentation
     dod_template:
       required:
-        - "Production build succeeds"
-        - "All tests pass"
-        - "CI/CD pipeline functional"
-        - "Environment variables documented"
-        - "Deployment succeeds"
-        - "Health checks pass"
+        - Production build succeeds
+        - All tests pass
+        - CI/CD pipeline functional
+        - Environment variables documented
+        - Deployment succeeds
+        - Health checks pass
       recommended:
-        - "Lighthouse score > 90"
-        - "Error monitoring configured"
-        - "Logging in place"
-        - "Security headers configured"
+        - Lighthouse score > 90
+        - Error monitoring configured
+        - Logging in place
+        - Security headers configured
     evidence:
       successes: 0
       failures: 0
       last_success: null
       last_failure: null
     common_failure_modes:
-      - "Environment variable misconfiguration"
-      - "Build optimization issues"
-      - "CI/CD pipeline failures"
-      - "Deployment permission issues"
+      - Environment variable misconfiguration
+      - Build optimization issues
+      - CI/CD pipeline failures
+      - Deployment permission issues
     last_validated: null
     last_used: null
-
-  # =============================================================================
-  # Adobe EDS Delivery
-  # =============================================================================
   - id: deliver.eds.site
-    name: "Adobe EDS Site Delivery"
-    description: "Deliver a complete Adobe Edge Delivery Services site"
+    name: Adobe EDS Site Delivery
+    description: Deliver a complete Adobe Edge Delivery Services site
     confidence: 40
     maturity: Declared
     scope:
       includes:
-        - "EDS project setup"
-        - "Block development"
-        - "Content structure"
-        - "Sidekick integration"
+        - EDS project setup
+        - Block development
+        - Content structure
+        - Sidekick integration
       excludes:
-        - "Complex custom blocks"
-        - "Advanced personalization"
-        - "Custom authentication"
+        - Complex custom blocks
+        - Advanced personalization
+        - Custom authentication
     requires_capabilities:
       technical:
         - eds.scaffold.basic
@@ -203,45 +185,41 @@ capabilities:
         - comm.documentation
     dod_template:
       required:
-        - "EDS structure valid"
-        - "Blocks render correctly"
-        - "Content loads from source"
-        - "Site accessible via preview URL"
+        - EDS structure valid
+        - Blocks render correctly
+        - Content loads from source
+        - Site accessible via preview URL
       recommended:
-        - "Performance score > 95"
-        - "Mobile responsive"
-        - "Block documentation"
+        - Performance score > 95
+        - Mobile responsive
+        - Block documentation
     evidence:
       successes: 0
       failures: 0
       last_success: null
       last_failure: null
     common_failure_modes:
-      - "Content source configuration"
-      - "Block rendering errors"
-      - "CSS specificity conflicts"
-      - "GitHub integration issues"
+      - Content source configuration
+      - Block rendering errors
+      - CSS specificity conflicts
+      - GitHub integration issues
     last_validated: null
     last_used: null
-
-  # =============================================================================
-  # Content Delivery
-  # =============================================================================
   - id: deliver.blog.post.researched
-    name: "Researched Blog Post Delivery"
-    description: "Deliver a well-researched, cited blog post on a technical topic"
+    name: Researched Blog Post Delivery
+    description: Deliver a well-researched, cited blog post on a technical topic
     confidence: 60
     maturity: Declared
     scope:
       includes:
-        - "Topic research"
-        - "Source citation"
-        - "Technical accuracy"
-        - "Structured writing"
+        - Topic research
+        - Source citation
+        - Technical accuracy
+        - Structured writing
       excludes:
-        - "Original research"
-        - "Interview-based content"
-        - "Video/multimedia content"
+        - Original research
+        - Interview-based content
+        - Video/multimedia content
     requires_capabilities:
       technical:
         - file.read_write
@@ -252,46 +230,42 @@ capabilities:
         - comm.needs_you.quality
     dod_template:
       required:
-        - "Topic thoroughly researched"
-        - "Sources cited"
-        - "Technical accuracy verified"
-        - "Clear structure (intro, body, conclusion)"
-        - "Proofread and edited"
+        - Topic thoroughly researched
+        - Sources cited
+        - Technical accuracy verified
+        - Clear structure (intro, body, conclusion)
+        - Proofread and edited
       recommended:
-        - "Code examples tested"
-        - "Images/diagrams included"
-        - "SEO optimized"
+        - Code examples tested
+        - Images/diagrams included
+        - SEO optimized
     evidence:
       successes: 0
       failures: 0
       last_success: null
       last_failure: null
     common_failure_modes:
-      - "Insufficient research depth"
-      - "Uncited claims"
-      - "Technical inaccuracies"
-      - "Poor structure"
+      - Insufficient research depth
+      - Uncited claims
+      - Technical inaccuracies
+      - Poor structure
     last_validated: null
     last_used: null
-
-  # =============================================================================
-  # MCP Server Delivery
-  # =============================================================================
   - id: deliver.mcp.server
-    name: "MCP Server Delivery"
-    description: "Deliver a functional Model Context Protocol server"
+    name: MCP Server Delivery
+    description: Deliver a functional Model Context Protocol server
     confidence: 30
     maturity: Declared
     scope:
       includes:
-        - "MCP protocol implementation"
-        - "Tool definition"
-        - "Basic resource handling"
-        - "Local testing setup"
+        - MCP protocol implementation
+        - Tool definition
+        - Basic resource handling
+        - Local testing setup
       excludes:
-        - "Complex state management"
-        - "Production deployment"
-        - "Multi-tenant architecture"
+        - Complex state management
+        - Production deployment
+        - Multi-tenant architecture
     requires_capabilities:
       technical:
         - node.npm.install
@@ -306,47 +280,43 @@ capabilities:
         - comm.documentation
     dod_template:
       required:
-        - "Server starts successfully"
-        - "Tools respond correctly"
-        - "Protocol compliance verified"
-        - "Error handling implemented"
+        - Server starts successfully
+        - Tools respond correctly
+        - Protocol compliance verified
+        - Error handling implemented
       recommended:
-        - "TypeScript types complete"
-        - "Unit tests for tools"
-        - "README with usage"
-        - "Example client code"
+        - TypeScript types complete
+        - Unit tests for tools
+        - README with usage
+        - Example client code
     evidence:
       successes: 0
       failures: 0
       last_success: null
       last_failure: null
     common_failure_modes:
-      - "Protocol version mismatch"
-      - "Tool schema errors"
-      - "Async handling issues"
-      - "Transport configuration"
+      - Protocol version mismatch
+      - Tool schema errors
+      - Async handling issues
+      - Transport configuration
     last_validated: null
     last_used: null
-
-  # =============================================================================
-  # Library Delivery
-  # =============================================================================
   - id: deliver.typescript.library
-    name: "TypeScript Library Delivery"
-    description: "Deliver a publishable TypeScript library with proper packaging"
+    name: TypeScript Library Delivery
+    description: Deliver a publishable TypeScript library with proper packaging
     confidence: 55
     maturity: Declared
     scope:
       includes:
-        - "Library structure setup"
-        - "TypeScript configuration"
-        - "Build and bundle setup"
-        - "Package.json configuration"
-        - "Type declarations"
+        - Library structure setup
+        - TypeScript configuration
+        - Build and bundle setup
+        - Package.json configuration
+        - Type declarations
       excludes:
-        - "Monorepo setups"
-        - "Complex bundling strategies"
-        - "Publishing automation"
+        - Monorepo setups
+        - Complex bundling strategies
+        - Publishing automation
     requires_capabilities:
       technical:
         - node.npm.install
@@ -359,47 +329,43 @@ capabilities:
         - comm.documentation
     dod_template:
       required:
-        - "TypeScript compiles"
-        - "Types are exported"
-        - "Package.json complete"
-        - "Entry points configured"
-        - "README with API docs"
+        - TypeScript compiles
+        - Types are exported
+        - Package.json complete
+        - Entry points configured
+        - README with API docs
       recommended:
-        - "Unit tests pass"
-        - "Example usage"
-        - "Changelog maintained"
-        - "Semantic versioning"
+        - Unit tests pass
+        - Example usage
+        - Changelog maintained
+        - Semantic versioning
     evidence:
       successes: 0
       failures: 0
       last_success: null
       last_failure: null
     common_failure_modes:
-      - "Type export issues"
-      - "Bundle configuration"
-      - "Peer dependency handling"
-      - "ESM/CJS compatibility"
+      - Type export issues
+      - Bundle configuration
+      - Peer dependency handling
+      - ESM/CJS compatibility
     last_validated: null
     last_used: null
-
-  # =============================================================================
-  # Calibration Project Delivery
-  # =============================================================================
   - id: deliver.calibration.project
-    name: "Calibration Project Delivery"
-    description: "Deliver a self-calibration project for capability assessment"
+    name: Calibration Project Delivery
+    description: Deliver a self-calibration project for capability assessment
     confidence: 20
     maturity: Declared
     scope:
       includes:
-        - "Capability assessment design"
-        - "Test case creation"
-        - "Evidence collection framework"
-        - "Confidence scoring"
+        - Capability assessment design
+        - Test case creation
+        - Evidence collection framework
+        - Confidence scoring
       excludes:
-        - "Automated calibration"
-        - "Multi-agent calibration"
-        - "Production calibration systems"
+        - Automated calibration
+        - Multi-agent calibration
+        - Production calibration systems
     requires_capabilities:
       technical:
         - file.read_write
@@ -412,46 +378,42 @@ capabilities:
         - comm.documentation
     dod_template:
       required:
-        - "Assessment criteria defined"
-        - "Test cases documented"
-        - "Evidence format specified"
-        - "Scoring rubric complete"
+        - Assessment criteria defined
+        - Test cases documented
+        - Evidence format specified
+        - Scoring rubric complete
       recommended:
-        - "Automated evidence collection"
-        - "Historical tracking"
-        - "Visualization of progress"
+        - Automated evidence collection
+        - Historical tracking
+        - Visualization of progress
     evidence:
       successes: 0
       failures: 0
       last_success: null
       last_failure: null
     common_failure_modes:
-      - "Vague assessment criteria"
-      - "Inconsistent scoring"
-      - "Missing edge cases"
-      - "Overconfident estimates"
+      - Vague assessment criteria
+      - Inconsistent scoring
+      - Missing edge cases
+      - Overconfident estimates
     last_validated: null
     last_used: null
-
-  # =============================================================================
-  # API Integration Delivery
-  # =============================================================================
   - id: deliver.api.integration
-    name: "API Integration Delivery"
-    description: "Deliver a working integration with an external API"
+    name: API Integration Delivery
+    description: Deliver a working integration with an external API
     confidence: 65
     maturity: Demonstrated
     scope:
       includes:
-        - "API client setup"
-        - "Authentication handling"
-        - "Basic CRUD operations"
-        - "Error handling"
-        - "Rate limiting awareness"
+        - API client setup
+        - Authentication handling
+        - Basic CRUD operations
+        - Error handling
+        - Rate limiting awareness
       excludes:
-        - "Complex OAuth flows"
-        - "Webhook handling"
-        - "Real-time subscriptions"
+        - Complex OAuth flows
+        - Webhook handling
+        - Real-time subscriptions
     requires_capabilities:
       technical:
         - node.npm.install
@@ -464,47 +426,43 @@ capabilities:
         - comm.documentation
     dod_template:
       required:
-        - "Authentication works"
-        - "Core endpoints functional"
-        - "Error handling implemented"
-        - "Response types defined"
+        - Authentication works
+        - Core endpoints functional
+        - Error handling implemented
+        - Response types defined
       recommended:
-        - "Retry logic"
-        - "Request logging"
-        - "Mock server for testing"
-        - "Rate limit handling"
+        - Retry logic
+        - Request logging
+        - Mock server for testing
+        - Rate limit handling
     evidence:
       successes: 0
       failures: 0
       last_success: null
       last_failure: null
     common_failure_modes:
-      - "Authentication failures"
-      - "Rate limiting"
-      - "Response schema changes"
-      - "Network timeout handling"
+      - Authentication failures
+      - Rate limiting
+      - Response schema changes
+      - Network timeout handling
     last_validated: null
     last_used: null
-
-  # =============================================================================
-  # Claude Code Skill Delivery
-  # =============================================================================
   - id: deliver.claude.skill
-    name: "Claude Code Skill Delivery"
-    description: "Deliver a tested Claude Code skill with SKILL.md, optional scripts, templates, and references"
-    confidence: 30
-    maturity: Declared
+    name: Claude Code Skill Delivery
+    description: Deliver a tested Claude Code skill with SKILL.md, optional scripts, templates, and references
+    confidence: 55
+    maturity: Reliable
     scope:
       includes:
-        - "SKILL.md creation with valid frontmatter"
-        - "Supporting scripts and templates"
-        - "Reference materials"
-        - "Build-test-fix iteration loop"
-        - "Format and functional validation"
+        - SKILL.md creation with valid frontmatter
+        - Supporting scripts and templates
+        - Reference materials
+        - Build-test-fix iteration loop
+        - Format and functional validation
       excludes:
-        - "Skills requiring external paid APIs without approval"
-        - "Skills that modify constitution.md"
-        - "Skills for other AI platforms"
+        - Skills requiring external paid APIs without approval
+        - Skills that modify constitution.md
+        - Skills for other AI platforms
     requires_capabilities:
       technical:
         - file.read_write
@@ -517,27 +475,28 @@ capabilities:
         - comm.documentation
     dod_template:
       required:
-        - "SKILL.md has valid frontmatter (name ≤64 chars, description ≤1024 chars)"
-        - "Instructions are self-contained and actionable"
-        - "Skill invokable via Skill tool"
-        - "All referenced files exist"
-        - "Tested end-to-end with at least one scenario"
-        - "Committed to git on a branch"
+        - SKILL.md has valid frontmatter (name ≤64 chars, description ≤1024 chars)
+        - Instructions are self-contained and actionable
+        - Skill invokable via Skill tool
+        - All referenced files exist
+        - Tested end-to-end with at least one scenario
+        - Committed to git on a branch
       recommended:
-        - "Error handling documented"
-        - "Multiple test scenarios validated"
-        - "Supporting scripts are executable"
-        - "References to existing skill patterns"
+        - Error handling documented
+        - Multiple test scenarios validated
+        - Supporting scripts are executable
+        - References to existing skill patterns
     evidence:
-      successes: 0
-      failures: 0
+      successes: 4
+      failures: 1
       last_success: null
       last_failure: null
+      last_validated: '2026-02-02'
     common_failure_modes:
-      - "Invalid frontmatter format"
-      - "Description exceeds 1024 char limit"
-      - "Referenced scripts not executable"
-      - "Instructions assume context not available to skill reader"
-      - "Skill not discoverable due to missing trigger phrases"
+      - Invalid frontmatter format
+      - Description exceeds 1024 char limit
+      - Referenced scripts not executable
+      - Instructions assume context not available to skill reader
+      - Skill not discoverable due to missing trigger phrases
     last_validated: null
     last_used: null

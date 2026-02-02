@@ -68,3 +68,13 @@ projects:
       - "**Files created:** 20+ files including:"
       - "- Created a calibration project for capability assessment"
     lessons: []
+  - id: goal-recipe-card-explorer
+    name: Full-Stack Recipe Discovery Platform
+    category: misc
+    completed: "2026-02-02"
+    output_path: /Users/jackjin/dev/agent-outputs/projects/nextjs/2026-01-29/1769685367609
+    archive_path: /Users/jackjin/dev/continuous-agent/workspace/completed/recipe-card-explorer
+    capabilities_exercised:
+      - general.implementation
+    features_built: []
+    lessons: []

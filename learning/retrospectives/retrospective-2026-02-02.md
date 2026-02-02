@@ -1,59 +1,55 @@
 # Weekly Retrospective - 2026-02-02
 
-**Generated:** 2026-02-02T00:55:43.161Z
-**Analysis Period:** 2026-01-26 to 2026-02-02
+**Generated:** 2026-02-02T02:48:01.107Z
+**Analysis Period:** 2026-02-02 to 2026-02-02
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Tasks Started | 11 |
-| Tasks Completed | 6 |
-| Task Completion Rate | 55% |
-| Steps Started | 104 |
-| Steps Completed | 44 |
-| Step Completion Rate | 42% |
+| Tasks Started | 5 |
+| Tasks Completed | 5 |
+| Task Completion Rate | 100% |
+| Steps Started | 9 |
+| Steps Completed | 6 |
+| Step Completion Rate | 67% |
 
 ## Capability Analysis
 
 | Capability | Pass | Fail | Success Rate | Trend | Confidence |
 |-----------|------|------|-------------|-------|------------|
-| node.npm.run_script | 77 | 93 | 45% | declining | 30 |
-| git.branch_commit | 46 | 37 | 55% | declining | 0 |
-| node.npm.install | 31 | 42 | 42% | declining | 0 |
-| nextjs.build.basic | 5 | 53 | 9% | stable | 20 |
-| comm.documentation | 26 | 30 | 46% | declining | 0 |
+| node.npm.run_script | 15 | 17 | 47% | declining | 10 |
+| git.branch_commit | 10 | 4 | 71% | stable | 50 |
+| nextjs.build.basic | 5 | 9 | 36% | declining | 0 |
+| node.npm.install | 6 | 3 | 67% | declining | 26 |
+| comm.documentation | 5 | 4 | 56% | declining | 5 |
 
 ## Confidence Adjustments
 
 | Capability | Old | New | Reason |
 |-----------|-----|-----|--------|
-| node.npm.run_script | 30 | 34 | Retrospective batch adjustment: 45% success rate over 170 observations (trend: declining) |
-| git.branch_commit | 0 | 14 | Retrospective batch adjustment: 55.00000000000001% success rate over 83 observations (trend: declining) |
-| node.npm.install | 0 | 11 | Retrospective batch adjustment: 42% success rate over 73 observations (trend: declining) |
-| nextjs.build.basic | 20 | 17 | Retrospective batch adjustment: 9% success rate over 58 observations (trend: stable) |
-| comm.documentation | 0 | 12 | Retrospective batch adjustment: 46% success rate over 56 observations (trend: declining) |
+| node.npm.run_script | 10 | 19 | Retrospective batch adjustment: 47% success rate over 32 observations (trend: declining) |
+| git.branch_commit | 50 | 54 | Retrospective batch adjustment: 71% success rate over 14 observations (trend: stable) |
+| nextjs.build.basic | 0 | 10 | Retrospective batch adjustment: 36% success rate over 14 observations (trend: declining) |
+| node.npm.install | 26 | 34 | Retrospective batch adjustment: 67% success rate over 9 observations (trend: declining) |
+| comm.documentation | 5 | 17 | Retrospective batch adjustment: 56.00000000000001% success rate over 9 observations (trend: declining) |
 
 ## Recommendations
 
-- DECLINING: node.npm.run_script is trending downward (77P/93F, 45% success). Consider adding practice tasks or investigating root causes.
-- DECLINING: git.branch_commit is trending downward (46P/37F, 55% success). Consider adding practice tasks or investigating root causes.
-- DECLINING: node.npm.install is trending downward (31P/42F, 42% success). Consider adding practice tasks or investigating root causes.
-- DECLINING: comm.documentation is trending downward (26P/30F, 46% success). Consider adding practice tasks or investigating root causes.
-- LOW SUCCESS: nextjs.build.basic has only 9% success rate over 58 attempts. This may need a fundamentally different approach or should be deprioritized.
+- DECLINING: node.npm.run_script is trending downward (15P/17F, 47% success). Consider adding practice tasks or investigating root causes.
+- DECLINING: nextjs.build.basic is trending downward (5P/9F, 36% success). Consider adding practice tasks or investigating root causes.
+- DECLINING: node.npm.install is trending downward (6P/3F, 67% success). Consider adding practice tasks or investigating root causes.
+- DECLINING: comm.documentation is trending downward (5P/4F, 56% success). Consider adding practice tasks or investigating root causes.
+- LOW SUCCESS: nextjs.build.basic has only 36% success rate over 14 attempts. This may need a fundamentally different approach or should be deprioritized.
+- HIGH RETRY: "[SELF-ENHANCE] Reference Refresh" required 4 attempts. Consider task decomposition or prerequisite verification.
+- STRONG COMPLETION: 100% task completion rate. Agent is performing well.
 
 ## Task Outcomes
 
 | Task | Status | Steps | Retries |
 |------|--------|-------|---------|
-| Notion Integration POC | Completed | 14/5 | 0 |
-| Self-Enhance Human Interface | Completed | 5/5 | 0 |
-| POC New Capabilities | Completed | N/A | 2 |
-| Integrate Self-Improvement Loop Triggers | In Progress | N/A | 3 |
-| Full-Stack Music Player Platform | In Progress | 1/4 | 0 |
-| Full-Stack Conversational Chat Application | Completed | 9/9 | 0 |
-| Full-Stack Retro Analytics Dashboard | Completed | 8/9 | 0 |
-| Full-Stack Recipe Discovery Platform | In Progress | 7/9 | 0 |
-| [SELF-ENHANCE] Reference Refresh | In Progress | N/A | 1 |
-| Integrate Self-Improvement Loop Triggers | Completed | N/A | 1 |
-| [SELF-ENHANCE] Weekly Retrospective | In Progress | N/A | 2 |
+| [SELF-ENHANCE] Reference Refresh | Completed | N/A | 4 |
+| [SELF-ENHANCE] Practice Loop | Completed | N/A | 2 |
+| Practice: Calibration Project Delivery Exercise | Completed | N/A | 1 |
+| Full-Stack Music Player Platform | Completed | 5/9 | 0 |
+| Full-Stack Recipe Discovery Platform | Completed | 1/9 | 0 |

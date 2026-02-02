@@ -1,13 +1,19 @@
 ---
 title: "[SKILL-BUILD] Playwright Demo Video Skill"
-slug: "playwright-demo-skill"
-priority: P1
+slug: playwright-demo-skill
 status: pending
+priority: P1
 complexity: high
 created: "2026-02-01"
-tags: [skill-build, playwright, demo, video, elevenlabs, ffmpeg]
-output_path:
-branch:
+tags:
+  - skill-build
+  - playwright
+  - demo
+  - video
+  - elevenlabs
+  - ffmpeg
+output_path: /Users/jackjin/dev/continuous-agent
+branch: null
 ---
 
 ## Problem
