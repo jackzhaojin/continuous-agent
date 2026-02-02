@@ -70,8 +70,23 @@ async function moveBundleToCompleted(sourcePath: string): Promise<boolean> {
 
   try {
     await mkdir(completedDir, { recursive: true });
-    await rename(sourcePath, destPath);
-    log(`  Moved bundle to completed/: ${sourcePath} → ${destPath}`);
+
+    // Handle name collision: append date suffix if target exists
+    let finalPath = destPath;
+    if (existsSync(destPath)) {
+      const dateSuffix = new Date().toISOString().split('T')[0];
+      finalPath = `${destPath}-${dateSuffix}`;
+      // If even the dated path exists, append a counter
+      let counter = 2;
+      while (existsSync(finalPath)) {
+        finalPath = `${destPath}-${dateSuffix}-${counter}`;
+        counter++;
+      }
+      log(`  Name collision: using ${path.basename(finalPath)}`);
+    }
+
+    await rename(sourcePath, finalPath);
+    log(`  Moved bundle to completed/: ${sourcePath} → ${finalPath}`);
     return true;
   } catch (error) {
     log(`  Failed to move bundle to completed/: ${error}`);
