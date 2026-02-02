@@ -46,3 +46,25 @@ projects:
     features_built:
       - The self-improvement loop triggers were successfully implemented and committed to the continuous-age
     lessons: []
+  - id: goal-reference-refresh
+    name: "[SELF-ENHANCE] Reference Refresh"
+    category: misc
+    completed: "2026-02-02"
+    output_path: /Users/jackjin/dev/continuous-agent
+    archive_path: /Users/jackjin/dev/continuous-agent/workspace/completed/reference-refresh
+    capabilities_exercised:
+      - git.commit
+    features_built: []
+    lessons: []
+  - id: goal-practice-calibration-project-delivery-exercise
+    name: "Practice: Calibration Project Delivery Exercise"
+    category: misc
+    completed: "2026-02-02"
+    output_path: /Users/jackjin/dev/agent-outputs/projects/misc/2026-02-02/1769995575621
+    archive_path: /Users/jackjin/dev/continuous-agent/workspace/completed/practice-calibration-project-delivery-exercise
+    capabilities_exercised:
+      - git.commit
+    features_built:
+      - "**Files created:** 20+ files including:"
+      - "- Created a calibration project for capability assessment"
+    lessons: []

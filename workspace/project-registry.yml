@@ -32,3 +32,19 @@ projects:
     capabilities:
       - general.implementation
     reusable: true
+  - slug: reference-refresh
+    title: "[SELF-ENHANCE] Reference Refresh"
+    output_path: /Users/jackjin/dev/continuous-agent
+    completed: "2026-02-02"
+    category: misc
+    capabilities:
+      - git.commit
+    reusable: true
+  - slug: practice-calibration-project-delivery-exercise
+    title: "Practice: Calibration Project Delivery Exercise"
+    output_path: /Users/jackjin/dev/agent-outputs/projects/misc/2026-02-02/1769995575621
+    completed: "2026-02-02"
+    category: misc
+    capabilities:
+      - git.commit
+    reusable: true

@@ -29,7 +29,7 @@ This document tracks items requiring human attention, decisions, or actions.
 **Note:** After you respond, the agent will automatically detect your response in the next loop iteration (typically within 30 seconds), unblock the task, and retry with fresh context.
 
 | Action | Why Agent Can't Do It | Response | Blocking | Since |
-| *None* | | | | |
+| Review & merge: [SELF-ENHANCE] Reference Refresh | Branch `self-enhance/1769993743708` ready for review. Run: `git checkout self-enhance/1769993743708 && git diff main...HEAD` | | HIGH | 2026-02-02 | | | | |
 
 ---
 

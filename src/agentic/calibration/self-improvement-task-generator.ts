@@ -2,7 +2,8 @@
  * Self-Improvement Task Generator
  *
  * Creates goal bundles for self-improvement activities.
- * All tasks are prefixed with [SELF-ENHANCE] for tracking.
+ * Currently only retrospective is auto-triggered, and it runs inline
+ * (no worker spawned), so this generator is rarely used.
  *
  * V1.2: Bundles only.
  *
@@ -40,27 +41,14 @@ export async function generateSelfImprovementTask(trigger: SelfImprovementTrigge
 interface SelfImprovementGoal {
   title: string;
   description: string;
-  skillId?: string;
 }
 
 function buildGoal(trigger: SelfImprovementTrigger): SelfImprovementGoal {
   switch (trigger.type) {
-    case 'practice':
-      return {
-        title: '[SELF-ENHANCE] Practice Loop',
-        description: `Run practice tasks to improve skill confidence. Trigger: ${trigger.reason}`,
-      };
-
     case 'retrospective':
       return {
         title: '[SELF-ENHANCE] Weekly Retrospective',
         description: `Analyze recent work outcomes and update skill confidence. Trigger: ${trigger.reason}`,
-      };
-
-    case 'reference-refresh':
-      return {
-        title: '[SELF-ENHANCE] Reference Refresh',
-        description: `Refresh external references (Mode A/B) to keep them up-to-date. Trigger: ${trigger.reason}`,
       };
 
     default:
@@ -70,4 +58,3 @@ function buildGoal(trigger: SelfImprovementTrigger): SelfImprovementGoal {
       };
   }
 }
-
