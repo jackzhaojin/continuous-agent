@@ -74,31 +74,24 @@ npm run build  # Rebuild only - changes take effect on next natural restart
 
 This separation is enforced by **Constitution Article I, Section 6** (zero tolerance violation).
 
-**EXCEPTION: Self-Enhancement Goals** - Goals prefixed with `[SELF-ENHANCE]` are routed to the self-enhancer subagent which works in the continuous-agent codebase. See "Self-Enhancement Workflow" below.
+**EXCEPTIONS:**
+- **Self-Enhancement Goals** - Goals prefixed with `[SELF-ENHANCE]` are routed to the self-enhancer subagent which works in the continuous-agent codebase. See "Self-Enhancement Workflow" below.
+- **Skill-Build Goals** - Goals prefixed with `[SKILL-BUILD]` are routed to the skill-builder subagent (`.claude/agents/skill-builder.md`) which creates Claude Code skills in the agent codebase.
 
-## Self-Enhancement Workflow
+## Self-Enhancement & Skill-Build Workflows
 
-The agent can modify its own infrastructure code through a special self-enhancement pathway.
+The agent can modify its own infrastructure code through special pathways using tag prefixes.
 
 ### How It Works
 
-1. **Tag-based Detection**: Goals prefixed with `[SELF-ENHANCE]` are recognized as self-enhancement goals
+1. **Tag-based Detection**: Goals prefixed with `[SELF-ENHANCE]` or `[SKILL-BUILD]` are recognized
 2. **Special Routing**: Worker spawner routes these to the agent codebase instead of agent-outputs
-3. **Subagent Delegation**: Uses the `self-enhancer` subagent (`.claude/agents/self-enhancer.md`) via Task tool
+3. **Subagent Delegation**: Uses the appropriate subagent via Task tool:
+   - `[SELF-ENHANCE]` → `.claude/agents/self-enhancer.md`
+   - `[SKILL-BUILD]` → `.claude/agents/skill-builder.md`
 4. **Staged Changes**: All changes are made on a branch for human review before merge
 
-### Goals.md Format
-
-```markdown
-## P2 - High Priority
-
-### [SELF-ENHANCE] Improve retry logic
-- **Status:** In Progress
-- **Description:** Enhance the retry logic to better handle rate limits
-- **Branch:** self-enhance/improve-retry-logic
-```
-
-**Branch Tracking:** When a self-enhancement goal starts, the self-enhancer updates `PROMPT.md` with a `branch:` frontmatter field. This allows the agent to resume work on the same branch across restarts, preventing duplicate branches.
+**Branch Tracking:** When a self-enhancement or skill-build goal starts, the subagent updates `PROMPT.md` with a `branch:` frontmatter field. This allows the agent to resume work on the same branch across restarts, preventing duplicate branches.
 
 ### What Can Be Modified
 
@@ -111,10 +104,10 @@ The agent can modify its own infrastructure code through a special self-enhancem
 | Documentation | `CLAUDE.md`, `README.md`, `ai-docs/` | ✅ Yes |
 | Constitution | `workspace/constitution.md` | ❌ **NEVER** |
 
-### Self-Enhancement Workflow
+### Branch Workflow
 
 ```
-1. Create branch: self-enhance/<goal-slug>
+1. Create branch: self-enhance/<goal-slug> (or skill-build/<goal-slug>)
 2. Make changes
 3. Run: npm run typecheck && npm run build
 4. Commit with clear message
@@ -125,7 +118,8 @@ The agent can modify its own infrastructure code through a special self-enhancem
 ### Key Files
 
 - **Self-enhancer agent:** `.claude/agents/self-enhancer.md`
-- **Detection logic:** `src/agentic/work-selection/work-selector.ts` (parses `[SELF-ENHANCE]` prefix, preserves full title for regex matching)
+- **Skill-builder agent:** `.claude/agents/skill-builder.md`
+- **Detection logic:** `src/agentic/work-selection/work-selector.ts` (parses `[SELF-ENHANCE]` and `[SKILL-BUILD]` prefixes, preserves full title for regex matching)
 - **Routing logic:** `src/agentic/execution/worker-spawner.ts` (routes to agent codebase, adds Task tool for subagent delegation)
 - **Review notification:** `src/deterministic/state-handler.ts` (adds review request to needs-you.md on completion)
 
@@ -213,6 +207,8 @@ Complex goals (>100 estimated turns) are automatically broken down into steps:
 - **Step Execution:** Each step is executed independently with max 100 turns per step
 - **Progress Tracking:** Steps are tracked in **STEPS.json** (machine-readable source of truth) + **PROGRESS_LOG.md** (append-only timeline).
 - **Shared Output:** All steps for a goal write to the SAME project directory
+- **Re-breakdown:** If a step fails with exit code 1, the system can re-breakdown remaining work (max `MAX_RE_BREAKDOWN_COUNT = 2` times per step)
+- **Step Retry Persistence:** `retry_count` is stored in STEPS.json and survives PM2 restarts (unlike in-memory retry tracker)
 - **Configuration:**
   - `BREAKDOWN_THRESHOLD_TURNS=100` - Trigger breakdown if estimated > 100 turns
   - `MAX_TURNS_PER_STEP=100` - Max turns per step (MINIMUM 100)
@@ -223,6 +219,7 @@ Complex goals (>100 estimated turns) are automatically broken down into steps:
 workspace/in-progress/P2/my-goal/
   PROMPT.md          # Content only (problem, DoD, approach)
   STEPS.json         # Machine-readable step definitions + status (source of truth)
+  CONTRACTS.jsonl    # Per-bundle contract event log (started, completed, failed, blocked)
   PROGRESS_LOG.md    # Append-only human-readable timeline
   step-1-handoff.md  # Per-step handoff context (still written during transition)
 ```
@@ -270,7 +267,8 @@ workspace/in-progress/P2/my-goal/
 - `learning/capability-updater.ts` - Updates capability confidence: +10 on PASS, -15 on FAIL
 - `calibration/self-improvement-task-generator.ts` - Generates self-improvement opportunities
 - `calibration/self-improvement-triggers.ts` - Detects when self-improvement should occur
-- `prompts/loader.ts` - Loads prompt templates from categorized subdirectories
+- `calibration/retrospective.ts` - Weekly retrospective: analyzes ledgers, calibrates confidence, generates recommendations
+- `prompts/loader.ts` - Loads prompt templates from categorized subdirectories (supports versioned filenames like `v1.1.0`)
 
 **Deterministic Layer** (`src/deterministic/`) - Mechanical operations:
 - `health-checker.ts` - Validates auth, tools, disk space
@@ -279,13 +277,17 @@ workspace/in-progress/P2/my-goal/
 - `state-handler.ts` - Updates goal bundles (STEPS.json + PROMPT.md + PROGRESS_LOG.md), needs-you.md, ledgers; multi-project patch generation
 - `steps-json-handler.ts` - Read/write/update STEPS.json files (atomic writes via temp+rename)
 - `progress-log-writer.ts` - Append-only PROGRESS_LOG.md writer for goal bundles
+- `contracts-log-writer.ts` - Per-bundle CONTRACTS.jsonl tracking (started, completed, failed, blocked events)
+- `notion-reporter.ts` - Fire-and-forget Notion integration (`reportMilestone()`, `closeMilestone()`, daily/weekly summaries)
+- `project-registry.ts` - Tracks completed projects for reuse (V1.2: `workspace/project-registry.yml`)
+- `project-memory-store.ts` - Records completed projects with capabilities and lessons (`capabilities/project-memory.yml`)
 - `validation-handler.ts` - Runs verifiers on worker output
 - `verifiers/` - Deterministic checks (git-clean, node-build, docs-complete)
 - `backoff-manager.ts` - Rate limit detection and exponential backoff
 - `workspace-writers.ts` - Writes to workspace markdown files
 - `queue-processor.ts` - Parses queue.md
 - `inputs-log.ts` - Appends to JSONL audit logs
-- `self-improvement-state.ts` - Tracks self-improvement state
+- `self-improvement-state.ts` - Tracks self-improvement state (`workspace/self-improvement-state.json`)
 
 **Core Layer** (`src/core/`):
 - `executive-loop.ts` - Main 8-phase loop orchestration
@@ -301,9 +303,10 @@ workspace/in-progress/P2/my-goal/
 - `workspace/queue.md`, `progress.md`, `completed.md` - State tracking
 - `workspace/preferences.md` - Learned preferences and conventions (code style, workflow, anti-patterns)
 - `workspace/project-registry.yml` - Tracks completed projects for reuse (V1.2: multi-project access)
+- `workspace/self-improvement-state.json` - Tracks last practice/retrospective/refresh timestamps and outcome counts
 
 **Append-only ledgers (JSONL):**
-- `ledgers/work-ledger.jsonl` - Goal events (GOAL_STARTED, GOAL_COMPLETED, GOAL_BLOCKED, STEP_STARTED, STEP_COMPLETED)
+- `ledgers/work-ledger.jsonl` - Goal events (GOAL_STARTED, GOAL_COMPLETED, GOAL_BLOCKED, STEP_STARTED, STEP_COMPLETED, GOAL_PROMOTED)
   - Each entry includes `contract_id` linking to worker log
 - `ledgers/capability-ledger.jsonl` - Capability attempts and results
   - Each entry includes `contract_id` linking to worker log
@@ -328,6 +331,7 @@ cat ledgers/2026-01-25/worker-contract-b25db16e.log
 - `capabilities/delivery-capabilities.yml` - End-to-end outcomes (nextjs app, EDS site)
 - `capabilities/functional-capabilities.yml` - Cross-cutting capabilities (debugging, research)
 - `capabilities/sdk-registry.yml` - Agent SDK capability mappings
+- `capabilities/project-memory.yml` - Completed project records with capabilities, features, and lessons learned
 
 ## Constitution (Hard Limits)
 
@@ -462,6 +466,7 @@ The agent reports milestone events and summaries to Notion. This is fire-and-for
 
 **What gets reported:**
 - **Milestone events** → rows in the Agent Milestones database (Started, Completed, Failed, Blocked, Step Completed)
+- **Milestone closure** → `closeMilestone()` updates the Started row with end date and duration when a goal completes/fails
 - **Daily summaries** → heading blocks appended to the monthly summaries page
 - **Weekly summaries** → child pages under the monthly summaries page
 
@@ -476,7 +481,7 @@ The agent reports milestone events and summaries to Notion. This is fire-and-for
 1. **Executive loop changes:** Test with `npm run dev` before deploying to PM2
 2. **Verifiers:** Must return `VerifierResult` interface with PASS/FAIL + evidence
    - **CRITICAL:** Verifiers must check `result.output_path` (worker's directory), NOT `process.cwd()` (agent infrastructure)
-3. **Intelligence layer:** Changes to prompts/strategies affect all future tasks. Prompts are in `src/agentic/prompts/` organized by category subdirectories (calibration, contracts, diagnosis, execution, intelligence, retry, strategy, validation, work-selection, worker)
+3. **Intelligence layer:** Changes to prompts/strategies affect all future tasks. Prompts are in `src/agentic/prompts/` organized by category subdirectories (calibration, communication, contracts, diagnosis, execution, intelligence, research, retry, strategy, validation, work-selection, worker)
 4. **Workspace files:** Never auto-modify `constitution.md` (human-only)
 5. **Ledgers:** Append-only JSONL, never truncate or modify existing entries
 6. **PM2 restarts:** After rebuilding, only restart PM2 if explicitly needed - avoid interrupting running tasks
@@ -615,7 +620,7 @@ continuous-agent/
 │   │   ├── intelligence/       # Intent classification, strategy selection
 │   │   ├── diagnosis/          # Failure analysis
 │   │   ├── learning/           # Capability confidence updates
-│   │   ├── calibration/        # Self-improvement triggers and goal generation
+│   │   ├── calibration/        # Self-improvement triggers, goal generation, retrospective
 │   │   └── prompts/            # Prompt templates organized by category (loader.ts + subdirs)
 │   └── deterministic/          # Mechanical operations (no LLM)
 │       ├── health-checker.ts   # System health validation
@@ -623,6 +628,10 @@ continuous-agent/
 │       ├── prompt-md-parser.ts # Parses PROMPT.md frontmatter + body
 │       ├── steps-json-handler.ts # STEPS.json read/write/update (atomic writes)
 │       ├── progress-log-writer.ts # Append-only PROGRESS_LOG.md writer
+│       ├── contracts-log-writer.ts # Per-bundle CONTRACTS.jsonl tracking
+│       ├── notion-reporter.ts  # Notion integration (milestones, summaries)
+│       ├── project-registry.ts # Completed project registry (V1.2)
+│       ├── project-memory-store.ts # Project memory with lessons learned
 │       ├── state-handler.ts    # Updates goal bundles, needs-you.md
 │       ├── validation-handler.ts # Runs verifiers
 │       ├── verifiers/          # Deterministic validation checks
@@ -638,6 +647,7 @@ continuous-agent/
 │   ├── needs-you.md            # Human interaction interface
 │   ├── preferences.md          # Learned preferences and conventions
 │   ├── project-registry.yml    # Completed projects for reuse (V1.2)
+│   ├── self-improvement-state.json # Self-improvement tracking
 │   ├── {queue,progress,completed}.md
 │   ├── _TEMPLATE/              # Goal bundle template
 │   ├── drafts/                 # New goal bundles
@@ -653,7 +663,8 @@ continuous-agent/
 ├── capabilities/               # YAML capability registries
 │   ├── technical-capabilities.yml    # Tool capabilities
 │   ├── delivery-capabilities.yml     # End-to-end outcomes
-│   └── functional-capabilities.yml   # Cross-cutting capabilities
+│   ├── functional-capabilities.yml   # Cross-cutting capabilities
+│   └── project-memory.yml            # Completed project records
 
 ├── references/                 # External references and POCs
 │   ├── poc/                    # Foundational proof-of-concept projects
@@ -664,7 +675,7 @@ continuous-agent/
 │   └── reference-registry.yaml # Reference tracking
 │
 ├── .claude/
-│   ├── agents/                 # Subagent definitions (self-enhancer, code-validator, task-researcher)
+│   ├── agents/                 # Subagent definitions (self-enhancer, skill-builder, code-validator, task-researcher)
 │   └── skills/                 # Claude Code skill definitions (SKILL.md files)
 ├── verifiers/
 │   ├── definitions/            # Verifier YAML configs (git-status-clean, node-build, etc.)
@@ -727,6 +738,8 @@ tail -20 ledgers/work-ledger.jsonl
 - PM2 running stale code → Verify `ecosystem.config.cjs` script path points to `dist/core/executive-loop.js`
 - No work selected → Check `workspace/in-progress/P{0-4}/` for goal bundles with `status: pending` in PROMPT.md; also check `workspace/ondeck/` for goals awaiting auto-promotion
 - Goal not promoted → Ensure PROMPT.md frontmatter has a valid `priority` field (P0-P4)
+- Notion not reporting → Check `NOTION_REPORTING_ENABLED` is not `false`, verify `NOTION_API_KEY` and `NOTION_DATABASE_ID` are set
+- Skill-build steps repeat → Same as self-enhance: title prefix `[SKILL-BUILD]` must be preserved for regex matching
 
 ## Documentation Locations
 
