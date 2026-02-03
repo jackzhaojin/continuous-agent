@@ -1,1 +1,1 @@
-worker-base-v1.1.0.md
+worker-base-v2.0.0.md

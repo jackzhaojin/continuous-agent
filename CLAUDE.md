@@ -67,10 +67,13 @@ npm run build  # Rebuild only - changes take effect on next natural restart
   - NO application code, NO project outputs
 
 - **`agent-outputs/`** (sibling directory) - ALL worker outputs
+  - Monorepo root: `CLAUDE.md`, `.env`, `.claude/` live at root (shared, not per-project)
   - Isolated project directories: `agent-outputs/projects/{category}/{date}/{goal-slug}/`
   - Real codebases with their own git history
   - Workers NEVER write to the agent codebase
-  - **API keys are copied:** Each worker gets a copy of `.env` from agent repo
+  - **Agent SDK CWD is `agent-outputs/`** — workers navigate to their project subdirectory via prompt
+  - **Shared `.env`** at root (copied from agent repo); projects can have their own for project-specific vars
+  - **Shared `.claude/`** at root (skills + agents); projects must NOT create their own
 
 This separation is enforced by **Constitution Article I, Section 6** (zero tolerance violation).
 
@@ -456,7 +459,7 @@ NOTION_MONTHLY_PAGE_ID=        # Current month's summaries page ID
 NOTION_REPORTING_ENABLED=true  # Kill switch for all Notion writes
 ```
 
-**API Key Management:** The `.env` file is automatically copied to each worker's project directory by `worker-spawner.ts`. This allows workers to access third-party APIs without exposing credentials in git.
+**API Key Management:** The `.env` file is copied to the `agent-outputs/` root by `worker-spawner.ts` (centralized, not per-project). Workers access shared API keys from there. Projects needing their own env vars can create a separate `.env` in their project directory.
 
 ## Notion Reporting
 
