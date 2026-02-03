@@ -7,7 +7,7 @@
  */
 
 import { query, type SDKMessage, type SDKResultMessage } from '@anthropic-ai/claude-agent-sdk';
-import { mkdirSync, existsSync, copyFileSync, cpSync, createWriteStream, writeFileSync } from 'fs';
+import { mkdirSync, existsSync, copyFileSync, cpSync, createWriteStream, readFileSync, writeFileSync } from 'fs';
 import { execSync } from 'child_process';
 import os from 'os';
 import path from 'path';
@@ -221,8 +221,8 @@ function generateOutputsClaudeMd(): void {
   const claudeMdPath = path.join(AGENT_OUTPUTS_BASE, 'CLAUDE.md');
   const content = `# Agent Outputs Workspace
 
-This is the centralized workspace for all projects built by the Continuous Executive Agent.
-It operates as a **monorepo** — multiple independent projects coexist here, each in its own subdirectory.
+This is a **monorepo** containing all projects built by the Continuous Executive Agent.
+Multiple independent projects coexist here, each in its own subdirectory.
 
 ## Directory Structure
 
@@ -234,46 +234,28 @@ agent-outputs/
 │   ├── skills/            # Reusable skill definitions (use via Skill tool)
 │   └── agents/            # Subagent definitions (use via Task tool)
 └── projects/              # All project directories
-    └── {category}/        # Organized by technology (nextjs, react, node, python, misc)
-        └── {date}/        # Organized by creation date
-            └── {id}/      # Individual project workspace
+    └── {category}/{date}/{id}/
 \`\`\`
 
-## CRITICAL RULES
+## Rules
 
-1. **Work ONLY in your assigned project directory.** Your prompt tells you which directory is yours.
-2. **Navigate to your project directory first** before doing any work:
-   \`\`\`bash
-   cd <your-project-path>
-   \`\`\`
-3. **NEVER modify files outside your project directory**, including:
-   - This CLAUDE.md file
-   - The root .env file
-   - The .claude/ directory
-   - Any other project's directory
-4. **Initialize git** in your project directory if it doesn't have a repo yet.
-5. **Commit all your work** to your project's git repo before finishing.
-
-## Available Skills
-
-Skills in \`.claude/skills/\` are shared across all projects. Use the \`Skill\` tool to invoke them by name.
-Do NOT copy or duplicate these skill files into your project directory.
-
-## API Keys
-
-Shared API keys are in \`.env\` at this root level. If your project needs its own environment
-variables (e.g., NEXT_PUBLIC_ vars), create a separate \`.env\` inside your project directory.
-
-## Technology Preferences
-
-- **Language priority:** JavaScript > Python > Other
-- Prefer JavaScript/Node.js for most tasks
-- Use plain JavaScript over TypeScript when possible
-- Only use Python if JavaScript SDK/library is unavailable
-- Stick to ONE language per project — don't add "complementary" implementations
+1. **Work ONLY in your assigned project directory.** Your prompt tells you which directory.
+2. **Navigate there first** before doing any work: \`cd <your-project-path>\`
+3. **NEVER modify** this CLAUDE.md, the root .env, the .claude/ directory, or other projects.
+4. **Do NOT create CLAUDE.md or .claude/ inside project folders.** Shared settings live here at the root.
+5. **Initialize git** in your project directory and commit all work before finishing.
+6. **Skills and agents** are shared at root \`.claude/\` — use via Skill/Task tools, do NOT copy them.
+7. If your project needs its own env vars, create a separate \`.env\` inside the project directory.
 `;
 
+  // Only write if content actually changed (avoid unnecessary disk writes)
+  if (existsSync(claudeMdPath)) {
+    const existing = readFileSync(claudeMdPath, 'utf-8');
+    if (existing === content) return;
+  }
+
   writeFileSync(claudeMdPath, content, 'utf-8');
+  console.log(`[Worker] Updated CLAUDE.md at ${claudeMdPath}`);
 }
 
 /**
