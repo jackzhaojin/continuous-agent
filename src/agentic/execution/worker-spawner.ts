@@ -241,10 +241,10 @@ agent-outputs/
 
 1. **Work ONLY in your assigned project directory.** Your prompt tells you which directory.
 2. **Navigate there first** before doing any work: \`cd <your-project-path>\`
-3. **NEVER modify** this CLAUDE.md, the root .env, the .claude/ directory, or other projects.
-4. **Do NOT create CLAUDE.md or .claude/ inside project folders.** Shared settings live here at the root.
-5. **Initialize git** in your project directory and commit all work before finishing.
-6. **Skills and agents** are shared at root \`.claude/\` — use via Skill/Task tools, do NOT copy them.
+3. **NEVER modify** this root CLAUDE.md, the root .env, the root .claude/ directory, or other projects.
+4. **Do NOT create .claude/ inside project folders.** Skills and agents are shared at the root only.
+5. **Projects CAN have their own CLAUDE.md** — it inherits from root and adds project-specific context.
+6. **Initialize git** in your project directory and commit all work before finishing.
 7. If your project needs its own env vars, create a separate \`.env\` inside the project directory.
 `;
 

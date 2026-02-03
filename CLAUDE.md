@@ -67,13 +67,14 @@ npm run build  # Rebuild only - changes take effect on next natural restart
   - NO application code, NO project outputs
 
 - **`agent-outputs/`** (sibling directory) - ALL worker outputs
-  - Monorepo root: `CLAUDE.md`, `.env`, `.claude/` live at root (shared, not per-project)
+  - Monorepo root: `CLAUDE.md`, `.env`, `.claude/` live at root (shared across all projects)
   - Isolated project directories: `agent-outputs/projects/{category}/{date}/{goal-slug}/`
   - Real codebases with their own git history
   - Workers NEVER write to the agent codebase
   - **Agent SDK CWD is `agent-outputs/`** — workers navigate to their project subdirectory via prompt
   - **Shared `.env`** at root (copied from agent repo); projects can have their own for project-specific vars
-  - **Shared `.claude/`** at root (skills + agents); projects must NOT create their own
+  - **Shared `.claude/`** at root (skills + agents); projects must NOT create their own `.claude/`
+  - **CLAUDE.md inherits hierarchically** — root provides shared context, projects CAN have their own CLAUDE.md for project-specific instructions
 
 This separation is enforced by **Constitution Article I, Section 6** (zero tolerance violation).
 

@@ -97,7 +97,8 @@ cd {{PROJECT_PATH}}
 - **ALL files you create or modify MUST be inside `{{PROJECT_PATH}}`**
 - Do NOT modify the root CLAUDE.md, .env, or .claude/ directory
 - Do NOT modify any other project's directory
-- Skills and agents are shared at the root `.claude/` — use via Skill/Task tools, do NOT copy them
+- **Do NOT create `.claude/` inside your project.** Skills and agents are shared at the root `.claude/` only — use via Skill/Task tools, do NOT copy them
+- **Projects CAN have their own CLAUDE.md** — CLAUDE.md inherits hierarchically, so your project-level CLAUDE.md adds to (not replaces) the root one
 - Initialize git inside your project directory if it doesn't have a repo yet
 
 **Available Tools:** {{TOOLS_ALLOWED}}
