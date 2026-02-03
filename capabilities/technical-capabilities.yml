@@ -28,10 +28,10 @@ capabilities:
       - commit_exists
     evidence:
       successes: 58
-      failures: 92
+      failures: 101
       last_success: null
       last_failure: null
-      last_validated: '2026-02-02'
+      last_validated: '2026-02-03'
     common_failure_modes:
       - Attempting to commit without staging
       - Branch name conflicts
@@ -137,7 +137,7 @@ capabilities:
   - id: node.npm.install
     name: NPM Package Installation
     description: Install npm packages and manage dependencies
-    confidence: 34
+    confidence: 0
     maturity: Demonstrated
     scope:
       includes:
@@ -159,10 +159,10 @@ capabilities:
       - package_lock_updated
     evidence:
       successes: 82
-      failures: 48
+      failures: 57
       last_success: null
       last_failure: null
-      last_validated: '2026-02-02'
+      last_validated: '2026-02-03'
     common_failure_modes:
       - Network connectivity issues
       - Peer dependency conflicts
@@ -173,7 +173,7 @@ capabilities:
   - id: node.npm.run_script
     name: NPM Script Execution
     description: Run npm scripts defined in package.json
-    confidence: 19
+    confidence: 10
     maturity: Demonstrated
     scope:
       includes:
@@ -192,11 +192,11 @@ capabilities:
       - script_exit_code
       - expected_output_patterns
     evidence:
-      successes: 196
-      failures: 148
+      successes: 205
+      failures: 166
       last_success: null
       last_failure: null
-      last_validated: '2026-02-02'
+      last_validated: '2026-02-03'
     common_failure_modes:
       - Missing dependencies
       - Script not found in package.json
@@ -207,7 +207,7 @@ capabilities:
   - id: nextjs.build.basic
     name: Next.js Basic Build
     description: Build Next.js applications for production
-    confidence: 10
+    confidence: 0
     maturity: Demonstrated
     scope:
       includes:
@@ -228,10 +228,10 @@ capabilities:
       - dot_next_directory_exists
     evidence:
       successes: 27
-      failures: 91
+      failures: 100
       last_success: null
       last_failure: null
-      last_validated: '2026-02-02'
+      last_validated: '2026-02-03'
     common_failure_modes:
       - TypeScript type errors
       - ESLint errors blocking build

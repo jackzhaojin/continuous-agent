@@ -1,12 +1,16 @@
 ---
-title: "Create demo video for Recipe Discovery Platform"
-slug: "recipe-demo-video"
+title: Create demo video for Recipe Discovery Platform
+slug: recipe-demo-video
+status: complete
 priority: P2
-status: pending
 complexity: high
 created: "2026-02-02"
-tags: [demo-video, playwright, elevenlabs, nextjs]
-output_path: "/Users/jackjin/dev/agent-outputs/projects/nextjs/2026-01-29/1769685367609"
+tags:
+  - demo-video
+  - playwright
+  - elevenlabs
+  - nextjs
+output_path: /Users/jackjin/dev/agent-outputs/projects/nextjs/2026-01-29/1769685367609
 ---
 
 ## Problem
@@ -50,7 +54,10 @@ Use the **playwright-demo-video** skill (available via `Skill` tool) in **Mode 2
 - The app is inside `recipe-discovery-platform/` subdirectory
 - ElevenLabs API key is available as `ELEVENLABS_API_KEY` in `.env` at the agent-outputs root
 - Use `npx playwright install chromium` if Playwright browsers aren't installed
-- The app likely needs `npm install` and `npm run dev` to start
+- The app needs `npm install` and `npm run dev` to start
+- **PostgreSQL is running** in Docker on localhost:5432 (user/password/recipe_discovery) with seeded data
+- Previous attempts produced a white video because the DB wasn't running — it is now
+- Delete the old demo-video.mp4 and demo-output/ before re-recording
 
 ## Definition of Done
 

@@ -114,7 +114,13 @@ function setupProjectDirectory(projectPath: string, category: string): void {
     }
   }
 
-  // NOTE: .env is now at agent-outputs/ root level (centralized), not per-project
+  // Copy .env into project directory so worker scripts can access API keys
+  const envSource = path.join(AGENT_BASE, '.env');
+  const envDest = path.join(projectPath, '.env');
+  if (existsSync(envSource) && !existsSync(envDest)) {
+    copyFileSync(envSource, envDest);
+    console.log(`[Worker] Copied .env to project directory`);
+  }
 
   // CRITICAL: Ensure git is clean before starting new work
   // This prevents verifier failures due to uncommitted changes from previous work
@@ -161,7 +167,7 @@ function copySourceProject(sourcePath: string, targetPath: string): boolean {
 
     // Use rsync to copy files, excluding build artifacts and secrets
     execSync(
-      `rsync -a --exclude='.git' --exclude='node_modules' --exclude='.env' --exclude='dist' --exclude='.next' --exclude='__pycache__' "${sourcePath}/" "${targetPath}/"`,
+      `rsync -a --exclude='.git' --exclude='node_modules' --exclude='.env' --exclude='.claude' --exclude='dist' --exclude='.next' --exclude='__pycache__' "${sourcePath}/" "${targetPath}/"`,
       { stdio: 'pipe' }
     );
 
@@ -190,12 +196,7 @@ function setupAgentOutputsRoot(): void {
     console.log(`[Worker] Created agent-outputs root: ${AGENT_OUTPUTS_BASE}`);
   }
 
-  // Copy .env to agent-outputs root (always refresh in case keys change)
-  const envSource = path.join(AGENT_BASE, '.env');
-  const envDest = path.join(AGENT_OUTPUTS_BASE, '.env');
-  if (existsSync(envSource)) {
-    copyFileSync(envSource, envDest);
-  }
+  // .env is copied per-project in setupProjectDirectory, not at root level
 
   // Copy .claude/ (skills + agents) to agent-outputs root
   if (existsSync(CLAUDE_FILES_DIR)) {
@@ -229,7 +230,6 @@ Multiple independent projects coexist here, each in its own subdirectory.
 \`\`\`
 agent-outputs/
 ├── CLAUDE.md              # This file — workspace-wide instructions (do not modify)
-├── .env                   # Shared API keys (do not modify or commit)
 ├── .claude/               # Shared Claude skills and agents (do not modify)
 │   ├── skills/            # Reusable skill definitions (use via Skill tool)
 │   └── agents/            # Subagent definitions (use via Task tool)
@@ -241,11 +241,11 @@ agent-outputs/
 
 1. **Work ONLY in your assigned project directory.** Your prompt tells you which directory.
 2. **Navigate there first** before doing any work: \`cd <your-project-path>\`
-3. **NEVER modify** this root CLAUDE.md, the root .env, the root .claude/ directory, or other projects.
+3. **NEVER modify** this root CLAUDE.md or the root .claude/ directory or other projects.
 4. **Do NOT create .claude/ inside project folders.** Skills and agents are shared at the root only.
 5. **Projects CAN have their own CLAUDE.md** — it inherits from root and adds project-specific context.
 6. **Initialize git** in your project directory and commit all work before finishing.
-7. If your project needs its own env vars, create a separate \`.env\` inside the project directory.
+7. **API keys** are provided in your project's \`.env\` file. Do not modify or commit it.
 `;
 
   // Only write if content actually changed (avoid unnecessary disk writes)
