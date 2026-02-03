@@ -262,7 +262,7 @@ workspace/in-progress/P2/my-goal/
 - `work-selection/work-selector.ts` - Selects highest priority unblocked goal (goal bundles first, legacy goals.md fallback)
 - `work-selection/goal-scanner.ts` - Scans workspace folder tree for goal bundles, reads STEPS.json (primary) or PROMPT.md (fallback), auto-promotes ondeck goals
 - `work-selection/goal-breakdown.ts` - Automatic breakdown of complex goals into steps; `writeStepsToBundle()` writes STEPS.json + PROGRESS_LOG.md
-- `execution/worker-spawner.ts` - Spawns Claude Agent SDK sessions with prompts, copies `.env` to worker directory
+- `execution/worker-spawner.ts` - Spawns Claude Agent SDK sessions with prompts, writes tiered `.env` files to worker directory
 - `execution/execution-handler.ts` - Orchestrates work execution with retry tracking
 - `intelligence/intent-classifier.ts` - Classifies goals as outcome_only vs what_and_how
 - `intelligence/strategy-selector.ts` - Chooses different strategies per retry
@@ -277,6 +277,7 @@ workspace/in-progress/P2/my-goal/
 **Deterministic Layer** (`src/deterministic/`) - Mechanical operations:
 - `health-checker.ts` - Validates auth, tools, disk space
 - `input-processor.ts` - Parses human responses from needs-you.md
+- `credential-tiers.ts` - Three-tier env var classification and filtering (executive/execution/application)
 - `prompt-md-parser.ts` - Parses PROMPT.md files (YAML frontmatter + markdown body)
 - `state-handler.ts` - Updates goal bundles (STEPS.json + PROMPT.md + PROGRESS_LOG.md), needs-you.md, ledgers; multi-project patch generation
 - `steps-json-handler.ts` - Read/write/update STEPS.json files (atomic writes via temp+rename)
@@ -427,40 +428,59 @@ Verifiers run after each goal and return structured evidence:
 
 Verifier results update capability confidence scores: +10 on PASS, -15 on FAIL.
 
-## Environment Variables
+## Environment Variables & Credential Tiers
+
+The system uses a **three-tier credential architecture** to separate concerns:
+
+| Tier | Purpose | Location | Example Keys |
+|------|---------|----------|-------------|
+| **1. Executive** | Loop orchestration, reporting | Stays in executive process only | `NOTION_API_KEY`, `IDLE_SLEEP_SECONDS` |
+| **2. Execution** | Worker agents (Agent SDK, future agents) | Copied to `agent-outputs/.env` | `ANTHROPIC_API_KEY`, `ELEVENLABS_API_KEY` |
+| **3. Application** | Built apps (databases, payment, etc.) | Copied to `agent-outputs/.env.app` | `APP_DATABASE_URL`, `APP_STRIPE_SECRET_KEY` |
+
+**Key design decisions:**
+- Some keys are **shared** across tiers (e.g., `ANTHROPIC_API_KEY` is Tier 2 but shared with Tier 1 for diagnosis)
+- Tier 3 keys use the `APP_` prefix for auto-detection. The prefix is **stripped** when written to `.env.app` (so apps see `DATABASE_URL`, not `APP_DATABASE_URL`)
+- Unknown env vars default to Tier 2 (execution) to avoid silently withholding needed keys from workers
+
+**Registry:** `capabilities/credential-tiers.yml` — source of truth for all known credentials
+**Logic:** `src/deterministic/credential-tiers.ts` — TypeScript module for tier classification and filtering
 
 Create `.env` from `.env.example`:
 
 ```bash
-# Required: ONE of these for Claude Agent SDK
+# ── TIER 2: EXECUTION AGENT (shared with Tier 1, copied to workers) ──
 CLAUDE_CODE_OAUTH_TOKEN=    # Option 1: OAuth (Claude Pro/Max)
 ANTHROPIC_API_KEY=          # Option 2: API key
-
-# Optional configuration
 MODEL=claude-sonnet-4-5
-MAX_TURNS=250               # Max turns per worker session for single-step tasks
-MAX_TURNS_PER_STEP=100      # Max turns per step for multi-step tasks (MINIMUM 100)
+ELEVENLABS_API_KEY=         # ElevenLabs TTS (worker tool)
 
-# Loop timing (continuous execution by default)
-# Agent continues immediately after completing work - no sleep between tasks
-# Sleep only occurs when idle (queue empty) or unhealthy
-IDLE_SLEEP_SECONDS=30       # Sleep when no work available (polling interval)
-UNHEALTHY_SLEEP_SECONDS=60  # Sleep when system unhealthy before retrying
+# ── TIER 1: EXECUTIVE AGENT (stays in executive process) ──
+MAX_TURNS=250
+MAX_TURNS_PER_STEP=100
+IDLE_SLEEP_SECONDS=30
+UNHEALTHY_SLEEP_SECONDS=60
+BREAKDOWN_THRESHOLD_TURNS=100
+AUTO_BREAKDOWN_ENABLED=true
+NOTION_API_KEY=
+NOTION_DATABASE_ID=
+NOTION_MONTHLY_PAGE_ID=
+NOTION_REPORTING_ENABLED=true
 
-# Incremental execution
-BREAKDOWN_THRESHOLD_TURNS=100  # Trigger breakdown if estimated > 100 turns
-AUTO_BREAKDOWN_ENABLED=true    # Enable automatic goal breakdown
-
-# Third-party API keys (copied to each worker's .env)
-NOTION_API_KEY=                # Notion integration key
-
-# Notion Reporting (set by scripts/setup-notion-workspace.ts)
-NOTION_DATABASE_ID=            # Agent Milestones database ID
-NOTION_MONTHLY_PAGE_ID=        # Current month's summaries page ID
-NOTION_REPORTING_ENABLED=true  # Kill switch for all Notion writes
+# ── TIER 3: APPLICATION (copied as .env.app with APP_ prefix stripped) ──
+APP_DATABASE_URL=           # → DATABASE_URL in .env.app
+APP_REDIS_URL=              # → REDIS_URL in .env.app
+APP_STRIPE_SECRET_KEY=      # → STRIPE_SECRET_KEY in .env.app
+# (see .env.example for full list of supported APP_* keys)
 ```
 
-**API Key Management:** The `.env` file is copied to the `agent-outputs/` root by `worker-spawner.ts` (centralized, not per-project). Workers access shared API keys from there. Projects needing their own env vars can create a separate `.env` in their project directory.
+**How credential tiers flow:**
+1. Executive loop loads the full `.env` via `dotenv.config()`
+2. `worker-spawner.ts` generates **filtered** env files at `agent-outputs/` root:
+   - `.env` — Tier 2 (execution) + Tier 3 (application) keys only
+   - `.env.app` — Tier 3 (application) keys only, with `APP_` prefix stripped
+3. Workers read `.env` from `agent-outputs/` root for their own credentials
+4. When a project needs app credentials, workers copy `.env.app` into the project directory
 
 ## Notion Reporting
 
@@ -627,6 +647,7 @@ continuous-agent/
 │   │   ├── calibration/        # Self-improvement triggers, goal generation, retrospective
 │   │   └── prompts/            # Prompt templates organized by category (loader.ts + subdirs)
 │   └── deterministic/          # Mechanical operations (no LLM)
+│       ├── credential-tiers.ts # Three-tier env var classification + filtering
 │       ├── health-checker.ts   # System health validation
 │       ├── input-processor.ts  # Parses needs-you.md responses
 │       ├── prompt-md-parser.ts # Parses PROMPT.md frontmatter + body
@@ -665,6 +686,7 @@ continuous-agent/
 │   └── executive-{date}.log    # Daily execution logs
 
 ├── capabilities/               # YAML capability registries
+│   ├── credential-tiers.yml          # Three-tier credential classification registry
 │   ├── technical-capabilities.yml    # Tool capabilities
 │   ├── delivery-capabilities.yml     # End-to-end outcomes
 │   ├── functional-capabilities.yml   # Cross-cutting capabilities

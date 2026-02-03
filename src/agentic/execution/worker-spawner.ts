@@ -16,6 +16,7 @@ import { buildIntelligentPrompt, buildSimplePrompt } from '../intelligence/promp
 import { classifyIntent } from '../intelligence/intent-classifier.js';
 import { selectStrategy } from '../intelligence/strategy-selector.js';
 import { findProjectBySlug } from '../../deterministic/project-registry.js';
+import { getWorkerEnv, getAppEnv, getAvailableAppCredentialNames } from '../../deterministic/credential-tiers.js';
 
 // Agent outputs directory - where workers create their projects
 const AGENT_OUTPUTS_BASE = process.env.AGENT_OUTPUTS_PATH || path.join(os.homedir(), 'dev', 'agent-outputs');
@@ -190,11 +191,23 @@ function setupAgentOutputsRoot(): void {
     console.log(`[Worker] Created agent-outputs root: ${AGENT_OUTPUTS_BASE}`);
   }
 
-  // Copy .env to agent-outputs root (always refresh in case keys change)
+  // Write tiered .env files to agent-outputs root (always refresh in case keys change)
+  // Workers get Tier 2 (execution) + Tier 3 (application) credentials only.
+  // Tier 1 (executive-only) keys like Notion, loop timing are excluded.
   const envSource = path.join(AGENT_BASE, '.env');
-  const envDest = path.join(AGENT_OUTPUTS_BASE, '.env');
   if (existsSync(envSource)) {
-    copyFileSync(envSource, envDest);
+    // Worker .env: Tier 2 (execution agent) + Tier 3 (application)
+    const workerEnvContent = getWorkerEnv(envSource);
+    const envDest = path.join(AGENT_OUTPUTS_BASE, '.env');
+    writeFileSync(envDest, workerEnvContent, 'utf-8');
+
+    // App .env: Tier 3 (application) only, with APP_ prefix stripped
+    // Workers can copy this into project directories for app consumption
+    const appEnvContent = getAppEnv(envSource);
+    if (appEnvContent.trim()) {
+      const appEnvDest = path.join(AGENT_OUTPUTS_BASE, '.env.app');
+      writeFileSync(appEnvDest, appEnvContent, 'utf-8');
+    }
   }
 
   // Copy .claude/ (skills + agents) to agent-outputs root
@@ -219,6 +232,28 @@ function setupAgentOutputsRoot(): void {
  */
 function generateOutputsClaudeMd(): void {
   const claudeMdPath = path.join(AGENT_OUTPUTS_BASE, 'CLAUDE.md');
+  // Build available app credentials info for workers
+  const envSource = path.join(AGENT_BASE, '.env');
+  let appCredentialsInfo = '';
+  if (existsSync(envSource)) {
+    const appCreds = getAvailableAppCredentialNames(envSource);
+    if (appCreds.length > 0) {
+      appCredentialsInfo = `
+## Available Application Credentials
+
+The following application credentials are available in \`.env.app\` at the workspace root.
+Copy this file into your project directory when your app needs these services:
+
+\`\`\`bash
+cp /path/to/.env.app <your-project-dir>/.env
+\`\`\`
+
+Available credentials (APP_ prefix already stripped):
+${appCreds.map(c => `- \`${c}\``).join('\n')}
+`;
+    }
+  }
+
   const content = `# Agent Outputs Workspace
 
 This is a **monorepo** containing all projects built by the Continuous Executive Agent.
@@ -229,7 +264,8 @@ Multiple independent projects coexist here, each in its own subdirectory.
 \`\`\`
 agent-outputs/
 ├── CLAUDE.md              # This file — workspace-wide instructions (do not modify)
-├── .env                   # Shared API keys (do not modify or commit)
+├── .env                   # Execution agent credentials (do not modify or commit)
+├── .env.app               # Application credentials for projects (APP_ prefix stripped)
 ├── .claude/               # Shared Claude skills and agents (do not modify)
 │   ├── skills/            # Reusable skill definitions (use via Skill tool)
 │   └── agents/            # Subagent definitions (use via Task tool)
@@ -237,15 +273,29 @@ agent-outputs/
     └── {category}/{date}/{id}/
 \`\`\`
 
+## Credential Tiers
+
+This workspace uses a **three-tier credential system**:
+
+- **Tier 1 (Executive):** Loop orchestration keys — NOT available here (stays in executive process)
+- **Tier 2 (Execution):** Agent SDK auth, model selection — in \`.env\` at root
+- **Tier 3 (Application):** Database, payment, email, cloud keys — in \`.env.app\` at root
+
+When your project needs application credentials (databases, APIs, etc.):
+1. Check if \`.env.app\` exists at the workspace root
+2. Copy it into your project directory as \`.env\`
+3. The APP_ prefix is already stripped (e.g., \`APP_DATABASE_URL\` → \`DATABASE_URL\`)
+${appCredentialsInfo}
 ## Rules
 
 1. **Work ONLY in your assigned project directory.** Your prompt tells you which directory.
 2. **Navigate there first** before doing any work: \`cd <your-project-path>\`
-3. **NEVER modify** this root CLAUDE.md, the root .env, the root .claude/ directory, or other projects.
+3. **NEVER modify** this root CLAUDE.md, the root .env, the root .env.app, the root .claude/ directory, or other projects.
 4. **Do NOT create .claude/ inside project folders.** Skills and agents are shared at the root only.
 5. **Projects CAN have their own CLAUDE.md** — it inherits from root and adds project-specific context.
 6. **Initialize git** in your project directory and commit all work before finishing.
-7. If your project needs its own env vars, create a separate \`.env\` inside the project directory.
+7. If your project needs app credentials, **copy .env.app** from root into your project dir as \`.env\`.
+8. If your project needs additional env vars beyond what's in .env.app, create them in your project's \`.env\`.
 `;
 
   // Only write if content actually changed (avoid unnecessary disk writes)
