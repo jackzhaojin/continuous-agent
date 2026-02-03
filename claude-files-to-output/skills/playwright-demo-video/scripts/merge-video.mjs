@@ -160,7 +160,7 @@ function loadCaptionsWithAudio() {
 //   if earliest > ideal -> insert freeze frame
 // ---------------------------------------------------------------------------
 
-function calculateFreezes(captions) {
+function calculateFreezes(captions, videoDuration) {
   let videoShift = 0;
   let prevEnd = -Infinity;
   const freezes = [];
@@ -182,6 +182,19 @@ function calculateFreezes(captions) {
 
     cap.newAudioStart = Math.max(idealStart, 0);
     prevEnd = cap.newAudioStart + cap.audioDuration;
+  }
+
+  // Tail freeze: if the last audio clip extends past the frozen video end,
+  // freeze the last frame to prevent -shortest from cutting off the voiceover
+  const frozenVideoDuration = videoDuration + videoShift;
+  const lastAudioEnd = prevEnd;
+  if (lastAudioEnd > frozenVideoDuration) {
+    const tailPadding = Math.ceil((lastAudioEnd - frozenVideoDuration + 1.0) * 10) / 10; // +1s buffer
+    freezes.push({
+      originalTime: videoDuration - 0.1, // freeze near the end of original video
+      duration: tailPadding,
+    });
+    console.log(`  Tail freeze: extending video by ${tailPadding}s so voiceover isn't cut off`);
   }
 
   return freezes;
@@ -283,8 +296,8 @@ function main() {
   console.log(`Captions: ${captions.length}`);
   console.log(`Audio shift: ${AUDIO_SHIFT}s  |  Min gap: ${MIN_GAP}s`);
 
-  // Calculate freeze points
-  const freezes = calculateFreezes(captions);
+  // Calculate freeze points (pass videoDuration for tail-freeze calculation)
+  const freezes = calculateFreezes(captions, videoDuration);
   const totalFreeze = freezes.reduce((s, f) => s + f.duration, 0);
 
   console.log(`\nFreeze points (${freezes.length}):`);

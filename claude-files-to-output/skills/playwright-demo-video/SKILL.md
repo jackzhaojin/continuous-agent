@@ -160,6 +160,12 @@ test('demo scene 1 - landing page @demo', async ({ page }) => {
 3. **Match narration to visuals exactly.** If the page shows 3 recipes, say "3 recipes" not "our collection of recipes."
 4. **Test each scene in isolation first.** Don't chain 10 scenes together and hope they all work.
 5. **Use specific, observable descriptions.** Instead of "powerful search capabilities," say "searching for pasta dishes" while the search box shows "pasta" and results are filtered.
+6. **Size caption hold times to text length.** The voiceover takes longer than you think. Use this formula for `caption()` hold times:
+   ```
+   holdMs = max(textLength * 80, 3000)
+   ```
+   Example: "Welcome to Recipe Discovery, a platform for finding and sharing recipes" (72 chars) → `caption(page, text, 5760)` not `caption(page, text, 3000)`. Short captions (< 40 chars) can use 3000ms. Longer narration needs proportionally more time.
+7. **Add a closing pause.** The last scene must include `await page.waitForTimeout(5000)` AFTER the final caption to ensure the voiceover finishes before the Playwright recording ends. The merge script adds a tail freeze for safety, but the spec should still provide enough buffer.
 
 ## Visual Verification (MANDATORY)
 
@@ -314,6 +320,7 @@ Known issues that cause demos to record error pages or blank screens:
 | Missing dependencies | Module not found errors in browser | `npm install` not run after cloning or after changing branches | Run `npm install` in the project directory |
 | Stale build cache | Hydration errors or old UI rendering | `.next/` or `dist/` cache from a different branch or config | Delete `.next/` (or `dist/`) and restart the dev server |
 | No data seeded | App loads but shows "No items found" or empty lists for the entire demo | Database is running but has no seed data | Run the seed script (`npx prisma db seed`, `npm run seed`, etc.) |
+| Voiceover cut off | Narration abruptly stops mid-sentence near the end of the video | Playwright recording ends before voiceover finishes; `caption()` hold times too short for text length | Use `holdMs = max(textLength * 80, 3000)` for caption timing; add 5s `waitForTimeout` after the final caption; the merge script's tail-freeze handles edge cases automatically |
 
 When any of these are detected during the pre-recording health check (Stage 1), fix the underlying issue before proceeding. Do not attempt to record a demo of a broken application.
 
