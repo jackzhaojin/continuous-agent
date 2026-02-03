@@ -7,7 +7,7 @@
  */
 
 import { query, type SDKMessage, type SDKResultMessage } from '@anthropic-ai/claude-agent-sdk';
-import { mkdirSync, existsSync, copyFileSync, cpSync, createWriteStream } from 'fs';
+import { mkdirSync, existsSync, copyFileSync, cpSync, createWriteStream, writeFileSync } from 'fs';
 import { execSync } from 'child_process';
 import os from 'os';
 import path from 'path';
@@ -25,7 +25,7 @@ const AGENT_BASE = process.env.AGENT_PATH || path.join(os.homedir(), 'dev', 'con
 const TEMPLATES_DIR = path.join(AGENT_BASE, 'templates');
 const LEDGERS_DIR = path.join(AGENT_BASE, 'ledgers');
 
-// Worker-facing Claude files (skills + agents) to copy into each worker's project
+// Worker-facing Claude files (skills + agents) — copied to agent-outputs root (not per-project)
 const CLAUDE_FILES_DIR = path.join(AGENT_BASE, 'claude-files-to-output');
 
 /**
@@ -114,13 +114,7 @@ function setupProjectDirectory(projectPath: string, category: string): void {
     }
   }
 
-  // Copy .env file with API keys to project directory
-  const envSource = path.join(AGENT_BASE, '.env');
-  const envDest = path.join(projectPath, '.env');
-  if (existsSync(envSource) && !existsSync(envDest)) {
-    copyFileSync(envSource, envDest);
-    console.log(`[Worker] Copied .env with API keys to project`);
-  }
+  // NOTE: .env is now at agent-outputs/ root level (centralized), not per-project
 
   // CRITICAL: Ensure git is clean before starting new work
   // This prevents verifier failures due to uncommitted changes from previous work
@@ -180,24 +174,106 @@ function copySourceProject(sourcePath: string, targetPath: string): boolean {
 }
 
 /**
- * Copy worker-facing Claude files (skills + agents) into the worker's project.
- * Sources from claude-files-to-output/ in the agent repo.
- * Called AFTER source project copy so curated files always win.
+ * Set up agent-outputs root with centralized CLAUDE.md, .claude/, and .env.
+ *
+ * Instead of copying skills/agents/env into every project directory (which clutters
+ * each project), we place them once at the agent-outputs root. The Agent SDK's cwd
+ * is set to agent-outputs/, so it reads CLAUDE.md and discovers .claude/skills/ from there.
+ *
+ * This is called before each worker spawn to ensure files are fresh.
  * Skipped for self-enhance/skill-build workers (they use the agent repo directly).
  */
-function copyClaudeFilesToOutput(projectPath: string): void {
-  if (!existsSync(CLAUDE_FILES_DIR)) {
-    console.log(`[Worker] Warning: claude-files-to-output/ not found, skipping skill/agent copy`);
-    return;
+function setupAgentOutputsRoot(): void {
+  // Create root if needed
+  if (!existsSync(AGENT_OUTPUTS_BASE)) {
+    mkdirSync(AGENT_OUTPUTS_BASE, { recursive: true });
+    console.log(`[Worker] Created agent-outputs root: ${AGENT_OUTPUTS_BASE}`);
   }
 
-  const destDir = path.join(projectPath, '.claude');
-  try {
-    cpSync(CLAUDE_FILES_DIR, destDir, { recursive: true });
-    console.log(`[Worker] Copied worker-facing skills and agents to ${destDir}`);
-  } catch (error) {
-    console.log(`[Worker] Warning: Failed to copy claude files to output: ${error}`);
+  // Copy .env to agent-outputs root (always refresh in case keys change)
+  const envSource = path.join(AGENT_BASE, '.env');
+  const envDest = path.join(AGENT_OUTPUTS_BASE, '.env');
+  if (existsSync(envSource)) {
+    copyFileSync(envSource, envDest);
   }
+
+  // Copy .claude/ (skills + agents) to agent-outputs root
+  if (existsSync(CLAUDE_FILES_DIR)) {
+    const destDir = path.join(AGENT_OUTPUTS_BASE, '.claude');
+    try {
+      cpSync(CLAUDE_FILES_DIR, destDir, { recursive: true });
+      console.log(`[Worker] Synced .claude/ skills and agents to ${destDir}`);
+    } catch (error) {
+      console.log(`[Worker] Warning: Failed to sync .claude/ to agent-outputs root: ${error}`);
+    }
+  }
+
+  // Generate CLAUDE.md at agent-outputs root
+  generateOutputsClaudeMd();
+}
+
+/**
+ * Generate CLAUDE.md at the agent-outputs root.
+ * This is what the Agent SDK reads when cwd is set to agent-outputs/.
+ * Explains the monorepo structure and rules for workers.
+ */
+function generateOutputsClaudeMd(): void {
+  const claudeMdPath = path.join(AGENT_OUTPUTS_BASE, 'CLAUDE.md');
+  const content = `# Agent Outputs Workspace
+
+This is the centralized workspace for all projects built by the Continuous Executive Agent.
+It operates as a **monorepo** — multiple independent projects coexist here, each in its own subdirectory.
+
+## Directory Structure
+
+\`\`\`
+agent-outputs/
+├── CLAUDE.md              # This file — workspace-wide instructions (do not modify)
+├── .env                   # Shared API keys (do not modify or commit)
+├── .claude/               # Shared Claude skills and agents (do not modify)
+│   ├── skills/            # Reusable skill definitions (use via Skill tool)
+│   └── agents/            # Subagent definitions (use via Task tool)
+└── projects/              # All project directories
+    └── {category}/        # Organized by technology (nextjs, react, node, python, misc)
+        └── {date}/        # Organized by creation date
+            └── {id}/      # Individual project workspace
+\`\`\`
+
+## CRITICAL RULES
+
+1. **Work ONLY in your assigned project directory.** Your prompt tells you which directory is yours.
+2. **Navigate to your project directory first** before doing any work:
+   \`\`\`bash
+   cd <your-project-path>
+   \`\`\`
+3. **NEVER modify files outside your project directory**, including:
+   - This CLAUDE.md file
+   - The root .env file
+   - The .claude/ directory
+   - Any other project's directory
+4. **Initialize git** in your project directory if it doesn't have a repo yet.
+5. **Commit all your work** to your project's git repo before finishing.
+
+## Available Skills
+
+Skills in \`.claude/skills/\` are shared across all projects. Use the \`Skill\` tool to invoke them by name.
+Do NOT copy or duplicate these skill files into your project directory.
+
+## API Keys
+
+Shared API keys are in \`.env\` at this root level. If your project needs its own environment
+variables (e.g., NEXT_PUBLIC_ vars), create a separate \`.env\` inside your project directory.
+
+## Technology Preferences
+
+- **Language priority:** JavaScript > Python > Other
+- Prefer JavaScript/Node.js for most tasks
+- Use plain JavaScript over TypeScript when possible
+- Only use Python if JavaScript SDK/library is unavailable
+- Stick to ONE language per project — don't add "complementary" implementations
+`;
+
+  writeFileSync(claudeMdPath, content, 'utf-8');
 }
 
 /**
@@ -517,11 +593,18 @@ export async function spawnWorker(
     }
   }
 
-  // Copy worker-facing Claude files (skills + agents) to output projects
+  // Set up centralized CLAUDE.md, .claude/, and .env at agent-outputs root
   // Skip for self-enhance/skill-build — they work in the agent repo which already has .claude/
   if (!isSelfEnhance && !isSkillBuild) {
-    copyClaudeFilesToOutput(projectPath);
+    setupAgentOutputsRoot();
   }
+
+  // Compute relative project path (relative to agent-outputs root).
+  // Regular workers use this in their prompts since cwd is agent-outputs/.
+  // Self-enhance/skill-build use the absolute path since cwd is the agent repo.
+  const relativeProjectPath = (isSelfEnhance || isSkillBuild)
+    ? projectPath
+    : path.relative(AGENT_OUTPUTS_BASE, projectPath);
 
   // Build prompt - use specialized prompts for self-enhance and skill-build tasks
   let prompt: string;
@@ -530,7 +613,8 @@ export async function spawnWorker(
   } else if (isSkillBuild && workItem) {
     prompt = buildSkillBuildPrompt(contract, workItem);
   } else {
-    prompt = await buildWorkerPrompt(contract, projectPath, workItem, retryContext);
+    // Pass relative path so workers navigate from the agent-outputs cwd
+    prompt = await buildWorkerPrompt(contract, relativeProjectPath, workItem, retryContext);
   }
 
   // Track which strategy we're using if retrying
@@ -554,6 +638,8 @@ export async function spawnWorker(
   logger.log(`=== WORKER START ===`);
   logger.log(`Task ID: ${contract.id}`);
   logger.log(`Project Path: ${projectPath}`);
+  logger.log(`Relative Path: ${relativeProjectPath}`);
+  logger.log(`CWD: ${(isSelfEnhance || isSkillBuild) ? projectPath : AGENT_OUTPUTS_BASE}`);
   logger.log(`Category: ${category}`);
   logger.log(`Model: ${model}`);
   logger.log(`Max Turns: ${contract.max_turns}`);
@@ -564,14 +650,20 @@ export async function spawnWorker(
 
   try {
 
-    // Query Claude using the Agent SDK with project directory as cwd
+    // Determine cwd for the Agent SDK:
+    // - Self-enhance/skill-build: AGENT_BASE (the agent codebase)
+    // - Regular workers: AGENT_OUTPUTS_BASE (monorepo root, NOT per-project)
+    //   CLAUDE.md, .claude/skills, .claude/agents all live at agent-outputs root.
+    //   Workers navigate to their project subdirectory via prompt instructions.
+    const workerCwd = (isSelfEnhance || isSkillBuild) ? projectPath : AGENT_OUTPUTS_BASE;
+
     // CRITICAL: settingSources enables skill/agent loading from user + project
     const stream = query({
       prompt,
       options: {
         model,
         maxTurns: contract.max_turns,
-        cwd: projectPath,  // Self-enhance uses AGENT_BASE, regular uses agent-outputs
+        cwd: workerCwd,
         allowedTools: allowedTools,
         settingSources: ['user', 'project'] as const,  // REQUIRED for skills and agents
       },
