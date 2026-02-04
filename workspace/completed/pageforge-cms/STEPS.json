@@ -1,0 +1,471 @@
+{
+  "version": 1,
+  "created_at": "2026-02-04T04:53:42.320Z",
+  "trigger": "auto",
+  "revision": 63,
+  "steps": [
+    {
+      "step_number": 0,
+      "title": "Research and plan architecture",
+      "description": "Analyze the full requirements across all files in requirements/ and PROMPT.md. Map out the complete architecture including: database schema with all tables (profiles, sites, pages, page_versions, media, components, templates, content_fragments, fragment_versions, media_folders, menus, activity_log, review_requests, form_submissions, api_keys, webhooks, invitations, notifications, newsletter_subscribers), component registry design, auth flow with Supabase, folder structure for Next.js 15 App Router, Drizzle ORM setup strategy, file upload strategy with Supabase Storage, and integration points between all features. Create a detailed implementation plan prioritizing: 1) Project setup and dependencies, 2) Database schema and auth, 3) Core editor (7 components), 4) Extended components (9 more), 5) Advanced features (templates, fragments, publish workflow, media library, forms, navigation, SEO, API, analytics). Identify critical dependencies and potential risks (React 19 compatibility with @dnd-kit, Tiptap SSR, Supabase Storage CORS). Document the component rendering pipeline and state management approach for the editor.",
+      "status": "complete",
+      "dependencies": [],
+      "estimated_turns": 40,
+      "id": "step-0",
+      "order": 0,
+      "started_at": "2026-02-04T04:53:42.335Z",
+      "completed_at": "2026-02-04T05:01:58.310Z",
+      "completed_by_contract": "contract-1770180822334"
+    },
+    {
+      "step_number": 1,
+      "title": "Initialize Next.js project with Tailwind v4",
+      "description": "Create new Next.js 15 project with TypeScript and App Router. Install all dependencies: next@15, react@19, typescript, tailwindcss@4, @tailwindcss/postcss, postcss, @supabase/supabase-js, @supabase/ssr, drizzle-orm, postgres, @dnd-kit/core, @dnd-kit/sortable, @tiptap/react, @tiptap/starter-kit, lucide-react, date-fns, zod, react-hook-form. Configure Tailwind v4 CSS-first setup with postcss.config.mjs and app/globals.css using @import \"tailwindcss\". Set up TypeScript with strict mode. Create folder structure: app/(auth), app/(dashboard), app/(public), app/api, lib/, components/ui, components/editor, components/renderers, drizzle/. Set up .env.example with SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, DATABASE_URL. Create basic layout files and verify the dev server runs cleanly.",
+      "status": "complete",
+      "dependencies": [
+        0
+      ],
+      "estimated_turns": 50,
+      "id": "step-1",
+      "order": 1,
+      "started_at": "2026-02-04T05:01:59.456Z",
+      "completed_at": "2026-02-04T05:07:59.855Z",
+      "completed_by_contract": "contract-1770181319455"
+    },
+    {
+      "step_number": 2,
+      "title": "Set up Supabase connection and Drizzle ORM",
+      "description": "Configure Supabase client for both client-side and server-side usage using @supabase/ssr patterns. Create lib/supabase/client.ts (browser client), lib/supabase/server.ts (server client with cookies), and lib/supabase/middleware.ts. Set up Drizzle ORM with postgres-js driver connecting to Supabase. Create drizzle.config.ts and lib/db/index.ts. Define all Drizzle schema files in lib/db/schema/ for: profiles, sites, pages, page_versions, media, components, templates, content_fragments, fragment_versions, media_folders, menus, activity_log, review_requests, form_submissions, api_keys, webhooks, invitations, notifications, newsletter_subscribers. Include all indexes, foreign keys, and constraints from database-schema.md. Generate migration files with drizzle-kit and document the push command to apply schema to Supabase. Create helper functions for common queries. Verify connection works with a test query.",
+      "status": "complete",
+      "dependencies": [
+        1
+      ],
+      "estimated_turns": 60,
+      "id": "step-2",
+      "order": 2,
+      "started_at": "2026-02-04T05:08:01.437Z",
+      "completed_at": "2026-02-04T05:18:41.172Z",
+      "completed_by_contract": "contract-1770181681437"
+    },
+    {
+      "step_number": 3,
+      "title": "Implement authentication system",
+      "description": "Build complete auth flow using Supabase Auth native (not Auth.js). Create pages: app/(auth)/login/page.tsx, app/(auth)/register/page.tsx, app/(auth)/logout/route.ts. Implement email/password authentication with Supabase signInWithPassword and signUp. Create middleware.ts to protect /dashboard/* routes and redirect unauthenticated users to /login. Set up database trigger (SQL function) to auto-create profile row in profiles table when auth.users row is inserted, defaulting role to 'author'. Create lib/auth/session.ts with helper functions: getSession(), getUser(), requireAuth(). Implement role-based authorization helpers: requireAdmin(), requireAuthor(), hasRole(). Create a user dropdown component in the dashboard header showing display name, avatar, and logout button. Add profile context/hook for accessing current user throughout the app. Test the full flow: register → auto-profile creation → login → middleware protection → role checks.",
+      "status": "complete",
+      "dependencies": [
+        2
+      ],
+      "estimated_turns": 70,
+      "id": "step-3",
+      "order": 3,
+      "started_at": "2026-02-04T05:18:43.095Z",
+      "completed_at": "2026-02-04T05:26:13.667Z",
+      "completed_by_contract": "contract-1770182323095"
+    },
+    {
+      "step_number": 4,
+      "title": "Build RLS policies and storage buckets",
+      "description": "Create SQL migration file with all Row Level Security policies for every table as specified in database-schema.md and requirement files. Policies for profiles (SELECT all, UPDATE own), sites (admin sees all, authors see their own), pages (admin all, authors their sites, published are public), page_versions (inherit page access), media (all authenticated for SELECT, uploader/admin for DELETE), templates (SELECT all, admin INSERT/UPDATE/DELETE), content_fragments (site access), media_folders (site access), menus (SELECT all, admin write), activity_log (SELECT site access, INSERT server-only), review_requests (author/admin), form_submissions (public INSERT, admin UPDATE/DELETE), api_keys (admin only), webhooks (admin only), invitations (admin write, invitee read by token), notifications (user sees own). Create Supabase Storage bucket 'media' with public access, 10MB max file size, allowed mime types for images. Configure CORS if needed for localhost uploads. Test policies by querying as different user roles and verify access control works correctly.",
+      "status": "complete",
+      "dependencies": [
+        3
+      ],
+      "estimated_turns": 50,
+      "id": "step-4",
+      "order": 4,
+      "started_at": "2026-02-04T05:26:15.174Z",
+      "completed_at": "2026-02-04T05:32:26.950Z",
+      "completed_by_contract": "contract-1770182775173"
+    },
+    {
+      "step_number": 5,
+      "title": "Create dashboard layout and navigation",
+      "description": "Build the main dashboard layout in app/(dashboard)/dashboard/[siteId]/layout.tsx with persistent sidebar navigation. Implement collapsible sidebar with icons and labels: Dashboard, Pages, Templates, Fragments, Media, Forms, Navigation, Activity, Settings. Add mobile responsive drawer version. Create site switcher dropdown in header for users with multiple sites. Implement global search (Cmd+K) with command palette UI using headlessui or radix-ui. Create notification bell component with unread count badge and dropdown showing last 10 notifications. Build dashboard home page at app/(dashboard)/dashboard/[siteId]/page.tsx with stats cards (total pages, published, drafts, in review, media files, form submissions), recent pages widget, quick actions buttons (new page, upload media, view site), recent activity feed widget, and form submissions widget. Create reusable UI components: Button, Card, Badge, Dropdown, Modal, Input, Textarea in components/ui/. Style with Tailwind v4 following the modern, clean aesthetic described in the requirements.",
+      "status": "complete",
+      "dependencies": [
+        4
+      ],
+      "estimated_turns": 80,
+      "id": "step-5",
+      "order": 5,
+      "started_at": "2026-02-04T05:32:28.327Z",
+      "completed_at": "2026-02-04T05:41:40.129Z",
+      "completed_by_contract": "contract-1770183148327"
+    },
+    {
+      "step_number": 6,
+      "title": "Implement media library with folders and upload",
+      "description": "Build the media library page at app/(dashboard)/dashboard/[siteId]/media/page.tsx with folder tree sidebar, media grid view, and detail panel. Implement folder CRUD operations (create, rename, delete, move) with nested folder support (max 5 levels deep). Create drag-and-drop upload component supporting multiple files (up to 20) with progress indicators. Implement file upload to Supabase Storage bucket 'media' with server-side API route POST /api/media/upload that: receives multipart/form-data, uploads to storage, extracts image dimensions using sharp or next/image, generates renditions (thumbnail 200px, medium 800px, large 1600px) using Supabase Storage image transformation URLs, creates media database row with metadata. Add tagging system with tag input component and autocomplete. Implement full-text search across filename, title, alt_text, description, and tags using tsvector. Add filters for file type, date range, uploaded by, tags, size. Create media detail side panel with editable fields (title, alt text, description, tags, folder), copy URL buttons, delete confirmation, and usage tracking ('Used on N pages'). Create reusable MediaPicker modal component for use in the page editor. Test upload, search, filtering, and folder organization.",
+      "status": "complete",
+      "dependencies": [
+        5
+      ],
+      "estimated_turns": 100,
+      "id": "step-6",
+      "order": 6,
+      "started_at": "2026-02-04T05:41:41.576Z",
+      "completed_at": "2026-02-04T05:51:19.956Z",
+      "completed_by_contract": "contract-1770183701575"
+    },
+    {
+      "step_number": 7,
+      "title": "Build component registry and seed data",
+      "description": "Create the component type registry system. Define seed data for all 16 component types in the components table: hero, text, image, two-column, cta, testimonial, spacer, accordion, tabs, carousel, video, form, card-grid, embed, header, footer. Each with type, label, icon (Lucide name), description, default_props JSON, prop_schema JSON, and sort_order. Create a seed script lib/db/seed.ts that: creates 3 users (admin@pageforge.dev admin, author@pageforge.dev author, viewer@pageforge.dev viewer all with password 'password123') via Supabase Admin API, creates 1 demo site 'PageForge Demo' with slug 'demo', seeds all 16 component definitions, creates 5 page templates (Blank, Landing, Blog, About, Contact), creates 2 content fragments (Global CTA Banner, Company Info Footer), creates 3 sample pages (Home published, About published, Blog draft) with real component content spanning multiple component types, uploads 5 sample media files to Supabase Storage with database entries, creates header and footer menus with navigation items, populates theme_config and social_links for the demo site. Make the seed script runnable via npm run db:seed. Test that all seed data is created correctly and relationships are intact.",
+      "status": "complete",
+      "dependencies": [
+        6
+      ],
+      "estimated_turns": 70,
+      "id": "step-7",
+      "order": 7,
+      "started_at": "2026-02-04T05:51:21.220Z",
+      "completed_at": "2026-02-04T06:01:40.956Z",
+      "completed_by_contract": "contract-1770184281219"
+    },
+    {
+      "step_number": 8,
+      "title": "Implement core component renderers (7 components)",
+      "description": "Create renderer components for the 7 core component types in components/renderers/. Each renderer receives props and renders semantic HTML with Tailwind v4 styling. Hero: full-width banner with background image (next/image), title, subtitle, CTA button, alignment variants (left/center/right). Text Block: render HTML content from Tiptap with semantic headings, paragraphs, lists. Image: next/image with alt text, caption in figcaption, width variants (full/wide/medium/narrow). Two-Column: side-by-side layout with leftContent and rightContent (render as text or nested components), responsive stacking on mobile. CTA: prominent section with heading, description, button with variant styles (primary/secondary/outline). Testimonial: quote card with blockquote, author name, role, avatar image. Spacer: vertical spacing component with height variants (sm/md/lg/xl) using margin or padding. All components must be accessible (semantic HTML, ARIA labels where needed, keyboard navigable). Test each renderer with sample props and verify responsive behavior.",
+      "status": "complete",
+      "dependencies": [
+        7
+      ],
+      "estimated_turns": 80,
+      "id": "step-8",
+      "order": 8,
+      "started_at": "2026-02-04T06:01:42.719Z",
+      "completed_at": "2026-02-04T06:08:54.753Z",
+      "completed_by_contract": "contract-1770184902719"
+    },
+    {
+      "step_number": 9,
+      "title": "Build page editor shell and canvas",
+      "description": "Create the page editor at app/(dashboard)/dashboard/[siteId]/pages/[pageId]/edit/page.tsx with three-panel layout: left component palette, center canvas, right property panel. Implement EditorContext using React Context to manage editor state: components array, selected component ID, history stack (for undo/redo), clipboard. Create the canvas component that renders the current components array using a read-only version of ComponentRenderer, but with editor-specific chrome (drag handles, selection outlines, click-to-select). Show empty state when canvas is empty ('Drag components from palette to start building'). Implement component selection (click a component on canvas to select it, show blue outline with ring-2 ring-blue-500). Create component toolbar overlay on selected component with delete button and drag handle. Add viewport toggle in editor toolbar (desktop/tablet/mobile) that constrains canvas width. Set up the property panel as an empty container that will display props based on selected component type. Create editor toolbar with buttons: Save (disabled initially), Preview, Publish (admin only), Version History. Test the editor shell loads, canvas renders components, and selection works.",
+      "status": "complete",
+      "dependencies": [
+        8
+      ],
+      "estimated_turns": 90,
+      "id": "step-9",
+      "order": 9,
+      "started_at": "2026-02-04T06:08:56.130Z",
+      "completed_at": "2026-02-04T06:15:45.344Z",
+      "completed_by_contract": "contract-1770185336130"
+    },
+    {
+      "step_number": 10,
+      "title": "Implement drag-and-drop with @dnd-kit",
+      "description": "Integrate @dnd-kit/core and @dnd-kit/sortable for drag-and-drop functionality. Create the component palette in the left panel with draggable component cards (one for each of the 16 component types) using DragOverlay. Each palette item shows icon, label, and description. Implement palette drag: when dragging from palette, show a ghost/preview of the component. Make the canvas a drop zone using useDroppable. When a component is dropped from palette onto canvas, add a new component block to the components array with a unique ID (crypto.randomUUID()) and default props from the component definition. Implement sortable reordering on the canvas using useSortable for each component block - allow vertical drag to reorder. Show drag handle (grip dots icon) on each component in the canvas. Update the EditorContext state on every drop and reorder operation. Add each state change to the undo history stack. Test: drag from palette to add components, drag on canvas to reorder, verify components array updates correctly and canvas re-renders.",
+      "status": "complete",
+      "dependencies": [
+        9
+      ],
+      "estimated_turns": 80,
+      "id": "step-10",
+      "order": 10,
+      "started_at": "2026-02-04T06:15:46.619Z",
+      "completed_at": "2026-02-04T06:22:59.561Z",
+      "completed_by_contract": "contract-1770185746619"
+    },
+    {
+      "step_number": 11,
+      "title": "Build property panel and editors for core components",
+      "description": "Create property editor components for each of the 7 core component types in components/editor/properties/. Each property editor receives the component props and an onChange callback. Hero editor: text inputs for title and subtitle, MediaPicker for backgroundImage, text inputs for ctaText and ctaLink, radio buttons for alignment. Text Block editor: integrate Tiptap editor with @tiptap/react and @tiptap/starter-kit, toolbar with bold/italic/underline/heading/bullet list/ordered list buttons, content editable area, output HTML on change. Image editor: MediaPicker for src, text inputs for alt and caption, select for width. Two-Column editor: two Tiptap instances for leftContent and rightContent. CTA editor: text inputs for heading, description, buttonText, buttonLink, select for variant. Testimonial editor: text inputs for quote, author, role, MediaPicker for avatarUrl. Spacer editor: select/radio buttons for height. Wire up the property panel to show the correct editor based on selectedComponent.type. When props change in property panel, update the component in the components array and add to history (debounced to avoid history spam). Test editing props for each component type and verify canvas updates in real-time.",
+      "status": "complete",
+      "dependencies": [
+        10
+      ],
+      "estimated_turns": 90,
+      "id": "step-11",
+      "order": 11,
+      "started_at": "2026-02-04T06:23:01.006Z",
+      "completed_at": "2026-02-04T06:30:34.244Z",
+      "completed_by_contract": "contract-1770186181005"
+    },
+    {
+      "step_number": 12,
+      "title": "Implement undo/redo and copy/paste",
+      "description": "Implement full undo/redo system in EditorContext with past/present/future state stacks (max depth 50). Track state changes on: add component, remove component, reorder component, edit component props (debounced 500ms). Implement keyboard shortcuts using useEffect with keydown listener: Ctrl+Z for undo, Ctrl+Shift+Z for redo, Ctrl+C for copy selected component, Ctrl+V for paste (below selected or at bottom), Ctrl+X for cut, Ctrl+D for duplicate, Delete/Backspace to delete selected, Ctrl+A to select all, Escape to deselect. Implement clipboard state in EditorContext (in-memory only, not system clipboard). Deep-clone component props on paste/duplicate and assign new IDs. Add undo/redo buttons in editor toolbar with disabled state when stacks are empty. Implement multi-select with Shift+Click to add/remove from selection. When multi-selected, allow bulk delete (single history entry) and disable property panel (show 'N components selected' message). Test all keyboard shortcuts and verify undo/redo works correctly across all operation types.",
+      "status": "complete",
+      "dependencies": [
+        11
+      ],
+      "estimated_turns": 70,
+      "id": "step-12",
+      "order": 12,
+      "started_at": "2026-02-04T06:30:37.439Z",
+      "completed_at": "2026-02-04T06:40:29.858Z",
+      "completed_by_contract": "contract-1770186637439"
+    },
+    {
+      "step_number": 13,
+      "title": "Implement page save and version history",
+      "description": "Create API route POST /api/pages/[pageId]/save that receives the components array and creates a new page_versions row with incremented version_number. Update pages.current_version and pages.updated_at. Wire up the Save button in editor toolbar to call this API route with the current canvas state. Show loading state during save and success toast notification. Implement activity logging: call logActivity() to record 'page.updated' action. Reset undo/redo history after successful save (save = new checkpoint). Create version history panel (slide-out drawer or modal) that lists all versions for the current page, showing version number, created_at timestamp (relative time), and created_by display name. Each version row has a 'View' button that loads that version's content into a read-only preview modal, and a 'Restore' button (with confirmation) that loads that version's content into the canvas as the new working state (doesn't auto-save). Test saving multiple times, verify version_number increments, view version history, and restore a previous version.",
+      "status": "complete",
+      "dependencies": [
+        12
+      ],
+      "estimated_turns": 60,
+      "id": "step-13",
+      "order": 13,
+      "started_at": "2026-02-04T06:40:31.264Z",
+      "completed_at": "2026-02-04T06:47:26.385Z",
+      "completed_by_contract": "contract-1770187231263"
+    },
+    {
+      "step_number": 14,
+      "title": "Build extended component renderers (Accordion, Tabs, Carousel, Video)",
+      "description": "Create renderers for Accordion, Tabs, Carousel, and Video components. Accordion: render items array with collapsible sections using either <details>/<summary> or ARIA accordion pattern (role=region, aria-expanded, aria-controls), support allowMultipleOpen prop, implement variants (default, bordered, separated), animated expand/collapse with CSS transitions, chevron icon rotation. Tabs: render tabs array with ARIA tablist/tab/tabpanel pattern, support variants (default, pills, underline, bordered), keyboard navigation (arrow keys, Enter/Space), animated tab switching (fade-in content, sliding underline for underline variant). Carousel: render slides array as an image slideshow, implement auto-play with interval timer (pausable on hover), navigation arrows (previous/next), dot indicators (clickable), support variants (full width, cards with peek, thumbnails), animated slide transitions (translateX or fade), pause button for accessibility. Video: support source types (youtube, vimeo, url), render iframe for youtube/vimeo with proper embed URLs, render <video> tag for self-hosted with poster image, support autoPlay/muted/loop/showControls props, lazy load with poster overlay and play button (click to load actual video). All components must respect prefers-reduced-motion and have proper accessibility (ARIA labels, keyboard support, screen reader announcements). Mark these as 'use client' components since they require interactivity.",
+      "status": "complete",
+      "dependencies": [
+        13
+      ],
+      "estimated_turns": 100,
+      "id": "step-14",
+      "order": 14,
+      "started_at": "2026-02-04T06:47:27.874Z",
+      "completed_at": "2026-02-04T06:53:58.140Z",
+      "completed_by_contract": "contract-1770187647874"
+    },
+    {
+      "step_number": 15,
+      "title": "Build extended component renderers (Form, Card Grid, Embed, Header, Footer)",
+      "description": "Create renderers for Form, Card Grid, Embed, Header, and Footer components. Form: render fields array as form elements (text/email/phone input, textarea, select dropdown, radio, checkbox, number, date, file upload), implement HTML5 validation (required, type, pattern, minLength, maxLength, min, max), client-side validation with real-time error messages (aria-describedby, aria-invalid, aria-required), submit handler that POSTs to /api/forms/submit with form data, show success message on submit, disable button during submission, support variants (default, card, inline), honeypot field for spam detection. Card Grid: render cards array as responsive grid (CSS Grid with auto-fit minmax), support columns (2/3/4) with responsive breakpoints (1 col mobile, 2 col tablet, configured on desktop), variants (default vertical, horizontal, minimal, overlay), image aspect ratio control, hover effects (lift, shadow), fade-in animation on scroll (Intersection Observer). Embed: support mode (url/html/preset), iframe rendering for url mode with sandbox attribute, srcdoc iframe for html mode, preset integrations (Google Maps, Twitter, Instagram, CodePen, Figma) with proper embed URLs, aspect ratio wrapper, admin-only HTML mode with security warning. Header: integrate with menus system (fetch header menu), render logo, horizontal navigation with dropdown submenus (hover on desktop, click on mobile), CTA button, variants (default, centered, transparent, minimal), sticky header with scroll detection (add shadow on scroll), mobile hamburger menu with slide-out drawer. Footer: integrate with menus system (fetch footer menu), render as link columns (each top-level menu item = column heading), social links from site settings, newsletter signup form (POST to /api/newsletter/subscribe), copyright text, bottom links, variants (columns, simple, centered). Mark Header, Footer, Form as 'use client'. Test all components with various prop configurations.",
+      "status": "complete",
+      "dependencies": [
+        14
+      ],
+      "estimated_turns": 100,
+      "id": "step-15",
+      "order": 15,
+      "started_at": "2026-02-04T06:53:59.569Z",
+      "completed_at": "2026-02-04T07:04:53.860Z",
+      "completed_by_contract": "contract-1770188039569"
+    },
+    {
+      "step_number": 16,
+      "title": "Build property editors for extended components",
+      "description": "Create property editor components for all 9 extended component types. Accordion editor: list-based editor with drag-to-reorder items, inline title input per item, 'Edit Content' button that opens Tiptap modal for item.content, delete button per item, 'Add Item' button, variant selector, icon position toggle, allow multiple open checkbox. Tabs editor: similar list-based editor for tabs array, inline label input, Tiptap modal for content, optional icon picker (Lucide icon dropdown), variant and alignment selectors. Carousel editor: list-based editor for slides, MediaPicker per slide for imageUrl, text inputs for alt and caption, optional link input, drag-to-reorder, auto-play settings (checkbox, interval slider), show arrows/dots toggles, aspect ratio selector. Video editor: radio buttons for source (youtube/vimeo/url), URL parser that auto-detects and extracts video ID, title input, caption input, MediaPicker for poster image, auto-play/muted/loop/controls checkboxes, aspect ratio and max width selectors. Form editor: list-based field builder with drag-to-reorder, 'Add Field' button that opens type selector modal, per-field inputs (label, placeholder, required checkbox, validation rules), options input for select/radio/checkbox types, width selector (full/half), notify email input, submit button text input. Card Grid editor: list-based cards editor, MediaPicker for card images, text inputs for title and description, link inputs, badge input, drag-to-reorder, columns selector, variant selector, gap toggle, show images checkbox, aspect ratio and equal height toggles. Embed editor: mode radio (url/html/preset), URL input with preview button, HTML textarea (code editor style) with admin-only warning, preset selector buttons (renders preset-specific config inputs), title input, aspect ratio and max width selectors, sandbox checkbox. Header editor: variant selector, show logo/navigation/cta checkboxes, CTA text/link/variant inputs, sticky checkbox, background color picker,",
+      "status": "complete",
+      "dependencies": [
+        15
+      ],
+      "estimated_turns": 100,
+      "id": "step-16",
+      "order": 16,
+      "started_at": "2026-02-04T07:04:55.394Z",
+      "completed_at": "2026-02-04T07:13:06.099Z",
+      "completed_by_contract": "contract-1770188695394"
+    },
+    {
+      "step_number": 17,
+      "title": "Implement template system",
+      "description": "Build template gallery modal at components/editor/TemplateGallery.tsx that opens when user clicks 'New Page'. Query templates from database for current site, display as grid of cards (thumbnail, name, description, component count badge), always show 'Blank Page' as first option. On template selection, prompt for page title and slug inputs, then create new page with content copied from template. Create template management page at app/(dashboard)/dashboard/[siteId]/templates/page.tsx (admin only) with list of templates, create/edit/delete actions. Build template editor at app/(dashboard)/dashboard/[siteId]/templates/[templateId]/edit/page.tsx using the same three-panel editor layout, but with additional 'Lock Component' toggle button on each component's toolbar. Locked components render with lock icon and gray border, cannot be dragged/deleted/edited by authors (admin can unlock). Implement locked_regions JSON array that stores locked component IDs. Add 'Save as Template' button in page editor toolbar (admin only) that copies current page content to a new template. Create API routes: POST /api/templates (create), PATCH /api/templates/[id] (update), DELETE /api/templates/[id] (delete with safety check for usage), GET /api/templates (list). Implement RLS policies (SELECT all, INSERT/UPDATE/DELETE admin only). Test template creation, locking regions, page creation from template, and verify locked regions are enforced for authors.",
+      "status": "complete",
+      "dependencies": [
+        16
+      ],
+      "estimated_turns": 80,
+      "id": "step-17",
+      "order": 17,
+      "started_at": "2026-02-04T07:13:07.714Z",
+      "completed_at": "2026-02-04T07:23:28.321Z",
+      "completed_by_contract": "contract-1770189187714"
+    },
+    {
+      "step_number": 18,
+      "title": "Implement content fragments system",
+      "description": "Create fragment reference component renderer that resolves fragmentId at render time by querying content_fragments table and recursively rendering the fragment's content array using ComponentRenderer. Build fragments list page at app/(dashboard)/dashboard/[siteId]/fragments/page.tsx with grid view of all fragments (name, description, tags, last updated, usage count). Implement fragment editor at app/(dashboard)/dashboard/[siteId]/fragments/[fragmentId]/edit/page.tsx using the same three-panel editor layout. Saving a fragment creates a new fragment_versions row and updates content_fragments.content. Create 'Fragment' component type in the component registry with property editor that has a FragmentPicker (dropdown or modal showing all fragments). When a fragment is selected, render it on the canvas with a bordered card showing fragment name, badge icon, and the fragment's content (read-only on page canvas). Add 'Edit Fragment' button that opens the fragment editor in a new tab. Implement usage tracking: compute which pages reference a fragment by querying page_versions.content for fragmentId. Show 'Used on N pages' in fragment editor toolbar with dropdown listing page links. Create API routes for fragment CRUD. Add activity logging for fragment.created, fragment.updated, fragment.deleted actions. Test creating fragments, referencing them in pages, editing fragments, and verify changes propagate to all pages using that fragment.",
+      "status": "complete",
+      "dependencies": [
+        17
+      ],
+      "estimated_turns": 70,
+      "id": "step-18",
+      "order": 18,
+      "started_at": "2026-02-04T07:23:29.614Z",
+      "completed_at": "2026-02-04T07:33:09.928Z",
+      "completed_by_contract": "contract-1770189809614"
+    },
+    {
+      "step_number": 19,
+      "title": "Implement publish workflow and scheduling",
+      "description": "Extend page status to support 5 states: draft, in_review, scheduled, published, archived. Update status check constraint in database. Build review submission flow: 'Submit for Review' button in editor (author), creates review_requests row with status='pending', changes page status to 'in_review', sends notification to admins. Create review approval UI: admins see 'Review' badge on pages in list, editor shows 'Approve & Publish' and 'Reject' buttons, approval changes status to 'published' and sets published_at/published_by, rejection returns to 'draft' with optional reviewer_notes. Implement scheduled publishing: 'Schedule Publish' button opens date/time picker (react-datepicker or native), sets scheduled_at and status='scheduled', shows 'Scheduled for [date]' badge. Create auto-publish mechanism using Supabase Edge Function triggered by pg_cron every 5 minutes that UPDATEs pages WHERE status='scheduled' AND scheduled_at <= NOW() to status='published'. Add 'Cancel Schedule' button for scheduled pages. Implement page locking: on editor load, set locked_by and locked_at, show warning if another user has lock with 'Open Read-Only' or 'Force Unlock' (admin) options, release lock on navigate away (beforeunload API call), auto-expire stale locks (>30 min). Add Archive flow: 'Archive' button with confirmation, moves page to archived status, create 'Archived' tab in pages list, 'Restore' button for admins. Implement bulk actions in pages list: checkboxes per row, 'Archive Selected' and 'Delete Selected' buttons. Update RLS policies (only admin can set published/scheduled). Test full lifecycle: draft → in_review → scheduled → auto-published → archived → restored.",
+      "status": "complete",
+      "dependencies": [
+        18
+      ],
+      "estimated_turns": 90,
+      "id": "step-19",
+      "order": 19,
+      "started_at": "2026-02-04T07:33:11.929Z",
+      "completed_at": "2026-02-04T07:44:39.129Z",
+      "completed_by_contract": "contract-1770190391928"
+    },
+    {
+      "step_number": 20,
+      "title": "Implement navigation management system",
+      "description": "Create menus table with items JSONB storing nested menu structure. Build navigation management page at app/(dashboard)/dashboard/[siteId]/navigation/page.tsx (admin only) with menu selector dropdown (header/footer/sidebar), visual menu editor with two panels (left: tree of menu items with drag handles, right: selected item settings). Implement menu item tree with drag-to-reorder and drag-to-nest (max depth 2 for header, 3 for sidebar). Each menu item has type (page/url/fragment/divider), label, icon (optional Lucide picker), target (_self/_blank), cssClass. Create 'Add Item' button that adds new item to tree. Item settings panel shows: label input, type selector, PagePicker for type='page' (dropdown of site's pages), URL input for type='url', icon picker, target toggle, CSS class input, delete button. Implement validation: max 50 items, enforce max depth, warn if linked page is draft/deleted. Add 'Preview' button that renders menu as it would appear on site. Create API routes: GET /api/menus (list), POST /api/menus (create), PATCH /api/menus/[id] (update), DELETE /api/menus/[id]. Build breadcrumb generation logic: find current page in all menus, walk up parent chain to build breadcrumb trail, always start with Home. Create Breadcrumb component that renders <nav aria-label='Breadcrumb'><ol> with semantic markup. Update Header and Footer renderers to query menus by location and render items (Header: horizontal nav with dropdown on hover, Footer: column groups). Test menu creation, nesting, reordering, page linking, breadcrumb generation, and rendering in header/footer.",
+      "status": "complete",
+      "dependencies": [
+        19
+      ],
+      "estimated_turns": 80,
+      "id": "step-20",
+      "order": 20,
+      "started_at": "2026-02-04T07:44:41.781Z",
+      "completed_at": "2026-02-04T07:56:25.898Z",
+      "completed_by_contract": "contract-1770191081781"
+    },
+    {
+      "step_number": 21,
+      "title": "Implement SEO management",
+      "description": "Add SEO columns to pages table: seo_title, seo_description, og_title, og_description, og_image_id, canonical_url, no_index, no_follow, structured_data. Create SEO tab in page editor's right panel with form inputs for all SEO fields, character counters (title 60/70, description 160/200 with color warnings), OG image MediaPicker, canonical URL input, no_index/no_follow checkboxes, structured data JSON editor (optional). Build SEO preview components: Google search result preview (shows title, URL, description), social preview (shows OG image, title, description in card format). Implement SEO score calculator (0-100 based on: title present +20, description present +20, OG image +15, OG title +10, OG description +10, no orphan page +10, canonical set +5, structured data +10), display as colored circle (red/yellow/green). Add auto-generated meta description fallback: extract first 155 chars from first Text Block component, strip HTML, append '...'. Create site-level SEO settings page at app/(dashboard)/dashboard/[siteId]/settings/seo with default title template input (e.g. '{page_title} | {site_name}'), default meta description, default OG image picker, robots.txt editor (textarea). Generate sitemap.xml route at app/sitemap.xml/route.ts that queries all published pages (WHERE status='published' AND no_index=false), returns XML with <url> entries including loc, lastmod (updated_at), changefreq, priority. Implement HTML head rendering in public layout: render <title>, <meta name='description'>, <link rel='canonical'>, all Open Graph tags, Twitter Card tags, robots meta tag, structured data script tag. Test SEO fields save correctly, previews render accurately, sitemap generates, and meta tags appear in page source.",
+      "status": "complete",
+      "dependencies": [
+        20
+      ],
+      "estimated_turns": 70,
+      "id": "step-21",
+      "order": 21,
+      "started_at": "2026-02-04T07:56:27.674Z",
+      "completed_at": "2026-02-04T08:05:11.835Z",
+      "completed_by_contract": "contract-1770191787674"
+    },
+    {
+      "step_number": 22,
+      "title": "Implement site settings and theme system",
+      "description": "Add columns to sites table: favicon_media_id, logo_media_id, theme_config, custom_head_html, custom_css, analytics_config, social_links, error_pages, settings. Create site settings page at app/(dashboard)/dashboard/[siteId]/settings with tabs: General, Branding/Theme, Analytics, Custom Code, Social Links, Error Pages, Danger Zone. General tab: site name input, slug input (readonly), description textarea, favicon MediaPicker (32x32), logo MediaPicker, default language dropdown, timezone dropdown. Branding tab: theme_config editor with color pickers (primary, secondary, accent), font selectors (Google Fonts dropdown for body and heading), border radius toggle (none/sm/md/lg/full), dark mode enable checkbox, live preview panel showing mini page with theme applied. Analytics tab: inputs for GA4 ID, GTM ID, Plausible domain, custom scripts textarea (code editor), validation (GA4 starts with 'G-', GTM with 'GTM-'). Custom Code tab: custom_head_html textarea, custom_css textarea (both code editor style), warning message about security. Social Links tab: inputs for twitter, facebook, instagram, linkedin, youtube, github, tiktok, website URLs with validation. Error Pages tab: 404 page config (title, message, or select existing page as 404), 500 page config, maintenance mode toggle with title/message. Danger Zone tab: 'Delete Site' button with double confirmation (type site name to confirm), soft delete (sets deleted_at). Implement theme CSS injection in public layout: generate CSS custom properties from theme_config (:root { --pf-primary: #...; }), inject custom_css as <style>, inject custom_head_html before </head>, inject analytics scripts (GA4, GTM, Plausible, custom). Test theme changes apply to public pages, analytics scripts load, custom code injects, and site deletion works.",
+      "status": "complete",
+      "dependencies": [
+        21
+      ],
+      "estimated_turns": 80,
+      "id": "step-22",
+      "order": 22,
+      "started_at": "2026-02-04T08:05:13.897Z",
+      "completed_at": "2026-02-04T08:17:28.196Z",
+      "completed_by_contract": "contract-1770192313897"
+    },
+    {
+      "step_number": 23,
+      "title": "Implement form submissions and management",
+      "description": "Create form_submissions table with site_id, page_id, form_id, data JSONB, submitted_by_ip, submitted_at, is_read, is_spam. Build form submission API route POST /api/forms/submit that: validates required fields, validates email format, validates field-level rules (minLength, pattern, min/max), implements honeypot spam check (hidden field must be empty), implements rate limiting (max 5 submissions per IP per minute using in-memory cache or Redis), stores submission in form_submissions table, sends email notification if notifyEmail is set (use Resend, SendGrid, or Supabase Edge Function for email), returns success/error. Implement client-side form validation in Form renderer: HTML5 validation attributes (required, type, minlength, maxlength, pattern), real-time validation on blur, error messages below fields with aria-describedby and aria-invalid, submit button disabled when form has errors, focus first invalid field on submit attempt, success message with aria-live region on successful submit. Create form submissions dashboard at app/(dashboard)/dashboard/[siteId]/forms/page.tsx with table view of all submissions (newest first), columns (Form Name, key fields preview, Submitted At, Read/Unread badge), filters (form dropdown, date range, read/unread toggle), click row to open detail view. Build submission detail modal/panel: full display of all fields, mark as read/unread toggle, mark as spam toggle, delete button (soft delete), reply button (opens email client with mailto: link). Implement bulk actions: checkboxes per row, 'Mark as Read', 'Mark as Spam', 'Delete' buttons. Add export CSV button that exports filtered submissions with all fields flattened. Test form submission from public page, validation, spam checks, rate limiting, submission storage, email notification, and dashboard management.",
+      "status": "complete",
+      "dependencies": [
+        22
+      ],
+      "estimated_turns": 90,
+      "id": "step-23",
+      "order": 23,
+      "started_at": "2026-02-04T08:17:29.960Z",
+      "completed_at": "2026-02-04T08:26:21.606Z",
+      "completed_by_contract": "contract-1770193049960"
+    },
+    {
+      "step_number": 24,
+      "title": "Implement activity log and notifications",
+      "description": "Create activity_log table with site_id, page_id, user_id, action, entity_type, entity_id, metadata JSONB, created_at. Create logActivity() utility function in lib/activity-log.ts that inserts activity records (fire-and-forget, never throws). Integrate logActivity() calls throughout the app for all actions listed in audit-trail.md: page actions (created, updated, published, unpublished, archived, restored, deleted, submitted_for_review, review_approved, review_rejected, scheduled, schedule_cancelled, locked, unlocked, version_restored), media actions (uploaded, deleted), fragment actions (created, updated, deleted), user actions (login, role_changed), site actions (created, updated), template actions. Build activity feed page at app/(dashboard)/dashboard/[siteId]/activity/page.tsx with infinite-scroll list of activity entries (newest first), each entry showing user avatar, display name, action description (human-readable, e.g. 'John published Home page'), relative timestamp, link to affected entity. Add filters: action type dropdown, user dropdown, date range selector. Create per-page activity tab in version history panel showing activity for that specific page. Add 'Recent Activity' widget to dashboard showing last 10 entries. Implement CSV export from activity page. Create notifications table with user_id, site_id, type, title, message, link, is_read, created_at. Create notification bell component in dashboard header with unread count badge, dropdown showing last 10 notifications (unread have blue dot), 'Mark all as read' button, 'View All' link. Implement notification creation on events: review_submitted (notify admins), review_approved/rejected (notify author), page_published (notify creator), form_submission (notify admin), page_unlocked (notify locked-out author). Add Supabase Realtime subscription for notifications (optional) to show toast on new notification. Test activity logging across all actions, verify entries appear in feed and filters work, test notifi",
+      "status": "complete",
+      "dependencies": [
+        23
+      ],
+      "estimated_turns": 80,
+      "id": "step-24",
+      "order": 24,
+      "started_at": "2026-02-04T08:26:22.848Z",
+      "completed_at": "2026-02-04T08:35:22.782Z",
+      "completed_by_contract": "contract-1770193582848"
+    },
+    {
+      "step_number": 25,
+      "title": "Implement headless API and webhooks",
+      "description": "Create api_keys table with site_id, name, key_hash, key_prefix, permissions, last_used_at, expires_at, created_by, is_active. Implement API key generation: 'pf_live_' + 32 random alphanumeric chars, store SHA-256 hash in db, show full key once on creation (masked after). Build API key management page at app/(dashboard)/dashboard/[siteId]/settings/api with list of keys (showing prefix, name, last used, permissions), create key form (name input, permissions checkboxes, optional expiration date picker), revoke button (sets is_active=false). Create API authentication middleware for /api/v1/* routes: extract Authorization: Bearer token, hash with SHA-256, look up in api_keys, verify is_active and expires_at, extract site_id, rate limit (100 req/min, 1000 req/hour per key), update last_used_at. Implement API routes: GET /api/v1/pages (list published pages with pagination, filters: slug, status, limit, offset, fields), GET /api/v1/pages/[slug] (single page with full content array), GET /api/v1/pages/[slug]/versions (version list), GET /api/v1/media (list media with pagination, filters: folder, tag, type, search), GET /api/v1/menus/[location] (get menu by location), GET /api/v1/fragments/[slug] (get fragment), GET /api/v1/site (get site metadata). All responses use JSON format with data/pagination envelope. Add CORS headers (allow all origins for GET requests). Create webhooks table with site_id, url, events array, secret, is_active, last_triggered_at, last_response_code. Build webhook management UI at app/(dashboard)/dashboard/[siteId]/settings/webhooks with list, create/edit form (URL input, event checkboxes for page.published, page.unpublished, page.updated, media.uploaded, media.deleted, fragment.updated), test button (sends test payload), delivery log (last 20). Implement webhook delivery: on events, query webhooks for site and event, construct payload JSON (event, timestamp, site, data), sign with HMAC-SHA256 using secret, POST to webhook URL with X-PageForge-Signatur",
+      "status": "complete",
+      "dependencies": [
+        24
+      ],
+      "estimated_turns": 90,
+      "id": "step-25",
+      "order": 25,
+      "started_at": "2026-02-04T08:35:24.086Z",
+      "completed_at": "2026-02-04T08:47:19.717Z",
+      "completed_by_contract": "contract-1770194124085"
+    },
+    {
+      "step_number": 26,
+      "title": "Implement public page rendering pipeline",
+      "description": "Create public page routes at app/(public)/sites/[siteSlug]/[pageSlug]/page.tsx for server-rendered published pages. Implement page lookup: getSiteBySlug(siteSlug), getPublishedPage(site.id, pageSlug), getPageVersion(page.id, page.current_version). Build ComponentRenderer that maps component types to renderer components via componentRegistry object. Add UnknownComponent fallback that renders nothing on public view, yellow warning box on preview. Implement FragmentRenderer that recursively resolves fragment references. Create preview route at app/(public)/preview/[siteSlug]/[pageSlug]/page.tsx (authenticated only) that loads current draft version or specific version with ?v=N query param. Add preview mode banner at top of preview pages. Implement ISR caching with revalidate: 60 for published pages, call revalidatePath() when page is published. Create public layout at app/(public)/sites/[siteSlug]/layout.tsx that: sets html lang from site settings, renders favicon link, injects theme CSS variables from theme_config, injects custom_css as <style>, renders analytics scripts from analytics_config, injects custom_head_html, renders SiteNavigation (header), renders children or MaintenancePage if enabled, renders SiteFooter. Implement custom 404 page: check if site has error_pages.notFound.pageId, if yes render that page, else render default 404 with site header/footer and 'Page not found' message. Add skip navigation link as first focusable element. Test published page rendering, ISR caching, preview mode, 404 page, theme application, and analytics injection.",
+      "status": "complete",
+      "dependencies": [
+        25
+      ],
+      "estimated_turns": 70,
+      "id": "step-26",
+      "order": 26,
+      "started_at": "2026-02-04T08:47:21.088Z",
+      "completed_at": "2026-02-04T08:57:06.445Z",
+      "completed_by_contract": "contract-1770194841088"
+    },
+    {
+      "step_number": 27,
+      "title": "Implement accessibility features",
+      "description": "Audit and enhance all components for WCAG 2.1 AA compliance. Ensure all interactive elements have visible focus indicators (outline: 2px solid #3B82F6, outline-offset: 2px), never remove outline without replacement. Add focus-visible styles. Verify tab order follows visual reading order everywhere. Implement skip navigation links on public pages (skip to main content, skip to navigation). Ensure all images have alt text: media library requires alt_text field, image component property editor shows alt text input, media without alt shows warning badge in editor. Add aria-labels to icon buttons, aria-live regions for status updates (saving, published, errors), aria-describedby for form field errors and help text. Check color contrast for all text: ensure 4.5:1 minimum for normal text, 3:1 for large text, validate theme color picker warns if contrast is poor. Implement prefers-reduced-motion media query support: disable carousel autoplay, use instant transitions instead of animated, disable parallax effects, disable accordion/tab animations. Add 'Reduce motion' toggle in user profile settings that overrides OS preference. Ensure all forms have proper labels (no placeholder-only fields), required fields marked with aria-required, error messages announced via aria-live. Add accessibility panel in page editor's right sidebar: run axe-core on current page content, show results (violations, warnings, passes), heading outline view (tree showing h1-h6 hierarchy), image audit (list all images with alt text status), link audit (list links flagging generic text), color contrast checker tool, overall accessibility score. Install eslint-plugin-jsx-a11y and fix all violations. Test full keyboard navigation throughout dashboard and editor, test with screen reader (announce all dynamic updates), test color contrast, test with prefers-reduced-motion enabled.",
+      "status": "complete",
+      "dependencies": [
+        26
+      ],
+      "estimated_turns": 80,
+      "id": "step-27",
+      "order": 27,
+      "started_at": "2026-02-04T08:57:07.691Z",
+      "completed_at": "2026-02-04T09:10:06.722Z",
+      "completed_by_contract": "contract-1770195427691"
+    },
+    {
+      "step_number": 28,
+      "title": "Implement user management and invitations",
+      "description": "Extend profiles.role to support 3 roles: viewer, author, admin. Update role check constraint. Build user management page at app/(dashboard)/dashboard/[siteId]/settings/team (admin only) with list of all users with site access (avatar, display name, email, role, joined date, last active timestamp), 'Edit' button per user that opens edit modal (role dropdown, remove from site button), three-dot menu with 'View activity' link. Show self-protection warnings: admins cannot demote themselves, cannot remove last admin. Create invitations table with site_id, email, role, invited_by, token (secure random 32 bytes URL-safe base64), status (pending/accepted/expired/revoked), expires_at (7 days), accepted_at. Build invite flow: 'Invite User' button opens modal with email input and role selector, on submit creates invitation row and sends invite email (or displays invite link if email not configured). Invite link format: /invite/[token]. Create invite acceptance page at app/(auth)/invite/[token]/page.tsx that: validates token (exists, not expired, not revoked), shows 'You've been invited to join [site name] as [role]', two buttons ('Sign in to accept' or 'Create account to accept'), on auth success adds user to site with role and marks invitation as accepted. Show 'Pending Invitations' section in team page with list of pending invites (email, role, invited date, 'Resend' and 'Revoke' buttons). Implement automatic profile creation on signup via Supabase Auth trigger (handle_new_user function). Create user profile page at app/(dashboard)/profile/page.tsx with editable fields (display name, avatar MediaPicker), read-only fields (email, role, joined), 'Change Password' form (current password, new password, confirm - uses Supabase updateUser), active sessions list (device, IP, last active, 'Sign out other sessions' button). Test invite flow end-to-end, role changes, user removal, profile editing, and password change.",
+      "status": "complete",
+      "dependencies": [
+        27
+      ],
+      "estimated_turns": 80,
+      "id": "step-28",
+      "order": 28,
+      "started_at": "2026-02-04T09:10:09.181Z",
+      "completed_at": "2026-02-04T09:20:14.652Z",
+      "completed_by_contract": "contract-1770196209181"
+    },
+    {
+      "step_number": 29,
+      "title": "Polish UI and implement final features",
+      "description": "Refine the overall UI design and polish: ensure consistent spacing, typography, and color usage across all pages using Tailwind v4. Implement loading states for all async operations (skeleton screens, spinners, disabled buttons). Add toast notifications for all actions (success, error, info) using react-hot-toast or similar. Implement error boundaries to catch React errors gracefully. Add confirmation dialogs for all destructive actions (delete, archive, revoke) using a Modal component. Create a global search feature (Cmd+K) using command palette pattern (cmdk library or custom): searches across pages (title, slug), media (filename, alt text), fragments (name), and users (display name), shows results grouped by type with icons, arrow keys to navigate, Enter to open. Implement page list view at app/(dashboard)/dashboard/[siteId]/pages with table view (title, status badge, last updated, actions), filters (status dropdown, search input, created by dropdown), sorting (title, updated_at, status), bulk actions checkboxes. Add status badges everywhere (draft gray, in_review yellow, scheduled blue, published green, archived dim). Implement breadcrumb navigation in dashboard header showing current location (Site > Pages > Edit Page). Add keyboard shortcut reference modal (toggle with ? key) listing all editor shortcuts. Implement drag handle indicators (show grip icon on hover). Add empty states for all list views (pages, media, fragments, forms, templates, activity) with friendly illustrations and call-to-action buttons. Ensure mobile responsive design throughout dashboard (collapsible sidebar, responsive tables, mobile-friendly forms). Add field validations with helpful error messages throughout. Implement auto-save draft feature in editor (save to localStorage every 30 seconds as backup). Add 'Last saved' timestamp in editor toolbar. Test all UI interactions, ensure smooth transitions, verify responsive design on multiple screen sizes, and check for any layout bugs.",
+      "status": "complete",
+      "dependencies": [
+        28
+      ],
+      "estimated_turns": 90,
+      "id": "step-29",
+      "order": 29,
+      "started_at": "2026-02-04T09:20:16.394Z",
+      "completed_at": "2026-02-04T09:28:59.234Z",
+      "completed_by_contract": "contract-1770196816394"
+    },
+    {
+      "step_number": 30,
+      "title": "Test, debug, and validate entire application",
+      "description": "Perform comprehensive end-to-end testing of the entire PageForge CMS. Run the seed script (npm run db:seed) on a fresh database and verify all seed data is created correctly. Test the full user journey: register → auto-profile creation → login → dashboard loads with stats → create new site → select template → create page → drag components from palette → edit properties → save → view version history → restore version → undo/redo operations → copy/paste components → submit for review (author) → approve and publish (admin) → schedule for future publish → verify auto-publish mechanism → upload media to library → organize into folders → tag and search → create content fragment → reference fragment in page → edit fragment and verify changes propagate → create menu navigation → view public page → verify SEO meta tags → submit form → view form submissions → create API key → test API endpoints → configure webhook → verify webhook delivery → invite new user → accept invitation → change user role → configure site theme → verify theme applies to public pages → test mobile responsive layout → test keyboard navigation → test with screen reader (basic validation) → run accessibility audit in editor → export activity log CSV → export form submissions CSV. Verify all 16 component types render correctly on both canvas and public pages. Check for any console errors, TypeScript errors, or ESLint warnings and fix them. Test error handling (invalid page slug, network errors, validation errors). Verify RLS policies prevent unauthorized access (attempt to edit page as different user roles). Run 'npm run build' and fix any build errors. Document any known issues or limitations. Test performance (page load times, editor responsiveness with 20+ components on canvas). Verify all environment variables are documented in .env.example. Clean up any test/debug code. Ensure git status is clean with meaningful commit messages throughout. Prepare final summary of what was built, what works, and any re",
+      "status": "complete",
+      "dependencies": [
+        29
+      ],
+      "estimated_turns": 100,
+      "id": "step-30",
+      "order": 30,
+      "started_at": "2026-02-04T09:29:00.686Z",
+      "completed_at": "2026-02-04T09:41:23.228Z",
+      "completed_by_contract": "contract-1770197340686"
+    }
+  ]
+}
