@@ -98,15 +98,42 @@ async function buildStepScopedDescription(item: WorkItem, step: WorkStep, previo
   const totalSteps = item.steps?.length || 1;
   const stepNum = step.step_number + 1;
 
-  const completedSteps = item.steps
-    ?.filter(s => s.status === 'complete')
-    .map(s => `- Step ${s.step_number + 1}: ${s.title} (complete)`)
-    .join('\n') || '(none — this is the first step)';
+  // For large goals (>10 steps), use a window view to avoid flooding context
+  let completedSteps: string;
+  let remainingSteps: string;
 
-  const remainingSteps = item.steps
-    ?.filter(s => s.status !== 'complete' && s.step_number !== step.step_number)
-    .map(s => `- Step ${s.step_number + 1}: ${s.title}`)
-    .join('\n') || '(none)';
+  if (totalSteps > 10) {
+    const completedCount = item.steps?.filter(s => s.status === 'complete').length || 0;
+    const remainingCount = totalSteps - completedCount - 1; // exclude current step
+
+    // Window: 2 completed steps before current, 3 upcoming after current
+    const windowStart = Math.max(0, step.step_number - 2);
+    const windowEnd = Math.min(totalSteps - 1, step.step_number + 3);
+    const nearbySteps = item.steps?.slice(windowStart, windowEnd + 1) || [];
+
+    const beforeCurrent = nearbySteps
+      .filter(s => s.step_number < step.step_number)
+      .map(s => `- Step ${s.step_number + 1}: ${s.title} (${s.status})`)
+      .join('\n') || '(none nearby)';
+
+    const afterCurrent = nearbySteps
+      .filter(s => s.step_number > step.step_number)
+      .map(s => `- Step ${s.step_number + 1}: ${s.title}`)
+      .join('\n') || '(none nearby)';
+
+    completedSteps = `**Progress: ${completedCount} of ${totalSteps} steps completed, ${remainingCount} remaining after this one**\n\nRecent completed steps:\n${beforeCurrent}`;
+    remainingSteps = `Next upcoming steps:\n${afterCurrent}`;
+  } else {
+    completedSteps = item.steps
+      ?.filter(s => s.status === 'complete')
+      .map(s => `- Step ${s.step_number + 1}: ${s.title} (complete)`)
+      .join('\n') || '(none — this is the first step)';
+
+    remainingSteps = item.steps
+      ?.filter(s => s.status !== 'complete' && s.step_number !== step.step_number)
+      .map(s => `- Step ${s.step_number + 1}: ${s.title}`)
+      .join('\n') || '(none)';
+  }
 
   const isResearchStep = step.title.toLowerCase().includes('research') ||
     step.title.toLowerCase().includes('plan') ||
@@ -238,7 +265,7 @@ export async function executeWork(
               'All code compiles and runs',
               'Changes are committed to git',
             ],
-        max_turns: 100,
+        max_turns: step?.estimated_turns || 100,
         risk_assessment: 'low',
         required_skills: [],
         logging_obligations: ['All work logged to output directory'],

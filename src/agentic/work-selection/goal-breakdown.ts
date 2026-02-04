@@ -7,6 +7,8 @@
  */
 
 import path from 'path';
+import { readFile, readdir } from 'fs/promises';
+import { existsSync } from 'fs';
 import { query, type SDKMessage, type SDKResultMessage } from '@anthropic-ai/claude-agent-sdk';
 import type { WorkItem, WorkStep } from '../../core/types.js';
 import { createStepsFile, writeStepsJson, stepsJsonExists } from '../../deterministic/steps-json-handler.js';
@@ -16,6 +18,46 @@ import { logBreakdownProgress } from '../../deterministic/progress-log-writer.js
 const BREAKDOWN_THRESHOLD_TURNS = parseInt(process.env.BREAKDOWN_THRESHOLD_TURNS || '100', 10);
 const AUTO_BREAKDOWN_ENABLED = process.env.AUTO_BREAKDOWN_ENABLED !== 'false';
 const MAX_RE_BREAKDOWN_COUNT = 2; // Maximum re-breakdowns per step
+
+/**
+ * Read full bundle context: PROMPT.md + all requirements/ files.
+ * Returns a formatted string with all content for the breakdown prompt.
+ */
+async function readBundleContext(bundlePath: string): Promise<string> {
+  const sections: string[] = [];
+
+  // Read full PROMPT.md
+  const promptPath = path.join(bundlePath, 'PROMPT.md');
+  if (existsSync(promptPath)) {
+    try {
+      const content = await readFile(promptPath, 'utf-8');
+      sections.push(`## PROMPT.md\n${content}`);
+    } catch {
+      // Fall through — prompt content may come from item.description
+    }
+  }
+
+  // Read all files in requirements/ directory
+  const reqDir = path.join(bundlePath, 'requirements');
+  if (existsSync(reqDir)) {
+    try {
+      const files = await readdir(reqDir);
+      const mdFiles = files.filter(f => f.endsWith('.md')).sort();
+      for (const file of mdFiles) {
+        try {
+          const content = await readFile(path.join(reqDir, file), 'utf-8');
+          sections.push(`## requirements/${file}\n${content}`);
+        } catch {
+          // Skip unreadable files
+        }
+      }
+    } catch {
+      // No requirements directory or unreadable
+    }
+  }
+
+  return sections.join('\n\n');
+}
 
 /**
  * Result of task breakdown
@@ -108,36 +150,63 @@ export function needsBreakdown(item: WorkItem): boolean {
 
 /**
  * Build the prompt for the LLM breakdown agent.
+ * Accepts full bundle context and complexity estimate for adaptive step sizing.
  */
-function buildBreakdownPrompt(item: WorkItem): string {
-  return `You are a task decomposition agent. Given a goal's title and description (from a PROMPT.md file), break it into 2-5 concrete, actionable steps.
+function buildBreakdownPrompt(item: WorkItem, bundleContext: string, complexityEstimate: number): string {
+  // Adaptive step count guidance based on complexity
+  let stepGuidance: string;
+  let turnRange: string;
+  if (complexityEstimate <= 150) {
+    stepGuidance = '3-5 steps';
+    turnRange = '20-100';
+  } else if (complexityEstimate <= 300) {
+    stepGuidance = '5-15 steps';
+    turnRange = '20-100';
+  } else if (complexityEstimate <= 600) {
+    stepGuidance = '15-40 steps';
+    turnRange = '20-100';
+  } else {
+    stepGuidance = '40-100+ steps';
+    turnRange = '20-100';
+  }
+
+  return `You are a task decomposition agent. Given a goal and its full context (PROMPT.md + requirements files), break it into concrete, actionable steps.
+
+COMPLEXITY ESTIMATE: ${complexityEstimate} turns → aim for ${stepGuidance}
 
 RULES:
-- Step 0 is ALWAYS a research/planning step
-- Each subsequent step should be a distinct, independently executable unit of work
+- Step 0 is ALWAYS a research/planning step (20-40 turns)
+- Each step must be a distinct, independently executable unit of work
 - Steps should be specific to THIS goal, not generic templates
-- Each step gets ~100 turns (an LLM agentic session), so scope accordingly
-- Step descriptions should be detailed enough that a worker agent can execute them without ambiguity
+- Each step gets its own LLM agentic session, so scope accordingly
+- Step descriptions should be detailed enough that a worker agent can execute without ambiguity
 - Include specific commands, file paths, and validation criteria when possible
 - Each step depends on the previous one (sequential execution)
 - The final step should always include validation and cleanup
+- Assign each step a turn budget proportional to its complexity (${turnRange} turns)
+  - Research/planning steps: 20-40 turns
+  - Simple implementation steps: 40-60 turns
+  - Complex implementation steps: 60-100 turns
+- Be granular: prefer more smaller steps over fewer larger steps
+- Each step should produce a testable/verifiable deliverable
 
 GOAL TITLE: ${item.title}
 
-GOAL DESCRIPTION:
-${item.description || '(no description)'}
+FULL CONTEXT:
+${bundleContext || item.description || '(no description)'}
 
 Respond with ONLY a JSON array of step objects. No markdown, no explanation, just the JSON array.
 Each step object must have:
 - "title": string (concise action title)
-- "description": string (detailed instructions for the worker, max 500 chars)
-- "estimated_turns": number (60-120)
+- "description": string (detailed instructions for the worker, up to 2000 chars)
+- "estimated_turns": number (${turnRange})
 
 Example format:
 [
-  {"title": "Research and plan approach", "description": "Analyze requirements for...", "estimated_turns": 80},
-  {"title": "Implement database schema", "description": "Create tables for...", "estimated_turns": 100},
-  {"title": "Validate and finalize", "description": "Test all features...", "estimated_turns": 80}
+  {"title": "Research and plan approach", "description": "Analyze requirements for...", "estimated_turns": 30},
+  {"title": "Set up project scaffolding", "description": "Initialize the project with...", "estimated_turns": 50},
+  {"title": "Implement database schema", "description": "Create tables for...", "estimated_turns": 80},
+  {"title": "Validate and finalize", "description": "Test all features...", "estimated_turns": 60}
 ]`;
 }
 
@@ -146,11 +215,17 @@ Example format:
  * Falls back to a generic 3-step breakdown if the LLM call fails.
  */
 export async function generateBreakdown(item: WorkItem): Promise<WorkStep[]> {
-  const prompt = buildBreakdownPrompt(item);
+  // Read full bundle context (PROMPT.md + requirements/)
+  const bundleContext = item.source_path
+    ? await readBundleContext(item.source_path)
+    : '';
+
+  const complexityEstimate = estimateComplexity(item);
+  const prompt = buildBreakdownPrompt(item, bundleContext, complexityEstimate);
 
   try {
     const model = process.env.BREAKDOWN_MODEL || process.env.MODEL || 'claude-sonnet-4-5';
-    console.log(`[Breakdown] Spawning LLM breakdown agent for "${item.title}" using ${model}`);
+    console.log(`[Breakdown] Spawning LLM breakdown agent for "${item.title}" using ${model} (complexity: ${complexityEstimate} turns)`);
 
     const stream = query({
       prompt,
@@ -201,15 +276,20 @@ export async function generateBreakdown(item: WorkItem): Promise<WorkStep[]> {
     const steps: WorkStep[] = parsed.map((s, i) => ({
       step_number: i,
       title: s.title,
-      description: (s.description || '').slice(0, 500),
+      description: (s.description || '').slice(0, 2000),
       status: 'pending' as const,
       dependencies: i === 0 ? [] : [i - 1],
-      estimated_turns: s.estimated_turns || 100,
+      estimated_turns: Math.max(20, Math.min(100, s.estimated_turns || 100)),
     }));
 
-    console.log(`[Breakdown] LLM produced ${steps.length} steps for "${item.title}"`);
+    // Summary logging
+    const totalEstimated = steps.reduce((sum, s) => sum + (s.estimated_turns || 100), 0);
+    const turnValues = steps.map(s => s.estimated_turns || 100);
+    const minTurns = Math.min(...turnValues);
+    const maxTurns = Math.max(...turnValues);
+    console.log(`[Breakdown] LLM produced ${steps.length} steps for "${item.title}" (total: ${totalEstimated} estimated turns, range: ${minTurns}-${maxTurns} per step)`);
     for (const s of steps) {
-      console.log(`  Step ${s.step_number}: ${s.title}`);
+      console.log(`  Step ${s.step_number}: ${s.title} (${s.estimated_turns} turns)`);
     }
 
     return steps;

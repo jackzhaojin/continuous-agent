@@ -264,6 +264,11 @@ async function runIteration(): Promise<IterationResult> {
     if (workItem.source_path) {
       const written = await writeStepsToBundle(workItem.source_path, steps);
       if (written) {
+        const totalEstimatedTurns = steps.reduce((sum, s) => sum + (s.estimated_turns || 100), 0);
+        const turnValues = steps.map(s => s.estimated_turns || 100);
+        const minTurns = Math.min(...turnValues);
+        const maxTurns = Math.max(...turnValues);
+        log(`  [Breakdown] Created ${steps.length} steps for "${workItem.title}" (total: ${totalEstimatedTurns} estimated turns, range: ${minTurns}-${maxTurns} per step)`);
         logAgentic(`  Steps written to STEPS.json — re-selecting to execute step 1`);
 
         // Log breakdown event to work ledger
