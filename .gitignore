@@ -11,6 +11,9 @@ node_modules
 
 # Environment files
 .env
+.env.executive
+.env.worker
+.env.app
 .env.local
 .env.*.local
 

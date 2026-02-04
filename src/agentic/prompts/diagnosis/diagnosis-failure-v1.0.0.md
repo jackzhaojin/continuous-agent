@@ -119,7 +119,7 @@ Provide a JSON response:
 ### Check Typical Issues
 
 1. **Authentication:**
-   - Missing API keys in .env
+   - Missing API keys in .env.executive or .env.worker
    - Invalid credentials
    - Expired tokens
    - Wrong authentication method
@@ -158,7 +158,7 @@ Provide a JSON response:
 ### Be Specific
 
 - ❌ "Something is wrong with auth"
-- ✅ "Missing NOTION_API_KEY in .env, causing 401 errors. Tried with invalid token format, then with no token."
+- ✅ "Missing NOTION_API_KEY in .env.executive, causing 401 errors. Tried with invalid token format, then with no token."
 
 ### Actionable Recommendations
 

@@ -67,12 +67,12 @@ npm run build  # Rebuild only - changes take effect on next natural restart
   - NO application code, NO project outputs
 
 - **`agent-outputs/`** (sibling directory) - ALL worker outputs
-  - Monorepo root: `CLAUDE.md`, `.env`, `.claude/` live at root (shared across all projects)
+  - Monorepo root: `CLAUDE.md`, `.env` (synced from `.env.worker`), `.claude/` live at root (shared across all projects)
   - Isolated project directories: `agent-outputs/projects/{category}/{date}/{goal-slug}/`
   - Real codebases with their own git history
   - Workers NEVER write to the agent codebase
   - **Agent SDK CWD is `agent-outputs/`** — workers navigate to their project subdirectory via prompt
-  - **Shared `.env`** at root (copied from agent repo); projects can have their own for project-specific vars
+  - **Shared `.env`** at root (copied from `.env.worker`); projects can have their own for project-specific vars
   - **Shared `.claude/`** at root (skills + agents); projects must NOT create their own `.claude/`
   - **CLAUDE.md inherits hierarchically** — root provides shared context, projects CAN have their own CLAUDE.md for project-specific instructions
 
@@ -262,7 +262,7 @@ workspace/in-progress/P2/my-goal/
 - `work-selection/work-selector.ts` - Selects highest priority unblocked goal (goal bundles first, legacy goals.md fallback)
 - `work-selection/goal-scanner.ts` - Scans workspace folder tree for goal bundles, reads STEPS.json (primary) or PROMPT.md (fallback), auto-promotes ondeck goals
 - `work-selection/goal-breakdown.ts` - Automatic breakdown of complex goals into steps; `writeStepsToBundle()` writes STEPS.json + PROGRESS_LOG.md
-- `execution/worker-spawner.ts` - Spawns Claude Agent SDK sessions with prompts, copies `.env` to worker directory
+- `execution/worker-spawner.ts` - Spawns Claude Agent SDK sessions with prompts, copies `.env.worker` to worker directory
 - `execution/execution-handler.ts` - Orchestrates work execution with retry tracking
 - `intelligence/intent-classifier.ts` - Classifies goals as outcome_only vs what_and_how
 - `intelligence/strategy-selector.ts` - Chooses different strategies per retry
@@ -285,6 +285,7 @@ workspace/in-progress/P2/my-goal/
 - `notion-reporter.ts` - Fire-and-forget Notion integration (`reportMilestone()`, `closeMilestone()`, daily/weekly summaries)
 - `project-registry.ts` - Tracks completed projects for reuse (V1.2: `workspace/project-registry.yml`)
 - `project-memory-store.ts` - Records completed projects with capabilities and lessons (`capabilities/project-memory.yml`)
+- `credential-tiers.ts` - Tier 3 format helpers, leak detection, env file resolution
 - `validation-handler.ts` - Runs verifiers on worker output
 - `verifiers/` - Deterministic checks (git-clean, node-build, docs-complete)
 - `backoff-manager.ts` - Rate limit detection and exponential backoff
@@ -427,40 +428,43 @@ Verifiers run after each goal and return structured evidence:
 
 Verifier results update capability confidence scores: +10 on PASS, -15 on FAIL.
 
-## Environment Variables
+## Environment Variables — Three-Tier Credential System
 
-Create `.env` from `.env.example`:
+Credentials are separated into three tiers using physically distinct files:
 
 ```bash
-# Required: ONE of these for Claude Agent SDK
-CLAUDE_CODE_OAUTH_TOKEN=    # Option 1: OAuth (Claude Pro/Max)
-ANTHROPIC_API_KEY=          # Option 2: API key
-
-# Optional configuration
-MODEL=claude-sonnet-4-5
-MAX_TURNS=250               # Max turns per worker session for single-step tasks
-MAX_TURNS_PER_STEP=100      # Max turns per step for multi-step tasks (MINIMUM 100)
-
-# Loop timing (continuous execution by default)
-# Agent continues immediately after completing work - no sleep between tasks
-# Sleep only occurs when idle (queue empty) or unhealthy
-IDLE_SLEEP_SECONDS=30       # Sleep when no work available (polling interval)
-UNHEALTHY_SLEEP_SECONDS=60  # Sleep when system unhealthy before retrying
-
-# Incremental execution
-BREAKDOWN_THRESHOLD_TURNS=100  # Trigger breakdown if estimated > 100 turns
-AUTO_BREAKDOWN_ENABLED=true    # Enable automatic goal breakdown
-
-# Third-party API keys (copied to each worker's .env)
-NOTION_API_KEY=                # Notion integration key
-
-# Notion Reporting (set by scripts/setup-notion-workspace.ts)
-NOTION_DATABASE_ID=            # Agent Milestones database ID
-NOTION_MONTHLY_PAGE_ID=        # Current month's summaries page ID
-NOTION_REPORTING_ENABLED=true  # Kill switch for all Notion writes
+# Setup
+cp .env.executive.example .env.executive   # Tier 1: Executive agent
+cp .env.worker.example .env.worker         # Tier 2: Worker/execution agent
+cp .env.app.example .env.app               # Tier 3: Application (optional)
 ```
 
-**API Key Management:** The `.env` file is copied to the `agent-outputs/` root by `worker-spawner.ts` (centralized, not per-project). Workers access shared API keys from there. Projects needing their own env vars can create a separate `.env` in their project directory.
+| Tier | File | Purpose | Consumers |
+|------|------|---------|-----------|
+| **1 - Executive** | `.env.executive` | Loop config, Notion reporting, breakdown settings | Executive loop only |
+| **2 - Worker** | `.env.worker` | Claude SDK auth, model, tool API keys | Worker agents (via `agent-outputs/.env`) |
+| **3 - Application** | `.env.app` | DB, cache, storage, payment, email keys | Built apps (platform-agnostic) |
+
+**Key design decisions:**
+- **Physical file separation** prevents accidental tier mixing (no classification logic needed)
+- **Tier 1 keys (e.g., NOTION_API_KEY) NEVER reach workers** — the spawner copies only `.env.worker`
+- **Tier 3 uses `APP_` prefix convention** — the prefix is stripped when injecting into projects (e.g., `APP_DATABASE_URL` becomes `DATABASE_URL`)
+- **Tier 3 is platform-agnostic** — apps can be Node.js, Python, Docker, bash, iOS, C++, etc. Format helpers in `credential-tiers.ts` convert to dotenv, JSON, shell, docker-compose, or YAML
+- **Backward compatible** — falls back to legacy `.env` if tiered files don't exist
+
+**Loading order in executive loop** (`executive-loop.ts`):
+1. `.env.executive` (loaded first, values take precedence via dotenv no-override)
+2. `.env.worker` (new keys only)
+3. `.env` (legacy fallback, new keys only)
+
+**API Key Management:** `.env.worker` is copied to `agent-outputs/.env` by `worker-spawner.ts` (centralized, not per-project). `.env.app` is also copied to `agent-outputs/.env.app` if it exists. Workers access shared API keys from there. The spawner validates that no executive-tier keys leaked into the worker env.
+
+**Tier 3 format helpers** (`src/deterministic/credential-tiers.ts`):
+- `getAppCredentialPairs(path)` — reads `.env.app`, strips `APP_` prefix, returns key-value pairs
+- `formatAppEnv(pairs, format)` — converts pairs to: `dotenv`, `json`, `shell`, `docker-compose`, `yaml`
+- `checkWorkerEnvForLeaks(path)` — validates no Tier 1 keys in worker env
+- `checkAppEnvForLeaks(path)` — validates no Tier 1/2 keys in app env
+- `resolveEnvFile(root, tier)` — resolves tiered file with fallback to `.env`
 
 ## Notion Reporting
 
@@ -474,7 +478,7 @@ The agent reports milestone events and summaries to Notion. This is fire-and-for
 - **Daily summaries** → heading blocks appended to the monthly summaries page
 - **Weekly summaries** → child pages under the monthly summaries page
 
-**Monthly rotation:** At the start of each month, create a new summaries page in Notion and update `NOTION_MONTHLY_PAGE_ID` in `.env`. The milestones database persists across months.
+**Monthly rotation:** At the start of each month, create a new summaries page in Notion and update `NOTION_MONTHLY_PAGE_ID` in `.env.executive`. The milestones database persists across months.
 
 **Setup:** Run `npx tsx scripts/setup-notion-workspace.ts <PARENT_PAGE_ID> --write-env` (see `ai-docs/v1/2026-01-28-v1.2/notion-api-automation.md` for full runbook).
 
@@ -619,7 +623,7 @@ continuous-agent/
 │   │   │   ├── goal-scanner.ts   # Scans workspace folders, auto-promotes ondeck goals
 │   │   │   └── goal-breakdown.ts # Complex goal decomposition
 │   │   ├── execution/          # Worker spawning
-│   │   │   ├── worker-spawner.ts # Agent SDK integration, .env copying
+│   │   │   ├── worker-spawner.ts # Agent SDK integration, .env.worker copying
 │   │   │   └── execution-handler.ts # Orchestrates execution
 │   │   ├── intelligence/       # Intent classification, strategy selection
 │   │   ├── diagnosis/          # Failure analysis
@@ -637,6 +641,7 @@ continuous-agent/
 │       ├── project-registry.ts # Completed project registry (V1.2)
 │       ├── project-memory-store.ts # Project memory with lessons learned
 │       ├── state-handler.ts    # Updates goal bundles, needs-you.md
+│       ├── credential-tiers.ts # Tier 3 format helpers, leak detection
 │       ├── validation-handler.ts # Runs verifiers
 │       ├── verifiers/          # Deterministic validation checks
 │       ├── backoff-manager.ts  # Rate limit handling
@@ -730,7 +735,7 @@ tail -20 ledgers/work-ledger.jsonl
 ```
 
 **Common issues:**
-- Worker fails immediately → Check auth tokens in `.env`
+- Worker fails immediately → Check auth tokens in `.env.worker`
 - Goal marked Blocked → Check `needs-you.md` for details, add human response
 - Build fails → Run `npm run typecheck` for detailed errors
 - Retry loops → Check `strategy-selector.ts` is picking different strategies

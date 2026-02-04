@@ -10,6 +10,7 @@
  */
 
 import { config } from 'dotenv';
+import { existsSync } from 'fs';
 import path from 'path';
 
 // CORE
@@ -62,8 +63,14 @@ import { checkSelfImprovementTriggers } from '../agentic/calibration/self-improv
 import { generateSelfImprovementTask } from '../agentic/calibration/self-improvement-task-generator.js';
 import { runWeeklyRetrospective } from '../agentic/calibration/retrospective.js';
 
-// Load environment variables
-config();
+// Load environment variables (tiered)
+const envFiles = ['.env.executive', '.env.worker', '.env'];
+for (const envFile of envFiles) {
+  const envPath = path.join(process.cwd(), envFile);
+  if (existsSync(envPath)) {
+    config({ path: envPath });
+  }
+}
 
 // === CONFIGURATION ===
 const MAX_RETRIES = 10; // Constitution mandates 10 retries minimum
