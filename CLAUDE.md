@@ -338,6 +338,7 @@ cat ledgers/2026-01-25/worker-contract-b25db16e.log
 - `capabilities/functional-capabilities.yml` - Cross-cutting capabilities (debugging, research)
 - `capabilities/sdk-registry.yml` - Agent SDK capability mappings
 - `capabilities/project-memory.yml` - Completed project records with capabilities, features, and lessons learned
+- `capabilities/services-registry.yml` - External services the agent interacts with (Supabase, Vercel, etc.)
 
 ## Constitution (Hard Limits)
 
@@ -517,49 +518,6 @@ description: |
 ---
 ```
 
-### Project Documentation Skills
-
-Complex features should follow a **WHY → WHAT → HOW → WHEN** progression. Use these skills for multi-day features requiring architectural planning:
-
-1. **PRD Writer** (`.claude/skills/prd-writer.md`) - Creates Product Requirements Documents
-   - **WHY**: Define the problem and business value
-   - **WHAT**: Specify functional requirements, success criteria, user outcomes
-   - Output: `ai-docs/prd-{feature-name}.md`
-
-2. **Project Architect** (`.claude/skills/project-architect.md`) - Creates architectural documentation
-   - **WHAT**: System design, components, data flow
-   - **HOW (high-level)**: Technology choices, integration patterns
-   - Output: `ai-docs/architect/{feature-name}-architecture.md`
-
-3. **Task Breakdown** (`.claude/skills/task-breakdown/`) - Creates detailed task specifications
-   - **HOW (detailed)**: Step-by-step implementation instructions
-   - **WHEN**: Dependencies, duration estimates, phases
-   - Output: `ai-docs/tasks/task-{phase}-{number}-{feature-name}.md`
-
-4. **Project Analysis** (`.claude/skills/project-analysis/`) - Analyzes existing codebases
-   - Documents tech stack, patterns, architecture
-   - Used before designing new features to understand existing patterns
-   - Output: `ai-docs/project-analysis.md`
-
-**Workflow for Complex Features:**
-```
-User describes need
-  ↓
-PRD Writer (define WHY/WHAT)
-  ↓
-Project Architect (design system)
-  ↓
-Task Breakdown (detail HOW)
-  ↓
-Implementation (workers execute tasks)
-```
-
-**When NOT to use these skills:**
-- Simple bug fixes or single-file changes
-- Features under 1 day of work
-- Minor refactors or updates
-- Quick prototypes or experiments
-
 **Agent SDK Integration:**
 - Worker spawning: `worker-spawner.ts` calls `@anthropic-ai/claude-agent-sdk`
 - Workers get isolated project directories in `agent-outputs/`
@@ -609,90 +567,16 @@ cd references/poc/claude/agent-sdk-subagents-poc && npm install && npm run build
 
 These POCs have their own `.env` files (not committed) - copy from `.env.example` and add credentials.
 
-## File Structure Reference
+## Top-Level Directory Layout
 
-```
-continuous-agent/
-├── src/                        # TypeScript source (compiles to dist/)
-│   ├── core/                   # Core infrastructure
-│   │   ├── executive-loop.ts   # Main 8-phase loop
-│   │   ├── types.ts            # Shared interfaces
-│   │   └── logging.ts          # Structured logging
-│   ├── agentic/                # AI decision-making (LLM-powered)
-│   │   ├── work-selection/     # Goal selection & breakdown
-│   │   │   ├── work-selector.ts  # Selects work from goal bundles (fallback: goals.md)
-│   │   │   ├── goal-scanner.ts   # Scans workspace folders, auto-promotes ondeck goals
-│   │   │   └── goal-breakdown.ts # Complex goal decomposition
-│   │   ├── execution/          # Worker spawning
-│   │   │   ├── worker-spawner.ts # Agent SDK integration, .env.worker copying
-│   │   │   └── execution-handler.ts # Orchestrates execution
-│   │   ├── intelligence/       # Intent classification, strategy selection
-│   │   ├── diagnosis/          # Failure analysis
-│   │   ├── learning/           # Capability confidence updates
-│   │   ├── calibration/        # Self-improvement triggers, goal generation, retrospective
-│   │   └── prompts/            # Prompt templates organized by category (loader.ts + subdirs)
-│   └── deterministic/          # Mechanical operations (no LLM)
-│       ├── health-checker.ts   # System health validation
-│       ├── input-processor.ts  # Parses needs-you.md responses
-│       ├── prompt-md-parser.ts # Parses PROMPT.md frontmatter + body
-│       ├── steps-json-handler.ts # STEPS.json read/write/update (atomic writes)
-│       ├── progress-log-writer.ts # Append-only PROGRESS_LOG.md writer
-│       ├── contracts-log-writer.ts # Per-bundle CONTRACTS.jsonl tracking
-│       ├── notion-reporter.ts  # Notion integration (milestones, summaries)
-│       ├── project-registry.ts # Completed project registry (V1.2)
-│       ├── project-memory-store.ts # Project memory with lessons learned
-│       ├── state-handler.ts    # Updates goal bundles, needs-you.md
-│       ├── credential-tiers.ts # Tier 3 format helpers, leak detection
-│       ├── validation-handler.ts # Runs verifiers
-│       ├── verifiers/          # Deterministic validation checks
-│       ├── backoff-manager.ts  # Rate limit handling
-│       ├── workspace-writers.ts # Writes to workspace files
-│       ├── queue-processor.ts  # Parses queue.md
-│       ├── inputs-log.ts       # JSONL audit logging
-│       └── self-improvement-state.ts # Self-improvement tracking
-
-├── workspace/                  # Human-editable state + goal bundles
-│   ├── constitution.md         # **IMMUTABLE** hard limits
-│   ├── goals.md                # Auto-generated index from goal bundles
-│   ├── needs-you.md            # Human interaction interface
-│   ├── preferences.md          # Learned preferences and conventions
-│   ├── project-registry.yml    # Completed projects for reuse (V1.2)
-│   ├── self-improvement-state.json # Self-improvement tracking
-│   ├── {queue,progress,completed}.md
-│   ├── _TEMPLATE/              # Goal bundle template
-│   ├── drafts/                 # New goal bundles
-│   ├── ondeck/                 # Queued for auto-promotion
-│   ├── in-progress/P{0-4}/    # Active goals by priority
-│   └── completed/              # Successfully completed goals
-
-├── ledgers/                    # Append-only logs (version controlled)
-│   ├── work-ledger.jsonl       # Goal events
-│   ├── capability-ledger.jsonl # Capability results
-│   └── executive-{date}.log    # Daily execution logs
-
-├── capabilities/               # YAML capability registries
-│   ├── technical-capabilities.yml    # Tool capabilities
-│   ├── delivery-capabilities.yml     # End-to-end outcomes
-│   ├── functional-capabilities.yml   # Cross-cutting capabilities
-│   └── project-memory.yml            # Completed project records
-
-├── references/                 # External references and POCs
-│   ├── poc/                    # Foundational proof-of-concept projects
-│   │   └── claude/             # Claude Agent SDK POCs
-│   │       ├── chat-cli/           # Agent SDK CLI demo
-│   │       ├── agent-sdk-skills-poc/  # Skills integration demo
-│   │       └── agent-sdk-subagents-poc/  # Subagent delegation demo
-│   └── reference-registry.yaml # Reference tracking
-│
-├── .claude/
-│   ├── agents/                 # Subagent definitions (self-enhancer, skill-builder, code-validator, task-researcher)
-│   └── skills/                 # Claude Code skill definitions (SKILL.md files)
-├── verifiers/
-│   ├── definitions/            # Verifier YAML configs (git-status-clean, node-build, etc.)
-│   └── run-verifier.sh         # Shell runner for verifiers
-└── ai-docs/                    # PRDs, specs, feature docs
-    └── notion/                 # Notion workspace layout, schema, page IDs
-```
+- `src/` — TypeScript source, compiles to `dist/`. Split into `core/`, `agentic/`, `deterministic/` (see "Agentic vs Deterministic Split" above)
+- `workspace/` — Goal bundles, constitution, human interaction files. `drafts/`, `ondeck/`, `in-progress/` are gitignored (lifecycle moves); `completed/` is tracked
+- `ledgers/` — Version-controlled append-only JSONL logs + daily executive logs + per-date worker logs
+- `capabilities/` — YAML registries: technical, delivery, functional capabilities + project memory + services registry
+- `references/poc/claude/` — Agent SDK proof-of-concept projects (chat-cli, skills, subagents)
+- `.claude/agents/` — Subagent definitions; `.claude/skills/` — Claude Code skill definitions
+- `verifiers/definitions/` — Verifier YAML configs; `verifiers/run-verifier.sh` — Shell runner
+- `ai-docs/` — PRDs, specs, Notion workspace layout
 
 ## Important Distinctions
 

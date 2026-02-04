@@ -10,7 +10,8 @@
  */
 
 import { config } from 'dotenv';
-import { existsSync } from 'fs';
+import { existsSync, readdirSync } from 'fs';
+import { execSync } from 'child_process';
 import path from 'path';
 
 // CORE
@@ -56,7 +57,7 @@ import {
   commitOutputsMonorepo,
 } from '../deterministic/state-handler.js';
 import { closeMilestone } from '../deterministic/notion-reporter.js';
-import { incrementStepRetryCount, readStepRetryCount, stepId as makeStepId } from '../deterministic/steps-json-handler.js';
+import { incrementStepRetryCount, readStepRetryCount, readStepsJson, writeStepsJson, stepId as makeStepId } from '../deterministic/steps-json-handler.js';
 
 // SELF-IMPROVEMENT - Idle and scheduled triggers
 import { checkSelfImprovementTriggers } from '../agentic/calibration/self-improvement-triggers.js';
@@ -495,6 +496,100 @@ async function main(): Promise<void> {
     closeLogStream();
     process.exit(0);
   });
+
+  // === STARTUP: ORPHAN WORKER CLEANUP ===
+  logDeterministic('Checking for orphan worker processes...');
+  try {
+    // Find claude processes whose cwd is inside agent-outputs (stale workers from prior instance)
+    const agentOutputsPath = process.env.AGENT_OUTPUTS_PATH || path.join(process.env.HOME || '', 'dev', 'agent-outputs');
+    const psOutput = execSync(
+      `ps aux | grep -E '[c]laude' | grep -v grep || true`,
+      { encoding: 'utf-8', timeout: 5000 }
+    ).trim();
+
+    if (psOutput) {
+      const lines = psOutput.split('\n').filter(Boolean);
+      let killed = 0;
+      for (const line of lines) {
+        const parts = line.trim().split(/\s+/);
+        const pid = parts[1];
+        if (!pid) continue;
+
+        // Check if this process's cwd is inside agent-outputs
+        try {
+          const procCwd = execSync(`lsof -p ${pid} -Fn 2>/dev/null | grep '^n.*cwd' | head -1 || true`, {
+            encoding: 'utf-8',
+            timeout: 3000,
+          }).trim();
+          if (procCwd.includes(agentOutputsPath) || procCwd.includes('agent-outputs')) {
+            log(`  Killing orphan worker process PID ${pid}`);
+            execSync(`kill ${pid} 2>/dev/null || true`, { timeout: 3000 });
+            killed++;
+          }
+        } catch {
+          // Can't inspect this process, skip it
+        }
+      }
+      if (killed > 0) {
+        log(`  Cleaned up ${killed} orphan worker process(es)`);
+      } else {
+        log('  No orphan worker processes found');
+      }
+    } else {
+      log('  No claude processes running');
+    }
+  } catch (error) {
+    log(`  Orphan cleanup check failed (non-blocking): ${error}`);
+  }
+
+  // === STARTUP: RESET STALE IN-PROGRESS STEPS ===
+  logDeterministic('Resetting stale in-progress steps...');
+  try {
+    // Scan workspace/in-progress/P{0-4}/*/ for STEPS.json files
+    const inProgressDir = path.join(process.cwd(), 'workspace', 'in-progress');
+    const bundlePaths: string[] = [];
+    if (existsSync(inProgressDir)) {
+      for (const pDir of readdirSync(inProgressDir, { withFileTypes: true })) {
+        if (!pDir.isDirectory() || !pDir.name.match(/^P\d$/)) continue;
+        const pPath = path.join(inProgressDir, pDir.name);
+        for (const goalDir of readdirSync(pPath, { withFileTypes: true })) {
+          if (!goalDir.isDirectory()) continue;
+          const goalPath = path.join(pPath, goalDir.name);
+          if (existsSync(path.join(goalPath, 'STEPS.json'))) {
+            bundlePaths.push(goalPath);
+          }
+        }
+      }
+    }
+
+    let resetCount = 0;
+    for (const bundlePath of bundlePaths) {
+      const stepsFile = await readStepsJson(bundlePath);
+      if (!stepsFile) continue;
+
+      let modified = false;
+      for (const step of stepsFile.steps) {
+        if (step.status === 'in_progress') {
+          log(`  Resetting step "${step.title}" (${step.id}) in ${path.basename(bundlePath)} → pending`);
+          step.status = 'pending';
+          // Clear started_at so it gets a fresh timestamp on next execution
+          step.started_at = undefined;
+          modified = true;
+          resetCount++;
+        }
+      }
+      if (modified) {
+        await writeStepsJson(bundlePath, stepsFile);
+      }
+    }
+    if (resetCount > 0) {
+      log(`  Reset ${resetCount} stale in-progress step(s) to pending`);
+    } else {
+      log('  No stale in-progress steps found');
+    }
+  } catch (error) {
+    log(`  Step reset check failed (non-blocking): ${error}`);
+  }
 
   // === MAIN LOOP (FORCE MARCH) ===
   logDeterministic('Starting continuous execution loop (CTRL+C to stop)');

@@ -22,6 +22,9 @@ import yaml from 'js-yaml';
 // Agent outputs directory - where workers create their projects
 const AGENT_OUTPUTS_BASE = process.env.AGENT_OUTPUTS_PATH || path.join(os.homedir(), 'dev', 'agent-outputs');
 
+// Worker timeout: wall-clock limit to prevent indefinite hangs (default 30 min)
+const WORKER_TIMEOUT_MS = parseInt(process.env.WORKER_TIMEOUT_MS || '1800000', 10);
+
 // Template directory for project setup files (lives in agent repo, not outputs)
 const AGENT_BASE = process.env.AGENT_PATH || path.join(os.homedir(), 'dev', 'continuous-agent');
 const TEMPLATES_DIR = path.join(AGENT_BASE, 'templates');
@@ -704,44 +707,63 @@ export async function spawnWorker(
       },
     });
 
-    // Process the streaming response
+    // Process the streaming response with a wall-clock timeout.
+    // Without this, a hung worker blocks the entire executive loop indefinitely.
     let turnCount = 0;
-    for await (const message of stream) {
-      const msg = message as SDKMessage;
 
-      // Log all messages for traceability
-      logger.log(`[MSG] type=${msg.type} ${JSON.stringify(msg).slice(0, 500)}`);
+    const streamingWork = async () => {
+      for await (const message of stream) {
+        const msg = message as SDKMessage;
 
-      // Handle different message types
-      if (msg.type === 'assistant') {
-        turnCount++;
-        logger.log(`[TURN ${turnCount}] Assistant response`);
-        // Extract text content from assistant messages
-        if ('content' in msg && Array.isArray(msg.content)) {
-          for (const block of msg.content) {
-            if (block.type === 'text' && 'text' in block) {
-              outputs.push(block.text);
+        // Log all messages for traceability
+        logger.log(`[MSG] type=${msg.type} ${JSON.stringify(msg).slice(0, 500)}`);
+
+        // Handle different message types
+        if (msg.type === 'assistant') {
+          turnCount++;
+          logger.log(`[TURN ${turnCount}] Assistant response`);
+          // Extract text content from assistant messages
+          if ('content' in msg && Array.isArray(msg.content)) {
+            for (const block of msg.content) {
+              if (block.type === 'text' && 'text' in block) {
+                outputs.push(block.text);
+              }
+            }
+          }
+        } else if (msg.type === 'result') {
+          // Handle final result message
+          const resultMsg = msg as SDKResultMessage;
+
+          if (resultMsg.subtype === 'success') {
+            // Collect the final result
+            if ('result' in resultMsg && resultMsg.result) {
+              outputs.push(String(resultMsg.result));
+            }
+          } else {
+            // Handle error results
+            errors.push(`Worker failed with: ${resultMsg.subtype}`);
+
+            if ('errors' in resultMsg && Array.isArray(resultMsg.errors)) {
+              errors.push(...resultMsg.errors.map(String));
             }
           }
         }
-      } else if (msg.type === 'result') {
-        // Handle final result message
-        const resultMsg = msg as SDKResultMessage;
-
-        if (resultMsg.subtype === 'success') {
-          // Collect the final result
-          if ('result' in resultMsg && resultMsg.result) {
-            outputs.push(String(resultMsg.result));
-          }
-        } else {
-          // Handle error results
-          errors.push(`Worker failed with: ${resultMsg.subtype}`);
-
-          if ('errors' in resultMsg && Array.isArray(resultMsg.errors)) {
-            errors.push(...resultMsg.errors.map(String));
-          }
-        }
       }
+    };
+
+    const timeoutPromise = new Promise<'timeout'>((resolve) => {
+      setTimeout(() => resolve('timeout'), WORKER_TIMEOUT_MS);
+    });
+
+    const raceResult = await Promise.race([
+      streamingWork().then(() => 'done' as const),
+      timeoutPromise,
+    ]);
+
+    if (raceResult === 'timeout') {
+      const timeoutMin = Math.round(WORKER_TIMEOUT_MS / 60000);
+      logger.log(`TIMEOUT: Worker exceeded ${timeoutMin} minute wall-clock limit`);
+      errors.push(`Worker timed out after ${timeoutMin} minutes (${WORKER_TIMEOUT_MS}ms wall-clock limit)`);
     }
 
     const duration = Date.now() - startTime;
