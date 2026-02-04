@@ -105,3 +105,15 @@ projects:
       - "- Created comprehensive health check tests"
       - "- 2 commits created with clear messages"
     lessons: []
+  - id: goal-migrate-recipe-app-supabase
+    name: Migrate Recipe Discovery Platform from local Postgres to Supabase
+    category: nextjs
+    completed: "2026-02-04"
+    output_path: /Users/jackjin/dev/agent-outputs/projects/nextjs/2026-02-04/1770173908713
+    archive_path: /Users/jackjin/dev/continuous-agent/workspace/completed/migrate-recipe-app-supabase
+    capabilities_exercised:
+      - deliver.nextjs.app.basic
+      - git.commit
+      - npm.install
+    features_built: []
+    lessons: []

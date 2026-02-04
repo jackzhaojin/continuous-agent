@@ -1,10 +1,10 @@
 {
   "last_practice_at": "2026-02-02T01:26:15.349Z",
-  "last_retrospective_at": "2026-02-03T03:59:20.218Z",
+  "last_retrospective_at": "2026-02-04T03:45:39.221Z",
   "last_reference_refresh_at": "2026-02-02T01:26:14.889Z",
   "practice_count": 1,
-  "retrospective_count": 3,
-  "outcomes_since_last_retro": 9,
+  "retrospective_count": 4,
+  "outcomes_since_last_retro": 0,
   "recent_practice_capabilities": [
     "deliver.calibration.project"
   ]

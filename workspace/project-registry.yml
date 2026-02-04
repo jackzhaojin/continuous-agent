@@ -82,3 +82,13 @@ projects:
       - deliver.nextjs.app.basic
       - npm.install
     reusable: true
+  - slug: migrate-recipe-discovery-platform-from-local-postgres-to-sup
+    title: Migrate Recipe Discovery Platform from local Postgres to Supabase
+    output_path: /Users/jackjin/dev/agent-outputs/projects/nextjs/2026-02-04/1770173908713
+    completed: "2026-02-04"
+    category: nextjs
+    capabilities:
+      - deliver.nextjs.app.basic
+      - git.commit
+      - npm.install
+    reusable: true
