@@ -423,3 +423,74 @@
 
 → Response: Logged prompts 53-58 covering credential system PR comparison, hybrid implementation, merge, cloud deployment discussion.
 → Action: Appended to prompt-log.md. ✅
+
+## Session 8: Worker Timeout, Orphan Cleanup & Validation (Feb 3, 2026)
+
+### Prompt 59: Implement Worker Timeout + Orphan Cleanup Plan (10:20 PM)
+
+> Implement the following plan:
+>
+> # Fix: Worker Timeout + Orphan Cleanup
+>
+> The executive loop has no wall-clock timeout on worker execution. When a worker hangs, the entire agent deadlocks. The `for await (const message of stream)` in worker-spawner.ts blocks indefinitely. Secondary: PM2 restarts leave orphan claude worker processes.
+>
+> Changes: (1) Worker timeout in worker-spawner.ts via Promise.race, (2) Orphan worker cleanup on startup in executive-loop.ts, (3) Reset in_progress steps on startup.
+
+→ Response: Implemented all 3 changes. Added `WORKER_TIMEOUT_MS` env var (default 30 min) with Promise.race around streaming loop. Added orphan cleanup (ps aux + lsof to find stale claude processes). Added STEPS.json scanner to reset in_progress steps to pending on startup.
+→ Action: Modified `worker-spawner.ts` (timeout wrapper), `executive-loop.ts` (orphan cleanup + step reset). Typecheck + build clean. ✅
+
+### Prompt 60: Restart PM2 (10:30 PM)
+
+> We can restart pm2 if we're not in a migration of db or anything
+
+→ Response: Confirmed worker was wrapping up (not mid-migration). Restarted PM2. Verified startup logs show orphan cleanup ran ("No orphan worker processes found") and step reset worked ("Resetting step 'Validate app works against Supabase and clean up' (step-3) → pending"). New worker immediately picked up step 4.
+→ Action: `pm2 restart executive-loop`. Verified via executive log. ✅
+
+### Prompt 61: What's Happening Now? (10:35 PM)
+
+> What's happening now?
+
+→ Response: Worker on turn 70 of step 4/4 (final step of Supabase migration). Fixing Next.js build issue — pages using Supabase runtime env vars needed `force-dynamic`. STEPS.json shows steps 0-2 complete, step 3 in_progress with retry_count 1 from the reset.
+→ Action: Read PM2 logs + STEPS.json. Informational. ✅
+
+### Prompt 62: Forward Progress on Restarts (10:38 PM)
+
+> What happens when we restart? Mostly we don't get reverted, and we kind of keep going. Is that what's happening? Ideally, we kind of make forward progress each time we restart.
+
+→ Response: Traced the full restart flow. What's preserved: files on disk, git commits, uncommitted changes (auto-committed by setupProjectDirectory), output_path in PROMPT.md, completed steps, handoff notes. What's lost: worker memory/context (new Claude session starts fresh), turns spent. Gap identified: no intra-step handoff — worker gets inter-step handoffs but not "here's what your predecessor did on this exact step."
+→ Action: Code analysis of worker-spawner.ts, prompt-builder.ts, execution-handler.ts. ✅
+
+### Prompt 63: Add Resume-Awareness to Worker Prompt (10:42 PM)
+
+> Can we maybe have one of the prompts in our worker to do a git diff and ls and understand outstanding changes from last execution, convinces it to keep going unless things are really bad
+
+→ Response: Updated worker base prompt to add "Navigate and Assess First" section. New workers now run `git log --oneline -10`, `git diff --stat`, `ls -la` before doing anything, with explicit instructions to continue from existing progress rather than starting over.
+→ Action: Created `worker-base-v2.1.0.md` with resume-awareness instructions. Updated symlink from v2.0.0 → v2.1.0. Build clean. ✅
+
+### Prompt 64: Validate the Supabase Migration (10:50 PM)
+
+> Looks like we finished, can you spin up a playwright mcp and validate the work, does the app actually work against supabase? use supabase cli or whatever to validate the data as well, do a bit of validation
+
+→ Response: Supabase REST API confirms: 3 recipes (Carbonara, Mediterranean Salad, Buddha Bowl), 2 users (Chef Alice, Baker Bob), ingredients (Tomato, Onion, Garlic...), 5 dietary tags. Started dev server on port 3099. Playwright verified: homepage loads with "Connected to Supabase" status, Database Status shows Active + 3 recipes, all 3 recipe cards render with images/descriptions/tags/cook times. Only error: missing favicon (404).
+→ Action: curl queries to Supabase REST API, `npm run dev`, Playwright navigation + screenshot. ✅
+
+### Prompt 65: Uninstall Postgres, Keep Supabase CLI (10:55 PM)
+
+> OK let's remove supabase from homebrew and uninstall container/image from docker, stop it from running on docker as well
+
+→ Response: Stopped and removed `recipe-db` container, deleted `postgres:16-alpine` image (388MB), uninstalled supabase CLI. User corrected: meant to uninstall Postgres, keep Supabase CLI.
+→ Action: `docker stop/rm recipe-db`, `docker rmi postgres:16-alpine`, `brew uninstall supabase`. ✅
+
+### Prompt 66: Correction — Reinstall Supabase, Remove Postgres (10:57 PM)
+
+> Sorry, omg, i meant to uninstall postgres, reinstall supabase cli please
+
+→ Response: Reinstalled Supabase CLI (v2.75.0). Found `postgresql@16` running as Homebrew service. Stopped service, uninstalled postgresql@16 + deps (icu4c, krb5), freed 166MB.
+→ Action: `brew install supabase`, `brew services stop postgresql@16`, `brew uninstall postgresql@16`. ✅
+
+### Prompt 67: Conversation Logger (11:00 PM)
+
+> /conversation-logger to prompt-log.md
+
+→ Response: Logged prompts 59-67 covering worker timeout implementation, PM2 restart, restart resilience analysis, resume-aware prompts, Supabase validation, cleanup.
+→ Action: Appended to prompt-log.md. ✅

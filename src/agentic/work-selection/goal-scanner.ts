@@ -94,7 +94,7 @@ interface GoalBundle {
   slug: string;
   promptMd: PromptMdFile;
   sourcePath: string;  // Full path to the goal directory
-  state: 'drafts' | 'ondeck' | 'in-progress' | 'blocked' | 'archive' | 'completed';
+  state: 'in-progress' | 'blocked' | 'archive' | 'completed';
   priority?: 'P0' | 'P1' | 'P2' | 'P3' | 'P4';
 }
 
@@ -117,15 +117,9 @@ export async function scanGoalBundles(): Promise<GoalBundle[]> {
     }
   }
 
-  // Scan drafts (for research tasks)
-  const draftsDir = path.join(WORKSPACE_DIR, 'drafts');
-  if (existsSync(draftsDir)) {
-    const goalDirs = await listGoalDirs(draftsDir);
-    for (const goalDir of goalDirs) {
-      const bundle = await readGoalBundle(goalDir, 'drafts');
-      if (bundle) bundles.push(bundle);
-    }
-  }
+  // NOTE: workspace/drafts/ is intentionally NOT scanned.
+  // Drafts are human-owned staging areas — the agent must never touch them.
+  // Goals must be moved to ondeck/ (auto-promoted) or in-progress/ to be executed.
 
   // Scan completed (for reference only)
   const completedDir = path.join(WORKSPACE_DIR, 'completed');
@@ -402,45 +396,5 @@ export async function buildSelectableWorkFromBundles(): Promise<SelectableWork[]
   return selectableWork;
 }
 
-/**
- * Get research tasks from drafts
- * Returns draft bundles that don't have references/ content yet
- */
-export async function getDraftResearchTasks(): Promise<SelectableWork[]> {
-  const bundles = await scanGoalBundles();
-  const researchTasks: SelectableWork[] = [];
-
-  for (const bundle of bundles) {
-    if (bundle.state !== 'drafts') continue;
-
-    // Check if references/ directory exists and has content
-    const refsDir = path.join(bundle.sourcePath, 'references');
-    let hasReferences = false;
-    if (existsSync(refsDir)) {
-      try {
-        const entries = await readdir(refsDir);
-        hasReferences = entries.filter(e => !e.startsWith('.')).length > 0;
-      } catch { /* ignore */ }
-    }
-
-    if (!hasReferences) {
-      let workItem: WorkItem;
-      try {
-        workItem = await bundleToWorkItemAsync(bundle);
-      } catch (error) {
-        console.log(`[GoalScanner] Failed to convert draft bundle "${bundle.slug}" to work item: ${error}`);
-        continue;
-      }
-      workItem.status = 'pending';
-      // Mark as research task with capped scope
-      workItem.description = `[RESEARCH ONLY] ${workItem.description}`;
-      researchTasks.push({
-        type: 'goal',
-        goal: workItem,
-        priority: 'P4',
-      });
-    }
-  }
-
-  return researchTasks;
-}
+// getDraftResearchTasks() removed — drafts are human-owned and must never be touched by the agent.
+// Goals must be explicitly moved to ondeck/ or in-progress/ before execution.
