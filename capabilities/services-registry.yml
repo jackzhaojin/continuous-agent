@@ -1,0 +1,58 @@
+metadata:
+  category: services
+  description: Cloud services and APIs available to workers and apps
+  version: 1.0.0
+
+services:
+  - id: supabase
+    name: Supabase
+    description: Postgres database, auth, storage, and realtime — replaces local Postgres, SQLite for persistence
+    replaces:
+      - local Postgres
+      - SQLite
+      - local file-based storage for structured data
+    tier: [2, 3]
+    env_vars:
+      worker:
+        - SUPABASE_URL
+        - SUPABASE_ANON_KEY
+        - SUPABASE_SERVICE_ROLE_KEY
+      app:
+        - APP_SUPABASE_URL
+        - APP_SUPABASE_ANON_KEY
+        - APP_SUPABASE_SERVICE_ROLE_KEY
+
+  - id: elevenlabs
+    name: ElevenLabs
+    description: Text-to-speech API — used for demo video narration and voice generation
+    replaces:
+      - local TTS
+      - say command
+    tier: [2, 3]
+    env_vars:
+      worker:
+        - ELEVENLABS_API_KEY
+      app:
+        - APP_ELEVENLABS_API_KEY
+
+  - id: notion
+    name: Notion
+    description: Milestone reporting and daily/weekly summaries — executive-only, workers never use this
+    replaces: []
+    tier: [1]
+    env_vars:
+      executive:
+        - NOTION_API_KEY
+        - NOTION_DATABASE_ID
+        - NOTION_MONTHLY_PAGE_ID
+        - NOTION_REPORTING_ENABLED
+
+  - id: claude-agent-sdk
+    name: Claude Agent SDK
+    description: Spawns worker agents via Anthropic's Agent SDK — core execution engine
+    replaces: []
+    tier: [2]
+    env_vars:
+      worker:
+        - CLAUDE_CODE_OAUTH_TOKEN
+        - ANTHROPIC_API_KEY

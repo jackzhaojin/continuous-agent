@@ -46,6 +46,9 @@ export const TIER2_WORKER_KEYS = new Set([
   'ELEVENLABS_API_KEY',
   'OPENAI_API_KEY',
   'GEMINI_API_KEY',
+  'SUPABASE_URL',
+  'SUPABASE_ANON_KEY',
+  'SUPABASE_SERVICE_ROLE_KEY',
 ]);
 
 // ── Tier 3 APP_ prefix convention ────────────────────────────────

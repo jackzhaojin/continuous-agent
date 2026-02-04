@@ -17,6 +17,7 @@ import { classifyIntent } from '../intelligence/intent-classifier.js';
 import { selectStrategy } from '../intelligence/strategy-selector.js';
 import { findProjectBySlug } from '../../deterministic/project-registry.js';
 import { getAvailableAppCredentialNames, checkWorkerEnvForLeaks } from '../../deterministic/credential-tiers.js';
+import yaml from 'js-yaml';
 
 // Agent outputs directory - where workers create their projects
 const AGENT_OUTPUTS_BASE = process.env.AGENT_OUTPUTS_PATH || path.join(os.homedir(), 'dev', 'agent-outputs');
@@ -249,36 +250,56 @@ function generateOutputsClaudeMd(): void {
     ? `\n## Available App Credentials (Tier 3)\n\nThe following application credentials are available in \`.env.app\` at the workspace root:\n${appCredNames.map(n => `- \`${n}\``).join('\n')}\n\nThese have been stripped of the \`APP_\` prefix. Inject them into your project in whatever format it needs:\n- **Node.js/Python**: Copy to project \`.env\` or use dotenv\n- **Docker**: Add to \`docker-compose.yml\` environment block\n- **Shell scripts**: Source as \`export KEY="value"\`\n- **Other platforms**: Convert to the appropriate config format\n`
     : '';
 
+  // Read services registry to tell workers what cloud services are available
+  let servicesSection = '';
+  const servicesRegistryPath = path.join(AGENT_BASE, 'capabilities', 'services-registry.yml');
+  if (existsSync(servicesRegistryPath)) {
+    try {
+      const registryContent = readFileSync(servicesRegistryPath, 'utf-8');
+      const registry = yaml.load(registryContent) as { services?: Array<{ id: string; name: string; description: string; replaces?: string[]; tier: number[]; env_vars?: Record<string, string[]> }> };
+      if (registry?.services && registry.services.length > 0) {
+        // Only show services available to workers (tier 2 or 3)
+        const workerServices = registry.services.filter(s => s.tier.includes(2) || s.tier.includes(3));
+        if (workerServices.length > 0) {
+          const serviceLines = workerServices.map(s => {
+            const envVars = s.env_vars?.worker || s.env_vars?.app || [];
+            const envNote = envVars.length > 0 ? ` (env: ${envVars.join(', ')})` : '';
+            return `- **${s.name}**${envNote}: ${s.description}`;
+          });
+          const replaceLines = workerServices
+            .filter(s => s.replaces && s.replaces.length > 0)
+            .flatMap(s => (s.replaces || []).map(r => `- Instead of **${r}** → use **${s.name}**`));
+
+          servicesSection = `\n## Available Cloud Services
+
+**Use these services by default** unless the task explicitly requires something else.
+
+${serviceLines.join('\n')}
+${replaceLines.length > 0 ? `\n### Do NOT use local alternatives when a cloud service exists\n\n${replaceLines.join('\n')}\n` : ''}`;
+        }
+      }
+    } catch {
+      // Non-fatal: skip services section if registry can't be read
+    }
+  }
+
+  // Load CLAUDE.md template and render with dynamic sections
   const claudeMdPath = path.join(AGENT_OUTPUTS_BASE, 'CLAUDE.md');
-  const content = `# Agent Outputs Workspace
+  const templatePath = path.join(AGENT_BASE, 'src', 'agentic', 'prompts', 'execution', 'agent-outputs-claude-md-v1.0.0.md');
+  let templateBody: string;
+  try {
+    const raw = readFileSync(templatePath, 'utf-8');
+    // Strip YAML frontmatter
+    const fmEnd = raw.indexOf('---', raw.indexOf('---') + 3);
+    templateBody = raw.slice(fmEnd + 3).trim();
+  } catch {
+    console.warn(`[Worker] Warning: Could not load CLAUDE.md template from ${templatePath}`);
+    return;
+  }
 
-This is a **monorepo** containing all projects built by the Continuous Executive Agent.
-Multiple independent projects coexist here, each in its own subdirectory.
-
-## Directory Structure
-
-\`\`\`
-agent-outputs/
-├── CLAUDE.md              # This file — workspace-wide instructions (do not modify)
-├── .env                   # Worker env (synced from .env.worker; do not modify)
-├── .env.app               # App credentials (Tier 3, APP_ prefix stripped; read-only)
-├── .claude/               # Shared Claude skills and agents (do not modify)
-│   ├── skills/            # Reusable skill definitions (use via Skill tool)
-│   └── agents/            # Subagent definitions (use via Task tool)
-└── projects/              # All project directories
-    └── {category}/{date}/{id}/
-\`\`\`
-
-## Rules
-
-1. **Work ONLY in your assigned project directory.** Your prompt tells you which directory.
-2. **Navigate there first** before doing any work: \`cd <your-project-path>\`
-3. **NEVER modify** this root CLAUDE.md, the root .env, the root .env.app, the root .claude/ directory, or other projects.
-4. **Do NOT create .claude/ inside project folders.** Skills and agents are shared at the root only.
-5. **Projects CAN have their own CLAUDE.md** — it inherits from root and adds project-specific context.
-6. **Initialize git** in your project directory and commit all work before finishing.
-7. If your project needs app-specific env vars, check \`.env.app\` at the root for available credentials, or create a separate \`.env\` inside the project directory.
-${appCredsSection}`;
+  const content = templateBody
+    .replace('{{SERVICES_SECTION}}', servicesSection)
+    .replace('{{APP_CREDS_SECTION}}', appCredsSection);
 
   // Only write if content actually changed (avoid unnecessary disk writes)
   if (existsSync(claudeMdPath)) {

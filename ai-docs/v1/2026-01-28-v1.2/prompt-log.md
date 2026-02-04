@@ -377,3 +377,49 @@
 
 → Response: Logged prompts 47-52 covering PR analysis/merge, CLAUDE.md inheritance fix, agent-outputs cleanup, demo video goal creation.
 → Action: Appended to prompt-log.md. ✅
+
+## Session 7: Three-Tier Credential System (Feb 3, 2026)
+
+### Prompt 53: Credential System Spec & PR Comparison (8:00 PM)
+
+> Context: We need a credential system with 3 tiers: Tier 1 (Executive agent, .env), Tier 2 (Execution/Builder agent, .env), Tier 3 (App credentials, language/runtime-agnostic). Requirements: separate storage/loading, prevent mixing/leaking, local dev easy, git-ignored by default, minimal docs + examples.
+>
+> Compare PR #6 and PR #7. Both claim to implement the 3-tier credential system. Review rules: prefer correctness + security over style. Cite evidence with file references. Output: Verdict, Score (0-5), 5 bullet reasons, 3 risks + mitigations.
+
+→ Response: Verdict: Hybrid. PR #7 has better storage model (physical file separation), PR #6 has better Tier 3 portability (format helpers). Scored both across 4 dimensions with file-level evidence.
+→ Action: `gh pr view 6/7`, `gh pr diff 6/7`. Full comparative analysis. ✅
+
+### Prompt 54: Implement Hybrid on PR #7 Branch (8:10 PM)
+
+> I'm aligned - check out PR #7 branch. Add Tier 3 format helpers from PR #6. Write ad hoc tests in the ad hoc testing folder. Update README.md and CLAUDE.md documentation. Commit, don't push.
+
+→ Response: Checked out PR #7 branch. Created `credential-tiers.ts` (parsing, APP_ prefix stripping, 5-format export, leak detection, env resolution). Updated `worker-spawner.ts` (leak validation, .env.app copy, dynamic CLAUDE.md). Updated CLAUDE.md and README.md. Wrote 7 ad hoc tests (114 assertions), all passing.
+→ Action: Created `src/deterministic/credential-tiers.ts`, 7 test files in `tests/adhoc/2026-02-03-credential-tiers/`. Modified 3 files. Committed. ✅
+
+### Prompt 55: Merge Main into PR #7 Branch (8:30 PM)
+
+> Can you merge main into this? weird that it has a conflict
+
+→ Response: Conflict in `worker-spawner.ts` — main had removed root-level .env copy (moved per-project), PR branch needs it for tiered system. Resolved 3 conflict regions keeping our tiered approach. Typecheck, build, all 114 tests pass.
+→ Action: `git merge main`, resolved conflicts, committed merge. ✅
+
+### Prompt 56: Cloud Deployment Question (8:35 PM)
+
+> Let's say if I were to run this on the cloud like a cloud coding agent, how can I set env variables for it? or is it basically local only at this point? or docker only?
+
+→ Response: Executive loop works with cloud-native env vars (dotenv doesn't override). Worker spawning breaks — `worker-spawner.ts` physically copies `.env.worker` file, which doesn't exist if secrets are injected as env vars only. Works fully with Docker/Kubernetes file mounts. Small fix possible but user declined.
+→ Action: Code analysis of runtime env loading paths. Informational only.
+
+### Prompt 57: Back to Main (8:40 PM)
+
+> OK merged to origin main! can you go back to main and pull?
+
+→ Response: Fast-forwarded main to `c443a09`. 23 files from merged PR pulled in.
+→ Action: `git checkout main && git pull`. ✅
+
+### Prompt 58: Conversation Logger (8:44 PM)
+
+> /conversation-logger to prompt-log.md
+
+→ Response: Logged prompts 53-58 covering credential system PR comparison, hybrid implementation, merge, cloud deployment discussion.
+→ Action: Appended to prompt-log.md. ✅
