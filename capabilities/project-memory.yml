@@ -78,3 +78,30 @@ projects:
       - general.implementation
     features_built: []
     lessons: []
+  - id: goal-recipe-demo-video
+    name: Create demo video for Recipe Discovery Platform
+    category: nextjs
+    completed: "2026-02-03"
+    output_path: /Users/jackjin/dev/agent-outputs/projects/nextjs/2026-01-29/1769685367609
+    archive_path: /Users/jackjin/dev/continuous-agent/workspace/completed/recipe-demo-video
+    capabilities_exercised:
+      - deliver.nextjs.app.basic
+      - npm.install
+    features_built:
+      - "### Files Modified/Created"
+      - "**Previously Created** (verified present and functional):"
+      - "- Demo video created showcasing Recipe Discovery Platform features"
+    lessons: []
+  - id: goal-recipe-demo-video-v2
+    name: Fix app bugs and re-record demo video for Recipe Discovery Platform
+    category: nextjs
+    completed: "2026-02-03"
+    output_path: /Users/jackjin/dev/agent-outputs/projects/nextjs/2026-01-29/1769685367609
+    archive_path: /Users/jackjin/dev/continuous-agent/workspace/completed/recipe-demo-video-v2
+    capabilities_exercised:
+      - deliver.nextjs.app.basic
+      - npm.install
+    features_built:
+      - "- Created comprehensive health check tests"
+      - "- 2 commits created with clear messages"
+    lessons: []

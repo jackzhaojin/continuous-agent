@@ -115,7 +115,13 @@ function setupProjectDirectory(projectPath: string, category: string): void {
     }
   }
 
-  // NOTE: .env is now at agent-outputs/ root level (centralized), not per-project
+  // Copy .env into project directory so worker scripts can access API keys
+  const envSource = path.join(AGENT_BASE, '.env');
+  const envDest = path.join(projectPath, '.env');
+  if (existsSync(envSource) && !existsSync(envDest)) {
+    copyFileSync(envSource, envDest);
+    console.log(`[Worker] Copied .env to project directory`);
+  }
 
   // CRITICAL: Ensure git is clean before starting new work
   // This prevents verifier failures due to uncommitted changes from previous work
@@ -162,7 +168,7 @@ function copySourceProject(sourcePath: string, targetPath: string): boolean {
 
     // Use rsync to copy files, excluding build artifacts and secrets
     execSync(
-      `rsync -a --exclude='.git' --exclude='node_modules' --exclude='.env' --exclude='dist' --exclude='.next' --exclude='__pycache__' "${sourcePath}/" "${targetPath}/"`,
+      `rsync -a --exclude='.git' --exclude='node_modules' --exclude='.env' --exclude='.claude' --exclude='dist' --exclude='.next' --exclude='__pycache__' "${sourcePath}/" "${targetPath}/"`,
       { stdio: 'pipe' }
     );
 

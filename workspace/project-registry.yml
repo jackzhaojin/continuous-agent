@@ -64,3 +64,21 @@ projects:
     capabilities:
       - general.implementation
     reusable: true
+  - slug: create-demo-video-for-recipe-discovery-platform
+    title: Create demo video for Recipe Discovery Platform
+    output_path: /Users/jackjin/dev/agent-outputs/projects/nextjs/2026-01-29/1769685367609
+    completed: "2026-02-03"
+    category: nextjs
+    capabilities:
+      - deliver.nextjs.app.basic
+      - npm.install
+    reusable: true
+  - slug: fix-app-bugs-and-re-record-demo-video-for-recipe-discovery-p
+    title: Fix app bugs and re-record demo video for Recipe Discovery Platform
+    output_path: /Users/jackjin/dev/agent-outputs/projects/nextjs/2026-01-29/1769685367609
+    completed: "2026-02-03"
+    category: nextjs
+    capabilities:
+      - deliver.nextjs.app.basic
+      - npm.install
+    reusable: true
