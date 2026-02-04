@@ -432,16 +432,17 @@ Verifier results update capability confidence scores: +10 on PASS, -15 on FAIL.
 
 The system uses a **three-tier credential architecture** to separate concerns:
 
-| Tier | Purpose | Location | Example Keys |
-|------|---------|----------|-------------|
-| **1. Executive** | Loop orchestration, reporting | Stays in executive process only | `NOTION_API_KEY`, `IDLE_SLEEP_SECONDS` |
-| **2. Execution** | Worker agents (Agent SDK, future agents) | Copied to `agent-outputs/.env` | `ANTHROPIC_API_KEY`, `ELEVENLABS_API_KEY` |
-| **3. Application** | Built apps (databases, payment, etc.) | Copied to `agent-outputs/.env.app` | `APP_DATABASE_URL`, `APP_STRIPE_SECRET_KEY` |
+| Tier | Purpose | Runtime | Location | Example Keys |
+|------|---------|---------|----------|-------------|
+| **1. Executive** | Loop orchestration, reporting | Always Node.js | Stays in executive process only | `NOTION_API_KEY`, `IDLE_SLEEP_SECONDS` |
+| **2. Execution** | Worker agents (Agent SDK, future agents) | Always Node.js | Copied to `agent-outputs/.env` | `ANTHROPIC_API_KEY`, `ELEVENLABS_API_KEY` |
+| **3. Application** | Built apps (databases, payment, etc.) | **Any platform** | Copied to `agent-outputs/.env.app` | `APP_DATABASE_URL`, `APP_STRIPE_SECRET_KEY` |
 
 **Key design decisions:**
 - Some keys are **shared** across tiers (e.g., `ANTHROPIC_API_KEY` is Tier 2 but shared with Tier 1 for diagnosis)
 - Tier 3 keys use the `APP_` prefix for auto-detection. The prefix is **stripped** when written to `.env.app` (so apps see `DATABASE_URL`, not `APP_DATABASE_URL`)
 - Unknown env vars default to Tier 2 (execution) to avoid silently withholding needed keys from workers
+- **Tier 3 is platform-agnostic.** The `.env.app` file is a KEY=VALUE transfer file. Target projects can be Node.js, Python, Docker, bash, iOS, C++, or anything else. Workers read `.env.app` and inject credentials in whatever format the project needs (dotenv, docker-compose.yml, config.py, .xcconfig, CMake vars, etc.). Multi-format helpers: `formatAppEnv(pairs, 'dotenv' | 'json' | 'shell' | 'docker-compose' | 'yaml')`
 
 **Registry:** `capabilities/credential-tiers.yml` — source of truth for all known credentials
 **Logic:** `src/deterministic/credential-tiers.ts` — TypeScript module for tier classification and filtering
@@ -480,7 +481,7 @@ APP_STRIPE_SECRET_KEY=      # → STRIPE_SECRET_KEY in .env.app
    - `.env` — Tier 2 (execution) + Tier 3 (application) keys only
    - `.env.app` — Tier 3 (application) keys only, with `APP_` prefix stripped
 3. Workers read `.env` from `agent-outputs/` root for their own credentials
-4. When a project needs app credentials, workers copy `.env.app` into the project directory
+4. When a project needs app credentials, workers read `.env.app` and inject them in the project's native format (not necessarily dotenv)
 
 ## Notion Reporting
 

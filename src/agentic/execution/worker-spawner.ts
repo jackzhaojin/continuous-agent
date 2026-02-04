@@ -239,16 +239,10 @@ function generateOutputsClaudeMd(): void {
     const appCreds = getAvailableAppCredentialNames(envSource);
     if (appCreds.length > 0) {
       appCredentialsInfo = `
-## Available Application Credentials
+### Available Application Credentials
 
-The following application credentials are available in \`.env.app\` at the workspace root.
-Copy this file into your project directory when your app needs these services:
+The following credentials are in \`.env.app\` at the workspace root (APP_ prefix already stripped):
 
-\`\`\`bash
-cp /path/to/.env.app <your-project-dir>/.env
-\`\`\`
-
-Available credentials (APP_ prefix already stripped):
 ${appCreds.map(c => `- \`${c}\``).join('\n')}
 `;
     }
@@ -265,7 +259,7 @@ Multiple independent projects coexist here, each in its own subdirectory.
 agent-outputs/
 ├── CLAUDE.md              # This file — workspace-wide instructions (do not modify)
 ├── .env                   # Execution agent credentials (do not modify or commit)
-├── .env.app               # Application credentials for projects (APP_ prefix stripped)
+├── .env.app               # Application credentials — KEY=VALUE transfer file
 ├── .claude/               # Shared Claude skills and agents (do not modify)
 │   ├── skills/            # Reusable skill definitions (use via Skill tool)
 │   └── agents/            # Subagent definitions (use via Task tool)
@@ -277,14 +271,31 @@ agent-outputs/
 
 This workspace uses a **three-tier credential system**:
 
-- **Tier 1 (Executive):** Loop orchestration keys — NOT available here (stays in executive process)
-- **Tier 2 (Execution):** Agent SDK auth, model selection — in \`.env\` at root
-- **Tier 3 (Application):** Database, payment, email, cloud keys — in \`.env.app\` at root
+| Tier | Runtime | Where |
+|------|---------|-------|
+| **1. Executive** | Always Node.js | NOT available here (stays in executive process) |
+| **2. Execution** | Always Node.js | \`.env\` at workspace root |
+| **3. Application** | **Any platform** | \`.env.app\` at workspace root (KEY=VALUE transfer file) |
 
-When your project needs application credentials (databases, APIs, etc.):
-1. Check if \`.env.app\` exists at the workspace root
-2. Copy it into your project directory as \`.env\`
-3. The APP_ prefix is already stripped (e.g., \`APP_DATABASE_URL\` → \`DATABASE_URL\`)
+### Tier 3: Application Credentials (Platform-Agnostic)
+
+The \`.env.app\` file is a simple KEY=VALUE transfer file. The target project could be **anything**:
+Node.js, Python, Docker, bash, iOS, C++, Go, Rust, etc.
+
+**Your job as a worker is to inject these credentials in whatever format the project needs:**
+
+| Project Type | How to Inject |
+|-------------|---------------|
+| Node.js / Ruby | Copy as \`.env\` (dotenv format) |
+| Python | Copy as \`.env\` (python-dotenv) or generate \`config.py\` |
+| Docker | Add to \`docker-compose.yml\` \`environment:\` block |
+| Bash scripts | Convert to \`export KEY="VALUE"\` and source it |
+| iOS (Xcode) | Add to \`.xcconfig\` or scheme environment variables |
+| C++ / CMake | Generate a \`config.h\` with \`#define\` or CMake cache vars |
+| Kubernetes | Create a Secret YAML or Helm values |
+| Any language | Parse the KEY=VALUE file or use JSON |
+
+**Do NOT assume the project uses dotenv.** Check what the project is and inject credentials in the appropriate format.
 ${appCredentialsInfo}
 ## Rules
 
@@ -294,8 +305,8 @@ ${appCredentialsInfo}
 4. **Do NOT create .claude/ inside project folders.** Skills and agents are shared at the root only.
 5. **Projects CAN have their own CLAUDE.md** — it inherits from root and adds project-specific context.
 6. **Initialize git** in your project directory and commit all work before finishing.
-7. If your project needs app credentials, **copy .env.app** from root into your project dir as \`.env\`.
-8. If your project needs additional env vars beyond what's in .env.app, create them in your project's \`.env\`.
+7. If your project needs app credentials, read \`.env.app\` from root and inject them in the format your project needs.
+8. If your project needs additional env vars beyond what's in .env.app, create them in your project's config.
 `;
 
   // Only write if content actually changed (avoid unnecessary disk writes)

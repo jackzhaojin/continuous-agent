@@ -2,14 +2,20 @@
  * Credential Tiers - Three-tier environment variable classification
  *
  * Tier 1 (Executive): Keys the executive loop needs to orchestrate work.
- *   Loop timing, reporting, breakdown config. Never copied to workers.
+ *   Always Node.js. Loop timing, reporting, breakdown config.
+ *   Never copied to workers.
  *
  * Tier 2 (Execution Agent): Keys worker agents need to execute tasks.
+ *   Always Node.js (Claude Agent SDK today, possibly other agents later).
  *   Agent SDK auth, model, tool-specific APIs. Copied to agent-outputs/.env.
  *
  * Tier 3 (Application): Keys that built applications need.
- *   Databases, payment, email, cloud. Prefixed with APP_.
- *   Copied to project directories as .env.app.
+ *   Platform-agnostic — the target project could be Node.js, Python, Docker,
+ *   bash, iOS, C++, or anything else. Prefixed with APP_ in the agent's .env.
+ *   Written to agent-outputs/.env.app as a KEY=VALUE transfer file.
+ *   Workers (always Node.js) read this file and inject credentials into the
+ *   project in whatever format is appropriate (dotenv, docker-compose.yml,
+ *   config.py, Xcode scheme, CMakeLists.txt, etc.).
  *
  * Some keys are "shared" across tiers (e.g., ANTHROPIC_API_KEY is needed
  * by both Tier 1 for diagnosis and Tier 2 for worker spawning).
@@ -251,4 +257,79 @@ export function getAvailableAppCredentialNames(envFilePath: string): string[] {
   return entries
     .filter(e => e.value && variableBelongsToTier(e.key, 'application'))
     .map(e => e.key.startsWith(APP_PREFIX) ? e.key.slice(APP_PREFIX.length) : e.key);
+}
+
+// ── Multi-Format Export (Tier 3 is platform-agnostic) ─────────────
+//
+// Tier 1 and 2 are always Node.js, so they only need dotenv format.
+// Tier 3 targets arbitrary platforms, so we provide multiple output
+// formats. The .env.app file at agent-outputs/ root is the canonical
+// KEY=VALUE transfer format. Workers read it and convert to whatever
+// the project needs using these helpers.
+
+export type AppEnvFormat = 'dotenv' | 'json' | 'shell' | 'docker-compose' | 'yaml';
+
+/**
+ * Get Tier 3 (application) credentials as key-value pairs.
+ * APP_ prefix is stripped. Only entries with values are included.
+ * This is the raw data — use formatAppEnv() to render to a specific format.
+ */
+export function getAppCredentialPairs(envFilePath: string): Array<{ key: string; value: string }> {
+  const entries = parseEnvFile(envFilePath);
+  return entries
+    .filter(e => e.value && variableBelongsToTier(e.key, 'application'))
+    .map(e => ({
+      key: e.key.startsWith(APP_PREFIX) ? e.key.slice(APP_PREFIX.length) : e.key,
+      value: e.value,
+    }));
+}
+
+/**
+ * Format app credentials for a specific project platform.
+ *
+ * Workers call this when they know what kind of project they're building
+ * and need to inject Tier 3 credentials in the right format.
+ *
+ * Supported formats:
+ *   - dotenv:         KEY=VALUE (Node.js, Python with python-dotenv, Ruby, etc.)
+ *   - json:           {"KEY": "VALUE"} (any language can parse JSON)
+ *   - shell:          export KEY="VALUE" (bash scripts, sourced configs)
+ *   - docker-compose: YAML environment block for docker-compose.yml
+ *   - yaml:           Flat YAML key: "value" (Kubernetes, Helm, generic config)
+ */
+export function formatAppEnv(pairs: Array<{ key: string; value: string }>, format: AppEnvFormat): string {
+  if (pairs.length === 0) return '';
+
+  switch (format) {
+    case 'dotenv':
+      return pairs.map(p => `${p.key}=${p.value}`).join('\n') + '\n';
+
+    case 'json':
+      const obj: Record<string, string> = {};
+      for (const p of pairs) obj[p.key] = p.value;
+      return JSON.stringify(obj, null, 2) + '\n';
+
+    case 'shell':
+      return pairs.map(p => `export ${p.key}="${escapeShellValue(p.value)}"`).join('\n') + '\n';
+
+    case 'docker-compose':
+      // Indented for use inside a docker-compose.yml `environment:` block
+      return pairs.map(p => `      - ${p.key}=${p.value}`).join('\n') + '\n';
+
+    case 'yaml':
+      return pairs.map(p => `${p.key}: "${escapeYamlValue(p.value)}"`).join('\n') + '\n';
+
+    default:
+      return pairs.map(p => `${p.key}=${p.value}`).join('\n') + '\n';
+  }
+}
+
+/** Escape a value for safe use inside double-quoted shell strings */
+function escapeShellValue(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\$/g, '\\$').replace(/`/g, '\\`');
+}
+
+/** Escape a value for safe use inside double-quoted YAML strings */
+function escapeYamlValue(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 }
