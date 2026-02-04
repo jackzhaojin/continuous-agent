@@ -16,6 +16,7 @@ import { buildIntelligentPrompt, buildSimplePrompt } from '../intelligence/promp
 import { classifyIntent } from '../intelligence/intent-classifier.js';
 import { selectStrategy } from '../intelligence/strategy-selector.js';
 import { findProjectBySlug } from '../../deterministic/project-registry.js';
+import { getAvailableAppCredentialNames, checkWorkerEnvForLeaks } from '../../deterministic/credential-tiers.js';
 
 // Agent outputs directory - where workers create their projects
 const AGENT_OUTPUTS_BASE = process.env.AGENT_OUTPUTS_PATH || path.join(os.homedir(), 'dev', 'agent-outputs');
@@ -196,6 +197,22 @@ function setupAgentOutputsRoot(): void {
   const envSource = envSources.find((candidate) => existsSync(candidate));
   if (envSource) {
     copyFileSync(envSource, envDest);
+
+    // Validate: warn if executive keys leaked into the worker env
+    const leakCheck = checkWorkerEnvForLeaks(envDest);
+    if (!leakCheck.clean) {
+      console.warn(`[Worker] WARNING: Executive-tier keys found in worker env:`);
+      for (const leak of leakCheck.leaks) {
+        console.warn(`[Worker]   ${leak.key} (belongs to ${leak.belongsToTier})`);
+      }
+    }
+  }
+
+  // Copy .env.app to agent-outputs root if it exists (Tier 3 transfer file)
+  const appEnvSource = path.join(AGENT_BASE, '.env.app');
+  const appEnvDest = path.join(AGENT_OUTPUTS_BASE, '.env.app');
+  if (existsSync(appEnvSource)) {
+    copyFileSync(appEnvSource, appEnvDest);
   }
 
   // Copy .claude/ (skills + agents) to agent-outputs root
@@ -219,6 +236,13 @@ function setupAgentOutputsRoot(): void {
  * Explains the monorepo structure and rules for workers.
  */
 function generateOutputsClaudeMd(): void {
+  // Check for available app credentials to include in worker instructions
+  const appEnvPath = path.join(AGENT_OUTPUTS_BASE, '.env.app');
+  const appCredNames = existsSync(appEnvPath) ? getAvailableAppCredentialNames(appEnvPath) : [];
+  const appCredsSection = appCredNames.length > 0
+    ? `\n## Available App Credentials (Tier 3)\n\nThe following application credentials are available in \`.env.app\` at the workspace root:\n${appCredNames.map(n => `- \`${n}\``).join('\n')}\n\nThese have been stripped of the \`APP_\` prefix. Inject them into your project in whatever format it needs:\n- **Node.js/Python**: Copy to project \`.env\` or use dotenv\n- **Docker**: Add to \`docker-compose.yml\` environment block\n- **Shell scripts**: Source as \`export KEY="value"\`\n- **Other platforms**: Convert to the appropriate config format\n`
+    : '';
+
   const claudeMdPath = path.join(AGENT_OUTPUTS_BASE, 'CLAUDE.md');
   const content = `# Agent Outputs Workspace
 
@@ -231,6 +255,7 @@ Multiple independent projects coexist here, each in its own subdirectory.
 agent-outputs/
 ├── CLAUDE.md              # This file — workspace-wide instructions (do not modify)
 ├── .env                   # Worker env (synced from .env.worker; do not modify)
+├── .env.app               # App credentials (Tier 3, APP_ prefix stripped; read-only)
 ├── .claude/               # Shared Claude skills and agents (do not modify)
 │   ├── skills/            # Reusable skill definitions (use via Skill tool)
 │   └── agents/            # Subagent definitions (use via Task tool)
@@ -242,12 +267,12 @@ agent-outputs/
 
 1. **Work ONLY in your assigned project directory.** Your prompt tells you which directory.
 2. **Navigate there first** before doing any work: \`cd <your-project-path>\`
-3. **NEVER modify** this root CLAUDE.md, the root .env, the root .claude/ directory, or other projects.
+3. **NEVER modify** this root CLAUDE.md, the root .env, the root .env.app, the root .claude/ directory, or other projects.
 4. **Do NOT create .claude/ inside project folders.** Skills and agents are shared at the root only.
 5. **Projects CAN have their own CLAUDE.md** — it inherits from root and adds project-specific context.
 6. **Initialize git** in your project directory and commit all work before finishing.
-7. If your project needs app-specific env vars, create a separate \`.env\` (or \`.env.app\`) inside the project directory.
-`;
+7. If your project needs app-specific env vars, check \`.env.app\` at the root for available credentials, or create a separate \`.env\` inside the project directory.
+${appCredsSection}`;
 
   // Only write if content actually changed (avoid unnecessary disk writes)
   if (existsSync(claudeMdPath)) {

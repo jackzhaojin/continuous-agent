@@ -64,6 +64,23 @@ The agent NEVER writes code to its own codebase. All outputs go to isolated proj
 - `workspace/constitution.md` - Immutable hard limits (human-only modification)
 - `ledgers/work-ledger.jsonl` - Append-only task event log
 
+## Credential Management (Three-Tier System)
+
+Credentials are isolated into three tiers using separate `.env` files:
+
+| Tier | File | Purpose |
+|------|------|---------|
+| **1 - Executive** | `.env.executive` | Loop config, Notion reporting, breakdown settings |
+| **2 - Worker** | `.env.worker` | Claude SDK auth, model selection, tool API keys |
+| **3 - Application** | `.env.app` | App credentials (DB, cache, storage) — platform-agnostic |
+
+- Tier 1 keys **never** reach worker agents (physical file separation)
+- Tier 3 uses `APP_` prefix (stripped when injected into projects)
+- Tier 3 supports multiple output formats: dotenv, JSON, shell, docker-compose, YAML
+- Falls back to legacy `.env` if tiered files don't exist
+
+See `CLAUDE.md` for full details and `src/deterministic/credential-tiers.ts` for format helpers.
+
 ## Human Interaction
 
 When the agent blocks after 10 retry attempts, it writes to `workspace/needs-you.md`:

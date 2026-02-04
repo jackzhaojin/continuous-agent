@@ -285,6 +285,7 @@ workspace/in-progress/P2/my-goal/
 - `notion-reporter.ts` - Fire-and-forget Notion integration (`reportMilestone()`, `closeMilestone()`, daily/weekly summaries)
 - `project-registry.ts` - Tracks completed projects for reuse (V1.2: `workspace/project-registry.yml`)
 - `project-memory-store.ts` - Records completed projects with capabilities and lessons (`capabilities/project-memory.yml`)
+- `credential-tiers.ts` - Tier 3 format helpers, leak detection, env file resolution
 - `validation-handler.ts` - Runs verifiers on worker output
 - `verifiers/` - Deterministic checks (git-clean, node-build, docs-complete)
 - `backoff-manager.ts` - Rate limit detection and exponential backoff
@@ -427,21 +428,43 @@ Verifiers run after each goal and return structured evidence:
 
 Verifier results update capability confidence scores: +10 on PASS, -15 on FAIL.
 
-## Environment Variables
+## Environment Variables — Three-Tier Credential System
 
-Create tiered env files from the examples:
+Credentials are separated into three tiers using physically distinct files:
 
 ```bash
-cp .env.executive.example .env.executive
-cp .env.worker.example .env.worker
-cp .env.app.example agent-outputs/projects/<project>/.env.app
+# Setup
+cp .env.executive.example .env.executive   # Tier 1: Executive agent
+cp .env.worker.example .env.worker         # Tier 2: Worker/execution agent
+cp .env.app.example .env.app               # Tier 3: Application (optional)
 ```
 
-- **.env.executive** → Executive loop config + Notion reporting keys.
-- **.env.worker** → Claude Agent SDK auth + worker tool API keys.
-- **.env.app** → App/runtime credentials per project (DBs, caches, storage). Optional: projects may instead use Docker envs, shell exports, iOS build settings, or other platform-specific config.
+| Tier | File | Purpose | Consumers |
+|------|------|---------|-----------|
+| **1 - Executive** | `.env.executive` | Loop config, Notion reporting, breakdown settings | Executive loop only |
+| **2 - Worker** | `.env.worker` | Claude SDK auth, model, tool API keys | Worker agents (via `agent-outputs/.env`) |
+| **3 - Application** | `.env.app` | DB, cache, storage, payment, email keys | Built apps (platform-agnostic) |
 
-**API Key Management:** `.env.worker` is copied to the `agent-outputs/` root as `.env` by `worker-spawner.ts` (centralized, not per-project). Workers access shared API keys from there. Projects needing their own config can create a separate `.env` or `.env.app`, or use platform-specific mechanisms (Docker envs, shell exports, mobile build settings).
+**Key design decisions:**
+- **Physical file separation** prevents accidental tier mixing (no classification logic needed)
+- **Tier 1 keys (e.g., NOTION_API_KEY) NEVER reach workers** — the spawner copies only `.env.worker`
+- **Tier 3 uses `APP_` prefix convention** — the prefix is stripped when injecting into projects (e.g., `APP_DATABASE_URL` becomes `DATABASE_URL`)
+- **Tier 3 is platform-agnostic** — apps can be Node.js, Python, Docker, bash, iOS, C++, etc. Format helpers in `credential-tiers.ts` convert to dotenv, JSON, shell, docker-compose, or YAML
+- **Backward compatible** — falls back to legacy `.env` if tiered files don't exist
+
+**Loading order in executive loop** (`executive-loop.ts`):
+1. `.env.executive` (loaded first, values take precedence via dotenv no-override)
+2. `.env.worker` (new keys only)
+3. `.env` (legacy fallback, new keys only)
+
+**API Key Management:** `.env.worker` is copied to `agent-outputs/.env` by `worker-spawner.ts` (centralized, not per-project). `.env.app` is also copied to `agent-outputs/.env.app` if it exists. Workers access shared API keys from there. The spawner validates that no executive-tier keys leaked into the worker env.
+
+**Tier 3 format helpers** (`src/deterministic/credential-tiers.ts`):
+- `getAppCredentialPairs(path)` — reads `.env.app`, strips `APP_` prefix, returns key-value pairs
+- `formatAppEnv(pairs, format)` — converts pairs to: `dotenv`, `json`, `shell`, `docker-compose`, `yaml`
+- `checkWorkerEnvForLeaks(path)` — validates no Tier 1 keys in worker env
+- `checkAppEnvForLeaks(path)` — validates no Tier 1/2 keys in app env
+- `resolveEnvFile(root, tier)` — resolves tiered file with fallback to `.env`
 
 ## Notion Reporting
 
@@ -618,6 +641,7 @@ continuous-agent/
 │       ├── project-registry.ts # Completed project registry (V1.2)
 │       ├── project-memory-store.ts # Project memory with lessons learned
 │       ├── state-handler.ts    # Updates goal bundles, needs-you.md
+│       ├── credential-tiers.ts # Tier 3 format helpers, leak detection
 │       ├── validation-handler.ts # Runs verifiers
 │       ├── verifiers/          # Deterministic validation checks
 │       ├── backoff-manager.ts  # Rate limit handling
