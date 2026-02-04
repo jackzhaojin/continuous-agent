@@ -23,9 +23,14 @@ npm install
 # Install PM2 globally (if not already installed)
 npm install -g pm2
 
-# Configure authentication (choose one)
-cp .env.example .env
-# Add CLAUDE_CODE_OAUTH_TOKEN (Claude Pro/Max) or ANTHROPIC_API_KEY
+# Configure environment (tiered)
+cp .env.executive.example .env.executive
+cp .env.worker.example .env.worker
+# Optional: app-specific env inside each project directory
+# (Apps can also use Docker envs, shell exports, iOS build settings, etc.)
+# cp .env.app.example agent-outputs/projects/<project>/.env.app
+
+# Add CLAUDE_CODE_OAUTH_TOKEN (Claude Pro/Max) or ANTHROPIC_API_KEY to .env.worker
 
 # Run in development
 npm run dev

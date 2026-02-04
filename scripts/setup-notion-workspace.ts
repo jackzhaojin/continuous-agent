@@ -14,7 +14,7 @@
  *   - Creating database views (table sort, board grouping, filtered views)
  *
  * Prerequisites:
- *   - NOTION_API_KEY in .env (with an integration that has Read + Update + Insert content capabilities)
+ *   - NOTION_API_KEY in .env.executive (with an integration that has Read + Update + Insert content capabilities)
  *   - The integration must already be connected to the PARENT PAGE (done via Notion UI)
  *   - Node.js 18+ (for native fetch)
  *
@@ -26,7 +26,7 @@
  * will be created. Find it in the page URL:
  *   https://www.notion.so/workspace/Page-Name-<PAGE_ID>
  *
- * After running, the script outputs the env vars to add to .env.
+ * After running, the script outputs the env vars to add to .env.executive.
  * Use --write-env to automatically append them.
  *
  *   npx tsx scripts/setup-notion-workspace.ts <PARENT_PAGE_ID> --write-env
@@ -44,17 +44,18 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(__dirname, '..');
-const ENV_PATH = path.join(PROJECT_ROOT, '.env');
+const ENV_PATHS = [path.join(PROJECT_ROOT, '.env.executive'), path.join(PROJECT_ROOT, '.env')];
 const NOTION_API_VERSION = '2022-06-28';
 const NOTION_BASE_URL = 'https://api.notion.com/v1';
 
 // ── Load .env manually (avoid dotenv import issues with tsx) ─────────────────
 
-function loadEnv(): Record<string, string> {
+function loadEnv(): { env: Record<string, string>; sourcePath: string | null } {
   const env: Record<string, string> = {};
-  if (!existsSync(ENV_PATH)) return env;
+  const envPath = ENV_PATHS.find((candidate) => existsSync(candidate)) ?? null;
+  if (!envPath) return { env, sourcePath: null };
 
-  const content = readFileSync(ENV_PATH, 'utf-8');
+  const content = readFileSync(envPath, 'utf-8');
   for (const line of content.split('\n')) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#')) continue;
@@ -64,7 +65,7 @@ function loadEnv(): Record<string, string> {
     const value = trimmed.slice(eqIndex + 1).trim();
     env[key] = value;
   }
-  return env;
+  return { env, sourcePath: envPath };
 }
 
 // ── Notion API helpers ───────────────────────────────────────────────────────
@@ -456,16 +457,16 @@ async function insertTestRow(
 
 // ── .env update ──────────────────────────────────────────────────────────────
 
-function updateEnvFile(databaseId: string, monthlyPageId: string): void {
-  console.log('\n📝 Appending to .env...');
+function updateEnvFile(databaseId: string, monthlyPageId: string, envPath: string): void {
+  console.log(`\n📝 Appending to ${path.basename(envPath)}...`);
 
-  if (!existsSync(ENV_PATH)) {
-    console.error(`  .env file not found at ${ENV_PATH}`);
-    console.error('  Copy .env.example to .env first, then re-run with --write-env');
+  if (!existsSync(envPath)) {
+    console.error(`  Env file not found at ${envPath}`);
+    console.error('  Copy .env.executive.example to .env.executive first, then re-run with --write-env');
     process.exit(1);
   }
 
-  const existingContent = readFileSync(ENV_PATH, 'utf-8');
+  const existingContent = readFileSync(envPath, 'utf-8');
 
   // Check if vars already exist
   const hasDbId = existingContent.includes('NOTION_DATABASE_ID=');
@@ -474,7 +475,7 @@ function updateEnvFile(databaseId: string, monthlyPageId: string): void {
 
   if (hasDbId || hasPageId || hasEnabled) {
     console.warn(
-      '  WARNING: Some NOTION_* vars already exist in .env.',
+      `  WARNING: Some NOTION_* vars already exist in ${path.basename(envPath)}.`,
       '\n  Appending new values — you may need to remove duplicates manually.',
       '\n  Existing values will take precedence if loaded by dotenv.'
     );
@@ -489,7 +490,7 @@ function updateEnvFile(databaseId: string, monthlyPageId: string): void {
     '',
   ].join('\n');
 
-  appendFileSync(ENV_PATH, additions, 'utf-8');
+  appendFileSync(envPath, additions, 'utf-8');
   console.log('  ✓ Added NOTION_DATABASE_ID, NOTION_MONTHLY_PAGE_ID, NOTION_REPORTING_ENABLED');
 }
 
@@ -517,13 +518,13 @@ Arguments:
                     https://www.notion.so/workspace/Page-Name-<PAGE_ID>
 
 Options:
-  --write-env       Append the generated env vars to .env automatically
+  --write-env       Append the generated env vars to .env.executive automatically
   --skip-test       Skip the test row insertion
 
 Prerequisites:
   1. Create a Notion internal integration at https://www.notion.so/my-integrations
      - Enable: Read content, Update content, Insert content
-     - Copy the API key to NOTION_API_KEY in .env
+     - Copy the API key to NOTION_API_KEY in .env.executive
   2. Create or choose a parent page in your Notion workspace
   3. Connect the integration to that parent page:
      - Open the page > "..." menu > "Connections" > add your integration
@@ -541,13 +542,13 @@ What must still be done manually in Notion UI:
   }
 
   // Load API key
-  const env = loadEnv();
+  const { env, sourcePath } = loadEnv();
   const apiKey = env.NOTION_API_KEY || process.env.NOTION_API_KEY;
 
   if (!apiKey) {
     console.error(
       '\nError: NOTION_API_KEY not found.',
-      '\n  Set it in .env or as an environment variable.',
+      '\n  Set it in .env.executive or as an environment variable.',
       '\n  Get it from: https://www.notion.so/my-integrations'
     );
     process.exit(1);
@@ -583,7 +584,7 @@ What must still be done manually in Notion UI:
   const pageId = summariesPage.id.replace(/-/g, '');
 
   console.log('\n' + '═'.repeat(60));
-  console.log('ADD THESE TO YOUR .env FILE:');
+  console.log('ADD THESE TO YOUR .env.executive FILE:');
   console.log('═'.repeat(60));
   console.log(`NOTION_DATABASE_ID=${dbId}`);
   console.log(`NOTION_MONTHLY_PAGE_ID=${pageId}`);
@@ -591,9 +592,10 @@ What must still be done manually in Notion UI:
   console.log('═'.repeat(60));
 
   if (writeEnv) {
-    updateEnvFile(dbId, pageId);
+    const envPath = sourcePath ?? ENV_PATHS[0];
+    updateEnvFile(dbId, pageId, envPath);
   } else {
-    console.log('\nTip: Re-run with --write-env to auto-append to .env');
+    console.log('\nTip: Re-run with --write-env to auto-append to .env.executive');
   }
 
   // Summary of manual steps remaining

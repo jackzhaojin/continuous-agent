@@ -174,7 +174,7 @@ function copySourceProject(sourcePath: string, targetPath: string): boolean {
 }
 
 /**
- * Set up agent-outputs root with centralized CLAUDE.md, .claude/, and .env.
+ * Set up agent-outputs root with centralized CLAUDE.md, .claude/, and .env (worker env).
  *
  * Instead of copying skills/agents/env into every project directory (which clutters
  * each project), we place them once at the agent-outputs root. The Agent SDK's cwd
@@ -190,10 +190,11 @@ function setupAgentOutputsRoot(): void {
     console.log(`[Worker] Created agent-outputs root: ${AGENT_OUTPUTS_BASE}`);
   }
 
-  // Copy .env to agent-outputs root (always refresh in case keys change)
-  const envSource = path.join(AGENT_BASE, '.env');
+  // Copy worker env to agent-outputs root (always refresh in case keys change)
+  const envSources = [path.join(AGENT_BASE, '.env.worker'), path.join(AGENT_BASE, '.env')];
   const envDest = path.join(AGENT_OUTPUTS_BASE, '.env');
-  if (existsSync(envSource)) {
+  const envSource = envSources.find((candidate) => existsSync(candidate));
+  if (envSource) {
     copyFileSync(envSource, envDest);
   }
 
@@ -229,7 +230,7 @@ Multiple independent projects coexist here, each in its own subdirectory.
 \`\`\`
 agent-outputs/
 ├── CLAUDE.md              # This file — workspace-wide instructions (do not modify)
-├── .env                   # Shared API keys (do not modify or commit)
+├── .env                   # Worker env (synced from .env.worker; do not modify)
 ├── .claude/               # Shared Claude skills and agents (do not modify)
 │   ├── skills/            # Reusable skill definitions (use via Skill tool)
 │   └── agents/            # Subagent definitions (use via Task tool)
@@ -245,7 +246,7 @@ agent-outputs/
 4. **Do NOT create .claude/ inside project folders.** Skills and agents are shared at the root only.
 5. **Projects CAN have their own CLAUDE.md** — it inherits from root and adds project-specific context.
 6. **Initialize git** in your project directory and commit all work before finishing.
-7. If your project needs its own env vars, create a separate \`.env\` inside the project directory.
+7. If your project needs app-specific env vars, create a separate \`.env\` (or \`.env.app\`) inside the project directory.
 `;
 
   // Only write if content actually changed (avoid unnecessary disk writes)

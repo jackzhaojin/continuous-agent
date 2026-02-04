@@ -105,7 +105,7 @@ Example 3 - Human Needed:
   "shouldRetry": false,
   "suggestedFix": "",
   "escalateToHuman": true,
-  "diagnosis": "The Notion API key appears to be invalid or expired. Worker has tried multiple times with same authentication error. Human needs to provide a valid API key in .env file."
+  "diagnosis": "The Notion API key appears to be invalid or expired. Worker has tried multiple times with same authentication error. Human needs to provide a valid API key in .env.executive."
 }
 
 Analyze the evidence and respond with JSON only.`;
