@@ -324,7 +324,7 @@ async function bundleToWorkItemAsync(bundle: GoalBundle): Promise<WorkItem> {
     id: `goal-${bundle.slug}`,
     priority: bundle.priority || 'P4',
     title: frontmatter.title,
-    description: body.slice(0, 2000), // Use body as description (truncated)
+    description: body.slice(0, 5000), // Use body as description (needs room for ## Approach parsing)
     status,
     output_path: (frontmatter.output_path as string) || undefined,
     selfEnhance,

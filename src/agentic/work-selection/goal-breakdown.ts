@@ -1,11 +1,13 @@
 /**
  * Task Breakdown - Automatic breakdown of complex tasks into steps
  *
- * Transforms large, complex tasks (>100 estimated turns) into
- * manageable steps that can be executed incrementally.
+ * Uses an LLM call to intelligently decompose goals based on the
+ * PROMPT.md content. Falls back to a simple 3-step generic breakdown
+ * if the LLM call fails.
  */
 
 import path from 'path';
+import { query, type SDKMessage, type SDKResultMessage } from '@anthropic-ai/claude-agent-sdk';
 import type { WorkItem, WorkStep } from '../../core/types.js';
 import { createStepsFile, writeStepsJson, stepsJsonExists } from '../../deterministic/steps-json-handler.js';
 import { logBreakdownProgress } from '../../deterministic/progress-log-writer.js';
@@ -13,9 +15,6 @@ import { logBreakdownProgress } from '../../deterministic/progress-log-writer.js
 // Configuration from environment
 const BREAKDOWN_THRESHOLD_TURNS = parseInt(process.env.BREAKDOWN_THRESHOLD_TURNS || '100', 10);
 const AUTO_BREAKDOWN_ENABLED = process.env.AUTO_BREAKDOWN_ENABLED !== 'false';
-const STEP_MIN_TURNS = parseInt(process.env.STEP_MIN_TURNS || '100', 10);
-const STEP_TARGET_TURNS = parseInt(process.env.STEP_TARGET_TURNS || '100', 10);
-const STEP_MAX_TURNS = parseInt(process.env.STEP_MAX_TURNS || '150', 10);
 const MAX_RE_BREAKDOWN_COUNT = 2; // Maximum re-breakdowns per step
 
 /**
@@ -108,21 +107,126 @@ export function needsBreakdown(item: WorkItem): boolean {
 }
 
 /**
- * Generate a static breakdown based on task type and complexity
- * This is a fallback when no AI breakdown is available
+ * Build the prompt for the LLM breakdown agent.
  */
-export function generateStaticBreakdown(item: WorkItem): WorkStep[] {
+function buildBreakdownPrompt(item: WorkItem): string {
+  return `You are a task decomposition agent. Given a goal's title and description (from a PROMPT.md file), break it into 2-5 concrete, actionable steps.
+
+RULES:
+- Step 0 is ALWAYS a research/planning step
+- Each subsequent step should be a distinct, independently executable unit of work
+- Steps should be specific to THIS goal, not generic templates
+- Each step gets ~100 turns (an LLM agentic session), so scope accordingly
+- Step descriptions should be detailed enough that a worker agent can execute them without ambiguity
+- Include specific commands, file paths, and validation criteria when possible
+- Each step depends on the previous one (sequential execution)
+- The final step should always include validation and cleanup
+
+GOAL TITLE: ${item.title}
+
+GOAL DESCRIPTION:
+${item.description || '(no description)'}
+
+Respond with ONLY a JSON array of step objects. No markdown, no explanation, just the JSON array.
+Each step object must have:
+- "title": string (concise action title)
+- "description": string (detailed instructions for the worker, max 500 chars)
+- "estimated_turns": number (60-120)
+
+Example format:
+[
+  {"title": "Research and plan approach", "description": "Analyze requirements for...", "estimated_turns": 80},
+  {"title": "Implement database schema", "description": "Create tables for...", "estimated_turns": 100},
+  {"title": "Validate and finalize", "description": "Test all features...", "estimated_turns": 80}
+]`;
+}
+
+/**
+ * Generate a breakdown using an LLM call to intelligently decompose the goal.
+ * Falls back to a generic 3-step breakdown if the LLM call fails.
+ */
+export async function generateBreakdown(item: WorkItem): Promise<WorkStep[]> {
+  const prompt = buildBreakdownPrompt(item);
+
+  try {
+    const model = process.env.BREAKDOWN_MODEL || process.env.MODEL || 'claude-sonnet-4-5';
+    console.log(`[Breakdown] Spawning LLM breakdown agent for "${item.title}" using ${model}`);
+
+    const stream = query({
+      prompt,
+      options: {
+        model,
+        maxTurns: 1, // Single-turn: just produce JSON
+        allowedTools: [], // No tools needed for breakdown
+      },
+    });
+
+    let response = '';
+    for await (const message of stream) {
+      const msg = message as SDKMessage;
+
+      if (msg.type === 'assistant') {
+        if ('content' in msg && Array.isArray(msg.content)) {
+          for (const block of msg.content) {
+            if (block.type === 'text' && 'text' in block) {
+              response += block.text;
+            }
+          }
+        }
+      } else if (msg.type === 'result') {
+        const resultMsg = msg as SDKResultMessage;
+        if (resultMsg.subtype === 'success' && 'result' in resultMsg && resultMsg.result) {
+          response += String(resultMsg.result);
+        }
+      }
+    }
+
+    // Parse JSON from response (may have markdown fences or extra text)
+    const jsonMatch = response.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) {
+      throw new Error('No JSON array found in LLM breakdown response');
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]) as Array<{
+      title: string;
+      description: string;
+      estimated_turns?: number;
+    }>;
+
+    if (!Array.isArray(parsed) || parsed.length < 2) {
+      throw new Error(`LLM returned ${parsed.length} steps, need at least 2`);
+    }
+
+    // Convert to WorkStep[] with proper structure
+    const steps: WorkStep[] = parsed.map((s, i) => ({
+      step_number: i,
+      title: s.title,
+      description: (s.description || '').slice(0, 500),
+      status: 'pending' as const,
+      dependencies: i === 0 ? [] : [i - 1],
+      estimated_turns: s.estimated_turns || 100,
+    }));
+
+    console.log(`[Breakdown] LLM produced ${steps.length} steps for "${item.title}"`);
+    for (const s of steps) {
+      console.log(`  Step ${s.step_number}: ${s.title}`);
+    }
+
+    return steps;
+  } catch (error) {
+    console.log(`[Breakdown] LLM breakdown failed for "${item.title}": ${error}`);
+    console.log(`[Breakdown] Falling back to generic 3-step breakdown`);
+    return generateGenericBreakdown(item);
+  }
+}
+
+/**
+ * Generic keyword-based breakdown (fallback when PROMPT.md has no ## Approach).
+ */
+function generateGenericBreakdown(item: WorkItem): WorkStep[] {
   const text = `${item.title} ${item.description || ''}`.toLowerCase();
   const steps: WorkStep[] = [];
   let stepNum = 0;
-
-  // Determine project type
-  const isNextJs = text.includes('next') || text.includes('nextjs');
-  const isApi = text.includes('api') || text.includes('endpoint');
-  const isFullStack = text.includes('full') && text.includes('stack');
-  const hasAuth = text.includes('auth') || text.includes('login');
-  const hasDb = text.includes('database') || text.includes('schema') || text.includes('model');
-  const hasDeploy = text.includes('deploy') || text.includes('production');
 
   // Step 1: Research & Planning (always included for complex tasks)
   steps.push({
@@ -134,106 +238,25 @@ export function generateStaticBreakdown(item: WorkItem): WorkStep[] {
     estimated_turns: 80,
   });
 
-  // Step 2: Project Setup
-  if (isNextJs || isFullStack) {
-    steps.push({
-      step_number: stepNum++,
-      title: 'Initialize project with Next.js and TypeScript',
-      description: 'Set up Next.js project with TypeScript, configure ESLint, set up folder structure.',
-      status: 'pending',
-      dependencies: [0],
-      estimated_turns: 100,
-    });
-  } else {
-    steps.push({
-      step_number: stepNum++,
-      title: 'Initialize project structure',
-      description: 'Set up project with appropriate tooling and folder structure.',
-      status: 'pending',
-      dependencies: [0],
-      estimated_turns: 80,
-    });
-  }
-
-  // Step 3: Database/Schema (if needed)
-  if (hasDb || isFullStack) {
-    steps.push({
-      step_number: stepNum++,
-      title: 'Design and implement database schema',
-      description: 'Create database models, migrations, and seed data. Set up ORM if needed.',
-      status: 'pending',
-      dependencies: [1],
-      estimated_turns: 110,
-    });
-  }
-
-  // Step 4: Authentication (if needed)
-  if (hasAuth) {
-    steps.push({
-      step_number: stepNum++,
-      title: 'Implement authentication system',
-      description: 'Set up user authentication with JWT or session-based auth. Create login/logout/register flows.',
-      status: 'pending',
-      dependencies: hasDb ? [stepNum - 2] : [1],
-      estimated_turns: 120,
-    });
-  }
-
-  // Step 5: Core API/Logic
-  if (isApi || isFullStack) {
-    steps.push({
-      step_number: stepNum++,
-      title: 'Build core API endpoints',
-      description: 'Implement main API routes with CRUD operations. Add validation and error handling.',
-      status: 'pending',
-      dependencies: [stepNum - 2],
-      estimated_turns: 130,
-    });
-  }
-
-  // Step 6: UI Components (for full-stack)
-  if (isNextJs || isFullStack) {
-    steps.push({
-      step_number: stepNum++,
-      title: 'Create UI components and pages',
-      description: 'Build React components for the user interface. Create main pages and navigation.',
-      status: 'pending',
-      dependencies: [stepNum - 2],
-      estimated_turns: 140,
-    });
-  }
-
-  // Step 7: Integration
+  // Step 2: Core implementation
   steps.push({
     step_number: stepNum++,
-    title: 'Integration and feature completion',
-    description: 'Connect all components, ensure data flow works end-to-end. Add any missing features.',
+    title: 'Implement core functionality',
+    description: `Build the main deliverable for "${item.title}". Follow the plan from research.`,
     status: 'pending',
-    dependencies: [stepNum - 2],
+    dependencies: [0],
     estimated_turns: 100,
   });
 
-  // Step 8: Testing
+  // Step 3: Validate & finish
   steps.push({
     step_number: stepNum++,
-    title: 'Testing and quality assurance',
-    description: 'Write unit tests, integration tests. Fix bugs and edge cases.',
+    title: 'Validate, test, and finalize',
+    description: `Test the implementation, fix issues, update documentation, and commit.`,
     status: 'pending',
     dependencies: [stepNum - 2],
-    estimated_turns: 100,
+    estimated_turns: 80,
   });
-
-  // Step 9: Deployment (if needed)
-  if (hasDeploy) {
-    steps.push({
-      step_number: stepNum++,
-      title: 'Deployment and documentation',
-      description: 'Set up deployment pipeline, deploy to production. Write documentation.',
-      status: 'pending',
-      dependencies: [stepNum - 2],
-      estimated_turns: 90,
-    });
-  }
 
   return steps;
 }

@@ -22,7 +22,7 @@ import { selectWorkWithSteps } from '../agentic/work-selection/work-selector.js'
 import {
   needsBreakdown,
   estimateComplexity,
-  generateStaticBreakdown,
+  generateBreakdown,
   logBreakdownEvent,
   writeStepsToBundle,
 } from '../agentic/work-selection/goal-breakdown.js';
@@ -256,7 +256,7 @@ async function runIteration(): Promise<IterationResult> {
     logAgentic(`PHASE 3b: Auto-Breakdown`);
     log(`  Estimated complexity: ${estimated} turns (threshold: ${process.env.BREAKDOWN_THRESHOLD_TURNS || '100'})`);
 
-    const steps = generateStaticBreakdown(workItem);
+    const steps = await generateBreakdown(workItem);
     log(`  Generated ${steps.length} steps for "${workItem.title}"`);
 
     // Write steps to the bundle: STEPS.json (source of truth)

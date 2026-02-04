@@ -4,7 +4,7 @@ An autonomous AI agent that finds and executes work proactively without waiting 
 
 ## What It Does
 
-- **Finds work autonomously** from prioritized goals in `workspace/goals.md`
+- **Finds work autonomously** from prioritized goal bundles in `workspace/in-progress/P{0-4}/`
 - **Executes tasks** by spawning Claude Agent SDK workers
 - **Validates outcomes** through deterministic verifiers
 - **Learns from results** by updating skill confidence scores
@@ -44,10 +44,10 @@ pm2 start ecosystem.config.cjs
 
 # PM2 management commands
 pm2 list                    # View running processes
-pm2 logs continuous-agent   # View logs
-pm2 stop continuous-agent   # Stop the agent
-pm2 restart continuous-agent # Restart the agent
-pm2 delete continuous-agent  # Remove from PM2
+pm2 logs executive-loop   # View logs
+pm2 stop executive-loop   # Stop the agent
+pm2 restart executive-loop # Restart the agent
+pm2 delete executive-loop  # Remove from PM2
 ```
 
 ## Architecture
@@ -59,7 +59,8 @@ pm2 delete continuous-agent  # Remove from PM2
 The agent NEVER writes code to its own codebase. All outputs go to isolated project directories in `agent-outputs/`.
 
 **Key Files:**
-- `workspace/goals.md` - P0-P4 prioritized work items (auto-generated index)
+- `workspace/in-progress/P{0-4}/` - Goal bundles with `PROMPT.md` + `STEPS.json` (primary)
+- `workspace/goals.md` - Auto-generated index from goal bundles
 - `workspace/needs-you.md` - Human-agent interaction interface
 - `workspace/constitution.md` - Immutable hard limits (human-only modification)
 - `ledgers/work-ledger.jsonl` - Append-only task event log

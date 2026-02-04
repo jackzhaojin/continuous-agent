@@ -207,7 +207,7 @@ source_project:          # V1.2: slug of source project to copy from
 
 Complex goals (>100 estimated turns) are automatically broken down into steps:
 
-- **Automatic Breakdown:** `goal-breakdown.ts` generates 2-4 steps when `estimateComplexity()` exceeds threshold
+- **Automatic Breakdown:** `goal-breakdown.ts` uses an LLM call to generate 2-5 goal-specific steps when `estimateComplexity()` exceeds threshold (falls back to a generic 3-step breakdown if the LLM call fails)
 - **Step Execution:** Each step is executed independently with max 100 turns per step
 - **Progress Tracking:** Steps are tracked in **STEPS.json** (machine-readable source of truth) + **PROGRESS_LOG.md** (append-only timeline).
 - **Shared Output:** All steps for a goal write to the SAME project directory
@@ -217,6 +217,7 @@ Complex goals (>100 estimated turns) are automatically broken down into steps:
   - `BREAKDOWN_THRESHOLD_TURNS=100` - Trigger breakdown if estimated > 100 turns
   - `MAX_TURNS_PER_STEP=100` - Max turns per step (MINIMUM 100)
   - `AUTO_BREAKDOWN_ENABLED=true` - Enable/disable auto-breakdown
+  - `BREAKDOWN_MODEL` - Model for LLM breakdown (defaults to `MODEL` or `claude-sonnet-4-5`)
 
 **Step tracking files per goal bundle:**
 ```
@@ -261,7 +262,7 @@ workspace/in-progress/P2/my-goal/
 **Agentic Layer** (`src/agentic/`) - AI decision-making:
 - `work-selection/work-selector.ts` - Selects highest priority unblocked goal (goal bundles first, legacy goals.md fallback)
 - `work-selection/goal-scanner.ts` - Scans workspace folder tree for goal bundles, reads STEPS.json (primary) or PROMPT.md (fallback), auto-promotes ondeck goals
-- `work-selection/goal-breakdown.ts` - Automatic breakdown of complex goals into steps; `writeStepsToBundle()` writes STEPS.json + PROGRESS_LOG.md
+- `work-selection/goal-breakdown.ts` - LLM-based breakdown of complex goals into steps via Agent SDK `query()`; falls back to generic 3-step breakdown; `writeStepsToBundle()` writes STEPS.json + PROGRESS_LOG.md
 - `execution/worker-spawner.ts` - Spawns Claude Agent SDK sessions with prompts, copies `.env.worker` to worker directory
 - `execution/execution-handler.ts` - Orchestrates work execution with retry tracking
 - `intelligence/intent-classifier.ts` - Classifies goals as outcome_only vs what_and_how
