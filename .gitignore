@@ -35,6 +35,12 @@ reports/
 # Verifier run results (runtime outputs)
 verifiers/results/
 
+# Workspace - active goal lifecycle folders (moves create git noise)
+# Only terminal states (completed/, archive/) are tracked as permanent record
+workspace/drafts/
+workspace/ondeck/
+workspace/in-progress/
+
 # Temporary files
 *.tmp
 *.temp
