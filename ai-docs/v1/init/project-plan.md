@@ -22,7 +22,7 @@ This is the build plan for the Continuous Executive Agent V1 MVP infrastructure.
 | Task | Command/Action | Exit Criteria |
 |------|----------------|---------------|
 | Create agent repo | `mkdir -p ~/dev/continuous-agent && cd ~/dev/continuous-agent && git init` | Repo exists |
-| Create outputs repo | `mkdir -p ~/dev/agent-outputs && cd ~/dev/agent-outputs && git init` | Repo exists |
+| Create outputs repo | `mkdir -p ~/dev/ai-sandbox && cd ~/dev/ai-sandbox && git init` | Repo exists |
 | Create GitHub remotes | `gh repo create` for both | Remotes exist |
 | Install dependencies | `npm init -y && npm install @anthropic-ai/claude-agent-sdk typescript @types/node` | package.json exists |
 | Say "proceed with bootstrap" | Human message | Agent begins Phase 1 |

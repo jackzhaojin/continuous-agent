@@ -232,7 +232,7 @@ The Continuous Executive Agent has **successfully implemented the core MVP infra
 **Evidence**:
 - `worker-spawner.ts` uses Agent SDK correctly
 - `settingSources: ['user', 'project']` configured
-- Workers spawn in `agent-outputs/projects/{category}/{date}/{slug}/`
+- Workers spawn in `ai-sandbox/projects/{category}/{date}/{slug}/`
 - Retry path persistence implemented (continues same project across retries)
 - MAX_TURNS configurable (currently 250)
 
@@ -280,13 +280,13 @@ The Continuous Executive Agent has **successfully implemented the core MVP infra
 ## Part 11: Two-Repository Architecture - ✅ COMPLETE
 
 **PRD Requirement**:
-> Strict separation: `continuous-agent/` for infrastructure, `agent-outputs/` for all worker outputs.
+> Strict separation: `continuous-agent/` for infrastructure, `ai-sandbox/` for all worker outputs.
 
 **Current Status**: ✅ **COMPLETE**
 
 **Evidence**:
 - Both repositories exist
-- Workers write to `agent-outputs/projects/{category}/{date}/{slug}/`
+- Workers write to `ai-sandbox/projects/{category}/{date}/{slug}/`
 - Constitution enforces separation (Article I, Section 6)
 - No application code in agent codebase
 

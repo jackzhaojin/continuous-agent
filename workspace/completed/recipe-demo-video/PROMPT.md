@@ -10,7 +10,7 @@ tags:
   - playwright
   - elevenlabs
   - nextjs
-output_path: /Users/jackjin/dev/agent-outputs/projects/nextjs/2026-01-29/1769685367609
+output_path: /Users/jackjin/dev/ai-sandbox/projects/nextjs/2026-01-29/1769685367609
 ---
 
 ## Problem
@@ -52,7 +52,7 @@ Use the **playwright-demo-video** skill (available via `Skill` tool) in **Mode 2
 
 ### Key details:
 - The app is inside `recipe-discovery-platform/` subdirectory
-- ElevenLabs API key is available as `ELEVENLABS_API_KEY` in `.env` at the agent-outputs root
+- ElevenLabs API key is available as `ELEVENLABS_API_KEY` in `.env` at the ai-sandbox root
 - Use `npx playwright install chromium` if Playwright browsers aren't installed
 - The app needs `npm install` and `npm run dev` to start
 - **PostgreSQL is running** in Docker on localhost:5432 (user/password/recipe_discovery) with seeded data

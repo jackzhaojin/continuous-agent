@@ -89,10 +89,10 @@ Build verified: ✅ TypeScript compiles with no errors
 
 ### Prompt 7: Increase MAX_TURNS (11:07 AM)
 
-> OK - i think we don't have enough max turns, we need to REALLY extend our max turns to like, something super high like 200 or 300, we're doing agentic coding tasks., do this, clean up '/Users/jackjin/dev/agent-outputs/projects' kill the current run first
+> OK - i think we don't have enough max turns, we need to REALLY extend our max turns to like, something super high like 200 or 300, we're doing agentic coding tasks., do this, clean up '/Users/jackjin/dev/ai-sandbox/projects' kill the current run first
 
 → Response: Set MAX_TURNS=250, cleaned outputs, archived old logs, started fresh agent run.
-→ Action: Updated .env, .env.example, cleaned agent-outputs, archived ledgers, restarted agent. ✅
+→ Action: Updated .env, .env.example, cleaned ai-sandbox, archived ledgers, restarted agent. ✅
 
 ---
 
@@ -206,7 +206,7 @@ Build verified: ✅ TypeScript compiles with no errors
 > After compacting, can you see what continuous agent is doing next? is notion poc done and it's on to its next priority?
 
 → Response: Found agent creating 27+ duplicate Notion project folders instead of working in one.
-→ Action: Read goals.md, checked agent-outputs, discovered fundamental architecture issue.
+→ Action: Read goals.md, checked ai-sandbox, discovered fundamental architecture issue.
 
 ---
 
@@ -230,7 +230,7 @@ Build verified: ✅ TypeScript compiles with no errors
 
 ### Prompt 17: Clean Up Folders (Late PM)
 
-> Can we please clean up all the notion project folders? and like, have it be one clean folder. Also all the '/Users/jackjin/dev/agent-outputs/projects/misc/2026-01-25', all these are notions as well.
+> Can we please clean up all the notion project folders? and like, have it be one clean folder. Also all the '/Users/jackjin/dev/ai-sandbox/projects/misc/2026-01-25', all these are notions as well.
 
 → Response: Cleaned all duplicate folders, kept only 1769393294746.
 → Action: Removed 26+ duplicate folders in 2026-01-26/, all folders in 2026-01-25/. ✅

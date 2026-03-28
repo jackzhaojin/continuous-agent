@@ -343,7 +343,7 @@ async function runIteration(): Promise<IterationResult> {
       await updateGoalState(workItem, true, undefined, result.output_path, contractId, result.output);
     }
 
-    // Commit worker output to agent-outputs monorepo
+    // Commit worker output to ai-sandbox monorepo
     commitOutputsMonorepo(workItem.title, result.output_path);
 
     // Reset backoff on success
@@ -505,8 +505,8 @@ async function main(): Promise<void> {
   // === STARTUP: ORPHAN WORKER CLEANUP ===
   logDeterministic('Checking for orphan worker processes...');
   try {
-    // Find claude processes whose cwd is inside agent-outputs (stale workers from prior instance)
-    const agentOutputsPath = process.env.AGENT_OUTPUTS_PATH || path.join(process.env.HOME || '', 'dev', 'agent-outputs');
+    // Find claude processes whose cwd is inside ai-sandbox (stale workers from prior instance)
+    const agentOutputsPath = process.env.AGENT_OUTPUTS_PATH || path.join(process.env.HOME || '', 'dev', 'ai-sandbox');
     const psOutput = execSync(
       `ps aux | grep -E '[c]laude' | grep -v grep || true`,
       { encoding: 'utf-8', timeout: 5000 }
@@ -520,13 +520,13 @@ async function main(): Promise<void> {
         const pid = parts[1];
         if (!pid) continue;
 
-        // Check if this process's cwd is inside agent-outputs
+        // Check if this process's cwd is inside ai-sandbox
         try {
           const procCwd = execSync(`lsof -p ${pid} -Fn 2>/dev/null | grep '^n.*cwd' | head -1 || true`, {
             encoding: 'utf-8',
             timeout: 3000,
           }).trim();
-          if (procCwd.includes(agentOutputsPath) || procCwd.includes('agent-outputs')) {
+          if (procCwd.includes(agentOutputsPath) || procCwd.includes('ai-sandbox')) {
             log(`  Killing orphan worker process PID ${pid}`);
             execSync(`kill ${pid} 2>/dev/null || true`, { timeout: 3000 });
             killed++;

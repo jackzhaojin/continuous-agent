@@ -19,7 +19,7 @@ tags:
   - full-stack
   - responsive
   - animation
-output_path: /Users/jackjin/dev/agent-outputs/projects/nextjs/2026-01-29/1769683759694/music-player
+output_path: /Users/jackjin/dev/ai-sandbox/projects/nextjs/2026-01-29/1769683759694/music-player
 branch: null
 ---
 

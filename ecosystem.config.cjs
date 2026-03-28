@@ -20,14 +20,14 @@ module.exports = {
         // NOTE: Using 'development' to ensure npm installs devDependencies
         // 'production' was causing workers to fail npm install for TypeScript
         NODE_ENV: 'development',
-        AGENT_OUTPUTS_PATH: '/Users/jackjin/dev/agent-outputs',
+        AGENT_OUTPUTS_PATH: '/Users/jackjin/dev/ai-sandbox',
         IDLE_SLEEP_SECONDS: '30',       // Sleep when no work (polling interval)
         UNHEALTHY_SLEEP_SECONDS: '60',  // Sleep when system unhealthy
         MODEL: 'claude-sonnet-4-5',
       },
       env_development: {
         NODE_ENV: 'development',
-        AGENT_OUTPUTS_PATH: '/Users/jackjin/dev/agent-outputs',
+        AGENT_OUTPUTS_PATH: '/Users/jackjin/dev/ai-sandbox',
         IDLE_SLEEP_SECONDS: '60',       // Longer polling in dev
         UNHEALTHY_SLEEP_SECONDS: '60',
         MODEL: 'claude-sonnet-4-5',

@@ -45,7 +45,7 @@ Each goal packet gets its own append-only JSONL file tracking every worker execu
 **Schema (one JSON object per line):**
 ```jsonl
 {"contract_id":"contract-1769685738333","step_id":"step-0","event":"STARTED","timestamp":"2026-01-29T05:44:52Z","strategy":"default","attempt":1}
-{"contract_id":"contract-1769685738333","step_id":"step-0","event":"COMPLETED","timestamp":"2026-01-29T05:59:42Z","output_path":"/Users/.../agent-outputs/projects/nextjs/2026-01-29/1769685367609","worker_log":"ledgers/2026-01-29/worker-contract-1769685738333.log"}
+{"contract_id":"contract-1769685738333","step_id":"step-0","event":"COMPLETED","timestamp":"2026-01-29T05:59:42Z","output_path":"/Users/.../ai-sandbox/projects/nextjs/2026-01-29/1769685367609","worker_log":"ledgers/2026-01-29/worker-contract-1769685738333.log"}
 {"contract_id":"contract-1769685800000","step_id":"step-1","event":"STARTED","timestamp":"2026-01-29T06:00:00Z","strategy":"default","attempt":1}
 {"contract_id":"contract-1769685800000","step_id":"step-1","event":"FAILED","timestamp":"2026-01-29T06:15:00Z","error":"npm build failed","strategy_used":"default","attempt":1}
 {"contract_id":"contract-1769685900000","step_id":"step-1","event":"STARTED","timestamp":"2026-01-29T06:16:00Z","strategy":"simplify_scope","attempt":2}

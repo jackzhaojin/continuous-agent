@@ -239,7 +239,7 @@ export async function executeWork(
         id: contractId || `contract-${Date.now()}`,
         prompt: scopedItem.description || item.description,
         scope: {
-          repos_allowed: ['agent-outputs'],
+          repos_allowed: ['ai-sandbox'],
           tools_allowed: [
             'Skill',
             'Task',

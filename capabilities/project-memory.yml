@@ -3,7 +3,7 @@ projects:
     name: Spotify-Inspired Music Player UI
     category: react
     completed: "2026-01-29"
-    output_path: /Users/jackjin/dev/agent-outputs/projects/react/2026-01-29/1769660844279
+    output_path: /Users/jackjin/dev/ai-sandbox/projects/react/2026-01-29/1769660844279
     archive_path: /Users/jackjin/dev/continuous-agent/workspace/archive/music-player-ui
     capabilities_exercised:
       - deliver.react.component
@@ -19,7 +19,7 @@ projects:
     name: Full-Stack Conversational Chat Application
     category: react
     completed: "2026-01-29"
-    output_path: /Users/jackjin/dev/agent-outputs/projects/nextjs/2026-01-29/1769671611924
+    output_path: /Users/jackjin/dev/ai-sandbox/projects/nextjs/2026-01-29/1769671611924
     archive_path: /Users/jackjin/dev/continuous-agent/workspace/archive/chatbot-ui-react
     capabilities_exercised:
       - deliver.react.component
@@ -29,7 +29,7 @@ projects:
     name: Full-Stack Retro Analytics Dashboard
     category: misc
     completed: "2026-01-29"
-    output_path: /Users/jackjin/dev/agent-outputs/projects/nextjs/2026-01-29/1769678844738
+    output_path: /Users/jackjin/dev/ai-sandbox/projects/nextjs/2026-01-29/1769678844738
     archive_path: /Users/jackjin/dev/continuous-agent/workspace/archive/retro-dashboard
     capabilities_exercised:
       - general.implementation
@@ -39,7 +39,7 @@ projects:
     name: Integrate Self-Improvement Loop Triggers
     category: misc
     completed: "2026-02-01"
-    output_path: /Users/jackjin/dev/agent-outputs/projects/misc/2026-01-26/1769399545316
+    output_path: /Users/jackjin/dev/ai-sandbox/projects/misc/2026-01-26/1769399545316
     archive_path: /Users/jackjin/dev/continuous-agent/workspace/completed/integrate-self-improvement-loop-triggers
     capabilities_exercised:
       - general.implementation
@@ -60,7 +60,7 @@ projects:
     name: "Practice: Calibration Project Delivery Exercise"
     category: misc
     completed: "2026-02-02"
-    output_path: /Users/jackjin/dev/agent-outputs/projects/misc/2026-02-02/1769995575621
+    output_path: /Users/jackjin/dev/ai-sandbox/projects/misc/2026-02-02/1769995575621
     archive_path: /Users/jackjin/dev/continuous-agent/workspace/completed/practice-calibration-project-delivery-exercise
     capabilities_exercised:
       - git.commit
@@ -72,7 +72,7 @@ projects:
     name: Full-Stack Recipe Discovery Platform
     category: misc
     completed: "2026-02-02"
-    output_path: /Users/jackjin/dev/agent-outputs/projects/nextjs/2026-01-29/1769685367609
+    output_path: /Users/jackjin/dev/ai-sandbox/projects/nextjs/2026-01-29/1769685367609
     archive_path: /Users/jackjin/dev/continuous-agent/workspace/completed/recipe-card-explorer
     capabilities_exercised:
       - general.implementation
@@ -82,7 +82,7 @@ projects:
     name: Create demo video for Recipe Discovery Platform
     category: nextjs
     completed: "2026-02-03"
-    output_path: /Users/jackjin/dev/agent-outputs/projects/nextjs/2026-01-29/1769685367609
+    output_path: /Users/jackjin/dev/ai-sandbox/projects/nextjs/2026-01-29/1769685367609
     archive_path: /Users/jackjin/dev/continuous-agent/workspace/completed/recipe-demo-video
     capabilities_exercised:
       - deliver.nextjs.app.basic
@@ -96,7 +96,7 @@ projects:
     name: Fix app bugs and re-record demo video for Recipe Discovery Platform
     category: nextjs
     completed: "2026-02-03"
-    output_path: /Users/jackjin/dev/agent-outputs/projects/nextjs/2026-01-29/1769685367609
+    output_path: /Users/jackjin/dev/ai-sandbox/projects/nextjs/2026-01-29/1769685367609
     archive_path: /Users/jackjin/dev/continuous-agent/workspace/completed/recipe-demo-video-v2
     capabilities_exercised:
       - deliver.nextjs.app.basic
@@ -109,7 +109,7 @@ projects:
     name: Migrate Recipe Discovery Platform from local Postgres to Supabase
     category: nextjs
     completed: "2026-02-04"
-    output_path: /Users/jackjin/dev/agent-outputs/projects/nextjs/2026-02-04/1770173908713
+    output_path: /Users/jackjin/dev/ai-sandbox/projects/nextjs/2026-02-04/1770173908713
     archive_path: /Users/jackjin/dev/continuous-agent/workspace/completed/migrate-recipe-app-supabase
     capabilities_exercised:
       - deliver.nextjs.app.basic
@@ -121,7 +121,7 @@ projects:
     name: Build PageForge CMS — AEM-Inspired Visual Page Builder
     category: nextjs
     completed: "2026-02-04"
-    output_path: /Users/jackjin/dev/agent-outputs/projects/nextjs/2026-02-04/1770180822334
+    output_path: /Users/jackjin/dev/ai-sandbox/projects/nextjs/2026-02-04/1770180822334
     archive_path: /Users/jackjin/dev/continuous-agent/workspace/completed/pageforge-cms
     capabilities_exercised:
       - deliver.nextjs.app.basic

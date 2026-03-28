@@ -20,7 +20,7 @@ import { getAvailableAppCredentialNames, checkWorkerEnvForLeaks } from '../../de
 import yaml from 'js-yaml';
 
 // Agent outputs directory - where workers create their projects
-const AGENT_OUTPUTS_BASE = process.env.AGENT_OUTPUTS_PATH || path.join(os.homedir(), 'dev', 'agent-outputs');
+const AGENT_OUTPUTS_BASE = process.env.AGENT_OUTPUTS_PATH || path.join(os.homedir(), 'dev', 'ai-sandbox');
 
 // Worker timeout: wall-clock limit to prevent indefinite hangs (default 30 min)
 const WORKER_TIMEOUT_MS = parseInt(process.env.WORKER_TIMEOUT_MS || '1800000', 10);
@@ -30,7 +30,7 @@ const AGENT_BASE = process.env.AGENT_PATH || path.join(os.homedir(), 'dev', 'con
 const TEMPLATES_DIR = path.join(AGENT_BASE, 'templates');
 const LEDGERS_DIR = path.join(AGENT_BASE, 'ledgers');
 
-// Worker-facing Claude files (skills + agents) — copied to agent-outputs root (not per-project)
+// Worker-facing Claude files (skills + agents) — copied to ai-sandbox root (not per-project)
 const CLAUDE_FILES_DIR = path.join(AGENT_BASE, 'claude-files-to-output');
 
 /**
@@ -185,11 +185,11 @@ function copySourceProject(sourcePath: string, targetPath: string): boolean {
 }
 
 /**
- * Set up agent-outputs root with centralized CLAUDE.md, .claude/, and .env (worker env).
+ * Set up ai-sandbox root with centralized CLAUDE.md, .claude/, and .env (worker env).
  *
  * Instead of copying skills/agents/env into every project directory (which clutters
- * each project), we place them once at the agent-outputs root. The Agent SDK's cwd
- * is set to agent-outputs/, so it reads CLAUDE.md and discovers .claude/skills/ from there.
+ * each project), we place them once at the ai-sandbox root. The Agent SDK's cwd
+ * is set to ai-sandbox/, so it reads CLAUDE.md and discovers .claude/skills/ from there.
  *
  * This is called before each worker spawn to ensure files are fresh.
  * Skipped for self-enhance/skill-build workers (they use the agent repo directly).
@@ -198,10 +198,10 @@ function setupAgentOutputsRoot(): void {
   // Create root if needed
   if (!existsSync(AGENT_OUTPUTS_BASE)) {
     mkdirSync(AGENT_OUTPUTS_BASE, { recursive: true });
-    console.log(`[Worker] Created agent-outputs root: ${AGENT_OUTPUTS_BASE}`);
+    console.log(`[Worker] Created ai-sandbox root: ${AGENT_OUTPUTS_BASE}`);
   }
 
-  // Copy worker env to agent-outputs root (always refresh in case keys change)
+  // Copy worker env to ai-sandbox root (always refresh in case keys change)
   const envSources = [path.join(AGENT_BASE, '.env.worker'), path.join(AGENT_BASE, '.env')];
   const envDest = path.join(AGENT_OUTPUTS_BASE, '.env');
   const envSource = envSources.find((candidate) => existsSync(candidate));
@@ -218,31 +218,31 @@ function setupAgentOutputsRoot(): void {
     }
   }
 
-  // Copy .env.app to agent-outputs root if it exists (Tier 3 transfer file)
+  // Copy .env.app to ai-sandbox root if it exists (Tier 3 transfer file)
   const appEnvSource = path.join(AGENT_BASE, '.env.app');
   const appEnvDest = path.join(AGENT_OUTPUTS_BASE, '.env.app');
   if (existsSync(appEnvSource)) {
     copyFileSync(appEnvSource, appEnvDest);
   }
 
-  // Copy .claude/ (skills + agents) to agent-outputs root
+  // Copy .claude/ (skills + agents) to ai-sandbox root
   if (existsSync(CLAUDE_FILES_DIR)) {
     const destDir = path.join(AGENT_OUTPUTS_BASE, '.claude');
     try {
       cpSync(CLAUDE_FILES_DIR, destDir, { recursive: true });
       console.log(`[Worker] Synced .claude/ skills and agents to ${destDir}`);
     } catch (error) {
-      console.log(`[Worker] Warning: Failed to sync .claude/ to agent-outputs root: ${error}`);
+      console.log(`[Worker] Warning: Failed to sync .claude/ to ai-sandbox root: ${error}`);
     }
   }
 
-  // Generate CLAUDE.md at agent-outputs root
+  // Generate CLAUDE.md at ai-sandbox root
   generateOutputsClaudeMd();
 }
 
 /**
- * Generate CLAUDE.md at the agent-outputs root.
- * This is what the Agent SDK reads when cwd is set to agent-outputs/.
+ * Generate CLAUDE.md at the ai-sandbox root.
+ * This is what the Agent SDK reads when cwd is set to ai-sandbox/.
  * Explains the monorepo structure and rules for workers.
  */
 function generateOutputsClaudeMd(): void {
@@ -288,7 +288,7 @@ ${replaceLines.length > 0 ? `\n### Do NOT use local alternatives when a cloud se
 
   // Load CLAUDE.md template and render with dynamic sections
   const claudeMdPath = path.join(AGENT_OUTPUTS_BASE, 'CLAUDE.md');
-  const templatePath = path.join(AGENT_BASE, 'src', 'agentic', 'prompts', 'execution', 'agent-outputs-claude-md-v1.0.0.md');
+  const templatePath = path.join(AGENT_BASE, 'src', 'agentic', 'prompts', 'execution', 'ai-sandbox-claude-md-v1.0.0.md');
   let templateBody: string;
   try {
     const raw = readFileSync(templatePath, 'utf-8');
@@ -511,7 +511,7 @@ After the skill works end-to-end:
 
 ## CRITICAL REMINDERS
 - Skills live in \`.claude/skills/{name}/SKILL.md\` in the agent codebase
-- You are working in the agent codebase (continuous-agent), NOT agent-outputs
+- You are working in the agent codebase (continuous-agent), NOT ai-sandbox
 - The skill-builder subagent handles file creation; you handle testing
 - Test the skill YOURSELF using the Skill tool after creation
 - Maximum 5 build→test→fix iterations before reporting a blocker
@@ -631,14 +631,14 @@ export async function spawnWorker(
     }
   }
 
-  // Set up centralized CLAUDE.md, .claude/, and .env at agent-outputs root
+  // Set up centralized CLAUDE.md, .claude/, and .env at ai-sandbox root
   // Skip for self-enhance/skill-build — they work in the agent repo which already has .claude/
   if (!isSelfEnhance && !isSkillBuild) {
     setupAgentOutputsRoot();
   }
 
-  // Compute relative project path (relative to agent-outputs root).
-  // Regular workers use this in their prompts since cwd is agent-outputs/.
+  // Compute relative project path (relative to ai-sandbox root).
+  // Regular workers use this in their prompts since cwd is ai-sandbox/.
   // Self-enhance/skill-build use the absolute path since cwd is the agent repo.
   const relativeProjectPath = (isSelfEnhance || isSkillBuild)
     ? projectPath
@@ -651,7 +651,7 @@ export async function spawnWorker(
   } else if (isSkillBuild && workItem) {
     prompt = buildSkillBuildPrompt(contract, workItem);
   } else {
-    // Pass relative path so workers navigate from the agent-outputs cwd
+    // Pass relative path so workers navigate from the ai-sandbox cwd
     prompt = await buildWorkerPrompt(contract, relativeProjectPath, workItem, retryContext);
   }
 
@@ -691,7 +691,7 @@ export async function spawnWorker(
     // Determine cwd for the Agent SDK:
     // - Self-enhance/skill-build: AGENT_BASE (the agent codebase)
     // - Regular workers: AGENT_OUTPUTS_BASE (monorepo root, NOT per-project)
-    //   CLAUDE.md, .claude/skills, .claude/agents all live at agent-outputs root.
+    //   CLAUDE.md, .claude/skills, .claude/agents all live at ai-sandbox root.
     //   Workers navigate to their project subdirectory via prompt instructions.
     const workerCwd = (isSelfEnhance || isSkillBuild) ? projectPath : AGENT_OUTPUTS_BASE;
 

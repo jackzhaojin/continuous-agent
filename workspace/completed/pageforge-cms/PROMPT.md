@@ -12,7 +12,7 @@ tags:
   - cms
   - drag-and-drop
   - full-stack
-output_path: /Users/jackjin/dev/agent-outputs/projects/nextjs/2026-02-04/1770180822334
+output_path: /Users/jackjin/dev/ai-sandbox/projects/nextjs/2026-02-04/1770180822334
 branch: null
 ---
 

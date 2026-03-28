@@ -27,7 +27,7 @@ Always respect the 8 hard limits from `workspace/constitution.md`:
 3. No external publishing
 4. No credential exposure
 5. No access control expansion
-6. All output to agent-outputs/
+6. All output to ai-sandbox/
 7. All activity logged
 8. 10 retries before blocking
 

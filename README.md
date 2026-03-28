@@ -28,7 +28,7 @@ cp .env.executive.example .env.executive
 cp .env.worker.example .env.worker
 # Optional: app-specific env inside each project directory
 # (Apps can also use Docker envs, shell exports, iOS build settings, etc.)
-# cp .env.app.example agent-outputs/projects/<project>/.env.app
+# cp .env.app.example ai-sandbox/projects/<project>/.env.app
 
 # Add CLAUDE_CODE_OAUTH_TOKEN (Claude Pro/Max) or ANTHROPIC_API_KEY to .env.worker
 
@@ -54,9 +54,9 @@ pm2 delete executive-loop  # Remove from PM2
 
 **Two-Repository Setup:**
 - `continuous-agent/` (this repo) - Agent infrastructure only
-- `agent-outputs/` (sibling directory) - All worker outputs and project code
+- `ai-sandbox/` (sibling directory) - All worker outputs and project code
 
-The agent NEVER writes code to its own codebase. All outputs go to isolated project directories in `agent-outputs/`.
+The agent NEVER writes code to its own codebase. All outputs go to isolated project directories in `ai-sandbox/`.
 
 **Key Files:**
 - `workspace/in-progress/P{0-4}/` - Goal bundles with `PROMPT.md` + `STEPS.json` (primary)
@@ -109,7 +109,7 @@ The agent operates under 8 immutable constraints defined in `workspace/constitut
 3. No external publishing without approval
 4. No credential exposure
 5. No access control expansion
-6. No output in agent codebase (all output → agent-outputs/)
+6. No output in agent codebase (all output → ai-sandbox/)
 7. All activity must be logged
 8. 10 retries minimum before blocking
 

@@ -7,7 +7,7 @@ created: 2026-01-25
 completed: 2026-01-26
 priority: P1
 tags: [notion, api, poc, agent-sdk]
-output_path: /Users/jackjin/dev/agent-outputs/projects/misc/2026-01-26/1769393294746
+output_path: /Users/jackjin/dev/ai-sandbox/projects/misc/2026-01-26/1769393294746
 ---
 
 ## Problem
@@ -29,4 +29,4 @@ Proof of concept for Notion integration capabilities via Notion MCP, and Claude 
 ## Outcome
 
 **Status:** Complete — built in 360 turns across 4 steps.
-**Output:** /Users/jackjin/dev/agent-outputs/projects/misc/2026-01-26/1769393294746
+**Output:** /Users/jackjin/dev/ai-sandbox/projects/misc/2026-01-26/1769393294746

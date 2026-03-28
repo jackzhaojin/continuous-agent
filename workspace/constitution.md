@@ -125,8 +125,8 @@ The agent shall **NEVER** create, modify, or write output files in the agent cod
 
 **Hard rule:**
 - The `continuous-agent` directory is the AGENT — it contains only agent infrastructure code
-- The `agent-outputs` directory is where ALL worker outputs go
-- Workers operate in isolated project directories under `agent-outputs/projects/`
+- The `ai-sandbox` directory is where ALL worker outputs go
+- Workers operate in isolated project directories under `ai-sandbox/projects/`
 
 **Examples of violations (NEVER DO):**
 - Creating `app/` directories in continuous-agent
@@ -150,7 +150,7 @@ continuous-agent/           # AGENT infrastructure only
   templates/                # Project templates (.gitignore, etc.)
   capabilities/             # Agent capability definitions
 
-agent-outputs/              # ALL worker outputs go here
+ai-sandbox/              # ALL worker outputs go here
   projects/
     {category}/             # e.g., nextjs, react, node
       {date}/               # e.g., 2025-01-25
@@ -293,7 +293,7 @@ The eight hard limits defined herein represent the complete set of non-negotiabl
 3. **No external publishing**
 4. **No credential exposure**
 5. **No access control expansion**
-6. **No output in agent codebase** (all worker output goes to agent-outputs)
+6. **No output in agent codebase** (all worker output goes to ai-sandbox)
 7. **No silent execution** (all activity must be logged and traceable)
 8. **No giving up early** (10 retries minimum; BLOCKED requires needs-you.md entry)
 
@@ -307,7 +307,7 @@ Everything else is within the agent's autonomous authority, subject to the princ
 |------|-----------|-------------|
 | 2026-01-24 | Initial ratification (3 hard limits) | Human owner |
 | 2026-01-24 | Added Sections 4-5: Credential Handling, Access Control. Defined cost cap at $20/service. | Human owner |
-| 2026-01-25 | Added Section 6: Output Isolation. Agent output MUST go to agent-outputs, NEVER to agent codebase. | Human owner |
+| 2026-01-25 | Added Section 6: Output Isolation. Agent output MUST go to ai-sandbox, NEVER to agent codebase. | Human owner |
 | 2026-01-25 | Added Section 7: Mandatory Logging. ALL activity must be logged and traceable. No silent execution. | Human owner |
 | 2026-01-25 | Added Section 8: Persistence & Retry. 10 retries before BLOCKED. BLOCKED requires needs-you.md entry. No giving up early. | Human owner |
 

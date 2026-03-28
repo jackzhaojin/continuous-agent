@@ -241,11 +241,11 @@
 > OK - let's monitor very closely on this, make sure it's going as expected, and agents we're copying over is being copied over
 
 → Response: Confirmed `.claude/` directory was copied to recipe-card-explorer project at worker spawn time. All 7 skills + 2 agents present, no infrastructure skills leaked. Agent idle (no pending work).
-→ Action: Inspected `agent-outputs/projects/nextjs/2026-01-29/1769685367609/.claude/` — full contents verified. ✅
+→ Action: Inspected `ai-sandbox/projects/nextjs/2026-01-29/1769685367609/.claude/` — full contents verified. ✅
 
 ### Prompt 34: CWD Confirmation (10:00 PM)
 
-> In this case, just making sure CWD is in '/Users/jackjin/dev/agent-outputs/projects/nextjs/2026-01-29/1769685367609' and not the recipe-discovery-platform subdirectory?
+> In this case, just making sure CWD is in '/Users/jackjin/dev/ai-sandbox/projects/nextjs/2026-01-29/1769685367609' and not the recipe-discovery-platform subdirectory?
 
 → Response: Confirmed CWD is the contract-level directory, not the app subdirectory. `.claude/` correctly placed at CWD level.
 → Action: Code analysis of `worker-spawner.ts` query() call.
@@ -338,7 +338,7 @@
 
 ### Prompt 47: Analyze PR #5 vs Local Changes (7:00 PM)
 
-> OK we have PR 5 and local changes, they're both created by different agent with the following prompt. Please take a look at the branch in PR5, and local main changes, and judge if they both work, and what should be in the final impl. i don't know if i like '/Users/jackjin/dev/continuous-agent/templates/claude-agent-outputs.md', and i dunno, please do a thorough analysis based on my original prompt: "I really want the Claude files output to be at the root of the harness, so that it's not at each project... CWD for all Agent SDK needs to be started at agent-outputs. Generate a CLAUDE.md that explains the monorepo structure."
+> OK we have PR 5 and local changes, they're both created by different agent with the following prompt. Please take a look at the branch in PR5, and local main changes, and judge if they both work, and what should be in the final impl. i don't know if i like '/Users/jackjin/dev/continuous-agent/templates/claude-ai-sandbox.md', and i dunno, please do a thorough analysis based on my original prompt: "I really want the Claude files output to be at the root of the harness, so that it's not at each project... CWD for all Agent SDK needs to be started at ai-sandbox. Generate a CLAUDE.md that explains the monorepo structure."
 
 → Response: Head-to-head comparison across 8 dimensions. PR #5 wins on .env centralization and relative paths. Local wins on diff-check, concise CLAUDE.md, and prompt-builder OUTPUTS_ROOT. Both have issues.
 → Action: Read PR diff via `gh pr diff 5`, read all 6 affected files, produced comparison table. ✅
@@ -359,7 +359,7 @@
 
 ### Prompt 50: Clean Up Agent-Outputs (8:15 PM)
 
-> Can you do a manual clean up job '/Users/jackjin/dev/agent-outputs' and look for all old stuff? and just manually copy claude-files-to-output once
+> Can you do a manual clean up job '/Users/jackjin/dev/ai-sandbox' and look for all old stuff? and just manually copy claude-files-to-output once
 
 → Response: Found only 1 real per-project `.claude/` (rest were `node_modules/es-abstract/.claude`). Removed it. Root-level shared files will be written automatically on next worker spawn.
 → Action: `rm -rf` one old `.claude/` dir. ✅
@@ -375,7 +375,7 @@
 
 > /conversation-logger to prompt-log.md
 
-→ Response: Logged prompts 47-52 covering PR analysis/merge, CLAUDE.md inheritance fix, agent-outputs cleanup, demo video goal creation.
+→ Response: Logged prompts 47-52 covering PR analysis/merge, CLAUDE.md inheritance fix, ai-sandbox cleanup, demo video goal creation.
 → Action: Appended to prompt-log.md. ✅
 
 ## Session 7: Three-Tier Credential System (Feb 3, 2026)

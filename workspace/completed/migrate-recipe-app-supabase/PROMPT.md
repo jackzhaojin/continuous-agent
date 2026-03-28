@@ -10,7 +10,7 @@ tags:
   - migration
   - database
   - recipe-app
-output_path: /Users/jackjin/dev/agent-outputs/projects/nextjs/2026-02-04/1770173908713
+output_path: /Users/jackjin/dev/ai-sandbox/projects/nextjs/2026-02-04/1770173908713
 source_project: "1769685367609"
 ---
 

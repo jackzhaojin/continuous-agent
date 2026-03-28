@@ -26,7 +26,7 @@ Run practice tasks when idle to improve skill confidence.
 
 1. **Identify target** - Scan goal bundles for required skills, find lowest confidence skill needed by highest priority goal
 
-2. **Create practice task** - Use safe location `~/dev/agent-outputs/practice/`
+2. **Create practice task** - Use safe location `~/dev/ai-sandbox/practice/`
 
 3. **Execute** - Run the practice task in isolation
 

@@ -805,19 +805,19 @@ function inferProjectCapabilities(item: WorkItem): string[] {
 }
 
 /**
- * Commit worker output to the agent-outputs monorepo.
+ * Commit worker output to the ai-sandbox monorepo.
  * Workers commit inside their own per-project .git repos, but those changes
  * are not reflected in the parent monorepo. This function stages and commits
- * any dirty files in agent-outputs after task/step execution.
+ * any dirty files in ai-sandbox after task/step execution.
  *
  * DETERMINISTIC: Shell commands, no LLM.
  */
 export function commitOutputsMonorepo(goalTitle: string, outputPath?: string): void {
   const agentOutputsRoot = process.env.AGENT_OUTPUTS_PATH
-    || path.join(os.homedir(), 'dev', 'agent-outputs');
+    || path.join(os.homedir(), 'dev', 'ai-sandbox');
 
   if (!existsSync(path.join(agentOutputsRoot, '.git'))) {
-    log(`  Warning: agent-outputs is not a git repo at ${agentOutputsRoot} — skipping monorepo commit`);
+    log(`  Warning: ai-sandbox is not a git repo at ${agentOutputsRoot} — skipping monorepo commit`);
     return;
   }
 
@@ -828,12 +828,12 @@ export function commitOutputsMonorepo(goalTitle: string, outputPath?: string): v
     }).trim();
 
     if (!status) {
-      logDeterministic('  agent-outputs monorepo already clean — no commit needed');
+      logDeterministic('  ai-sandbox monorepo already clean — no commit needed');
       return;
     }
 
     const fileCount = status.split('\n').length;
-    logDeterministic(`  Committing ${fileCount} file(s) to agent-outputs monorepo...`);
+    logDeterministic(`  Committing ${fileCount} file(s) to ai-sandbox monorepo...`);
 
     execSync('git add -A', { cwd: agentOutputsRoot, stdio: 'pipe' });
 
@@ -845,8 +845,8 @@ export function commitOutputsMonorepo(goalTitle: string, outputPath?: string): v
       stdio: 'pipe',
     });
 
-    logDeterministic(`  Committed to agent-outputs monorepo: ${message}`);
+    logDeterministic(`  Committed to ai-sandbox monorepo: ${message}`);
   } catch (error) {
-    log(`  Warning: Failed to commit to agent-outputs monorepo: ${error}`);
+    log(`  Warning: Failed to commit to ai-sandbox monorepo: ${error}`);
   }
 }

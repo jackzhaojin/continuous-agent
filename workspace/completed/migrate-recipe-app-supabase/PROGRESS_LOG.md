@@ -10,7 +10,7 @@ Contract: contract-1770173908713
 ## 2026-02-04T03:05:11.323Z | Step Complete 1/9
 **Research existing patterns and plan approach** (step-0)
 Contract: contract-1770173908713
-Output: /Users/jackjin/dev/agent-outputs/projects/nextjs/2026-02-04/1770173908713
+Output: /Users/jackjin/dev/ai-sandbox/projects/nextjs/2026-02-04/1770173908713
 
 ## 2026-02-04T03:05:12.653Z | Step Started 2/9
 **Initialize project with Next.js and TypeScript** (step-1)
@@ -19,7 +19,7 @@ Contract: contract-1770174312652
 ## 2026-02-04T03:11:54.426Z | Step Complete 2/9
 **Initialize project with Next.js and TypeScript** (step-1)
 Contract: contract-1770174312652
-Output: /Users/jackjin/dev/agent-outputs/projects/nextjs/2026-02-04/1770173908713
+Output: /Users/jackjin/dev/ai-sandbox/projects/nextjs/2026-02-04/1770173908713
 
 ## 2026-02-04T03:11:55.780Z | Step Started 3/4
 **Push schema and migrate seed data to Supabase** (step-2)
@@ -28,7 +28,7 @@ Contract: contract-1770174715778
 ## 2026-02-04T03:21:33.065Z | Step Complete 3/4
 **Push schema and migrate seed data to Supabase** (step-2)
 Contract: contract-1770174715778
-Output: /Users/jackjin/dev/agent-outputs/projects/nextjs/2026-02-04/1770173908713
+Output: /Users/jackjin/dev/ai-sandbox/projects/nextjs/2026-02-04/1770173908713
 
 ## 2026-02-04T03:21:34.623Z | Step Started 4/4
 **Validate app works against Supabase and clean up** (step-3)
@@ -45,5 +45,5 @@ Contract: contract-1770176269611
 ## 2026-02-04T03:45:36.588Z | Step Complete 4/4
 **Validate app works against Supabase and clean up** (step-3)
 Contract: contract-1770176269611
-Output: /Users/jackjin/dev/agent-outputs/projects/nextjs/2026-02-04/1770173908713
+Output: /Users/jackjin/dev/ai-sandbox/projects/nextjs/2026-02-04/1770173908713
 

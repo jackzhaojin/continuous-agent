@@ -26,7 +26,7 @@ A continuously-running autonomous agent that:
 | Repository | Purpose |
 |------------|---------|
 | `continuous-agent/` | Agent infrastructure: executive loop, verifiers, capabilities, workspace files |
-| `agent-outputs/` | Worker outputs: isolated projects with their own git history |
+| `ai-sandbox/` | Worker outputs: isolated projects with their own git history |
 
 Workers NEVER write to the agent codebase. Constitution Article I, Section 6 enforces this separation.
 
@@ -50,7 +50,7 @@ The executive loop runs continuously in PM2 via `src/executive-loop.ts`:
 ### Worker Delegation
 
 The executive spawns workers via `@anthropic-ai/claude-agent-sdk`. Workers:
-- Get isolated project directories in `agent-outputs/`
+- Get isolated project directories in `ai-sandbox/`
 - Receive prompts built by `prompt-builder.ts` with Constitution, retry context, strategies
 - Have access to Claude Code skills via the 'Skill' tool
 - Copy `.env` from agent repo for API key access
@@ -171,7 +171,7 @@ The agent detects responses in Phase 2, unblocks tasks, resets retry counters.
 3. No external publishing without approval
 4. No credential exposure
 5. No access control expansion
-6. No output in agent codebase (all output to agent-outputs/)
+6. No output in agent codebase (all output to ai-sandbox/)
 7. All activity must be logged
 8. 10 retries minimum before BLOCKED
 

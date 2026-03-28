@@ -10,7 +10,7 @@ tags:
   - practice-loop
   - retrospective
   - reference-refresh
-output_path: /Users/jackjin/dev/agent-outputs/projects/misc/2026-01-26/1769399545316
+output_path: /Users/jackjin/dev/ai-sandbox/projects/misc/2026-01-26/1769399545316
 block_reason: Scope misalignment — PRD terminology update needed before execution can proceed
 ---
 

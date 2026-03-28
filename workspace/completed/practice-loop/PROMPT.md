@@ -25,7 +25,7 @@ Implemented a comprehensive practice loop module that:
 5. Integrates with the existing self-improvement trigger system
 
 ## Agent Notes
-- Practice tasks are regular P4 goals (not SELF-ENHANCE), so they run in agent-outputs/ and exercise skills via the normal worker+verifier flow
+- Practice tasks are regular P4 goals (not SELF-ENHANCE), so they run in ai-sandbox/ and exercise skills via the normal worker+verifier flow
 - 12 specific practice templates created for common capabilities (git, npm, Next.js, TypeScript, MCP, etc.)
 - Fallback template handles any capability without a specific template
 - Also fixed Notion reporting: step title now passed to markGoalBlocked for better traceability

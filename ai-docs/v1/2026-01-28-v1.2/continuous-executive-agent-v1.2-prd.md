@@ -43,7 +43,7 @@
 
 **What was built:**
 - **Executive Loop** — 8-phase continuous cycle via PM2
-- **Two-Repository Architecture** — `continuous-agent/` for infrastructure, `agent-outputs/` for worker outputs
+- **Two-Repository Architecture** — `continuous-agent/` for infrastructure, `ai-sandbox/` for worker outputs
 - **Task Contract System** — Scope, risk, Definition of Done before execution
 - **Constitution** — 8 immutable hard limits
 - **Workspace Files** — Markdown-based state: goals.md, needs-you.md
@@ -79,7 +79,7 @@ Before specifying V1.2 features, here is where the V1.1 system stands:
 
 **Work selection** (`src/agentic/work-selection/work-selector.ts`): Parses `workspace/goals.md` as flat markdown. Extracts `### Title` headings under `## P0-P4` sections. Parses `- **Status:**`, `- **Output:**`, `- **Branch:**` metadata and `#### Step N:` sub-headings. Returns highest-priority non-blocked, non-complete item.
 
-**Worker spawning** (`src/agentic/execution/worker-spawner.ts`): Calls `query()` from `@anthropic-ai/claude-agent-sdk`. Generates project paths as `agent-outputs/projects/{category}/{date}/{slug}`. Copies `.env` and `.gitignore` template. Streams responses and logs to `ledgers/{date}/worker-{id}.log`.
+**Worker spawning** (`src/agentic/execution/worker-spawner.ts`): Calls `query()` from `@anthropic-ai/claude-agent-sdk`. Generates project paths as `ai-sandbox/projects/{category}/{date}/{slug}`. Copies `.env` and `.gitignore` template. Streams responses and logs to `ledgers/{date}/worker-{id}.log`.
 
 **State management** (`src/deterministic/state-handler.ts`): Updates goals.md via regex-based find-and-replace on `### Title` patterns. Writes to needs-you.md action table. Appends JSONL to work-ledger and capability-ledger.
 
@@ -333,7 +333,7 @@ After each iteration, the state handler regenerates `workspace/goals.md` from th
 ### Build Next.js Transactional App
 - **Status:** In Progress (Step 2 of 4, 50% complete)
 - **Source:** workspace/in-progress/P0/build-nextjs-transactional-app/
-- **Output:** /Users/jackjin/dev/agent-outputs/projects/nextjs/2026-01-25/d5d9e97f
+- **Output:** /Users/jackjin/dev/ai-sandbox/projects/nextjs/2026-01-25/d5d9e97f
 
 ## Drafts
 ### Dashboard POC
@@ -393,7 +393,7 @@ Agent activity lives in local JSONL ledgers and daily log files. Understanding w
 
 ### Solution
 
-Integrate Notion as a reporting destination for milestone events, curated highlights, and periodic summaries. The agent already has Notion API access (`NOTION_API_KEY` in `.env`) and a completed Notion Integration POC (`agent-outputs/projects/misc/2026-01-26/1769393294746`).
+Integrate Notion as a reporting destination for milestone events, curated highlights, and periodic summaries. The agent already has Notion API access (`NOTION_API_KEY` in `.env`) and a completed Notion Integration POC (`ai-sandbox/projects/misc/2026-01-26/1769393294746`).
 
 ### Architecture
 
@@ -513,7 +513,7 @@ NOTION_REPORTING_ENABLED=true    # Kill switch
 
 ### Problem
 
-V1.1 workers can only write to `agent-outputs/`. Existing projects (harnesses, blogs, tools) can't be enhanced without manual copy-paste. The agent builds greenfield projects but can't iterate on real codebases.
+V1.1 workers can only write to `ai-sandbox/`. Existing projects (harnesses, blogs, tools) can't be enhanced without manual copy-paste. The agent builds greenfield projects but can't iterate on real codebases.
 
 ### Solution
 
@@ -532,7 +532,7 @@ Copy-in → isolated work → approval → copy-back pattern that respects Const
 │                                                                    │
 │  2. COPY-IN (automated by worker-spawner.ts)                       │
 │     ┌──────────────────┐         ┌──────────────────────────┐     │
-│     │ /Users/jackjin/  │ ──cp──► │ agent-outputs/external/  │     │
+│     │ /Users/jackjin/  │ ──cp──► │ ai-sandbox/external/  │     │
 │     │ dev/harness-eds  │  (rsync │ harness-eds-{timestamp}/ │     │
 │     └──────────────────┘  w/     └──────────────────────────┘     │
 │                          exclude)          │                       │
@@ -545,7 +545,7 @@ Copy-in → isolated work → approval → copy-back pattern that respects Const
 │  4. COMPLETION → APPROVAL REQUEST          ▼                       │
 │     Agent writes to needs-you.md:                                  │
 │     "Changes ready for harness-eds. Diff: +3 files, -1 file"      │
-│     Agent generates patch: agent-outputs/external/harness-eds.patch│
+│     Agent generates patch: ai-sandbox/external/harness-eds.patch│
 │                                            │                       │
 │  5. HUMAN APPLIES (manual)                 ▼                       │
 │     Human reviews diff, applies patch to original project.         │
@@ -554,7 +554,7 @@ Copy-in → isolated work → approval → copy-back pattern that respects Const
 └───────────────────────────────────────────────────────────────────┘
 ```
 
-**Key design decision:** The agent generates a patch file but does NOT copy-back automatically. Constitution Section 6 prohibits writing outside `agent-outputs/`. The human applies the patch. This is safer and simpler than building an automated copy-back with approval gates.
+**Key design decision:** The agent generates a patch file but does NOT copy-back automatically. Constitution Section 6 prohibits writing outside `ai-sandbox/`. The human applies the patch. This is safer and simpler than building an automated copy-back with approval gates.
 
 ### Project Registry
 
@@ -581,10 +581,10 @@ Human maintains this registry. Agent reads it when PROMPT.md references a `sourc
 
 ### Worker Spawner Changes
 
-In `worker-spawner.ts`, the `generateProjectPath()` function currently creates paths under `agent-outputs/projects/{category}/{date}/{slug}`. For external project goals:
+In `worker-spawner.ts`, the `generateProjectPath()` function currently creates paths under `ai-sandbox/projects/{category}/{date}/{slug}`. For external project goals:
 
 1. Look up `source_project` in `project-registry.yml`
-2. If found, `rsync` the project to `agent-outputs/external/{project-name}-{timestamp}/`
+2. If found, `rsync` the project to `ai-sandbox/external/{project-name}-{timestamp}/`
 3. Set `projectPath` to the copied directory
 4. After worker completes, generate unified diff: `git diff --no-index original/ copy/ > patch`
 
@@ -640,7 +640,7 @@ projects:
     name: Next.js Transactional App
     category: nextjs
     completed: 2026-01-25
-    output_path: /Users/jackjin/dev/agent-outputs/projects/nextjs/2026-01-25/d5d9e97f
+    output_path: /Users/jackjin/dev/ai-sandbox/projects/nextjs/2026-01-25/d5d9e97f
     archive_path: workspace/archive/2026-01/build-nextjs-transactional-app/
     turns: 101
     duration_minutes: 23
@@ -664,7 +664,7 @@ projects:
     name: Notion Integration POC
     category: misc
     completed: 2026-01-26
-    output_path: /Users/jackjin/dev/agent-outputs/projects/misc/2026-01-26/1769393294746
+    output_path: /Users/jackjin/dev/ai-sandbox/projects/misc/2026-01-26/1769393294746
     turns: 360
     capabilities_exercised:
       - deliver.notion.integration
@@ -690,7 +690,7 @@ You have successfully built similar projects before:
 ### Next.js Transactional App (2026-01-25)
 - Features: Transaction handling, TypeScript strict mode
 - Lessons: "Next.js App Router preferred over Pages Router"
-- Reference: Check /Users/jackjin/dev/agent-outputs/projects/nextjs/2026-01-25/d5d9e97f for patterns
+- Reference: Check /Users/jackjin/dev/ai-sandbox/projects/nextjs/2026-01-25/d5d9e97f for patterns
 ```
 
 **2. During strategy selection** (`strategy-selector.ts`):
@@ -799,9 +799,9 @@ Phase 4: Multi-Project Access
 
 **Affected by:** Multi-Project Access (Feature 3)
 
-The copy-in pattern is Constitution-compliant: the agent copies external projects INTO `agent-outputs/external/` and works there. The agent generates a patch but does NOT write back to the original project. Human applies the patch manually.
+The copy-in pattern is Constitution-compliant: the agent copies external projects INTO `ai-sandbox/external/` and works there. The agent generates a patch but does NOT write back to the original project. Human applies the patch manually.
 
-**No amendment needed.** The copy-in destination (`agent-outputs/external/`) is within the allowed output area.
+**No amendment needed.** The copy-in destination (`ai-sandbox/external/`) is within the allowed output area.
 
 ### Section 7 (Mandatory Logging)
 

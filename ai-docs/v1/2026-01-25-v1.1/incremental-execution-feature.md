@@ -722,7 +722,7 @@ STEP_MAX_TURNS=150                  # Maximum turns before suggesting further br
 #### Step 1: Initialize Next.js project with TypeScript
 - **Status:** Complete
 - **Duration:** 1 iteration, 95 turns (1.5 hours)
-- **Output:** /agent-outputs/.../nextjs-app
+- **Output:** /ai-sandbox/.../nextjs-app
 - **Completed:** 2026-01-25 18:15
 
 #### Step 2: Implement user authentication (JWT + session)

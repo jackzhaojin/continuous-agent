@@ -47,7 +47,7 @@ Provide a JSON response:
       "Criterion 2"
     ],
     "estimated_turns": 30,
-    "project_path": "agent-outputs/practice-[capability]-[date]",
+    "project_path": "ai-sandbox/practice-[capability]-[date]",
     "risk_level": "low"
   },
   "learning_goals": [
@@ -109,7 +109,7 @@ Purpose: Improves testing capability for P1 app
 - **No external APIs** (unless using mock/sandbox)
 - **No production systems**
 - **No spending** (stay within free tiers)
-- **Isolated workspace** (own directory in agent-outputs)
+- **Isolated workspace** (own directory in ai-sandbox)
 - **No credentials** (unless test credentials)
 
 ## If No Gaps

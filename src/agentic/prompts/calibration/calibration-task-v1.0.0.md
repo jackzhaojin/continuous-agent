@@ -44,7 +44,7 @@ Provide a JSON response:
       "Criterion 2"
     ],
     "estimated_turns": 50,
-    "project_path": "agent-outputs/calibration-[capability]-[date]"
+    "project_path": "ai-sandbox/calibration-[capability]-[date]"
   },
   "evidence_collection": {
     "verifiers_to_run": ["git-clean", "node-build"],

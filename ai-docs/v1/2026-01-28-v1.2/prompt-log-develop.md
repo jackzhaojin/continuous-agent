@@ -213,7 +213,7 @@
 
 > merge from main into develop, then do a bit of triaging, i feeel like what used to commit code stopped working in target directoroy, we now have 50 uncommitted source code.
 
--> Response: Merged main→develop (fast-forward, terminology cleanup commit). Root cause: workers commit in per-project .git repos but nothing commits to agent-outputs monorepo. Added `commitOutputsMonorepo()` to state-handler.ts, wired into executive-loop Phase 6. Manually committed 48 dirty files in agent-outputs.
+-> Response: Merged main→develop (fast-forward, terminology cleanup commit). Root cause: workers commit in per-project .git repos but nothing commits to ai-sandbox monorepo. Added `commitOutputsMonorepo()` to state-handler.ts, wired into executive-loop Phase 6. Manually committed 48 dirty files in ai-sandbox.
 -> Action: Modified `src/deterministic/state-handler.ts` (new function), `src/core/executive-loop.ts` (import + call). Typecheck + build clean. ✅
 
 ### Prompt 21: Log Session (5:56 PM)

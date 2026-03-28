@@ -15,7 +15,7 @@ This is a **continuously-running autonomous agent** that finds and executes work
 | **Goal** | A unit of work the agent pursues (previously called "task"). Stored as a goal bundle in `workspace/`. |
 | **Step** | A sub-unit of a goal, created when a goal is too complex for a single worker session. Tracked in `STEPS.json`. |
 | **Contract** | A scoped work agreement given to a worker: prompt, tools allowed, Definition of Done, turn budget. ID prefix: `contract-`. |
-| **Worker** | A spawned Claude Agent SDK session that executes a contract. Runs in `agent-outputs/`. |
+| **Worker** | A spawned Claude Agent SDK session that executes a contract. Runs in `ai-sandbox/`. |
 | **Goal Bundle** | A directory containing `PROMPT.md` (frontmatter + description), `STEPS.json` (step definitions), and `PROGRESS_LOG.md`. |
 
 ## Build & Run Commands
@@ -71,12 +71,12 @@ npm run build  # Rebuild only - changes take effect on next natural restart
   - Executive loop, worker spawner, verifiers, capabilities, workspace files
   - NO application code, NO project outputs
 
-- **`agent-outputs/`** (sibling directory) - ALL worker outputs
+- **`ai-sandbox/`** (sibling directory) - ALL worker outputs
   - Monorepo root: `CLAUDE.md`, `.env` (synced from `.env.worker`), `.claude/` live at root (shared across all projects)
-  - Isolated project directories: `agent-outputs/projects/{category}/{date}/{goal-slug}/`
+  - Isolated project directories: `ai-sandbox/projects/{category}/{date}/{goal-slug}/`
   - Real codebases with their own git history
   - Workers NEVER write to the agent codebase
-  - **Agent SDK CWD is `agent-outputs/`** — workers navigate to their project subdirectory via prompt
+  - **Agent SDK CWD is `ai-sandbox/`** — workers navigate to their project subdirectory via prompt
   - **Shared `.env`** at root (copied from `.env.worker`); projects can have their own for project-specific vars
   - **Shared `.claude/`** at root (skills + agents); projects must NOT create their own `.claude/`
   - **CLAUDE.md inherits hierarchically** — root provides shared context, projects CAN have their own CLAUDE.md for project-specific instructions
@@ -94,7 +94,7 @@ The agent can modify its own infrastructure code through special pathways using 
 ### How It Works
 
 1. **Tag-based Detection**: Goals prefixed with `[SELF-ENHANCE]` or `[SKILL-BUILD]` are recognized
-2. **Special Routing**: Worker spawner routes these to the agent codebase instead of agent-outputs
+2. **Special Routing**: Worker spawner routes these to the agent codebase instead of ai-sandbox
 3. **Subagent Delegation**: Uses the appropriate subagent via Task tool:
    - `[SELF-ENHANCE]` → `.claude/agents/self-enhancer.md`
    - `[SKILL-BUILD]` → `.claude/agents/skill-builder.md`
@@ -356,7 +356,7 @@ The agent CANNOT modify this file. It defines 8 absolute boundaries:
 3. **No external publishing** (npm publish, blog posts require approval)
 4. **No credential exposure** (never log, commit, or transmit credentials)
 5. **No access control expansion** (no making private things public)
-6. **No output in agent codebase** (all output → agent-outputs/)
+6. **No output in agent codebase** (all output → ai-sandbox/)
 7. **All activity must be logged** (no silent execution)
 8. **10 retries minimum before BLOCKED** (needs-you.md entry required)
 
@@ -414,7 +414,7 @@ if (retry.attempts >= 10) {
 
 **Philosophy:** Deterministically triggered, agentically evaluated.
 
-**CRITICAL:** Verifiers run in the **worker's output directory** (`result.output_path`), NOT the agent infrastructure directory. This was a bug that was fixed - verifiers must check the actual work output in `agent-outputs/`.
+**CRITICAL:** Verifiers run in the **worker's output directory** (`result.output_path`), NOT the agent infrastructure directory. This was a bug that was fixed - verifiers must check the actual work output in `ai-sandbox/`.
 
 Verifiers run after each goal and return structured evidence:
 
@@ -449,7 +449,7 @@ cp .env.app.example .env.app               # Tier 3: Application (optional)
 | Tier | File | Purpose | Consumers |
 |------|------|---------|-----------|
 | **1 - Executive** | `.env.executive` | Loop config, Notion reporting, breakdown settings | Executive loop only |
-| **2 - Worker** | `.env.worker` | Claude SDK auth, model, tool API keys | Worker agents (via `agent-outputs/.env`) |
+| **2 - Worker** | `.env.worker` | Claude SDK auth, model, tool API keys | Worker agents (via `ai-sandbox/.env`) |
 | **3 - Application** | `.env.app` | DB, cache, storage, payment, email keys | Built apps (platform-agnostic) |
 
 **Key design decisions:**
@@ -464,7 +464,7 @@ cp .env.app.example .env.app               # Tier 3: Application (optional)
 2. `.env.worker` (new keys only)
 3. `.env` (legacy fallback, new keys only)
 
-**API Key Management:** `.env.worker` is copied to `agent-outputs/.env` by `worker-spawner.ts` (centralized, not per-project). `.env.app` is also copied to `agent-outputs/.env.app` if it exists. Workers access shared API keys from there. The spawner validates that no executive-tier keys leaked into the worker env.
+**API Key Management:** `.env.worker` is copied to `ai-sandbox/.env` by `worker-spawner.ts` (centralized, not per-project). `.env.app` is also copied to `ai-sandbox/.env.app` if it exists. Workers access shared API keys from there. The spawner validates that no executive-tier keys leaked into the worker env.
 
 **Tier 3 format helpers** (`src/deterministic/credential-tiers.ts`):
 - `getAppCredentialPairs(path)` — reads `.env.app`, strips `APP_` prefix, returns key-value pairs
@@ -525,7 +525,7 @@ description: |
 
 **Agent SDK Integration:**
 - Worker spawning: `worker-spawner.ts` calls `@anthropic-ai/claude-agent-sdk`
-- Workers get isolated project directories in `agent-outputs/`
+- Workers get isolated project directories in `ai-sandbox/`
 - Prompts built via `prompt-builder.ts` include Constitution, retry context, strategies
 - Each worker includes 'Skill' tool for accessing Claude Code skills
 

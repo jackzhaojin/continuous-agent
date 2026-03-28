@@ -28,7 +28,7 @@ A continuously-running autonomous agent that:
 │                         REPOSITORY STRATEGY                              │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                          │
-│   ~/dev/continuous-agent/              ~/dev/agent-outputs/              │
+│   ~/dev/continuous-agent/              ~/dev/ai-sandbox/              │
 │   ┌──────────────────────┐            ┌──────────────────────┐          │
 │   │   AGENT REPO         │            │   OUTPUT MONOREPO    │          │
 │   │                      │            │                      │          │
@@ -612,10 +612,10 @@ continuous-agent/
 └── README.md
 ```
 
-### 3.2 Output Monorepo (`~/dev/agent-outputs/`)
+### 3.2 Output Monorepo (`~/dev/ai-sandbox/`)
 
 ```
-agent-outputs/
+ai-sandbox/
 ├── .gitignore                           # Repo-level ignores
 ├── README.md                            # Index of all projects
 │
@@ -740,7 +740,7 @@ agent-outputs/
 │   ✅ FULLY AUTONOMOUS                                                    │
 │   ┌─────────────────────────────────────────────────────────────────┐   │
 │   │ • Writing/running code locally                                   │   │
-│   │ • Creating branches in agent-outputs/                            │   │
+│   │ • Creating branches in ai-sandbox/                            │   │
 │   │ • Research, documentation                                        │   │
 │   │ • Running verifiers                                              │   │
 │   │ • Updating capability confidence                                 │   │
@@ -916,7 +916,7 @@ agent-outputs/
 │   PHASE 0: REPOSITORY SETUP (Human does this)                           │
 │   ┌─────────────────────────────────────────────────────────────────┐   │
 │   │  1. mkdir -p ~/dev/continuous-agent                              │   │
-│   │  2. mkdir -p ~/dev/agent-outputs                                 │   │
+│   │  2. mkdir -p ~/dev/ai-sandbox                                 │   │
 │   │  3. git init both                                                │   │
 │   │  4. npm init + install @anthropic-ai/claude-agent-sdk            │   │
 │   │  5. Say "proceed with bootstrap"                                 │   │
@@ -1003,7 +1003,7 @@ The agent receives these in `goals.md` and figures them out through POCs, resear
 │   │    - README with run instructions                                │   │
 │   └─────────────────────────────────────────────────────────────────┘   │
 │                                                                          │
-│   OUTPUT: agent-outputs/projects/nextjs-todo-transactional/             │
+│   OUTPUT: ai-sandbox/projects/nextjs-todo-transactional/             │
 │                                                                          │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
@@ -1046,7 +1046,7 @@ The agent receives these in `goals.md` and figures them out through POCs, resear
 │   │    5. Resume when auth provided                                  │   │
 │   └─────────────────────────────────────────────────────────────────┘   │
 │                                                                          │
-│   OUTPUT: agent-outputs/projects/notion-integration/                    │
+│   OUTPUT: ai-sandbox/projects/notion-integration/                    │
 │                                                                          │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
@@ -1183,9 +1183,9 @@ The agent receives these in `goals.md` and figures them out through POCs, resear
 
 ```bash
 mkdir -p ~/dev/continuous-agent
-mkdir -p ~/dev/agent-outputs
+mkdir -p ~/dev/ai-sandbox
 cd ~/dev/continuous-agent && git init
-cd ~/dev/agent-outputs && git init
+cd ~/dev/ai-sandbox && git init
 # Create GitHub repos for both
 cd ~/dev/continuous-agent && npm init -y
 npm install @anthropic-ai/claude-agent-sdk typescript @types/node

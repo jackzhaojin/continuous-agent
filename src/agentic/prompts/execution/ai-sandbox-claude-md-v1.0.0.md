@@ -1,6 +1,6 @@
 ---
-name: agent-outputs-claude-md
-description: Template for the CLAUDE.md generated at the agent-outputs root. Workers read this as their workspace-level instructions.
+name: ai-sandbox-claude-md
+description: Template for the CLAUDE.md generated at the ai-sandbox root. Workers read this as their workspace-level instructions.
 version: 1.0.0
 variables:
   - name: SERVICES_SECTION
@@ -20,7 +20,7 @@ Multiple independent projects coexist here, each in its own subdirectory.
 ## Directory Structure
 
 ```
-agent-outputs/
+ai-sandbox/
 ├── CLAUDE.md              # This file — workspace-wide instructions (do not modify)
 ├── .env                   # Worker env (synced from .env.worker; do not modify)
 ├── .env.app               # App credentials (Tier 3, APP_ prefix stripped; read-only)

@@ -18,7 +18,7 @@ tags:
   - full-stack
   - responsive
   - animation
-output_path: /Users/jackjin/dev/agent-outputs/projects/nextjs/2026-01-29/1769671611924
+output_path: /Users/jackjin/dev/ai-sandbox/projects/nextjs/2026-01-29/1769671611924
 branch: null
 ---
 
