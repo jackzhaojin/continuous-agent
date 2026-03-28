@@ -20,7 +20,12 @@ This is a **continuously-running autonomous agent** that finds and executes work
 
 ## Build & Run Commands
 
+**Requirements:** Node.js >= 18.0.0, PM2 (for production)
+
 ```bash
+# Install dependencies
+npm install
+
 # Build TypeScript to dist/
 npm run build
 
@@ -575,6 +580,7 @@ These POCs have their own `.env` files (not committed) - copy from `.env.example
 - `capabilities/` — YAML registries: technical, delivery, functional capabilities + project memory + services registry
 - `references/poc/claude/` — Agent SDK proof-of-concept projects (chat-cli, skills, subagents)
 - `.claude/agents/` — Subagent definitions; `.claude/skills/` — Claude Code skill definitions
+- `scripts/` — Utility scripts (Notion setup, STEPS.json migration, etc.)
 - `verifiers/definitions/` — Verifier YAML configs; `verifiers/run-verifier.sh` — Shell runner
 - `ai-docs/` — PRDs, specs, Notion workspace layout
 
