@@ -23,6 +23,7 @@ module.exports = {
         AGENT_OUTPUTS_PATH: '/Users/jackjin/dev/ai-sandbox',
         IDLE_SLEEP_SECONDS: '30',       // Sleep when no work (polling interval)
         UNHEALTHY_SLEEP_SECONDS: '60',  // Sleep when system unhealthy
+        MAX_TURNS_PER_STEP: '200',      // Default max turns per worker (higher for complex tasks)
         MODEL: 'claude-sonnet-4-5',
       },
       env_development: {
@@ -30,6 +31,7 @@ module.exports = {
         AGENT_OUTPUTS_PATH: '/Users/jackjin/dev/ai-sandbox',
         IDLE_SLEEP_SECONDS: '60',       // Longer polling in dev
         UNHEALTHY_SLEEP_SECONDS: '60',
+        MAX_TURNS_PER_STEP: '200',      // Default max turns per worker
         MODEL: 'claude-sonnet-4-5',
       },
 

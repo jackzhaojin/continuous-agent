@@ -265,7 +265,7 @@ export async function executeWork(
               'All code compiles and runs',
               'Changes are committed to git',
             ],
-        max_turns: step?.estimated_turns || 100,
+        max_turns: item.max_turns || step?.estimated_turns || parseInt(process.env.MAX_TURNS_PER_STEP || '200', 10),
         risk_assessment: 'low',
         required_skills: [],
         logging_obligations: ['All work logged to output directory'],

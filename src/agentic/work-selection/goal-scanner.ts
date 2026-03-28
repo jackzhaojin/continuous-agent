@@ -329,6 +329,7 @@ async function bundleToWorkItemAsync(bundle: GoalBundle): Promise<WorkItem> {
     progress_pct,
     source_path: bundle.sourcePath, // V1.2 field
     source_project: source_project || undefined, // V1.2: Multi-project access
+    max_turns: frontmatter.max_turns ? Number(frontmatter.max_turns) : undefined,
   };
 }
 

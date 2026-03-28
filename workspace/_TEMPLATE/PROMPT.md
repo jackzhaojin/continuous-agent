@@ -6,6 +6,7 @@ status: pending
 complexity: medium
 created: "2026-01-01"
 tags: [tag1, tag2]
+max_turns:                   # Optional: override default (200). Set 500 for Playwright/complex tasks
 output_path:
 branch:
 ---

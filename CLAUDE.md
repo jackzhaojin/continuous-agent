@@ -220,7 +220,7 @@ Complex goals (>100 estimated turns) are automatically broken down into steps:
 - **Step Retry Persistence:** `retry_count` is stored in STEPS.json and survives PM2 restarts (unlike in-memory retry tracker)
 - **Configuration:**
   - `BREAKDOWN_THRESHOLD_TURNS=100` - Trigger breakdown if estimated > 100 turns
-  - `MAX_TURNS_PER_STEP=100` - Max turns per step (MINIMUM 100)
+  - `MAX_TURNS_PER_STEP=200` - Max turns per worker (env-configurable, default 200)
   - `AUTO_BREAKDOWN_ENABLED=true` - Enable/disable auto-breakdown
   - `BREAKDOWN_MODEL` - Model for LLM breakdown (defaults to `MODEL` or `claude-sonnet-4-5`)
 

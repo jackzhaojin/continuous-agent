@@ -97,6 +97,9 @@ export interface WorkItem {
 
   // V1.2: Multi-project access - reference to source project for copy-in
   source_project?: string;    // Slug of source project to copy from
+
+  // Per-goal turn override — set in PROMPT.md frontmatter for turn-intensive tasks (e.g., Playwright)
+  max_turns?: number;
 }
 
 /**
