@@ -6,7 +6,7 @@ capabilities:
   - id: git.branch_commit
     name: Git Branch and Commit
     description: Create branches, stage changes, and commit with proper messages
-    confidence: 100
+    confidence: 85
     maturity: Demonstrated
     scope:
       includes:
@@ -28,10 +28,10 @@ capabilities:
       - commit_exists
     evidence:
       successes: 93
-      failures: 102
+      failures: 103
       last_success: null
       last_failure: null
-      last_validated: '2026-02-04'
+      last_validated: '2026-03-28'
     common_failure_modes:
       - Attempting to commit without staging
       - Branch name conflicts
@@ -137,7 +137,7 @@ capabilities:
   - id: node.npm.install
     name: NPM Package Installation
     description: Install npm packages and manage dependencies
-    confidence: 100
+    confidence: 85
     maturity: Demonstrated
     scope:
       includes:
@@ -159,10 +159,10 @@ capabilities:
       - package_lock_updated
     evidence:
       successes: 116
-      failures: 57
+      failures: 58
       last_success: null
       last_failure: null
-      last_validated: '2026-02-04'
+      last_validated: '2026-03-28'
     common_failure_modes:
       - Network connectivity issues
       - Peer dependency conflicts
@@ -173,7 +173,7 @@ capabilities:
   - id: node.npm.run_script
     name: NPM Script Execution
     description: Run npm scripts defined in package.json
-    confidence: 8
+    confidence: 10
     maturity: Demonstrated
     scope:
       includes:
@@ -192,11 +192,11 @@ capabilities:
       - script_exit_code
       - expected_output_patterns
     evidence:
-      successes: 240
-      failures: 227
+      successes: 241
+      failures: 229
       last_success: null
       last_failure: null
-      last_validated: '2026-02-04'
+      last_validated: '2026-03-28'
     common_failure_modes:
       - Missing dependencies
       - Script not found in package.json
@@ -228,10 +228,10 @@ capabilities:
       - dot_next_directory_exists
     evidence:
       successes: 27
-      failures: 132
+      failures: 133
       last_success: null
       last_failure: null
-      last_validated: '2026-02-04'
+      last_validated: '2026-03-28'
     common_failure_modes:
       - TypeScript type errors
       - ESLint errors blocking build

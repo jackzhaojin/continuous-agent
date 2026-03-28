@@ -101,3 +101,13 @@ projects:
       - deliver.nextjs.app.basic
       - npm.install
     reusable: true
+  - slug: fix-chat-app-to-use-oauth-token-and-record-playwright-demo-v
+    title: Fix Chat App to Use OAuth Token and Record Playwright Demo Video
+    output_path: /Users/jackjin/dev/ai-sandbox/projects/nextjs/2026-01-29/1769671611924
+    completed: "2026-03-28"
+    category: nextjs
+    capabilities:
+      - deliver.nextjs.app.basic
+      - git.commit
+      - npm.install
+    reusable: true

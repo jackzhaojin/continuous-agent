@@ -128,3 +128,16 @@ projects:
       - npm.install
     features_built: []
     lessons: []
+  - id: goal-fix-chatapp-oauth-and-demo
+    name: Fix Chat App to Use OAuth Token and Record Playwright Demo Video
+    category: nextjs
+    completed: "2026-03-28"
+    output_path: /Users/jackjin/dev/ai-sandbox/projects/nextjs/2026-01-29/1769671611924
+    archive_path: /Users/jackjin/dev/continuous-agent/workspace/completed/fix-chatapp-oauth-and-demo
+    capabilities_exercised:
+      - deliver.nextjs.app.basic
+      - git.commit
+      - npm.install
+    features_built:
+      - "- Created Playwright demo spec (`e2e/chat-demo.spec.ts`) showcasing the full user journey"
+    lessons: []
