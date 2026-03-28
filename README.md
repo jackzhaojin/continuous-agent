@@ -30,7 +30,7 @@ cp .env.worker.example .env.worker
 # (Apps can also use Docker envs, shell exports, iOS build settings, etc.)
 # cp .env.app.example ai-sandbox/projects/<project>/.env.app
 
-# Add CLAUDE_CODE_OAUTH_TOKEN (Claude Pro/Max) or ANTHROPIC_API_KEY to .env.worker
+# Add CLAUDE_CODE_OAUTH_TOKEN to .env.worker (Claude Pro/Max subscription — OAuth-first, no API key)
 
 # Run in development
 npm run dev
@@ -72,7 +72,7 @@ Credentials are isolated into three tiers using separate `.env` files:
 | Tier | File | Purpose |
 |------|------|---------|
 | **1 - Executive** | `.env.executive` | Loop config, Notion reporting, breakdown settings |
-| **2 - Worker** | `.env.worker` | Claude SDK auth, model selection, tool API keys |
+| **2 - Worker** | `.env.worker` | Claude SDK auth (OAuth token), model selection |
 | **3 - Application** | `.env.app` | App credentials (DB, cache, storage) — platform-agnostic |
 
 - Tier 1 keys **never** reach worker agents (physical file separation)
@@ -140,7 +140,7 @@ npm install && npm run build && npm start
 ## Requirements
 
 - Node.js ≥ 18.0.0
-- Claude Agent SDK authentication (OAuth token or API key)
+- Claude Agent SDK authentication (OAuth token via Claude Pro/Max subscription)
 - PM2 recommended for production deployment
 
 ## License

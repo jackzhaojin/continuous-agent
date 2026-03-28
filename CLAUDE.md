@@ -449,7 +449,7 @@ cp .env.app.example .env.app               # Tier 3: Application (optional)
 | Tier | File | Purpose | Consumers |
 |------|------|---------|-----------|
 | **1 - Executive** | `.env.executive` | Loop config, Notion reporting, breakdown settings | Executive loop only |
-| **2 - Worker** | `.env.worker` | Claude SDK auth, model, tool API keys | Worker agents (via `ai-sandbox/.env`) |
+| **2 - Worker** | `.env.worker` | Claude SDK auth (OAuth token), model selection | Worker agents (via `ai-sandbox/.env`) |
 | **3 - Application** | `.env.app` | DB, cache, storage, payment, email keys | Built apps (platform-agnostic) |
 
 **Key design decisions:**
@@ -464,7 +464,7 @@ cp .env.app.example .env.app               # Tier 3: Application (optional)
 2. `.env.worker` (new keys only)
 3. `.env` (legacy fallback, new keys only)
 
-**API Key Management:** `.env.worker` is copied to `ai-sandbox/.env` by `worker-spawner.ts` (centralized, not per-project). `.env.app` is also copied to `ai-sandbox/.env.app` if it exists. Workers access shared API keys from there. The spawner validates that no executive-tier keys leaked into the worker env.
+**Authentication:** This project uses **OAuth token (`CLAUDE_CODE_OAUTH_TOKEN`) via Claude Pro/Max subscription** — there is no Anthropic API key. `.env.worker` is copied to `ai-sandbox/.env` by `worker-spawner.ts` (centralized, not per-project). `.env.app` is also copied to `ai-sandbox/.env.app` if it exists. The spawner validates that no executive-tier keys leaked into the worker env.
 
 **Tier 3 format helpers** (`src/deterministic/credential-tiers.ts`):
 - `getAppCredentialPairs(path)` — reads `.env.app`, strips `APP_` prefix, returns key-value pairs
@@ -537,7 +537,7 @@ Foundational proof-of-concept projects are stored in `references/poc/`, organize
 - How to use `query()` from `@anthropic-ai/claude-agent-sdk`
 - Streaming message handling (`for await of stream`)
 - Message type handling (system, assistant, user, result)
-- Authentication patterns (OAuth token vs API key)
+- Authentication patterns (OAuth token — subscription-first, no API key budget)
 
 **`references/poc/claude/agent-sdk-skills-poc/`** - Skills integration with Agent SDK
 - `settingSources: ['user', 'project']` is REQUIRED for skills
