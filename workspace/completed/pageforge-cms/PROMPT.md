@@ -1,10 +1,12 @@
 ---
 title: Build PageForge CMS — AEM-Inspired Visual Page Builder
 slug: pageforge-cms
-status: complete
+status: archived
 priority: P2
 complexity: high
 created: "2026-02-04"
+archived: "2026-03-29"
+archived_reason: "Too complex for current agent capabilities. Built across 31 steps but no integration testing between steps — app compiles but doesn't work end-to-end (missing DB schema push, broken routing, no functional verification). Revisit when agent has better E2E validation, database provisioning skills, and iterative build-test loops."
 tags:
   - nextjs
   - supabase
@@ -12,6 +14,7 @@ tags:
   - cms
   - drag-and-drop
   - full-stack
+  - archived-too-complex
 output_path: /Users/jackjin/dev/ai-sandbox/projects/nextjs/2026-02-04/1770180822334
 branch: null
 ---

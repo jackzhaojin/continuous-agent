@@ -111,3 +111,13 @@ projects:
       - git.commit
       - npm.install
     reusable: true
+  - slug: fix-pageforge-cms-routing-dashboard-redirect-loop
+    title: Fix PageForge CMS Routing — Dashboard Redirect Loop
+    output_path: /Users/jackjin/dev/ai-sandbox/projects/nextjs/2026-02-04/1770180822334
+    completed: "2026-03-29"
+    category: nextjs
+    capabilities:
+      - deliver.nextjs.app.basic
+      - git.commit
+      - npm.install
+    reusable: true
