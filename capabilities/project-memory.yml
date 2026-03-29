@@ -153,3 +153,17 @@ projects:
       - npm.install
     features_built: []
     lessons: []
+  - id: goal-hello-react
+    name: Build Hello World React App
+    category: react
+    completed: "2026-03-29"
+    output_path: /Users/jackjin/dev/ai-sandbox/projects/react/2026-03-29/1774808631099
+    archive_path: /Users/jackjin/dev/continuous-agent-develop/workspace/completed/hello-react
+    capabilities_exercised:
+      - deliver.react.component
+      - git.commit
+      - npm.install
+    features_built:
+      - Successfully built a minimal Hello World React app using Vite + React + TypeScript.
+      - "### Files Created/Modified"
+    lessons: []
