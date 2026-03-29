@@ -35,10 +35,11 @@ export interface SkillDefinition {
 export interface PlaybookDefinition {
   name: string;
   version: string;
-  category: 'playbook';
+  category: 'executive' | 'worker' | 'domain' | 'pipeline';
   description: string;
   goal: string;
-  context_requires: string[];
+  context_requires: Array<Record<string, string>>;
+  context_optional: Array<Record<string, string>>;
   composes_skills: string[];
   composes_playbooks: string[];
   execution_pattern: ExecutionPattern;

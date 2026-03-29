@@ -66,3 +66,30 @@ export function toStringArray(value: unknown): string[] {
 export function toStringValue(value: unknown, fallback = ''): string {
   return typeof value === 'string' ? value : fallback;
 }
+
+export function toContextList(value: unknown): Array<Record<string, string>> {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const contextEntries: Array<Record<string, string>> = [];
+  for (const item of value) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      continue;
+    }
+
+    const normalized: Record<string, string> = {};
+    for (const [key, raw] of Object.entries(item)) {
+      if (!key) {
+        continue;
+      }
+      normalized[key] = typeof raw === 'string' ? raw : String(raw ?? '');
+    }
+
+    if (Object.keys(normalized).length > 0) {
+      contextEntries.push(normalized);
+    }
+  }
+
+  return contextEntries;
+}

@@ -4,6 +4,7 @@ import type { ExecutionPattern } from '../core/types.js';
 import {
   findSkillMarkdownFiles,
   parseSkillMarkdown,
+  toContextList,
   toStringArray,
   toStringValue,
 } from './library-frontmatter-parser.js';
@@ -22,6 +23,9 @@ const ALLOWED_PATTERNS: ExecutionPattern[] = [
   'deterministic-pipeline',
 ];
 
+const ALLOWED_PLAYBOOK_CATEGORIES = ['executive', 'worker', 'domain', 'pipeline'] as const;
+type AllowedPlaybookCategory = (typeof ALLOWED_PLAYBOOK_CATEGORIES)[number];
+
 function normalizeTrackRecord(value: unknown): TrackRecord {
   const record = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>;
 
@@ -39,11 +43,11 @@ function createWarning(filePath: string, code: string, message: string): Library
   return { severity: 'warning', code, message, filePath };
 }
 
-function normalizeExecutionPattern(value: unknown): ExecutionPattern {
+function normalizeExecutionPattern(value: unknown): ExecutionPattern | null {
   if (typeof value === 'string' && ALLOWED_PATTERNS.includes(value as ExecutionPattern)) {
     return value as ExecutionPattern;
   }
-  return 'plan-then-execute';
+  return null;
 }
 
 export async function loadPlaybookLibrary(
@@ -65,10 +69,14 @@ export async function loadPlaybookLibrary(
       const doc = await parseSkillMarkdown(filePath);
       const fm = doc.frontmatter;
 
-      const category = toStringValue(fm.category, 'playbook');
-      if (category !== 'playbook') {
+      const category = toStringValue(fm.category);
+      if (!ALLOWED_PLAYBOOK_CATEGORIES.includes(category as AllowedPlaybookCategory)) {
         warnings.push(
-          createWarning(filePath, 'PLAYBOOK_CATEGORY_INVALID', `Expected category "playbook" but got "${category}". Skipping file.`)
+          createWarning(
+            filePath,
+            'PLAYBOOK_CATEGORY_INVALID',
+            `Expected category one of [${ALLOWED_PLAYBOOK_CATEGORIES.join(', ')}] but got "${category || '(missing)'}". Skipping file.`
+          )
         );
         continue;
       }
@@ -79,16 +87,29 @@ export async function loadPlaybookLibrary(
         continue;
       }
 
+      const executionPattern = normalizeExecutionPattern(fm.execution_pattern);
+      if (!executionPattern) {
+        warnings.push(
+          createWarning(
+            filePath,
+            'PLAYBOOK_EXECUTION_PATTERN_INVALID',
+            `Invalid execution_pattern "${toStringValue(fm.execution_pattern, '(missing)')}". Skipping file.`
+          )
+        );
+        continue;
+      }
+
       const playbook: PlaybookDefinition = {
         name,
         version: toStringValue(fm.version, '0.1.0'),
-        category: 'playbook',
+        category: category as AllowedPlaybookCategory,
         description: toStringValue(fm.description),
         goal: toStringValue(fm.goal),
-        context_requires: toStringArray(fm.context_requires),
+        context_requires: toContextList(fm.context_requires),
+        context_optional: toContextList(fm.context_optional),
         composes_skills: toStringArray(fm.composes_skills),
         composes_playbooks: toStringArray(fm.composes_playbooks),
-        execution_pattern: normalizeExecutionPattern(fm.execution_pattern),
+        execution_pattern: executionPattern,
         tags: toStringArray(fm.tags),
         track_record: normalizeTrackRecord(fm.track_record),
         source_path: filePath,

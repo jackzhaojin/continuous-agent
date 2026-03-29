@@ -77,10 +77,15 @@ async function testPlaybookLoaderPatternsAndStrictMode(): Promise<void> {
       `---
 name: build-from-plan
 version: 1.0.0
-category: playbook
+category: worker
 description: Build plan implementation flow
 goal: Ship implementation from a plan
-context_requires: [repo]
+context_requires:
+  - plan_document: "A structured plan with phases and acceptance criteria"
+  - project_type: "nextjs | rust | python"
+  - output_path: "Target directory"
+context_optional:
+  - existing_codebase: "Path to existing codebase"
 composes_skills: [git, bash]
 execution_pattern: loop-until-progress
 tags: [worker]
@@ -102,6 +107,7 @@ track_record:
       `---
 name: bad
 category: skill
+execution_pattern: plan-then-execute
 ---
 # bad
 `
@@ -112,7 +118,7 @@ category: skill
       'invalid-pattern',
       `---
 name: invalid-pattern
-category: playbook
+category: domain
 execution_pattern: unknown-pattern
 ---
 # invalid pattern fallback
@@ -120,18 +126,25 @@ execution_pattern: unknown-pattern
     );
 
     const result = await loadPlaybookLibrary(root);
-    assert.equal(result.playbooks.length, 2, 'playbooks with valid category should load');
+    assert.equal(result.playbooks.length, 1, 'only valid playbooks should load');
 
     const valid = result.playbooks.find((p) => p.name === 'build-from-plan');
     assert.ok(valid, 'expected build-from-plan playbook');
     assert.equal(valid?.execution_pattern, 'loop-until-progress');
+    assert.deepEqual(valid?.context_requires[0], {
+      plan_document: 'A structured plan with phases and acceptance criteria',
+    });
+    assert.deepEqual(valid?.context_optional[0], {
+      existing_codebase: 'Path to existing codebase',
+    });
+    assert.equal(valid?.category, 'worker');
 
     const fallback = result.playbooks.find((p) => p.name === 'invalid-pattern');
-    assert.ok(fallback, 'expected invalid-pattern playbook');
-    assert.equal(fallback?.execution_pattern, 'plan-then-execute', 'invalid pattern should fallback');
+    assert.equal(fallback, undefined, 'invalid execution pattern should be skipped');
 
-    assert.equal(result.warnings.length, 1, 'invalid category should produce warning');
+    assert.equal(result.warnings.length, 2, 'invalid category and pattern should produce warnings');
     assert.match(result.warnings[0].code, /PLAYBOOK_CATEGORY_INVALID/);
+    assert.match(result.warnings[1].code, /PLAYBOOK_EXECUTION_PATTERN_INVALID/);
 
     let strictThrew = false;
     try {
