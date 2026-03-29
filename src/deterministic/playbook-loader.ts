@@ -8,6 +8,7 @@ import {
   toStringArray,
   toStringValue,
 } from './library-frontmatter-parser.js';
+import { parsePipelineSteps } from '../harness/pipeline-types.js';
 import type {
   LoaderOptions,
   LibraryValidationIssue,
@@ -99,6 +100,11 @@ export async function loadPlaybookLibrary(
         continue;
       }
 
+      // Parse pipeline_steps for deterministic-pipeline playbooks
+      const pipelineSteps = executionPattern === 'deterministic-pipeline'
+        ? parsePipelineSteps(fm.pipeline_steps)
+        : undefined;
+
       const playbook: PlaybookDefinition = {
         name,
         version: toStringValue(fm.version, '0.1.0'),
@@ -114,6 +120,7 @@ export async function loadPlaybookLibrary(
         track_record: normalizeTrackRecord(fm.track_record),
         source_path: filePath,
         body: doc.body,
+        ...(pipelineSteps && pipelineSteps.length > 0 ? { pipeline_steps: pipelineSteps } : {}),
       };
 
       playbooks.push(playbook);

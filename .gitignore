@@ -6,6 +6,10 @@ output
 # Build output (regenerated from src/)
 dist/
 
+# Next.js build cache (dashboard/)
+.next/
+out/
+
 # node
 node_modules
 

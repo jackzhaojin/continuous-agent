@@ -109,6 +109,10 @@ export interface WorkItem {
 
   // Per-goal turn override — set in PROMPT.md frontmatter for turn-intensive tasks (e.g., Playwright)
   max_turns?: number;
+
+  // V2.0: Execution pattern override from PROMPT.md frontmatter
+  // When set, takes highest precedence in pattern resolution (over playbook default)
+  execution_pattern?: ExecutionPattern;
 }
 
 /**

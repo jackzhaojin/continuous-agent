@@ -1,4 +1,5 @@
 import type { ExecutionPattern } from '../core/types.js';
+import type { PipelineStep } from '../harness/pipeline-types.js';
 
 export type LibraryValidationSeverity = 'warning' | 'error';
 
@@ -47,6 +48,9 @@ export interface PlaybookDefinition {
   track_record: TrackRecord;
   source_path: string;
   body: string;
+
+  /** Pipeline steps — only present when execution_pattern is 'deterministic-pipeline'. */
+  pipeline_steps?: PipelineStep[];
 }
 
 export interface SkillLibraryResult {

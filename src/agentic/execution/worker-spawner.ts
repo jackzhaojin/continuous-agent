@@ -11,7 +11,7 @@ import { mkdirSync, existsSync, copyFileSync, cpSync, createWriteStream, readFil
 import { execSync } from 'child_process';
 import os from 'os';
 import path from 'path';
-import type { WorkerContract, WorkerResult, WorkItem } from '../../core/types.js';
+import type { WorkerContract, WorkerResult, WorkItem, ExecutionPattern } from '../../core/types.js';
 import { buildIntelligentPrompt, buildSimplePrompt } from '../intelligence/prompt-builder.js';
 import { classifyIntent } from '../intelligence/intent-classifier.js';
 import { selectStrategy } from '../intelligence/strategy-selector.js';
@@ -554,18 +554,31 @@ async function buildWorkerPrompt(
   return await buildSimplePrompt(contract, projectPath);
 }
 
+/** Tools that are read-only (allowed in plan-mode) */
+const PLAN_MODE_ALLOWED_TOOLS = ['Skill', 'Task', 'Read', 'Glob', 'Grep', 'WebFetch', 'WebSearch'];
+
+/**
+ * Restrict tool set for plan-mode execution (read-only tools only).
+ * Removes Write, Edit, Bash, and other write-capable tools.
+ */
+function restrictToolsForPlanMode(tools: string[]): string[] {
+  return tools.filter(t => PLAN_MODE_ALLOWED_TOOLS.includes(t));
+}
+
 /**
  * Spawn a worker agent to execute a task contract
  *
  * @param contract - The task contract defining what the worker should do
  * @param workItem - Optional work item for intelligent prompt building
  * @param retryContext - Optional retry context for strategy selection
+ * @param executionPattern - Optional V2.0 execution pattern (affects tool access and behavior)
  * @returns WorkerResult with success status, output, and any artifacts/errors
  */
 export async function spawnWorker(
   contract: WorkerContract,
   workItem?: WorkItem,
-  retryContext?: WorkerRetryContext
+  retryContext?: WorkerRetryContext,
+  executionPattern?: ExecutionPattern,
 ): Promise<WorkerResult> {
   const startTime = Date.now();
   const outputs: string[] = [];
@@ -667,9 +680,27 @@ export async function spawnWorker(
   // Determine allowed tools
   // Task is included by default for all workers (subagent delegation to task-researcher, code-validator).
   // This guard ensures it's present for self-enhance/skill-build even if default changes.
-  const allowedTools = [...contract.scope.tools_allowed];
+  let allowedTools = [...contract.scope.tools_allowed];
   if ((isSelfEnhance || isSkillBuild) && !allowedTools.includes('Task')) {
     allowedTools.push('Task');
+  }
+
+  // V2.0: Apply execution pattern restrictions
+  if (executionPattern) {
+    logger.log(`Execution Pattern: ${executionPattern}`);
+    console.log(`[Worker] Execution Pattern: ${executionPattern}`);
+
+    if (executionPattern === 'plan-mode') {
+      // Plan-mode: restrict to read-only tools
+      const originalCount = allowedTools.length;
+      allowedTools = restrictToolsForPlanMode(allowedTools);
+      logger.log(`Plan-mode: restricted tools from ${originalCount} to ${allowedTools.length} (read-only)`);
+      console.log(`[Worker] Plan-mode: tools restricted to read-only: ${allowedTools.join(', ')}`);
+    }
+
+    // TODO: loop-until-progress — add a loop wrapper around the worker execution
+    // that checks for progress after each iteration and continues while making gains.
+    // For now, uses standard single-shot execution.
   }
 
   // Log worker start with full context

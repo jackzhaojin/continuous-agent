@@ -45,6 +45,8 @@ import { ingestQueueTasks } from '../deterministic/queue-processor.js';
 import { createGoalBundle } from '../deterministic/workspace-writers.js';
 import { appendInputLog } from '../deterministic/inputs-log.js';
 import { isRateLimitError, isInCooldown, enterCooldown, resetBackoff } from '../deterministic/backoff-manager.js';
+import { resolveExecutionPattern } from '../deterministic/execution-pattern-resolver.js';
+import { loadPlaybookLibrary } from '../deterministic/playbook-loader.js';
 import { validateWork } from '../deterministic/validation-handler.js';
 import {
   updateGoalState,
@@ -63,6 +65,10 @@ import { incrementStepRetryCount, readStepRetryCount, readStepsJson, writeStepsJ
 import { checkSelfImprovementTriggers } from '../agentic/calibration/self-improvement-triggers.js';
 import { generateSelfImprovementTask } from '../agentic/calibration/self-improvement-task-generator.js';
 import { runWeeklyRetrospective } from '../agentic/calibration/retrospective.js';
+
+// IDENTITY - Agent identity (Gmail + Slack)
+import { checkInbox } from '../identity/inbox-checker.js';
+import { sendCompletionNotification, sendBlockedNotification } from '../identity/slack-client.js';
 
 // Load environment variables (tiered)
 const envFiles = ['.env.executive', '.env.worker', '.env'];
@@ -143,6 +149,20 @@ async function runIteration(): Promise<IterationResult> {
     } catch (e) {
       log(`  Weekly summary generation failed (non-blocking): ${e}`);
     }
+  }
+
+  // === PHASE 0.5: CHECK INBOX (Identity — Gmail) ===
+  // Fire-and-forget: if identity is disabled, this is a no-op
+  try {
+    const inboxResult = await checkInbox(loopState.iteration);
+    if (inboxResult.actionableIntents > 0) {
+      log(`  Phase 0.5: ${inboxResult.actionableIntents} actionable email intent(s) queued`);
+      for (const intent of inboxResult.intents) {
+        log(`    [${intent.type}] from ${intent.from}: "${intent.subject}"`);
+      }
+    }
+  } catch (e) {
+    log(`  Phase 0.5 inbox check failed (non-blocking): ${e}`);
   }
 
   // === PHASE 1: HEALTH CHECK ===
@@ -307,6 +327,51 @@ async function runIteration(): Promise<IterationResult> {
 
   logAgentic('PHASE 4: Execute Work (Agent SDK Worker)');
 
+  // V2.0: Resolve execution pattern (PROMPT.md override > playbook default > system default)
+  // Try to match a playbook for pattern resolution; non-fatal if playbooks dir missing
+  let matchedPlaybook = null;
+  try {
+    const playbooksRoot = path.join(process.cwd(), 'playbooks');
+    const playbookResult = await loadPlaybookLibrary(playbooksRoot);
+    const text = `${workItem.title} ${workItem.description || ''}`.toLowerCase();
+    // Simple best-match by tag/name overlap (same logic as prompt-builder)
+    let bestScore = 0;
+    for (const pb of playbookResult.playbooks) {
+      let score = 0;
+      for (const tag of pb.tags) {
+        if (text.includes(tag.toLowerCase())) score += 1;
+      }
+      const nameWords = pb.name.replace(/[-_]/g, ' ').toLowerCase().split(/\s+/);
+      for (const word of nameWords) {
+        if (word.length > 2 && text.includes(word)) score += 2;
+      }
+      if (score > bestScore) {
+        bestScore = score;
+        matchedPlaybook = pb;
+      }
+    }
+    if (bestScore < 2) matchedPlaybook = null;
+  } catch {
+    // Non-fatal: playbook matching is best-effort
+  }
+
+  const patternResolution = resolveExecutionPattern(workItem, matchedPlaybook);
+  workItem.execution_pattern = patternResolution.pattern;
+  log(`  Execution pattern: ${patternResolution.pattern} (${patternResolution.source})`);
+
+  // V2.0: Route by execution pattern
+  if (patternResolution.pattern === 'deterministic-pipeline') {
+    log(`  [ROUTING] deterministic-pipeline: Pipeline executor not yet implemented (Phase 6)`);
+    log(`  Falling back to plan-then-execute for this iteration`);
+    workItem.execution_pattern = 'plan-then-execute';
+  } else if (patternResolution.pattern === 'loop-until-progress') {
+    log(`  [ROUTING] loop-until-progress: Using standard worker (loop wrapper is future work)`);
+  } else if (patternResolution.pattern === 'plan-mode') {
+    log(`  [ROUTING] plan-mode: Worker will use read-only tool set`);
+  } else {
+    log(`  [ROUTING] plan-then-execute: Standard worker execution`);
+  }
+
   // Log capability attempt
   const intent = await classifyIntent(workItem);
   const capabilities = inferCapabilitiesFromGoal(workItem, intent);
@@ -348,6 +413,11 @@ async function runIteration(): Promise<IterationResult> {
 
     // Reset backoff on success
     resetBackoff();
+
+    // Fire-and-forget Slack notification on completion
+    sendCompletionNotification(workItem.title, workItem.priority, result.output_path).catch(e => {
+      log(`  Slack completion notification failed (non-blocking): ${e}`);
+    });
 
     loopState.last_work_at = new Date().toISOString();
     return 'work_completed';
@@ -437,6 +507,16 @@ async function runIteration(): Promise<IterationResult> {
       await markGoalBlocked(workItem, contractId, currentStep?.title);
       await escalateWithDiagnosis(workItem, retry.attempts, diagnosis.diagnosis, contractId);
 
+      // Fire-and-forget Slack notification on escalation
+      sendBlockedNotification(
+        workItem.title,
+        workItem.priority,
+        diagnosis.rootCause || retry.lastError,
+        retry.attempts
+      ).catch(e => {
+        log(`  Slack blocked notification failed (non-blocking): ${e}`);
+      });
+
       retryTracker.delete(retryKey);
       return 'work_failed';
     }
@@ -463,6 +543,16 @@ async function runIteration(): Promise<IterationResult> {
     }
     await markGoalBlocked(workItem, contractId, currentStep?.title);
     await writeToNeedsYou(workItem, retry.attempts, retry.lastError, contractId);
+
+    // Fire-and-forget Slack notification on blocked
+    sendBlockedNotification(
+      workItem.title,
+      workItem.priority,
+      retry.lastError,
+      retry.attempts
+    ).catch(e => {
+      log(`  Slack blocked notification failed (non-blocking): ${e}`);
+    });
 
     retryTracker.delete(retryKey);
     return 'work_failed';

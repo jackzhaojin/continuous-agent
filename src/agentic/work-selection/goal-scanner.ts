@@ -7,7 +7,7 @@ import { readdir, rename, mkdir, appendFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 import { parsePromptMd, type PromptMdFile } from '../../deterministic/prompt-md-parser.js';
-import type { WorkItem, WorkStep } from '../../core/types.js';
+import type { WorkItem, WorkStep, ExecutionPattern } from '../../core/types.js';
 import type { SelectableWork } from './work-selector.js';
 import { readStepsJson, stepsJsonToWorkSteps, migrateFromPromptMd } from '../../deterministic/steps-json-handler.js';
 
@@ -330,6 +330,7 @@ async function bundleToWorkItemAsync(bundle: GoalBundle): Promise<WorkItem> {
     source_path: bundle.sourcePath, // V1.2 field
     source_project: source_project || undefined, // V1.2: Multi-project access
     max_turns: frontmatter.max_turns ? Number(frontmatter.max_turns) : undefined,
+    execution_pattern: (frontmatter.execution_pattern as ExecutionPattern) || undefined, // V2.0: Override from PROMPT.md
   };
 }
 

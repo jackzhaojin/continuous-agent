@@ -11,6 +11,7 @@ import { readFileSync, writeFileSync, appendFileSync } from 'fs';
 import path from 'path';
 import yaml from 'js-yaml';
 import type { VerifierResult } from '../../deterministic/verifiers/core-verifiers.js';
+import { updateSkillAndPlaybookRecords } from '../../deterministic/skill-updater.js';
 
 interface Capability {
   id: string;
@@ -232,3 +233,49 @@ export const DEFAULT_CAPABILITY_MAPPINGS: Record<string, string[]> = {
   docs_checklist: ['comm.documentation'],
   skill_format: ['deliver.claude.skill'],
 };
+
+// ── V2 Track Record Integration ────────────────────────────────────────
+
+/**
+ * Check whether V2 track records are enabled.
+ * Controlled by `V2_TRACK_RECORDS` environment variable (default: false).
+ */
+export function isV2TrackRecordsEnabled(): boolean {
+  return process.env.V2_TRACK_RECORDS === 'true';
+}
+
+/**
+ * V2 capability update path: updates skill and playbook SKILL.md track records
+ * instead of the legacy per-file YAML capabilities.
+ *
+ * When V2_TRACK_RECORDS=true, call this instead of (or in addition to)
+ * updateCapabilitiesFromVerifierResults.
+ */
+export async function updateCapabilitiesV2(
+  skillNames: string[],
+  playbookName: string | null,
+  passed: boolean,
+  options?: { skillsDir?: string; playbooksDir?: string }
+): Promise<void> {
+  if (!isV2TrackRecordsEnabled()) {
+    return;
+  }
+
+  try {
+    const updates = await updateSkillAndPlaybookRecords(skillNames, playbookName, passed, options);
+    for (const update of updates) {
+      logToLedger({
+        event: 'V2_TRACK_RECORD_UPDATE',
+        file: update.filePath,
+        result: passed ? 'PASS' : 'FAIL',
+        confidence_before: update.before.confidence,
+        confidence_after: update.after.confidence,
+        maturity_before: update.before.maturity,
+        maturity_after: update.after.maturity,
+        review_needed: update.reviewNeeded,
+      });
+    }
+  } catch (error) {
+    console.error(`[capability-updater] V2 track record update failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}

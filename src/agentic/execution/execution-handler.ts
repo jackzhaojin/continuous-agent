@@ -234,6 +234,9 @@ export async function executeWork(
 
     // AGENTIC: Spawn Agent SDK worker
     log(`  Spawning Agent SDK worker...`);
+    if (scopedItem.execution_pattern) {
+      log(`  Execution pattern: ${scopedItem.execution_pattern}`);
+    }
     const result = await spawnWorker(
       {
         id: contractId || `contract-${Date.now()}`,
@@ -272,7 +275,8 @@ export async function executeWork(
         created_at: new Date().toISOString(),
       },
       scopedItem,
-      retryContext
+      retryContext,
+      scopedItem.execution_pattern,  // V2.0: pass execution pattern to worker spawner
     );
 
     if (result.success) {
