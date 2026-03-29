@@ -8,7 +8,8 @@
     "build": "tsc",
     "start": "node dist/executive-loop.js",
     "dev": "tsx src/executive-loop.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:adhoc:v2-loaders": "tsx tests/adhoc/v2-library-loaders.adhoc.ts"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.29",

@@ -3,6 +3,15 @@
  */
 
 /**
+ * Worker execution pattern (V2.0)
+ */
+export type ExecutionPattern =
+  | 'plan-then-execute'
+  | 'loop-until-progress'
+  | 'plan-mode'
+  | 'deterministic-pipeline';
+
+/**
  * Individual health check result
  */
 export interface HealthCheck {
