@@ -6,7 +6,7 @@ capabilities:
   - id: git.branch_commit
     name: Git Branch and Commit
     description: Create branches, stage changes, and commit with proper messages
-    confidence: 100
+    confidence: 93
     maturity: Demonstrated
     scope:
       includes:
@@ -27,11 +27,11 @@ capabilities:
       - git_status_check
       - commit_exists
     evidence:
-      successes: 99
-      failures: 103
+      successes: 104
+      failures: 104
       last_success: null
       last_failure: null
-      last_validated: '2026-03-29'
+      last_validated: '2026-03-30'
     common_failure_modes:
       - Attempting to commit without staging
       - Branch name conflicts
@@ -137,7 +137,7 @@ capabilities:
   - id: node.npm.install
     name: NPM Package Installation
     description: Install npm packages and manage dependencies
-    confidence: 100
+    confidence: 93
     maturity: Demonstrated
     scope:
       includes:
@@ -158,11 +158,11 @@ capabilities:
       - node_modules_exists
       - package_lock_updated
     evidence:
-      successes: 121
+      successes: 126
       failures: 58
       last_success: null
       last_failure: null
-      last_validated: '2026-03-29'
+      last_validated: '2026-03-30'
     common_failure_modes:
       - Network connectivity issues
       - Peer dependency conflicts
@@ -173,7 +173,7 @@ capabilities:
   - id: node.npm.run_script
     name: NPM Script Execution
     description: Run npm scripts defined in package.json
-    confidence: 97
+    confidence: 85
     maturity: Demonstrated
     scope:
       includes:
@@ -192,11 +192,11 @@ capabilities:
       - script_exit_code
       - expected_output_patterns
     evidence:
-      successes: 251
-      failures: 231
+      successes: 260
+      failures: 234
       last_success: null
       last_failure: null
-      last_validated: '2026-03-29'
+      last_validated: '2026-03-30'
     common_failure_modes:
       - Missing dependencies
       - Script not found in package.json
@@ -207,7 +207,7 @@ capabilities:
   - id: nextjs.build.basic
     name: Next.js Basic Build
     description: Build Next.js applications for production
-    confidence: 30
+    confidence: 70
     maturity: Demonstrated
     scope:
       includes:
@@ -227,11 +227,11 @@ capabilities:
       - build_success
       - dot_next_directory_exists
     evidence:
-      successes: 30
+      successes: 34
       failures: 134
       last_success: null
       last_failure: null
-      last_validated: '2026-03-29'
+      last_validated: '2026-03-30'
     common_failure_modes:
       - TypeScript type errors
       - ESLint errors blocking build
