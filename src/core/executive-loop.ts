@@ -66,9 +66,9 @@ import { checkSelfImprovementTriggers } from '../agentic/calibration/self-improv
 import { generateSelfImprovementTask } from '../agentic/calibration/self-improvement-task-generator.js';
 import { runWeeklyRetrospective } from '../agentic/calibration/retrospective.js';
 
-// IDENTITY - Agent identity (Gmail + Slack)
+// IDENTITY - Agent identity (Gmail + Discord)
 import { checkInbox } from '../identity/inbox-checker.js';
-import { sendCompletionNotification, sendBlockedNotification } from '../identity/slack-client.js';
+import { sendCompletionNotification, sendBlockedNotification } from '../identity/discord-client.js';
 
 // Load environment variables (tiered)
 const envFiles = ['.env.executive', '.env.worker', '.env'];
@@ -414,9 +414,9 @@ async function runIteration(): Promise<IterationResult> {
     // Reset backoff on success
     resetBackoff();
 
-    // Fire-and-forget Slack notification on completion
+    // Fire-and-forget Discord notification on completion
     sendCompletionNotification(workItem.title, workItem.priority, result.output_path).catch(e => {
-      log(`  Slack completion notification failed (non-blocking): ${e}`);
+      log(`  Discord completion notification failed (non-blocking): ${e}`);
     });
 
     loopState.last_work_at = new Date().toISOString();
@@ -507,14 +507,14 @@ async function runIteration(): Promise<IterationResult> {
       await markGoalBlocked(workItem, contractId, currentStep?.title);
       await escalateWithDiagnosis(workItem, retry.attempts, diagnosis.diagnosis, contractId);
 
-      // Fire-and-forget Slack notification on escalation
+      // Fire-and-forget Discord notification on escalation
       sendBlockedNotification(
         workItem.title,
         workItem.priority,
         diagnosis.rootCause || retry.lastError,
         retry.attempts
       ).catch(e => {
-        log(`  Slack blocked notification failed (non-blocking): ${e}`);
+        log(`  Discord blocked notification failed (non-blocking): ${e}`);
       });
 
       retryTracker.delete(retryKey);
@@ -544,14 +544,14 @@ async function runIteration(): Promise<IterationResult> {
     await markGoalBlocked(workItem, contractId, currentStep?.title);
     await writeToNeedsYou(workItem, retry.attempts, retry.lastError, contractId);
 
-    // Fire-and-forget Slack notification on blocked
+    // Fire-and-forget Discord notification on blocked
     sendBlockedNotification(
       workItem.title,
       workItem.priority,
       retry.lastError,
       retry.attempts
     ).catch(e => {
-      log(`  Slack blocked notification failed (non-blocking): ${e}`);
+      log(`  Discord blocked notification failed (non-blocking): ${e}`);
     });
 
     retryTracker.delete(retryKey);

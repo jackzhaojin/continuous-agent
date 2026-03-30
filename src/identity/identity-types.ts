@@ -1,10 +1,10 @@
 /**
- * Identity Types — Interfaces for Agent Identity (Gmail + Slack)
+ * Identity Types — Interfaces for Agent Identity (Gmail + Discord)
  *
  * All identity features are opt-in, disabled by default via env vars:
  *   IDENTITY_ENABLED=false   (master kill switch)
  *   GMAIL_ENABLED=false
- *   SLACK_ENABLED=false
+ *   DISCORD_ENABLED=false
  *
  * Env vars for Gmail:
  *   AGENT_EMAIL=
@@ -12,10 +12,10 @@
  *   GMAIL_CLIENT_ID=
  *   GMAIL_CLIENT_SECRET=
  *
- * Env vars for Slack:
- *   SLACK_BOT_TOKEN=
- *   SLACK_CHANNEL_ID=
- *   SLACK_MAX_MESSAGES_PER_HOUR=10
+ * Env vars for Discord:
+ *   DISCORD_BOT_TOKEN=
+ *   DISCORD_CHANNEL_ID=
+ *   DISCORD_MAX_MESSAGES_PER_HOUR=10
  *
  * Env vars for inbox checking:
  *   INBOX_CHECK_INTERVAL=1
@@ -24,31 +24,31 @@
 // ── Identity Configuration ──────────────────────────────────────────
 
 export interface IdentityConfig {
-  /** Master kill switch — both Gmail and Slack require this to be true */
+  /** Master kill switch — both Gmail and Discord require this to be true */
   identityEnabled: boolean;
 
   /** Gmail-specific enable flag */
   gmailEnabled: boolean;
 
-  /** Slack-specific enable flag */
-  slackEnabled: boolean;
+  /** Discord-specific enable flag */
+  discordEnabled: boolean;
 
   /** Agent's Gmail address */
   agentEmail: string;
+
+  /** Agent's display name (used in Discord webhooks, etc.) */
+  agentDisplayName: string;
 
   /** Gmail OAuth2 credentials */
   gmailRefreshToken: string;
   gmailClientId: string;
   gmailClientSecret: string;
 
-  /** Slack bot token (xoxb-...) */
-  slackBotToken: string;
+  /** Discord webhook URL (posts as agent display name) */
+  discordWebhookUrl: string;
 
-  /** Default Slack channel for notifications */
-  slackChannelId: string;
-
-  /** Max Slack messages per hour (throttle) */
-  slackMaxMessagesPerHour: number;
+  /** Max Discord messages per hour (throttle) */
+  discordMaxMessagesPerHour: number;
 
   /** How often to check inbox (every N iterations, default 1) */
   inboxCheckInterval: number;
@@ -107,29 +107,29 @@ export interface FetchedEmail {
   threadId?: string;
 }
 
-// ── Slack Message ───────────────────────────────────────────────────
+// ── Discord Message ─────────────────────────────────────────────────
 
-export interface SlackMessage {
-  /** Channel to send to (defaults to configured SLACK_CHANNEL_ID) */
-  channel?: string;
+export interface DiscordMessage {
+  /** Plain text content */
+  content: string;
 
-  /** Plain text fallback */
-  text: string;
-
-  /** Block Kit blocks for rich formatting */
-  blocks?: SlackBlock[];
+  /** Rich embeds */
+  embeds?: DiscordEmbed[];
 }
 
-export interface SlackBlock {
-  type: 'section' | 'header' | 'divider' | 'context';
-  text?: {
-    type: 'mrkdwn' | 'plain_text';
-    text: string;
-  };
-  fields?: Array<{
-    type: 'mrkdwn' | 'plain_text';
-    text: string;
-  }>;
+export interface DiscordEmbed {
+  title?: string;
+  description?: string;
+  color?: number;
+  fields?: DiscordEmbedField[];
+  footer?: { text: string };
+  timestamp?: string;
+}
+
+export interface DiscordEmbedField {
+  name: string;
+  value: string;
+  inline?: boolean;
 }
 
 // ── Inbox Check Result ──────────────────────────────────────────────

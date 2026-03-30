@@ -1,7 +1,7 @@
 # Agent Identity Setup Guide
 
 **Date:** 2026-03-29
-**Purpose:** Step-by-step instructions to give your executive agent its own email, Slack presence, and Notion identity.
+**Purpose:** Step-by-step instructions to give your executive agent its own email, Discord presence, and Notion identity.
 
 ---
 
@@ -9,7 +9,7 @@
 
 - The executive agent is running (PM2 or dev mode)
 - You have a personal Google account
-- You have a Slack workspace (or can create one)
+- You have a Discord server (or can create one)
 - Notion workspace already configured (from V1.2)
 
 ---
@@ -25,7 +25,7 @@ Pick a name and create a dedicated Gmail account for the agent. This becomes the
 
 **Create the Gmail account:**
 1. Go to https://accounts.google.com/signup
-2. Use the agent's name as first/last name (e.g., "Exec Agent" or your chosen name)
+2. Use the agent's name as first/last name (e.g., "Your Agent Name" or your chosen name)
 3. Use the email address you chose above
 4. Set a strong password and save it in your password manager
 5. **Skip phone verification if possible** — use your own phone only if required
@@ -137,38 +137,40 @@ const server = http.createServer(async (req, res) => {
 
 ---
 
-## Step 3: Set Up Slack Bot
+## Step 3: Set Up Discord Bot
 
-### 3a. Create a Slack App
+### 3a. Create a Discord Application
 
-1. Go to https://api.slack.com/apps
-2. Click **"Create New App" → "From scratch"**
-3. App name: your agent's name (e.g., "Exec Agent")
-4. Workspace: select your workspace
-5. Click "Create App"
+1. Go to https://discord.com/developers/applications
+2. Sign in (create account with agent email if needed — Discord does not support Google SSO)
+3. Click **"New Application"**
+4. Name: your agent's display name (from `AGENT_DISPLAY_NAME`)
+5. Click "Create"
 
-### 3b. Add Bot Permissions
+### 3b. Create a Bot
 
-1. In the app settings, go to **OAuth & Permissions**
-2. Under "Bot Token Scopes", add:
-   - `chat:write` — send messages
-   - `channels:read` — list channels
-   - `im:write` — send DMs
-   - `chat:write.customize` — custom bot name/icon per message (optional)
-3. Scroll up and click **"Install to Workspace"**
-4. Click "Allow"
-5. Copy the **"Bot User OAuth Token"** (starts with `xoxb-`)
+1. In the application settings, go to **Bot**
+2. Click **"Reset Token"** to generate a bot token
+3. Copy the token — save it securely (e.g., `local-only/tokens/discord-bot-token.txt`)
+4. Enable **MESSAGE CONTENT INTENT** (toggle ON under Privileged Gateway Intents)
+5. Click "Save Changes"
 
-### 3c. Create a Channel or Get DM Channel ID
+### 3c. Invite Bot to Your Server
 
-**Option A: Dedicated channel**
-1. Create a channel like `#agent-updates` in your Slack workspace
-2. Invite the bot to the channel: `/invite @ExecAgent`
-3. Get the channel ID: right-click the channel name → "View channel details" → copy the Channel ID at the bottom
+1. Go to **OAuth2 → URL Generator**
+2. Select scope: **bot**
+3. Select permissions: **Send Messages**, **Embed Links**, **Read Message History**
+4. Copy the generated URL and open it in your browser
+5. Select your Discord server and click **"Authorize"**
 
-**Option B: Direct messages**
-1. Open a DM with the bot
-2. Get the DM channel ID from the URL (it's the `D...` or `C...` string after `/messages/`)
+### 3d. Get Channel ID
+
+1. In Discord, go to **Settings → App Settings → Advanced → Enable Developer Mode**
+2. Right-click the channel you want the bot to post in → **"Copy Channel ID"**
+
+### 3e. (Optional) DM Support
+
+The bot can also DM users directly if it shares a server with them. Set `DISCORD_DM_USER_ID` in `.env.executive` to the target user's Discord ID (right-click user → "Copy User ID").
 
 ---
 
@@ -182,16 +184,18 @@ IDENTITY_ENABLED=true
 
 # Gmail Configuration
 GMAIL_ENABLED=true
-AGENT_EMAIL=exec.agent.jackjin@gmail.com      # Your agent's Gmail
+AGENT_EMAIL=your-agent@gmail.com
+AGENT_DISPLAY_NAME=Your Agent Name
 GMAIL_CLIENT_ID=123456789-abc.apps.googleusercontent.com
 GMAIL_CLIENT_SECRET=GOCSPX-xxxxxxxxxxxx
 GMAIL_REFRESH_TOKEN=1//0xxxxxxxxxxxxxxxxx
 
-# Slack Configuration
-SLACK_ENABLED=true
-SLACK_BOT_TOKEN=xoxb-xxxxxxxxxxxx-xxxxxxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx
-SLACK_CHANNEL_ID=C0123456789                   # Channel or DM ID
-SLACK_MAX_MESSAGES_PER_HOUR=10                 # Throttle limit
+# Discord Configuration
+DISCORD_ENABLED=true
+DISCORD_BOT_TOKEN=your-bot-token
+DISCORD_CHANNEL_ID=123456789012345678          # Channel for notifications
+DISCORD_DM_USER_ID=123456789012345678          # (Optional) User ID for DMs
+DISCORD_MAX_MESSAGES_PER_HOUR=10               # Throttle limit
 
 # Inbox Checking
 INBOX_CHECK_INTERVAL=1                         # Check every N loop iterations
@@ -218,7 +222,7 @@ Your Notion integration is already configured from V1.2. To give the agent a nam
    - Any other pages you want the agent to update
 4. The agent's Notion updates will now show the agent's name instead of "Integration"
 
-> **Note:** The existing `NOTION_API_KEY` in `.env.executive` continues to work. The guest invitation is purely for attribution — Notion shows "Exec Agent commented" instead of anonymous API writes.
+> **Note:** The existing `NOTION_API_KEY` in `.env.executive` continues to work. The guest invitation is purely for attribution — Notion shows "Your Agent Name commented" instead of anonymous API writes.
 
 ---
 
@@ -236,12 +240,13 @@ pm2 logs executive-loop --lines 50
 # Look for: [IDENTITY] Gmail check: 1 unread email(s)
 ```
 
-### Test Slack
+### Test Discord
 
 ```bash
-# The agent sends Slack messages when goals complete or block.
-# Create a test goal and watch for the Slack notification.
-# Or check logs for: [IDENTITY] Slack message sent
+# Run the E2E test:
+node tests/e2e/executive-accounts/discord-test.mjs
+# Or create a test goal and watch for the Discord notification.
+# Check logs for: [DETERMINISTIC] Discord: Sent webhook message
 ```
 
 ### Kill Switches
@@ -252,7 +257,7 @@ If anything goes wrong, you can disable individual channels without stopping the
 # In .env.executive:
 IDENTITY_ENABLED=false    # Disables ALL identity features
 GMAIL_ENABLED=false       # Disables only Gmail
-SLACK_ENABLED=false       # Disables only Slack
+DISCORD_ENABLED=false     # Disables only Discord
 ```
 
 ---
@@ -260,10 +265,10 @@ SLACK_ENABLED=false       # Disables only Slack
 ## Security Notes
 
 - **Refresh tokens don't expire** unless revoked — no re-auth needed
-- **Bot tokens are workspace-scoped** — they can't access other workspaces
+- **Bot tokens are server-scoped** — they only work in servers the bot has joined
 - All identity credentials live in `.env.executive` (Tier 1) — they **never** reach worker agents
 - The agent can only read/send from **its own** email address
-- Slack messages are throttled to 10/hour by default
+- Discord messages are throttled to 10/hour by default
 - All identity actions are logged to the executive ledger
 
 ---
@@ -273,8 +278,8 @@ SLACK_ENABLED=false       # Disables only Slack
 Once configured, the executive loop automatically:
 
 1. **Phase 0.5 (Inbox Check):** Reads unread emails, parses intent (priority changes, new goals, approvals), processes them like needs-you.md responses
-2. **On goal blocked:** Sends you a Slack DM and/or email with the blocker details
-3. **On goal completed:** Posts a summary to `#agent-updates`
+2. **On goal blocked:** Sends you a Discord message and/or email with the blocker details
+3. **On goal completed:** Posts a summary to the configured Discord channel
 4. **Weekly:** Sends a summary email of what was accomplished
 
 You can email the agent instructions like:
