@@ -698,9 +698,7 @@ export async function spawnWorker(
       console.log(`[Worker] Plan-mode: tools restricted to read-only: ${allowedTools.join(', ')}`);
     }
 
-    // TODO: loop-until-progress — add a loop wrapper around the worker execution
-    // that checks for progress after each iteration and continues while making gains.
-    // For now, uses standard single-shot execution.
+    // loop-until-progress — handled at executive-loop level (Phase 4 re-execution loop)
   }
 
   // Log worker start with full context
