@@ -6,7 +6,6 @@
  * and actual AI-powered task execution.
  */
 
-import { query, type SDKMessage, type SDKResultMessage } from '@anthropic-ai/claude-agent-sdk';
 import { mkdirSync, existsSync, copyFileSync, cpSync, createWriteStream, readFileSync, writeFileSync } from 'fs';
 import { execSync } from 'child_process';
 import os from 'os';
@@ -17,6 +16,11 @@ import { classifyIntent } from '../intelligence/intent-classifier.js';
 import { selectStrategy } from '../intelligence/strategy-selector.js';
 import { findProjectBySlug } from '../../deterministic/project-registry.js';
 import { getAvailableAppCredentialNames, checkWorkerEnvForLeaks } from '../../deterministic/credential-tiers.js';
+import {
+  getAgentWorkerProvider,
+  resolveWorkerModel,
+  type AgentWorkerMessage,
+} from '../../core/vendor/index.js';
 import yaml from 'js-yaml';
 
 // Agent outputs directory - where workers create their projects
@@ -675,7 +679,7 @@ export async function spawnWorker(
       logger.log(`Strategy: ${strategySelection.strategy.name} (${strategySelection.strategy.id})`);
     }
   }
-  const model = process.env.MODEL || 'claude-sonnet-4-5';
+  const model = resolveWorkerModel();
 
   // Determine allowed tools
   // Task is included by default for all workers (subagent delegation to task-researcher, code-validator).
@@ -726,16 +730,15 @@ export async function spawnWorker(
     //   Workers navigate to their project subdirectory via prompt instructions.
     const workerCwd = (isSelfEnhance || isSkillBuild) ? projectPath : AGENT_OUTPUTS_BASE;
 
-    // CRITICAL: settingSources enables skill/agent loading from user + project
-    const stream = query({
+    // Spawn worker via the configured vendor provider (Claude Agent SDK, Codex SDK, etc.)
+    const provider = getAgentWorkerProvider();
+    const stream = provider.spawn({
       prompt,
-      options: {
-        model,
-        maxTurns: contract.max_turns,
-        cwd: workerCwd,
-        allowedTools: allowedTools,
-        settingSources: ['user', 'project'] as const,  // REQUIRED for skills and agents
-      },
+      model,
+      maxTurns: contract.max_turns,
+      cwd: workerCwd,
+      allowedTools: allowedTools,
+      settingSources: ['user', 'project'],
     });
 
     // Process the streaming response with a wall-clock timeout.
@@ -744,38 +747,27 @@ export async function spawnWorker(
 
     const streamingWork = async () => {
       for await (const message of stream) {
-        const msg = message as SDKMessage;
+        const msg: AgentWorkerMessage = message;
 
         // Log all messages for traceability
-        logger.log(`[MSG] type=${msg.type} ${JSON.stringify(msg).slice(0, 500)}`);
+        logger.log(`[MSG] type=${msg.type} ${JSON.stringify(msg.raw).slice(0, 500)}`);
 
         // Handle different message types
         if (msg.type === 'assistant') {
           turnCount++;
           logger.log(`[TURN ${turnCount}] Assistant response`);
-          // Extract text content from assistant messages
-          if ('content' in msg && Array.isArray(msg.content)) {
-            for (const block of msg.content) {
-              if (block.type === 'text' && 'text' in block) {
-                outputs.push(block.text);
-              }
-            }
+          if (msg.text) {
+            outputs.push(msg.text);
           }
         } else if (msg.type === 'result') {
-          // Handle final result message
-          const resultMsg = msg as SDKResultMessage;
-
-          if (resultMsg.subtype === 'success') {
-            // Collect the final result
-            if ('result' in resultMsg && resultMsg.result) {
-              outputs.push(String(resultMsg.result));
+          if (msg.resultSuccess) {
+            if (msg.text) {
+              outputs.push(msg.text);
             }
           } else {
             // Handle error results
-            errors.push(`Worker failed with: ${resultMsg.subtype}`);
-
-            if ('errors' in resultMsg && Array.isArray(resultMsg.errors)) {
-              errors.push(...resultMsg.errors.map(String));
+            if (msg.resultErrors) {
+              errors.push(...msg.resultErrors);
             }
           }
         }
@@ -842,23 +834,10 @@ export async function spawnWorker(
 }
 
 /**
- * Validate that authentication is configured for the Agent SDK
+ * Validate that authentication is configured for the active worker vendor.
+ * Delegates to the vendor provider's own auth validation.
  */
 export function validateAuth(): { valid: boolean; method: string | null; error: string | null } {
-  const oauthToken = process.env.CLAUDE_CODE_OAUTH_TOKEN;
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-
-  if (oauthToken) {
-    return { valid: true, method: 'OAuth Token', error: null };
-  }
-
-  if (apiKey) {
-    return { valid: true, method: 'API Key', error: null };
-  }
-
-  return {
-    valid: false,
-    method: null,
-    error: 'No authentication credentials found. Set CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY.',
-  };
+  const provider = getAgentWorkerProvider();
+  return provider.validateAuth();
 }

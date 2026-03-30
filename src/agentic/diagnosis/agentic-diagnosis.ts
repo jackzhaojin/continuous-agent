@@ -7,12 +7,12 @@
  * Only escalate to human if the diagnostic agent determines it's truly blocked.
  */
 
-import { query, type SDKMessage, type SDKResultMessage } from '@anthropic-ai/claude-agent-sdk';
 import { readFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 import os from 'os';
 import type { WorkItem, WorkerResult } from '../../core/types.js';
+import { getChatCompletionProvider, resolveChatModel } from '../../core/vendor/index.js';
 
 const AGENT_BASE = process.env.AGENT_PATH || path.join(os.homedir(), 'dev', 'continuous-agent');
 const LEDGERS_DIR = path.join(AGENT_BASE, 'ledgers');
@@ -183,37 +183,20 @@ export async function diagnoseFailure(
 
     console.log(`[Diagnosis] Spawning diagnostic agent with ${validationReports.length} validation reports and ${workerLogs.length} worker logs`);
 
-    // Spawn diagnostic agent using Agent SDK
-    const model = process.env.MODEL || 'claude-sonnet-4-5';
-    const stream = query({
-      prompt,
-      options: {
-        model,
-        maxTurns: 10, // Diagnostic agent needs few turns
-        cwd: AGENT_BASE, // Run in agent base directory
-        allowedTools: ['Read', 'Glob', 'Grep'], // Can read files but not modify
-      },
+    // Spawn diagnostic agent via configured chat vendor
+    // Evidence is already gathered and embedded in the prompt, so a single-turn
+    // chat completion is sufficient (no tool use needed).
+    const model = resolveChatModel();
+    const chatProvider = getChatCompletionProvider();
+
+    console.log(`[Diagnosis] Using ${chatProvider.vendorName} with model ${model}`);
+
+    const result = await chatProvider.complete({
+      model,
+      messages: [{ role: 'user', content: prompt }],
     });
 
-    let diagnosis = '';
-    for await (const message of stream) {
-      const msg = message as SDKMessage;
-
-      if (msg.type === 'assistant') {
-        if ('content' in msg && Array.isArray(msg.content)) {
-          for (const block of msg.content) {
-            if (block.type === 'text' && 'text' in block) {
-              diagnosis += block.text;
-            }
-          }
-        }
-      } else if (msg.type === 'result') {
-        const resultMsg = msg as SDKResultMessage;
-        if (resultMsg.subtype === 'success' && 'result' in resultMsg && resultMsg.result) {
-          diagnosis += String(resultMsg.result);
-        }
-      }
-    }
+    const diagnosis = result.text;
 
     // Parse JSON response from diagnostic agent
     try {

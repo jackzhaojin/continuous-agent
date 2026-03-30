@@ -9,8 +9,8 @@
 import path from 'path';
 import { readFile, readdir } from 'fs/promises';
 import { existsSync } from 'fs';
-import { query, type SDKMessage, type SDKResultMessage } from '@anthropic-ai/claude-agent-sdk';
 import type { WorkItem, WorkStep } from '../../core/types.js';
+import { getChatCompletionProvider, resolveChatModel } from '../../core/vendor/index.js';
 import { createStepsFile, writeStepsJson, stepsJsonExists } from '../../deterministic/steps-json-handler.js';
 import { logBreakdownProgress } from '../../deterministic/progress-log-writer.js';
 
@@ -224,37 +224,16 @@ export async function generateBreakdown(item: WorkItem): Promise<WorkStep[]> {
   const prompt = buildBreakdownPrompt(item, bundleContext, complexityEstimate);
 
   try {
-    const model = process.env.BREAKDOWN_MODEL || process.env.MODEL || 'claude-sonnet-4-5';
-    console.log(`[Breakdown] Spawning LLM breakdown agent for "${item.title}" using ${model} (complexity: ${complexityEstimate} turns)`);
+    const model = resolveChatModel('BREAKDOWN_MODEL');
+    const chatProvider = getChatCompletionProvider();
+    console.log(`[Breakdown] Spawning LLM breakdown via ${chatProvider.vendorName} for "${item.title}" using ${model} (complexity: ${complexityEstimate} turns)`);
 
-    const stream = query({
-      prompt,
-      options: {
-        model,
-        maxTurns: 1, // Single-turn: just produce JSON
-        allowedTools: [], // No tools needed for breakdown
-      },
+    const result = await chatProvider.complete({
+      model,
+      messages: [{ role: 'user', content: prompt }],
     });
 
-    let response = '';
-    for await (const message of stream) {
-      const msg = message as SDKMessage;
-
-      if (msg.type === 'assistant') {
-        if ('content' in msg && Array.isArray(msg.content)) {
-          for (const block of msg.content) {
-            if (block.type === 'text' && 'text' in block) {
-              response += block.text;
-            }
-          }
-        }
-      } else if (msg.type === 'result') {
-        const resultMsg = msg as SDKResultMessage;
-        if (resultMsg.subtype === 'success' && 'result' in resultMsg && resultMsg.result) {
-          response += String(resultMsg.result);
-        }
-      }
-    }
+    const response = result.text;
 
     // Parse JSON from response (may have markdown fences or extra text)
     const jsonMatch = response.match(/\[[\s\S]*\]/);
