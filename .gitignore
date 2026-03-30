@@ -45,6 +45,9 @@ workspace/drafts/
 workspace/ondeck/
 workspace/in-progress/
 
+# Dashboard runtime data
+workspace/dashboard-data.json
+
 # Temporary files
 *.tmp
 *.temp
