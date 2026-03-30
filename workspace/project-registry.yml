@@ -152,3 +152,12 @@ projects:
       - git.commit
       - npm.install
     reusable: true
+  - slug: v2-smoke-test-hello-world
+    title: V2 Smoke Test — Hello World
+    output_path: /Users/jackjin/dev/ai-sandbox/projects/node/2026-03-30/1774845112711
+    completed: "2026-03-30"
+    category: node
+    capabilities:
+      - git.commit
+      - npm.install
+    reusable: true

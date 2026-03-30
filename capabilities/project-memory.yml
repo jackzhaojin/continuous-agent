@@ -192,3 +192,14 @@ projects:
       - npm.install
     features_built: []
     lessons: []
+  - id: goal-v2-smoke-test
+    name: V2 Smoke Test — Hello World
+    category: node
+    completed: "2026-03-30"
+    output_path: /Users/jackjin/dev/ai-sandbox/projects/node/2026-03-30/1774845112711
+    archive_path: /Users/jackjin/dev/continuous-agent/workspace/completed/v2-smoke-test
+    capabilities_exercised:
+      - git.commit
+      - npm.install
+    features_built: []
+    lessons: []
