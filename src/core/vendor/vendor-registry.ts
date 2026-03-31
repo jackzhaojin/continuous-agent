@@ -27,6 +27,12 @@
  *   CHAT_MODEL=gpt-4o
  *   OPENAI_API_KEY=sk-...
  *
+ *   # Use Kimi Wire for workers (bidirectional), Kimi for chat:
+ *   WORKER_VENDOR=kimi
+ *   CHAT_VENDOR=moonshot
+ *   CHAT_MODEL=kimi-k2.5
+ *   MOONSHOT_API_KEY=sk-...
+ *
  *   # All Claude (existing behavior, no config needed):
  *   MODEL=claude-sonnet-4-5
  */
@@ -39,6 +45,7 @@ import type {
 } from './types.js';
 import { ClaudeAgentWorkerProvider, ClaudeChatProvider } from './claude-agent-provider.js';
 import { CodexAgentWorkerProvider } from './codex-agent-provider.js';
+import { KimiWireAgentProvider } from './kimi-wire-provider.js';
 import { OpenAIChatProvider } from './openai-chat-provider.js';
 
 // ── Singleton Instances (lazy-initialized) ──────────────────────
@@ -86,6 +93,8 @@ export function resolveWorkerModel(): string {
   switch (vendor) {
     case 'codex':
       return 'o3';  // Codex default model
+    case 'kimi':
+      return 'kimi-k2.5';
     case 'claude':
     default:
       return 'claude-sonnet-4-5';
@@ -170,6 +179,8 @@ function createAgentWorkerProvider(vendor: AgentWorkerVendor): AgentWorkerProvid
   switch (vendor) {
     case 'codex':
       return new CodexAgentWorkerProvider();
+    case 'kimi':
+      return new KimiWireAgentProvider();
     case 'claude':
     default:
       return new ClaudeAgentWorkerProvider();

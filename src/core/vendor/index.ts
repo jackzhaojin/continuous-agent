@@ -32,6 +32,8 @@ export type {
 // Providers
 export { ClaudeAgentWorkerProvider, ClaudeChatProvider } from './claude-agent-provider.js';
 export { CodexAgentWorkerProvider } from './codex-agent-provider.js';
+export { KimiWireAgentProvider, KimiWireAgentProviderWithTools } from './kimi-wire-provider.js';
+export type { ExternalToolDefinition } from './kimi-wire-provider.js';
 export { OpenAIChatProvider } from './openai-chat-provider.js';
 
 // Registry
