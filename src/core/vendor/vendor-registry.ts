@@ -29,6 +29,7 @@
  *
  *   # Use Kimi Wire for workers (bidirectional), Kimi for chat:
  *   WORKER_VENDOR=kimi
+ *   KIMI_MODE=wire              # 'wire' (default, SDK) or 'cli' (--print stream-json)
  *   CHAT_VENDOR=moonshot
  *   CHAT_MODEL=kimi-k2.5
  *   MOONSHOT_API_KEY=sk-...
@@ -46,6 +47,7 @@ import type {
 import { ClaudeAgentWorkerProvider, ClaudeChatProvider } from './claude-agent-provider.js';
 import { CodexAgentWorkerProvider } from './codex-agent-provider.js';
 import { KimiWireAgentProvider } from './kimi-wire-provider.js';
+import { KimiCliAgentProvider } from './kimi-cli-provider.js';
 import { OpenAIChatProvider } from './openai-chat-provider.js';
 
 // ── Singleton Instances (lazy-initialized) ──────────────────────
@@ -92,9 +94,9 @@ export function resolveWorkerModel(): string {
   // Vendor-specific defaults
   switch (vendor) {
     case 'codex':
-      return 'o3';  // Codex default model
+      return ''; // Let Codex CLI use its default (ChatGPT auth doesn't support all models)
     case 'kimi':
-      return 'kimi-k2.5';
+      return ''; // Let kimi CLI use its configured default model
     case 'claude':
     default:
       return 'claude-sonnet-4-5';
@@ -166,6 +168,41 @@ export function validateAllVendors(): {
 }
 
 /**
+ * Get a worker provider for a specific vendor, bypassing the cached singleton.
+ * Used for per-goal vendor overrides from PROMPT.md frontmatter.
+ * Priority: goalVendor > WORKER_VENDOR env > 'claude' default.
+ */
+export function getAgentWorkerProviderForVendor(goalVendor?: AgentWorkerVendor): AgentWorkerProvider {
+  if (goalVendor) {
+    const provider = createAgentWorkerProvider(goalVendor);
+    console.log(`[Vendor] Per-goal worker provider: ${provider.vendorName} (${provider.vendorId})`);
+    return provider;
+  }
+  // Fall back to the cached global provider
+  return getAgentWorkerProvider();
+}
+
+/**
+ * Resolve the model name for a specific vendor.
+ * Used alongside per-goal vendor overrides.
+ */
+export function resolveWorkerModelForVendor(goalVendor?: AgentWorkerVendor): string {
+  const vendor = goalVendor || (process.env.WORKER_VENDOR || 'claude') as AgentWorkerVendor;
+  const model = process.env.MODEL;
+  if (model) return model;
+
+  switch (vendor) {
+    case 'codex':
+      return ''; // Let Codex CLI use its default
+    case 'kimi':
+      return ''; // Let kimi CLI use its configured default
+    case 'claude':
+    default:
+      return 'claude-sonnet-4-5';
+  }
+}
+
+/**
  * Reset cached providers (useful for testing or config changes).
  */
 export function resetProviders(): void {
@@ -179,8 +216,13 @@ function createAgentWorkerProvider(vendor: AgentWorkerVendor): AgentWorkerProvid
   switch (vendor) {
     case 'codex':
       return new CodexAgentWorkerProvider();
-    case 'kimi':
+    case 'kimi': {
+      const kimiMode = process.env.KIMI_MODE || 'wire';
+      if (kimiMode === 'cli') {
+        return new KimiCliAgentProvider();
+      }
       return new KimiWireAgentProvider();
+    }
     case 'claude':
     default:
       return new ClaudeAgentWorkerProvider();

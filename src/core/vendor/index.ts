@@ -34,13 +34,16 @@ export { ClaudeAgentWorkerProvider, ClaudeChatProvider } from './claude-agent-pr
 export { CodexAgentWorkerProvider } from './codex-agent-provider.js';
 export { KimiWireAgentProvider, KimiWireAgentProviderWithTools } from './kimi-wire-provider.js';
 export type { ExternalToolDefinition } from './kimi-wire-provider.js';
+export { KimiCliAgentProvider } from './kimi-cli-provider.js';
 export { OpenAIChatProvider } from './openai-chat-provider.js';
 
 // Registry
 export {
   getAgentWorkerProvider,
+  getAgentWorkerProviderForVendor,
   getChatCompletionProvider,
   resolveWorkerModel,
+  resolveWorkerModelForVendor,
   resolveChatModel,
   validateAllVendors,
   resetProviders,

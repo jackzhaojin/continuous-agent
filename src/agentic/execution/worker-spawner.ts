@@ -17,8 +17,8 @@ import { selectStrategy } from '../intelligence/strategy-selector.js';
 import { findProjectBySlug } from '../../deterministic/project-registry.js';
 import { getAvailableAppCredentialNames, checkWorkerEnvForLeaks } from '../../deterministic/credential-tiers.js';
 import {
-  getAgentWorkerProvider,
-  resolveWorkerModel,
+  getAgentWorkerProviderForVendor,
+  resolveWorkerModelForVendor,
   type AgentWorkerMessage,
 } from '../../core/vendor/index.js';
 import yaml from 'js-yaml';
@@ -679,7 +679,7 @@ export async function spawnWorker(
       logger.log(`Strategy: ${strategySelection.strategy.name} (${strategySelection.strategy.id})`);
     }
   }
-  const model = resolveWorkerModel();
+  const model = resolveWorkerModelForVendor(workItem?.worker_vendor);
 
   // Determine allowed tools
   // Task is included by default for all workers (subagent delegation to task-researcher, code-validator).
@@ -728,8 +728,8 @@ export async function spawnWorker(
     //   Workers navigate to their project subdirectory via prompt instructions.
     const workerCwd = (isSelfEnhance || isSkillBuild) ? projectPath : AGENT_OUTPUTS_BASE;
 
-    // Spawn worker via the configured vendor provider (Claude Agent SDK, Codex SDK, etc.)
-    const provider = getAgentWorkerProvider();
+    // Spawn worker via vendor provider — per-goal override > env config > claude default
+    const provider = getAgentWorkerProviderForVendor(workItem?.worker_vendor);
     const stream = provider.spawn({
       prompt,
       model,
@@ -836,6 +836,6 @@ export async function spawnWorker(
  * Delegates to the vendor provider's own auth validation.
  */
 export function validateAuth(): { valid: boolean; method: string | null; error: string | null } {
-  const provider = getAgentWorkerProvider();
+  const provider = getAgentWorkerProviderForVendor();
   return provider.validateAuth();
 }

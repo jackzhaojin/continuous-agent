@@ -130,15 +130,23 @@ export class ClaudeChatProvider implements ChatCompletionProvider {
 
 function normalizeClaudeMessage(msg: SDKMessage): AgentWorkerMessage {
   if (msg.type === 'assistant') {
-    let text = '';
+    const parts: string[] = [];
     if ('content' in msg && Array.isArray(msg.content)) {
       for (const block of msg.content) {
         if (block.type === 'text' && 'text' in block) {
-          text += block.text;
+          parts.push(block.text);
+        } else if (block.type === 'thinking' && 'thinking' in block) {
+          parts.push(`[thinking] ${(block as { thinking: string }).thinking}`);
+        } else if (block.type === 'tool_use') {
+          const tb = block as { name: string; input: unknown };
+          parts.push(`[tool_call] ${tb.name}(${JSON.stringify(tb.input).slice(0, 200)})`);
+        } else if (block.type === 'tool_result') {
+          const tr = block as { content?: string; is_error?: boolean };
+          parts.push(`[tool_result] ${tr.is_error ? 'ERROR: ' : ''}${(tr.content || '').slice(0, 200)}`);
         }
       }
     }
-    return { type: 'assistant', text: text || undefined, raw: msg };
+    return { type: 'assistant', text: parts.join('\n') || undefined, raw: msg };
   }
 
   if (msg.type === 'result') {
@@ -166,6 +174,24 @@ function normalizeClaudeMessage(msg: SDKMessage): AgentWorkerMessage {
     };
   }
 
-  // system, user, or other message types
+  // system, user, or other message types — extract tool_result content blocks
+  if (msg.type === 'user' && 'content' in msg && Array.isArray(msg.content)) {
+    const parts: string[] = [];
+    for (const block of msg.content) {
+      if (block.type === 'tool_result') {
+        const tr = block as { tool_use_id?: string; content?: string | Array<{ text?: string }>; is_error?: boolean };
+        const content = typeof tr.content === 'string'
+          ? tr.content
+          : Array.isArray(tr.content)
+            ? tr.content.map(c => c.text || '').join('')
+            : '';
+        parts.push(`[tool_result] ${tr.is_error ? 'ERROR: ' : ''}${content.slice(0, 500)}`);
+      }
+    }
+    if (parts.length > 0) {
+      return { type: 'assistant', text: parts.join('\n'), raw: msg };
+    }
+  }
+
   return { type: (msg.type as 'system' | 'user') || 'other', raw: msg };
 }

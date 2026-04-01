@@ -66,7 +66,8 @@ export class KimiWireAgentProvider implements AgentWorkerProvider {
     const { createSession } = KimiSDK;
 
     // Resolve configuration from env + config
-    const model = config.model || process.env.KIMI_MODEL || 'kimi-k2.5';
+    // Omit model to use CLI default from ~/.config/kimi/config.toml
+    const model = process.env.KIMI_MODEL || config.model || undefined;
     const executable = process.env.KIMI_EXECUTABLE || 'kimi';
     const thinking = process.env.KIMI_THINKING === 'true';
     // Workers auto-approve by default (equivalent to Claude's --dangerously-skip-permissions)
@@ -128,19 +129,13 @@ export class KimiWireAgentProvider implements AgentWorkerProvider {
   }
 
   validateAuth(): AuthValidation {
+    // Kimi CLI handles its own authentication via `kimi login`.
+    // We trust the local login session — no API key required.
     const apiKey = process.env.MOONSHOT_API_KEY;
-    if (apiKey) {
-      return { valid: true, method: 'Moonshot API Key', error: null };
-    }
-
-    // Note: Could also check `isLoggedIn()` from the SDK, but that requires
-    // synchronous import which doesn't work well with ESM. The API key check
-    // above is sufficient for validation.
-
     return {
-      valid: false,
-      method: null,
-      error: 'No Kimi authentication found. Set MOONSHOT_API_KEY or run `kimi login`.',
+      valid: true,
+      method: apiKey ? 'Moonshot API Key' : 'Kimi CLI Login',
+      error: null,
     };
   }
 }
@@ -186,7 +181,8 @@ export class KimiWireAgentProviderWithTools extends KimiWireAgentProvider {
 
     const { createSession } = KimiSDK;
 
-    const model = config.model || process.env.KIMI_MODEL || 'kimi-k2.5';
+    // Omit model to use CLI default from ~/.config/kimi/config.toml
+    const model = process.env.KIMI_MODEL || config.model || undefined;
     const executable = process.env.KIMI_EXECUTABLE || 'kimi';
     const thinking = process.env.KIMI_THINKING === 'true';
     const yoloMode = process.env.KIMI_YOLO_MODE !== 'false';

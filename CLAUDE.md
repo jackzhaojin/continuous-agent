@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-A continuously-running autonomous agent that finds and executes work without waiting for human prompts. It runs 24/7 via PM2, picks goals from a prioritized queue, spawns Claude Agent SDK workers, validates results, and moves to the next task. Human interaction happens asynchronously via `workspace/needs-you.md`.
+A continuously-running autonomous agent that finds and executes work without waiting for human prompts. It runs 24/7 via PM2, picks goals from a prioritized queue, spawns workers via a multi-vendor abstraction layer (Claude Agent SDK, OpenAI Codex SDK, or Kimi CLI/Wire), validates results, and moves to the next task. Human interaction happens asynchronously via `workspace/needs-you.md`.
 
 ## Build & Run
 
@@ -27,6 +27,7 @@ pm2 start ecosystem.config.cjs    # Production (requires build first)
 - Import paths need `.js` extension (`'./types.js'` even for `.ts` files)
 - No test framework -- validation is done through runtime verifiers, not unit tests
 - Ad-hoc tests live in `tests/adhoc/` and run via `npx tsx tests/adhoc/<file>.ts`
+- E2E vendor tests: `npx tsx tests/e2e/vendor-workers/<test>.ts` (Claude, Codex, Kimi wire, Kimi CLI, registry)
 
 ## Architecture
 
@@ -47,6 +48,30 @@ Logging tags operations as `[AGENTIC]` or `[DETERMINISTIC]` for debugging.
 - `gmail-client.ts` -- OAuth2 refresh token flow, email fetch/send/archive, intent parsing
 - `discord-client.ts` -- Webhook-based notifications with throttling
 - `inbox-checker.ts` -- Phase 0.5: fetches unread emails, queues actionable intents
+
+### Vendor Abstraction Layer (v2.1)
+
+`src/core/vendor/` -- Multi-vendor LLM support for workers and chat completions.
+
+Two interfaces:
+- **`AgentWorkerProvider`** -- Full agentic execution (tools, file editing, code execution)
+- **`ChatCompletionProvider`** -- Simple text-in/text-out LLM calls (breakdown, diagnosis)
+
+Worker vendors (`WORKER_VENDOR` env):
+
+| Vendor | Provider | Auth |
+|--------|----------|------|
+| `claude` (default) | Claude Agent SDK `query()` | `CLAUDE_CODE_OAUTH_TOKEN` |
+| `codex` | OpenAI Codex SDK threads | `codex login` (ChatGPT) |
+| `kimi` | Wire SDK or CLI stream-json | `kimi login` (CLI session) |
+
+Kimi has two modes (`KIMI_MODE` env): `wire` (default, `@moonshot-ai/kimi-agent-sdk`, bidirectional) or `cli` (`--print --output-format=stream-json`, simpler, cleaner logs).
+
+**Per-goal vendor override:** Add `worker_vendor: codex` (or `kimi`) to PROMPT.md frontmatter. Priority: goal frontmatter > `WORKER_VENDOR` env > `claude` default.
+
+All providers normalize output to `AgentWorkerMessage` with structured `[tool_call]`, `[tool_result]`, and `[thinking]` prefixes in text for uniform logging.
+
+**Reference POCs:** `references/poc/{claude,codex,kimi}/` contain standalone proof-of-concept scripts.
 
 ### Executive Loop Phases
 
@@ -106,7 +131,7 @@ Three physically separated tiers:
 | 2 - Worker | `.env.worker` | Claude SDK auth (OAuth token) |
 | 3 - Application | `.env.app` | App credentials (DB, storage) with `APP_` prefix |
 
-Tier 1 keys never reach workers. Auth is OAuth-first (`CLAUDE_CODE_OAUTH_TOKEN`).
+Tier 1 keys never reach workers. Auth is OAuth-first (`CLAUDE_CODE_OAUTH_TOKEN`). Codex and Kimi authenticate via their respective CLI logins (`codex login`, `kimi login`) -- no API keys needed for worker execution.
 
 Loading order: `.env.executive` -> `.env.worker` -> `.env` (legacy fallback). Worker spawner copies `.env.worker` to `ai-sandbox/.env` and validates no Tier 1 key leakage.
 
@@ -127,6 +152,8 @@ DISCORD_ENABLED=true           # Discord notifications
 | What | Where |
 |------|-------|
 | Executive loop | `src/core/executive-loop.ts` |
+| Vendor registry | `src/core/vendor/vendor-registry.ts` |
+| Vendor types | `src/core/vendor/types.ts` |
 | Worker spawner | `src/agentic/execution/worker-spawner.ts` |
 | Work selector | `src/agentic/work-selection/work-selector.ts` |
 | Goal scanner | `src/agentic/work-selection/goal-scanner.ts` |

@@ -39,9 +39,9 @@ export class CodexAgentWorkerProvider implements AgentWorkerProvider {
     const { Codex } = CodexSDK;
 
     // Build Codex configuration
+    // Only pass model if explicitly set and non-empty — ChatGPT auth doesn't support
+    // all models (e.g., 'o3' requires API key). Omitting lets Codex use its default.
     const codexConfig: Record<string, string> = {};
-
-    // Map model override if provided
     if (config.model) {
       codexConfig['model'] = config.model;
     }
@@ -106,17 +106,71 @@ interface CodexStreamEvent {
 
 function normalizeCodexEvent(event: CodexStreamEvent): AgentWorkerMessage {
   if (event.type === 'item.completed' && event.item) {
+    const item = event.item;
+    const itemType = item.type;
+
+    // Extract structured text based on item type
+    if (itemType === 'agent_message') {
+      const text = typeof item.content === 'string'
+        ? item.content
+        : Array.isArray(item.content)
+          ? (item.content as Array<{ text?: string }>).map(c => c.text || '').join('')
+          : JSON.stringify(item);
+      return { type: 'assistant', text, raw: event };
+    }
+
+    if (itemType === 'reasoning') {
+      const summary = typeof item.summary === 'string' ? item.summary : JSON.stringify(item);
+      return { type: 'assistant', text: `[thinking] ${summary}`, raw: event };
+    }
+
+    if (itemType === 'command_execution') {
+      const cmd = (item.command || item.args || '') as string;
+      const exit = item.exit_code ?? item.exitCode ?? '?';
+      const output = ((item.output || '') as string).slice(0, 300);
+      return {
+        type: 'assistant',
+        text: `[tool_call] shell(${cmd})\n[tool_result] exit=${exit} ${output}`,
+        raw: event,
+      };
+    }
+
+    if (itemType === 'file_change') {
+      const action = item.action || item.status || 'change';
+      const file = item.path || item.file || 'unknown';
+      return {
+        type: 'assistant',
+        text: `[tool_call] file_${action}(${file})`,
+        raw: event,
+      };
+    }
+
+    // Fallback for other item types (mcp_tool_call, web_search, etc.)
     return {
       type: 'assistant',
-      text: typeof event.item === 'object' ? JSON.stringify(event.item) : String(event.item),
+      text: `[${itemType}] ${JSON.stringify(item).slice(0, 300)}`,
       raw: event,
     };
   }
 
   if (event.type === 'turn.completed') {
+    const usage = event.usage as { input_tokens?: number; output_tokens?: number } | undefined;
+    const usageText = usage
+      ? ` (input=${usage.input_tokens || 0} output=${usage.output_tokens || 0})`
+      : '';
     return {
       type: 'result',
+      text: `Turn completed${usageText}`,
       resultSuccess: true,
+      raw: event,
+    };
+  }
+
+  if (event.type === 'turn.failed') {
+    return {
+      type: 'result',
+      resultSuccess: false,
+      resultErrors: [`Codex turn failed: ${JSON.stringify(event).slice(0, 500)}`],
       raw: event,
     };
   }

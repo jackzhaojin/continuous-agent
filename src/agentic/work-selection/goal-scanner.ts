@@ -331,6 +331,9 @@ async function bundleToWorkItemAsync(bundle: GoalBundle): Promise<WorkItem> {
     source_project: source_project || undefined, // V1.2: Multi-project access
     max_turns: frontmatter.max_turns ? Number(frontmatter.max_turns) : undefined,
     execution_pattern: (frontmatter.execution_pattern as ExecutionPattern) || undefined, // V2.0: Override from PROMPT.md
+    worker_vendor: (['claude', 'codex', 'kimi'].includes(frontmatter.worker_vendor as string)
+      ? frontmatter.worker_vendor as 'claude' | 'codex' | 'kimi'
+      : undefined), // V2.1: Per-goal vendor override
   };
 }
 

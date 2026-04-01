@@ -113,6 +113,10 @@ export interface WorkItem {
   // V2.0: Execution pattern override from PROMPT.md frontmatter
   // When set, takes highest precedence in pattern resolution (over playbook default)
   execution_pattern?: ExecutionPattern;
+
+  // V2.1: Per-goal worker vendor override from PROMPT.md frontmatter
+  // Priority: goal frontmatter > WORKER_VENDOR env > 'claude' default
+  worker_vendor?: 'claude' | 'codex' | 'kimi';
 }
 
 /**
