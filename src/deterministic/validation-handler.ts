@@ -108,20 +108,37 @@ export async function validateWork(
       .filter((v) => v.result === 'FAIL')
       .map((v) => v.verifier_id);
 
-    const hasBlockingFailures = failedVerifiers.includes('git_status_clean');
+    const passRatio = summary.pass_count / (summary.pass_count + summary.fail_count);
 
-    if (overallStatus === 'PARTIAL' && !hasBlockingFailures) {
+    // Blocking verifiers: if any of these fail, the goal cannot pass
+    const blockingVerifiers = ['git_status_clean', 'node_build', 'node_install'];
+    const hasBlockingFailures = failedVerifiers.some(v => blockingVerifiers.includes(v));
+
+    // Require worker success AND reasonable pass ratio for partial pass
+    if (overallStatus === 'PARTIAL' && !hasBlockingFailures && result.success && passRatio >= 0.5) {
       logAgentic('  Partial pass - some optional verifiers failed');
-      log(`  Continuing despite minor issues`);
+      log(`  Pass ratio: ${(passRatio * 100).toFixed(0)}% (${summary.pass_count}/${summary.pass_count + summary.fail_count})`);
+      log(`  Advisory failures: ${failedVerifiers.join(', ')}`);
       return true;
     }
 
-    // If the worker itself reported success, treat verifier failures as advisory
-    // warnings. This prevents infinite retry loops for non-app tasks (demo
-    // videos, media production, research, etc.) where app-centric verifiers
-    // (node_build, docs_checklist, etc.) are inapplicable.
+    // Worker reported success but verifiers show critical failures — don't trust it
+    if (result.success && hasBlockingFailures) {
+      logAgentic('  Worker reported SUCCESS but blocking verifiers failed — rejecting');
+      log(`  Blocking failures: ${failedVerifiers.filter(v => blockingVerifiers.includes(v)).join(', ')}`);
+      return false;
+    }
+
+    // Worker reported success with no blocking failures but low pass ratio
+    if (result.success && !hasBlockingFailures && passRatio < 0.5) {
+      logAgentic('  Worker reported SUCCESS but too many verifiers failed — rejecting');
+      log(`  Pass ratio: ${(passRatio * 100).toFixed(0)}% (below 50% threshold)`);
+      return false;
+    }
+
+    // Worker reported success, no blocking failures, decent ratio — accept
     if (result.success) {
-      logAgentic('  Worker reported SUCCESS — treating verifier failures as advisory warnings');
+      logAgentic('  Worker reported SUCCESS — treating remaining verifier failures as advisory');
       if (failedVerifiers.length > 0) {
         log(`  Advisory verifier warnings: ${failedVerifiers.join(', ')}`);
       }

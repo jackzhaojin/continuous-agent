@@ -53,6 +53,8 @@ export class CodexAgentWorkerProvider implements AgentWorkerProvider {
     const thread = codex.startThread({
       workingDirectory: config.cwd,
       skipGitRepoCheck: true, // Workers may operate in non-git directories
+      sandboxMode: 'danger-full-access',
+      approvalPolicy: 'never',
     });
 
     // Use streaming API if available, otherwise fall back to run()

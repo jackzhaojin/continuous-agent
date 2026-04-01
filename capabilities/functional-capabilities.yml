@@ -365,7 +365,7 @@ capabilities:
   - id: comm.documentation
     name: Documentation
     description: Create clear, useful documentation for work performed
-    confidence: 41
+    confidence: 21
     maturity: Demonstrated
     scope:
       includes:
@@ -392,8 +392,8 @@ capabilities:
         - Copy-paste without context
         - Jargon without explanation
     evidence:
-      successes: 115
-      failures: 53
+      successes: 116
+      failures: 55
       last_success: null
       last_failure: null
       last_validated: '2026-04-01'
