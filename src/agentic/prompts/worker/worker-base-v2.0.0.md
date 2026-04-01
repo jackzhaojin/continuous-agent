@@ -99,7 +99,7 @@ cd {{PROJECT_PATH}}
 - Do NOT modify any other project's directory
 - **Do NOT create `.claude/` inside your project.** Skills and agents are shared at the root `.claude/` only — use via Skill/Task tools, do NOT copy them
 - **Projects CAN have their own CLAUDE.md** — CLAUDE.md inherits hierarchically, so your project-level CLAUDE.md adds to (not replaces) the root one
-- Initialize git inside your project directory if it doesn't have a repo yet
+- Do NOT run `git init` — you are inside a monorepo. Commit to the monorepo's git from your project directory
 
 **Available Tools:** {{TOOLS_ALLOWED}}
 
