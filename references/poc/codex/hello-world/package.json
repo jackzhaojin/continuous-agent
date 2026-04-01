@@ -1,5 +1,5 @@
 {
-  "name": "codex",
+  "name": "codex-hello-world",
   "version": "1.0.0",
   "description": "Minimal Codex SDK hello world",
   "main": "src/hello.js",
