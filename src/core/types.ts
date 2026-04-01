@@ -116,7 +116,7 @@ export interface WorkItem {
 
   // V2.1: Per-goal worker vendor override from PROMPT.md frontmatter
   // Priority: goal frontmatter > WORKER_VENDOR env > 'claude' default
-  worker_vendor?: 'claude' | 'codex' | 'kimi';
+  worker_vendor?: 'claude' | 'codex' | 'kimi' | 'kimi-cli' | 'kimi-wire';
 }
 
 /**

@@ -188,17 +188,17 @@ export function getAgentWorkerProviderForVendor(goalVendor?: AgentWorkerVendor):
  */
 export function resolveWorkerModelForVendor(goalVendor?: AgentWorkerVendor): string {
   const vendor = goalVendor || (process.env.WORKER_VENDOR || 'claude') as AgentWorkerVendor;
-  const model = process.env.MODEL;
-  if (model) return model;
 
   switch (vendor) {
     case 'codex':
-      return ''; // Let Codex CLI use its default
+      return ''; // Let Codex CLI use its default — MODEL env is Claude-specific
     case 'kimi':
-      return ''; // Let kimi CLI use its configured default
+    case 'kimi-cli':
+    case 'kimi-wire':
+      return ''; // Let kimi CLI use its configured default — MODEL env is Claude-specific
     case 'claude':
     default:
-      return 'claude-sonnet-4-5';
+      return process.env.MODEL || 'claude-sonnet-4-5';
   }
 }
 
@@ -216,6 +216,10 @@ function createAgentWorkerProvider(vendor: AgentWorkerVendor): AgentWorkerProvid
   switch (vendor) {
     case 'codex':
       return new CodexAgentWorkerProvider();
+    case 'kimi-cli':
+      return new KimiCliAgentProvider();
+    case 'kimi-wire':
+      return new KimiWireAgentProvider();
     case 'kimi': {
       const kimiMode = process.env.KIMI_MODE || 'wire';
       if (kimiMode === 'cli') {

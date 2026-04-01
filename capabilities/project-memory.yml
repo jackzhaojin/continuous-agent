@@ -203,3 +203,55 @@ projects:
       - npm.install
     features_built: []
     lessons: []
+  - id: goal-finance-dashboard-claude
+    name: Finance Dashboard (Claude)
+    category: react
+    completed: "2026-04-01"
+    output_path: /Users/jackjin/dev/ai-sandbox/projects/react/2026-03-31/finance-dashboard-claude
+    archive_path: /Users/jackjin/dev/continuous-agent/workspace/completed/finance-dashboard-claude
+    capabilities_exercised:
+      - deliver.react.component
+      - git.commit
+      - npm.install
+    features_built:
+      - "### 📊 What Was Built"
+      - "**Core Features Implemented:**"
+      - "- ✅ All 8 functional requirements implemented"
+      - "- **Created**: 28 files total"
+    lessons: []
+  - id: goal-finance-dashboard-codex
+    name: Finance Dashboard (Codex)
+    category: react
+    completed: "2026-04-01"
+    output_path: /Users/jackjin/dev/ai-sandbox/projects/react/2026-03-31/finance-dashboard-codex
+    archive_path: /Users/jackjin/dev/continuous-agent/workspace/completed/finance-dashboard-codex
+    capabilities_exercised:
+      - deliver.react.component
+      - git.commit
+      - npm.install
+    features_built: []
+    lessons: []
+  - id: goal-finance-dashboard-kimi-cli
+    name: Finance Dashboard (Kimi CLI)
+    category: react
+    completed: "2026-04-01"
+    output_path: /Users/jackjin/dev/ai-sandbox/projects/react/2026-03-31/finance-dashboard-kimi-cli
+    archive_path: /Users/jackjin/dev/continuous-agent/workspace/completed/finance-dashboard-kimi-cli
+    capabilities_exercised:
+      - deliver.react.component
+      - git.commit
+      - npm.install
+    features_built: []
+    lessons: []
+  - id: goal-finance-dashboard-kimi-wire
+    name: Finance Dashboard (Kimi Wire)
+    category: react
+    completed: "2026-04-01"
+    output_path: /Users/jackjin/dev/ai-sandbox/projects/react/2026-03-31/finance-dashboard-kimi-wire
+    archive_path: /Users/jackjin/dev/continuous-agent/workspace/completed/finance-dashboard-kimi-wire
+    capabilities_exercised:
+      - deliver.react.component
+      - git.commit
+      - npm.install
+    features_built: []
+    lessons: []

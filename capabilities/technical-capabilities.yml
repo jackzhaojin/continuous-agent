@@ -27,11 +27,11 @@ capabilities:
       - git_status_check
       - commit_exists
     evidence:
-      successes: 105
+      successes: 109
       failures: 104
       last_success: null
       last_failure: null
-      last_validated: '2026-03-30'
+      last_validated: '2026-04-01'
     common_failure_modes:
       - Attempting to commit without staging
       - Branch name conflicts
@@ -137,7 +137,7 @@ capabilities:
   - id: node.npm.install
     name: NPM Package Installation
     description: Install npm packages and manage dependencies
-    confidence: 100
+    confidence: 55
     maturity: Demonstrated
     scope:
       includes:
@@ -158,11 +158,11 @@ capabilities:
       - node_modules_exists
       - package_lock_updated
     evidence:
-      successes: 127
-      failures: 58
+      successes: 128
+      failures: 61
       last_success: null
       last_failure: null
-      last_validated: '2026-03-30'
+      last_validated: '2026-04-01'
     common_failure_modes:
       - Network connectivity issues
       - Peer dependency conflicts
@@ -173,7 +173,7 @@ capabilities:
   - id: node.npm.run_script
     name: NPM Script Execution
     description: Run npm scripts defined in package.json
-    confidence: 90
+    confidence: 25
     maturity: Demonstrated
     scope:
       includes:
@@ -192,11 +192,11 @@ capabilities:
       - script_exit_code
       - expected_output_patterns
     evidence:
-      successes: 262
-      failures: 235
+      successes: 267
+      failures: 242
       last_success: null
       last_failure: null
-      last_validated: '2026-03-30'
+      last_validated: '2026-04-01'
     common_failure_modes:
       - Missing dependencies
       - Script not found in package.json
@@ -207,7 +207,7 @@ capabilities:
   - id: nextjs.build.basic
     name: Next.js Basic Build
     description: Build Next.js applications for production
-    confidence: 55
+    confidence: 20
     maturity: Demonstrated
     scope:
       includes:
@@ -227,11 +227,11 @@ capabilities:
       - build_success
       - dot_next_directory_exists
     evidence:
-      successes: 34
-      failures: 135
+      successes: 35
+      failures: 138
       last_success: null
       last_failure: null
-      last_validated: '2026-03-30'
+      last_validated: '2026-04-01'
     common_failure_modes:
       - TypeScript type errors
       - ESLint errors blocking build

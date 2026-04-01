@@ -39,6 +39,8 @@ export function loadIdentityConfig(): IdentityConfig {
     gmailClientId: process.env.GMAIL_CLIENT_ID || '',
     gmailClientSecret: process.env.GMAIL_CLIENT_SECRET || '',
     discordWebhookUrl: process.env.DISCORD_WEBHOOK_URL || '',
+    discordBotToken: process.env.DISCORD_BOT_TOKEN || '',
+    discordDmUserId: process.env.DISCORD_DM_USER_ID || '',
     discordMaxMessagesPerHour: parseInt(process.env.DISCORD_MAX_MESSAGES_PER_HOUR || '10', 10),
     inboxCheckInterval: parseInt(process.env.INBOX_CHECK_INTERVAL || '1', 10),
   };

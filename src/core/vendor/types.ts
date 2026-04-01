@@ -122,11 +122,13 @@ export interface AuthValidation {
 
 /**
  * Supported agentic worker vendors.
- * 'claude' = Claude Agent SDK (default)
- * 'codex'  = OpenAI Codex SDK
- * 'kimi'   = Kimi Wire Protocol via @moonshot-ai/kimi-agent-sdk
+ * 'claude'    = Claude Agent SDK (default)
+ * 'codex'     = OpenAI Codex SDK
+ * 'kimi'      = Kimi (mode determined by KIMI_MODE env: 'wire' or 'cli')
+ * 'kimi-cli'  = Kimi CLI print mode (explicit per-goal override)
+ * 'kimi-wire' = Kimi Wire Protocol via @moonshot-ai/kimi-agent-sdk (explicit per-goal override)
  */
-export type AgentWorkerVendor = 'claude' | 'codex' | 'kimi';
+export type AgentWorkerVendor = 'claude' | 'codex' | 'kimi' | 'kimi-cli' | 'kimi-wire';
 
 /**
  * Supported chat completion vendors.

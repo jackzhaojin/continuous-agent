@@ -47,6 +47,12 @@ export interface IdentityConfig {
   /** Discord webhook URL (posts as agent display name) */
   discordWebhookUrl: string;
 
+  /** Discord bot token (for DM support) */
+  discordBotToken: string;
+
+  /** Discord user ID to send DMs to */
+  discordDmUserId: string;
+
   /** Max Discord messages per hour (throttle) */
   discordMaxMessagesPerHour: number;
 

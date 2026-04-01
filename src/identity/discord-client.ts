@@ -32,6 +32,84 @@ export function isDiscordEnabled(config?: IdentityConfig): boolean {
 }
 
 /**
+ * Check if Discord DM is enabled (bot token + user ID configured).
+ */
+export function isDiscordDmEnabled(config?: IdentityConfig): boolean {
+  const c = config || loadIdentityConfig();
+  return c.identityEnabled && c.discordEnabled && c.discordBotToken !== '' && c.discordDmUserId !== '';
+}
+
+// ── DM Support ──────────────────────────────────────────────────────
+
+/**
+ * Send a Discord DM via bot API.
+ * Opens a DM channel first, then sends the message.
+ * Returns true if sent, false if disabled/throttled/error.
+ */
+export async function sendDiscordDM(message: DiscordMessage, config?: IdentityConfig): Promise<boolean> {
+  const c = config || loadIdentityConfig();
+
+  if (!isDiscordDmEnabled(c)) {
+    return false;
+  }
+
+  if (isThrottled(c)) {
+    log(`  Discord DM: Throttled — ${messageTimestamps.length}/${c.discordMaxMessagesPerHour} messages in last hour`);
+    return false;
+  }
+
+  try {
+    const headers = {
+      Authorization: `Bot ${c.discordBotToken}`,
+      'Content-Type': 'application/json',
+    };
+
+    // Open DM channel
+    const dmRes = await fetch('https://discord.com/api/v10/users/@me/channels', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ recipient_id: c.discordDmUserId }),
+    });
+
+    if (!dmRes.ok) {
+      const text = await dmRes.text();
+      log(`  Discord DM: Failed to open channel — HTTP ${dmRes.status} ${text}`);
+      return false;
+    }
+
+    const dmChannel = await dmRes.json() as { id: string };
+
+    // Send the message
+    const payload: Record<string, unknown> = {
+      content: message.content,
+    };
+
+    if (message.embeds && message.embeds.length > 0) {
+      payload.embeds = message.embeds;
+    }
+
+    const msgRes = await fetch(`https://discord.com/api/v10/channels/${dmChannel.id}/messages`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+    });
+
+    if (!msgRes.ok) {
+      const text = await msgRes.text();
+      log(`  Discord DM: Failed to send — HTTP ${msgRes.status} ${text}`);
+      return false;
+    }
+
+    recordMessage();
+    logDeterministic('Discord: Sent DM');
+    return true;
+  } catch (error) {
+    log(`  Discord DM: Send error: ${error}`);
+    return false;
+  }
+}
+
+/**
  * Check if we've exceeded the throttle limit.
  * Cleans up timestamps older than 1 hour.
  */
@@ -134,6 +212,7 @@ export async function sendDiscordMessage(message: DiscordMessage, config?: Ident
 
 /**
  * Send a goal completion notification.
+ * Sends DM if configured, otherwise falls back to webhook.
  * Fire-and-forget: catches errors, never blocks the loop.
  */
 export async function sendCompletionNotification(
@@ -142,6 +221,8 @@ export async function sendCompletionNotification(
   outputPath?: string,
   config?: IdentityConfig
 ): Promise<boolean> {
+  const c = config || loadIdentityConfig();
+
   const embed: DiscordEmbed = {
     title: 'Goal Completed',
     color: 0x00cc66, // green
@@ -155,17 +236,24 @@ export async function sendCompletionNotification(
     embed.fields!.push({ name: 'Output', value: `\`${outputPath}\`` });
   }
 
-  return sendDiscordMessage(
-    {
-      content: `Goal completed: ${goalTitle} [${priority}]`,
-      embeds: [embed],
-    },
-    config
-  );
+  const message: DiscordMessage = {
+    content: `Goal completed: ${goalTitle} [${priority}]`,
+    embeds: [embed],
+  };
+
+  // Try DM first if configured, fall back to webhook
+  if (isDiscordDmEnabled(c)) {
+    const sent = await sendDiscordDM(message, c);
+    if (sent) return true;
+    // Fall back to webhook if DM fails
+  }
+
+  return sendDiscordMessage(message, c);
 }
 
 /**
  * Send a goal blocked notification.
+ * Sends DM if configured, otherwise falls back to webhook.
  * Fire-and-forget: catches errors, never blocks the loop.
  */
 export async function sendBlockedNotification(
@@ -175,6 +263,8 @@ export async function sendBlockedNotification(
   attempts: number,
   config?: IdentityConfig
 ): Promise<boolean> {
+  const c = config || loadIdentityConfig();
+
   const embed: DiscordEmbed = {
     title: 'Goal Blocked — Needs Your Input',
     color: 0xff4444, // red
@@ -186,17 +276,24 @@ export async function sendBlockedNotification(
     ],
   };
 
-  return sendDiscordMessage(
-    {
-      content: `BLOCKED: ${goalTitle} [${priority}] — ${reason.slice(0, 100)}`,
-      embeds: [embed],
-    },
-    config
-  );
+  const message: DiscordMessage = {
+    content: `BLOCKED: ${goalTitle} [${priority}] — ${reason.slice(0, 100)}`,
+    embeds: [embed],
+  };
+
+  // Try DM first if configured, fall back to webhook
+  if (isDiscordDmEnabled(c)) {
+    const sent = await sendDiscordDM(message, c);
+    if (sent) return true;
+    // Fall back to webhook if DM fails
+  }
+
+  return sendDiscordMessage(message, c);
 }
 
 /**
  * Send a daily summary to Discord.
+ * Sends DM if configured, otherwise falls back to webhook.
  * Fire-and-forget.
  */
 export async function sendDailySummary(
@@ -208,6 +305,7 @@ export async function sendDailySummary(
   },
   config?: IdentityConfig
 ): Promise<boolean> {
+  const c = config || loadIdentityConfig();
   const today = new Date().toISOString().split('T')[0];
 
   const embed: DiscordEmbed = {
@@ -221,11 +319,17 @@ export async function sendDailySummary(
     ],
   };
 
-  return sendDiscordMessage(
-    {
-      content: `Daily summary ${today}: ${summary.goalsCompleted} completed, ${summary.goalsFailed} failed, ${summary.goalsBlocked} blocked`,
-      embeds: [embed],
-    },
-    config
-  );
+  const message: DiscordMessage = {
+    content: `Daily summary ${today}: ${summary.goalsCompleted} completed, ${summary.goalsFailed} failed, ${summary.goalsBlocked} blocked`,
+    embeds: [embed],
+  };
+
+  // Try DM first if configured, fall back to webhook
+  if (isDiscordDmEnabled(c)) {
+    const sent = await sendDiscordDM(message, c);
+    if (sent) return true;
+    // Fall back to webhook if DM fails
+  }
+
+  return sendDiscordMessage(message, c);
 }
