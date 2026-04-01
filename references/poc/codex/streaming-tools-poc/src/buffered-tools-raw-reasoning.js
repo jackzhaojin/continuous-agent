@@ -1,4 +1,4 @@
-import { runStreamedPrompt, traceFilePath } from "./lib.js";
+import { runBufferedPrompt, traceFilePath } from "./lib.js";
 
 const prompt = `
 Inspect the current folder.
@@ -15,6 +15,11 @@ Then answer with:
 Do not modify any files.
 `;
 
-await runStreamedPrompt(prompt, {
-  outputPath: traceFilePath("stream-tools-output.txt"),
+await runBufferedPrompt(prompt, {
+  outputPath: traceFilePath("buffered-tools-raw-reasoning-output.txt"),
+  codexOptions: {
+    config: {
+      show_raw_agent_reasoning: true,
+    },
+  },
 });

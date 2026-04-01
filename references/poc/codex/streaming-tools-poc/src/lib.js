@@ -1,8 +1,9 @@
 import path from "node:path";
+import fs from "node:fs/promises";
 import { Codex } from "@openai/codex-sdk";
 
-export function createCodex() {
-  return new Codex();
+export function createCodex(options = {}) {
+  return new Codex(options);
 }
 
 export function defaultThreadOptions(overrides = {}) {
@@ -81,38 +82,57 @@ function formatItem(item) {
 }
 
 export function printEvent(event) {
+  return formatEvent(event);
+}
+
+function formatEvent(event) {
   switch (event.type) {
     case "thread.started":
-      console.log(`[thread.started] ${event.thread_id}`);
-      break;
+      return `[thread.started] ${event.thread_id}`;
     case "turn.started":
-      console.log("[turn.started]");
-      break;
+      return "[turn.started]";
     case "turn.completed":
-      console.log(
-        `[turn.completed] input=${event.usage.input_tokens} cached=${event.usage.cached_input_tokens} output=${event.usage.output_tokens}`,
-      );
-      break;
+      return `[turn.completed] input=${event.usage.input_tokens} cached=${event.usage.cached_input_tokens} output=${event.usage.output_tokens}`;
     case "turn.failed":
-      console.log(`[turn.failed] ${event.error.message}`);
-      break;
+      return `[turn.failed] ${event.error.message}`;
     case "error":
-      console.log(`[error] ${event.message}`);
-      break;
+      return `[error] ${event.message}`;
     case "item.started":
     case "item.updated":
     case "item.completed":
-      console.log(`[${event.type}:${event.item.type}] ${formatItem(event.item)}`);
-      break;
+      return `[${event.type}:${event.item.type}] ${formatItem(event.item)}`;
     default:
-      console.log(`[unknown] ${JSON.stringify(event)}`);
-      break;
+      return `[unknown] ${JSON.stringify(event)}`;
   }
 }
 
+function createLogger(outputPath) {
+  const lines = [];
+
+  function log(line) {
+    console.log(line);
+
+    if (outputPath) {
+      lines.push(line);
+    }
+  }
+
+  async function flush() {
+    if (!outputPath) {
+      return;
+    }
+
+    await fs.mkdir(path.dirname(outputPath), { recursive: true });
+    await fs.writeFile(outputPath, `${lines.join("\n")}\n`, "utf8");
+  }
+
+  return { log, flush };
+}
+
 export async function runStreamedPrompt(prompt, options = {}) {
-  const codex = createCodex();
-  const thread = codex.startThread(defaultThreadOptions(options));
+  const logger = createLogger(options.outputPath);
+  const codex = createCodex(options.codexOptions);
+  const thread = codex.startThread(defaultThreadOptions(options.threadOptions));
   const { events } = await thread.runStreamed(prompt);
 
   const summary = {
@@ -122,7 +142,7 @@ export async function runStreamedPrompt(prompt, options = {}) {
   };
 
   for await (const event of events) {
-    printEvent(event);
+    logger.log(printEvent(event));
 
     if (event.type === "thread.started") {
       summary.threadId = event.thread_id;
@@ -137,17 +157,48 @@ export async function runStreamedPrompt(prompt, options = {}) {
     }
   }
 
-  console.log(
+  logger.log(
     `[summary] thread=${summary.threadId ?? "unknown"} item_types=${Array.from(summary.itemTypes).join(", ") || "none"}`,
   );
 
   if (summary.finalMessage) {
-    console.log(`[final] ${oneLine(summary.finalMessage)}`);
+    logger.log(`[final] ${oneLine(summary.finalMessage)}`);
   }
 
+  await logger.flush();
   return summary;
 }
 
 export function outputFilePath() {
   return path.join(process.cwd(), "output", "hello-from-codex.txt");
+}
+
+export function traceFilePath(name) {
+  return path.join(process.cwd(), "output", name);
+}
+
+export function summarizeTurn(turn, logger = console) {
+  const itemTypes = [];
+
+  for (const item of turn.items) {
+    itemTypes.push(item.type);
+    logger.log(`[item:${item.type}] ${formatItem(item)}`);
+  }
+
+  logger.log(
+    `[turn.completed] input=${turn.usage?.input_tokens ?? 0} cached=${turn.usage?.cached_input_tokens ?? 0} output=${turn.usage?.output_tokens ?? 0}`,
+  );
+  logger.log(`[summary] item_types=${itemTypes.join(", ") || "none"}`);
+  logger.log(`[final] ${oneLine(turn.finalResponse)}`);
+}
+
+export async function runBufferedPrompt(prompt, options = {}) {
+  const logger = createLogger(options.outputPath);
+  const codex = createCodex(options.codexOptions);
+  const thread = codex.startThread(defaultThreadOptions(options.threadOptions));
+  const turn = await thread.run(prompt);
+
+  summarizeTurn(turn, logger);
+  await logger.flush();
+  return turn;
 }
