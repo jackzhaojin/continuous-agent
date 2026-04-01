@@ -27,11 +27,11 @@ capabilities:
       - git_status_check
       - commit_exists
     evidence:
-      successes: 95
-      failures: 103
+      successes: 105
+      failures: 104
       last_success: null
       last_failure: null
-      last_validated: '2026-03-29'
+      last_validated: '2026-03-30'
     common_failure_modes:
       - Attempting to commit without staging
       - Branch name conflicts
@@ -158,11 +158,11 @@ capabilities:
       - node_modules_exists
       - package_lock_updated
     evidence:
-      successes: 118
+      successes: 127
       failures: 58
       last_success: null
       last_failure: null
-      last_validated: '2026-03-29'
+      last_validated: '2026-03-30'
     common_failure_modes:
       - Network connectivity issues
       - Peer dependency conflicts
@@ -173,7 +173,7 @@ capabilities:
   - id: node.npm.run_script
     name: NPM Script Execution
     description: Run npm scripts defined in package.json
-    confidence: 37
+    confidence: 90
     maturity: Demonstrated
     scope:
       includes:
@@ -192,11 +192,11 @@ capabilities:
       - script_exit_code
       - expected_output_patterns
     evidence:
-      successes: 245
-      failures: 231
+      successes: 262
+      failures: 235
       last_success: null
       last_failure: null
-      last_validated: '2026-03-29'
+      last_validated: '2026-03-30'
     common_failure_modes:
       - Missing dependencies
       - Script not found in package.json
@@ -207,7 +207,7 @@ capabilities:
   - id: nextjs.build.basic
     name: Next.js Basic Build
     description: Build Next.js applications for production
-    confidence: 10
+    confidence: 55
     maturity: Demonstrated
     scope:
       includes:
@@ -227,11 +227,11 @@ capabilities:
       - build_success
       - dot_next_directory_exists
     evidence:
-      successes: 28
-      failures: 134
+      successes: 34
+      failures: 135
       last_success: null
       last_failure: null
-      last_validated: '2026-03-29'
+      last_validated: '2026-03-30'
     common_failure_modes:
       - TypeScript type errors
       - ESLint errors blocking build

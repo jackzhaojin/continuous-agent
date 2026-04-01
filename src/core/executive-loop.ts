@@ -16,7 +16,7 @@ import path from 'path';
 
 // CORE
 import { logAgentic, logDeterministic, log, logHealthStatus, closeLogStream } from './logging.js';
-import type { HealthStatus, LoopState } from './types.js';
+import type { HealthStatus, LoopState, WorkerResult } from './types.js';
 
 // AGENTIC - AI decision-making
 import { selectWorkWithSteps } from '../agentic/work-selection/work-selector.js';
@@ -66,9 +66,21 @@ import { checkSelfImprovementTriggers } from '../agentic/calibration/self-improv
 import { generateSelfImprovementTask } from '../agentic/calibration/self-improvement-task-generator.js';
 import { runWeeklyRetrospective } from '../agentic/calibration/retrospective.js';
 
-// IDENTITY - Agent identity (Gmail + Slack)
+// IDENTITY - Agent identity (Gmail + Discord)
 import { checkInbox } from '../identity/inbox-checker.js';
-import { sendCompletionNotification, sendBlockedNotification } from '../identity/slack-client.js';
+import { sendCompletionNotification, sendBlockedNotification } from '../identity/discord-client.js';
+
+// DASHBOARD - V2.0 dashboard projection
+import {
+  writeDashboardData,
+  setDashboardLoopRunning,
+  setDashboardPhase,
+  setDashboardActiveWorker,
+} from '../deterministic/dashboard-writer.js';
+
+// PIPELINE - V2.0 deterministic pipeline executor
+import { executePipeline } from '../harness/pipeline-executor.js';
+import { spawnWorker } from '../agentic/execution/worker-spawner.js';
 
 // Load environment variables (tiered)
 const envFiles = ['.env.executive', '.env.worker', '.env'];
@@ -112,6 +124,31 @@ type IterationResult =
   | 'work_failed' // Continue immediately (retry or next task)
   | 'no_work' // Sleep before polling again
   | 'unhealthy'; // Sleep before retrying
+
+// V2.0: Loop-until-progress iteration cap
+const MAX_LOOP_ITERATIONS = 3;
+
+/**
+ * Detect if meaningful progress was made in the output directory.
+ * Checks git for uncommitted changes or recent commits.
+ */
+async function detectProgress(outputPath: string | undefined): Promise<boolean> {
+  if (!outputPath || !existsSync(outputPath)) return false;
+  try {
+    const status = execSync('git status --porcelain 2>/dev/null || true', {
+      cwd: outputPath, encoding: 'utf-8', timeout: 5000,
+    }).trim();
+    if (status.length > 0) return true;
+
+    const recent = execSync(
+      'git log --oneline --since="10 minutes ago" 2>/dev/null | head -1 || true',
+      { cwd: outputPath, encoding: 'utf-8', timeout: 5000 },
+    ).trim();
+    return recent.length > 0;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Main loop iteration - THE 8 PHASES
@@ -166,6 +203,7 @@ async function runIteration(): Promise<IterationResult> {
   }
 
   // === PHASE 1: HEALTH CHECK ===
+  setDashboardPhase(1);
   logDeterministic('PHASE 1: Health Check');
   const health = await checkHealth();
   logHealthStatus(health);
@@ -176,6 +214,7 @@ async function runIteration(): Promise<IterationResult> {
   }
 
   // === PHASE 2: CHECK HUMAN INPUTS ===
+  setDashboardPhase(2);
   logAgentic('PHASE 2: Process Human Inputs');
   const inputsProcessed = await processHumanInputs();
 
@@ -215,6 +254,7 @@ async function runIteration(): Promise<IterationResult> {
   }
 
   // === PHASE 3: SELECT WORK ===
+  setDashboardPhase(3);
   logAgentic('PHASE 3: Select Work (Priority: P0 > P1 > P2 > P3 > P4)');
   const selectedWork = await selectWorkWithSteps();
 
@@ -325,6 +365,7 @@ async function runIteration(): Promise<IterationResult> {
   const contractId = `contract-${Date.now()}`;
   loopState.current_contract = contractId;
 
+  setDashboardPhase(4);
   logAgentic('PHASE 4: Execute Work (Agent SDK Worker)');
 
   // V2.0: Resolve execution pattern (PROMPT.md override > playbook default > system default)
@@ -360,35 +401,129 @@ async function runIteration(): Promise<IterationResult> {
   log(`  Execution pattern: ${patternResolution.pattern} (${patternResolution.source})`);
 
   // V2.0: Route by execution pattern
-  if (patternResolution.pattern === 'deterministic-pipeline') {
-    log(`  [ROUTING] deterministic-pipeline: Pipeline executor not yet implemented (Phase 6)`);
-    log(`  Falling back to plan-then-execute for this iteration`);
-    workItem.execution_pattern = 'plan-then-execute';
-  } else if (patternResolution.pattern === 'loop-until-progress') {
-    log(`  [ROUTING] loop-until-progress: Using standard worker (loop wrapper is future work)`);
-  } else if (patternResolution.pattern === 'plan-mode') {
-    log(`  [ROUTING] plan-mode: Worker will use read-only tool set`);
+  let result: WorkerResult | null = null;
+
+  if (patternResolution.pattern === 'deterministic-pipeline'
+      && matchedPlaybook?.pipeline_steps?.length) {
+    // === PIPELINE EXECUTION PATH ===
+    log(`  [ROUTING] deterministic-pipeline: Executing via pipeline executor`);
+    log(`  Pipeline: ${matchedPlaybook.name} (${matchedPlaybook.pipeline_steps.length} steps)`);
+
+    setDashboardActiveWorker({
+      goal_slug: workItem.title,
+      execution_pattern: 'deterministic-pipeline',
+      started_at: new Date().toISOString(),
+    });
+
+    const pipelineResult = await executePipeline(workItem, matchedPlaybook, {
+      spawnWorkerFn: spawnWorker,
+    });
+
+    setDashboardActiveWorker(null);
+
+    // Convert PipelineResult → WorkerResult for Phase 5
+    result = {
+      success: pipelineResult.success,
+      output: pipelineResult.step_results
+        .map(sr => `Step ${sr.step} "${sr.name}": ${sr.success ? 'OK' : sr.error || 'failed'}`)
+        .join('\n'),
+      artifacts: [],
+      errors: pipelineResult.step_results
+        .filter(sr => !sr.success && sr.error)
+        .map(sr => sr.error!),
+      duration_ms: pipelineResult.duration_ms,
+      output_path: pipelineResult.output_path,
+      exit_code: pipelineResult.success ? 0 : 1,
+    };
   } else {
-    log(`  [ROUTING] plan-then-execute: Standard worker execution`);
+    // === STANDARD EXECUTION PATH ===
+    if (patternResolution.pattern === 'deterministic-pipeline') {
+      log(`  [ROUTING] deterministic-pipeline: No pipeline_steps in playbook — falling back`);
+      workItem.execution_pattern = 'plan-then-execute';
+    } else if (patternResolution.pattern === 'loop-until-progress') {
+      log(`  [ROUTING] loop-until-progress: Worker with progress loop`);
+    } else if (patternResolution.pattern === 'plan-mode') {
+      log(`  [ROUTING] plan-mode: Worker will use read-only tool set`);
+    } else {
+      log(`  [ROUTING] plan-then-execute: Standard worker execution`);
+    }
+
+    // Log capability attempt
+    const intent = await classifyIntent(workItem);
+    const capabilities = inferCapabilitiesFromGoal(workItem, intent);
+    await logCapabilityAttempt(workItem, capabilities);
+    await logWorkStart(workItem, currentStep, contractId);
+
+    setDashboardActiveWorker({
+      goal_slug: workItem.title,
+      execution_pattern: patternResolution.pattern,
+      started_at: new Date().toISOString(),
+      max_turns: workItem.max_turns,
+    });
+
+    result = await executeWork(workItem, currentStep, contractId);
+
+    setDashboardActiveWorker(null);
+
+    // === LOOP-UNTIL-PROGRESS: Re-execute if worker made progress ===
+    if (patternResolution.pattern === 'loop-until-progress' && result?.success) {
+      let loopIteration = 1;
+      while (loopIteration < MAX_LOOP_ITERATIONS) {
+        const madeProgress = await detectProgress(result.output_path);
+        if (!madeProgress) {
+          log(`  [loop-until-progress] No progress detected after iteration ${loopIteration} — stopping`);
+          break;
+        }
+        loopIteration++;
+        log(`  [loop-until-progress] Progress detected — re-executing (iteration ${loopIteration}/${MAX_LOOP_ITERATIONS})`);
+
+        // Mid-loop validation: if work already passes, stop early
+        setDashboardPhase(5);
+        const midLoopValid = await validateWork(workItem, result, currentStep);
+        if (midLoopValid) {
+          log(`  [loop-until-progress] Mid-loop validation passed — work complete, stopping loop`);
+          break;
+        }
+
+        // Not yet valid — run another iteration
+        setDashboardPhase(4);
+        setDashboardActiveWorker({
+          goal_slug: workItem.title,
+          execution_pattern: 'loop-until-progress',
+          started_at: new Date().toISOString(),
+          max_turns: workItem.max_turns,
+        });
+
+        result = await executeWork(workItem, currentStep, contractId);
+
+        setDashboardActiveWorker(null);
+
+        if (!result?.success) {
+          log(`  [loop-until-progress] Worker failed on iteration ${loopIteration} — stopping loop`);
+          break;
+        }
+      }
+      if (loopIteration >= MAX_LOOP_ITERATIONS) {
+        log(`  [loop-until-progress] Reached max iterations (${MAX_LOOP_ITERATIONS}) — proceeding to validation`);
+      }
+    }
   }
 
-  // Log capability attempt
-  const intent = await classifyIntent(workItem);
-  const capabilities = inferCapabilitiesFromGoal(workItem, intent);
-  await logCapabilityAttempt(workItem, capabilities);
-  await logWorkStart(workItem, currentStep, contractId);
-
-  const result = await executeWork(workItem, currentStep, contractId);
-
   // === PHASE 5: VALIDATE WORK ===
+  setDashboardPhase(5);
   logAgentic('PHASE 5: Validate Work');
   // Pass current step for step-aware validation
   const isValid = await validateWork(workItem, result, currentStep);
 
-  // Log capability result
-  await logCapabilityResult(workItem, capabilities, isValid, contractId);
+  // Log capability result (only for standard execution path where capabilities were tracked)
+  if (patternResolution.pattern !== 'deterministic-pipeline') {
+    const intent = await classifyIntent(workItem);
+    const capabilities = inferCapabilitiesFromGoal(workItem, intent);
+    await logCapabilityResult(workItem, capabilities, isValid, contractId);
+  }
 
   // === PHASE 6: UPDATE STATE ===
+  setDashboardPhase(6);
   if (isValid && result) {
     logDeterministic('PHASE 6: Update State (Success)');
 
@@ -414,9 +549,9 @@ async function runIteration(): Promise<IterationResult> {
     // Reset backoff on success
     resetBackoff();
 
-    // Fire-and-forget Slack notification on completion
+    // Fire-and-forget Discord notification on completion
     sendCompletionNotification(workItem.title, workItem.priority, result.output_path).catch(e => {
-      log(`  Slack completion notification failed (non-blocking): ${e}`);
+      log(`  Discord completion notification failed (non-blocking): ${e}`);
     });
 
     loopState.last_work_at = new Date().toISOString();
@@ -507,14 +642,14 @@ async function runIteration(): Promise<IterationResult> {
       await markGoalBlocked(workItem, contractId, currentStep?.title);
       await escalateWithDiagnosis(workItem, retry.attempts, diagnosis.diagnosis, contractId);
 
-      // Fire-and-forget Slack notification on escalation
+      // Fire-and-forget Discord notification on escalation
       sendBlockedNotification(
         workItem.title,
         workItem.priority,
         diagnosis.rootCause || retry.lastError,
         retry.attempts
       ).catch(e => {
-        log(`  Slack blocked notification failed (non-blocking): ${e}`);
+        log(`  Discord blocked notification failed (non-blocking): ${e}`);
       });
 
       retryTracker.delete(retryKey);
@@ -544,14 +679,14 @@ async function runIteration(): Promise<IterationResult> {
     await markGoalBlocked(workItem, contractId, currentStep?.title);
     await writeToNeedsYou(workItem, retry.attempts, retry.lastError, contractId);
 
-    // Fire-and-forget Slack notification on blocked
+    // Fire-and-forget Discord notification on blocked
     sendBlockedNotification(
       workItem.title,
       workItem.priority,
       retry.lastError,
       retry.attempts
     ).catch(e => {
-      log(`  Slack blocked notification failed (non-blocking): ${e}`);
+      log(`  Discord blocked notification failed (non-blocking): ${e}`);
     });
 
     retryTracker.delete(retryKey);
@@ -687,6 +822,7 @@ async function main(): Promise<void> {
   }
 
   // === MAIN LOOP (FORCE MARCH) ===
+  setDashboardLoopRunning(true);
   logDeterministic('Starting continuous execution loop (CTRL+C to stop)');
   log('');
 
@@ -702,6 +838,9 @@ async function main(): Promise<void> {
 
       // Run iteration
       const result = await runIteration();
+
+      // Dashboard write — NEVER blocks the loop
+      try { await writeDashboardData(); } catch { /* non-blocking */ }
 
       // Decide whether to sleep
       if (result === 'work_completed' || result === 'work_failed') {

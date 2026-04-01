@@ -44,7 +44,7 @@ export interface DashboardAgentStatus {
   current_phase: number;
   active_worker: DashboardActiveWorker | null;
   last_inbox_check?: string;
-  last_slack_sent?: string;
+  last_discord_sent?: string;
 }
 
 export interface DashboardGoalSummary {

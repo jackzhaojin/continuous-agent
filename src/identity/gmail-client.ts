@@ -32,14 +32,14 @@ export function loadIdentityConfig(): IdentityConfig {
   return {
     identityEnabled: process.env.IDENTITY_ENABLED === 'true',
     gmailEnabled: process.env.GMAIL_ENABLED === 'true',
-    slackEnabled: process.env.SLACK_ENABLED === 'true',
+    discordEnabled: process.env.DISCORD_ENABLED === 'true',
     agentEmail: process.env.AGENT_EMAIL || '',
+    agentDisplayName: process.env.AGENT_DISPLAY_NAME || 'Agent',
     gmailRefreshToken: process.env.GMAIL_REFRESH_TOKEN || '',
     gmailClientId: process.env.GMAIL_CLIENT_ID || '',
     gmailClientSecret: process.env.GMAIL_CLIENT_SECRET || '',
-    slackBotToken: process.env.SLACK_BOT_TOKEN || '',
-    slackChannelId: process.env.SLACK_CHANNEL_ID || '',
-    slackMaxMessagesPerHour: parseInt(process.env.SLACK_MAX_MESSAGES_PER_HOUR || '10', 10),
+    discordWebhookUrl: process.env.DISCORD_WEBHOOK_URL || '',
+    discordMaxMessagesPerHour: parseInt(process.env.DISCORD_MAX_MESSAGES_PER_HOUR || '10', 10),
     inboxCheckInterval: parseInt(process.env.INBOX_CHECK_INTERVAL || '1', 10),
   };
 }

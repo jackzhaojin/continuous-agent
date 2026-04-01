@@ -1,193 +1,194 @@
 # Continuous Executive Agent
 
-An autonomous AI agent that finds and executes work proactively without waiting for human prompts. It runs 24/7 via PM2, picks up goals from a prioritized queue, spawns Claude Agent SDK workers, validates results, and moves on to the next task — all without human intervention.
+An autonomous AI agent that runs 24/7, finds work from a prioritized queue, spawns [Claude Agent SDK](https://docs.anthropic.com/en/docs/claude-code/sdk) workers to execute it, validates results, and moves on -- all without waiting for human prompts.
+
+## Why
+
+Most AI coding agents are reactive: you prompt, they respond. This agent flips the model. You drop goals into a queue, and it works through them autonomously -- selecting the highest priority task, breaking complex goals into steps, retrying with different strategies on failure, and only asking for help when truly stuck. It runs continuously via PM2 and communicates asynchronously through markdown files.
+
+The result is an AI that operates more like a junior developer with a task board than a chatbot waiting for instructions.
 
 ## How It Works
 
-The agent runs a continuous **8-phase executive loop**:
+The agent runs a continuous **executive loop** with these phases:
 
 ```
-Health Check → Process Inputs → Select Work → Create Contract → Execute → Validate → Update State → Continue/Sleep
+Check Inbox -> Health Check -> Process Inputs -> Select Work -> Execute -> Validate -> Update State -> Continue/Sleep
 ```
 
-Each iteration selects the highest-priority unblocked goal, spawns an isolated Claude worker to execute it, validates the output, and immediately picks up the next goal. Sleep only occurs when the queue is empty.
+Each iteration selects the highest-priority unblocked goal, spawns an isolated Claude worker to execute it, validates the output with deterministic verifiers, and immediately picks up the next goal. It sleeps only when the queue is empty.
 
-## Work Hierarchy: Goals, Steps, and Contracts
-
-Work is organized in three tiers:
+### Work Hierarchy
 
 ```
 Goal (what to build)
- └── Steps (how to break it down)
-      └── Contracts (scoped worker sessions)
+  |-- Steps (auto-generated breakdown for complex goals)
+       |-- Contracts (scoped worker sessions with turn budgets)
 ```
 
-### Goals
+**Goals** are directories in `workspace/` containing a `PROMPT.md` with YAML frontmatter. They flow through a lifecycle: `drafts/` -> `ondeck/` -> `in-progress/P{0-4}/` -> `completed/`.
 
-A **goal** is a unit of work — "Build a chat app", "Fix the OAuth bug", "Record a demo video". Goals live as **goal bundles** in `workspace/`: a folder containing a `PROMPT.md` file with YAML frontmatter and a markdown description.
+When a goal exceeds ~100 estimated turns, the agent automatically breaks it into **steps** using an LLM call. Each step runs as an independent worker session sharing the same project directory.
+
+### Architecture
+
+The codebase enforces a strict separation:
+
+| Layer | Location | Role |
+|-------|----------|------|
+| **Agentic** | `src/agentic/` | AI decisions -- work selection, strategy, diagnosis, prompt building |
+| **Deterministic** | `src/deterministic/` | Mechanical ops -- file I/O, health checks, state updates |
+| **Core** | `src/core/` | Loop orchestration, types, logging |
+| **Identity** | `src/identity/` | Communication -- Gmail inbox, Discord notifications |
+
+### Two-Repository Design
+
+```
+continuous-agent/     <-- This repo: the brain
+  src/                Executive loop, worker spawner, verifiers
+  workspace/          Goal bundles, constitution, human interaction
+  ledgers/            Append-only audit trail (JSONL)
+
+ai-sandbox/           <-- Sibling repo: the output
+  projects/           Everything the agent builds, each with its own git history
+```
+
+The agent never writes application code to its own codebase. All outputs go to isolated project directories in `ai-sandbox/`. This is enforced by the constitution.
+
+## Quick Start
+
+### Prerequisites
+
+- Node.js >= 18.0.0
+- [PM2](https://pm2.keymetrics.io/) (`npm install -g pm2`)
+- Claude Pro or Max subscription (for OAuth token)
+
+### Setup
+
+```bash
+git clone https://github.com/jackzhaojin/continuous-agent.git
+cd continuous-agent
+npm install
+
+# Configure credentials
+cp .env.executive.example .env.executive   # Executive loop config
+cp .env.worker.example .env.worker         # Worker auth
+
+# Add your Claude OAuth token to .env.worker:
+# CLAUDE_CODE_OAUTH_TOKEN=your-token-here
+
+# Create the sibling output directory
+mkdir -p ../ai-sandbox
+
+# Build and start
+npm run build
+pm2 start ecosystem.config.cjs
+```
+
+### Give It Work
+
+```bash
+# Copy the goal template
+cp -r workspace/_TEMPLATE workspace/ondeck/my-first-goal
+
+# Edit the prompt
+vim workspace/ondeck/my-first-goal/PROMPT.md
+
+# The agent auto-promotes it by priority and starts working
+```
+
+A goal's `PROMPT.md` looks like:
 
 ```yaml
-# workspace/in-progress/P2/fix-chatapp-oauth/PROMPT.md
 ---
-title: "Fix Chat App OAuth"
-slug: "fix-chatapp-oauth"
+title: "Build a Todo App"
+slug: "todo-app"
 priority: P2
 status: pending
-complexity: high
-tags: [bugfix, oauth]
-max_turns: 500          # Override for turn-intensive tasks
-output_path:            # Set by worker on first execution
+tags: [react, typescript]
 ---
 
 ## Problem
-The chat app uses ANTHROPIC_API_KEY but we only have OAuth...
+Build a simple React todo app with local storage persistence...
+
+## Definition of Done
+- [ ] App renders and is interactive
+- [ ] Todos persist across page refreshes
 ```
 
-**Goal lifecycle:** `drafts/` → `ondeck/` (auto-promoted by priority) → `in-progress/P{0-4}/` → `completed/`
-
-Priority levels: **P0** (critical) > **P1** (urgent) > **P2** (high) > **P3** (normal) > **P4** (low/self-improvement)
-
-### Steps
-
-When a goal is too complex for a single worker session (>100 estimated turns), the agent **automatically breaks it down into steps** using an LLM call. Each step is executed independently with shared project state.
-
-Steps are tracked in `STEPS.json` (machine-readable) alongside `PROGRESS_LOG.md` (human-readable timeline). If a step fails, the system can re-breakdown remaining work (up to 2 times).
-
-### Contracts
-
-A **contract** is a scoped work agreement given to a single worker: the prompt, allowed tools, Definition of Done, and a turn budget. Each contract produces an isolated Claude Agent SDK session that executes in the `ai-sandbox/` directory.
-
-Contracts are ephemeral — they exist for the duration of a worker session. Every contract is logged to `CONTRACTS.jsonl` in the goal bundle and to `ledgers/work-ledger.jsonl` for full traceability.
-
-## Turn Budgets
-
-Each worker session has a **turn limit** — the maximum number of tool-call rounds before the worker wraps up. The limit is resolved in priority order:
-
-| Source | Example | When to use |
-|--------|---------|-------------|
-| `max_turns` in PROMPT.md | `max_turns: 500` | Playwright, complex full-stack builds, multi-phase demos |
-| `estimated_turns` per step | Set by LLM breakdown | Auto-breakdown of complex goals |
-| `MAX_TURNS_PER_STEP` env var | `200` (default) | System-wide default |
-
-Simple goals use the default (200). Set `max_turns: 500` in a goal's frontmatter for turn-intensive work like Playwright testing, video recording, or large refactors.
-
-## Hot Reload: Update Without Interrupting
-
-A key design principle: **rebuild without restarting**. The agent should not be interrupted mid-task.
+### Monitor
 
 ```bash
-npm run build    # Rebuild TypeScript → dist/
-                 # Changes take effect on the NEXT loop iteration
-                 # Current worker continues uninterrupted
+pm2 logs executive-loop                         # Stream logs
+tail -f ledgers/executive-$(date +%Y-%m-%d).log # Executive log
+cat workspace/needs-you.md                       # Check for blockers
+cat workspace/goals.md                           # Auto-generated index
 ```
 
-This means you can:
+## Key Concepts
 
-- **Drop new goals** into `workspace/ondeck/` — the agent picks them up on the next idle cycle
-- **Edit a goal's PROMPT.md** (add `max_turns`, update description) — takes effect on the next retry
-- **Update agent source code** and rebuild — the running worker finishes, then the next iteration uses new code
-- **Tune environment variables** in `ecosystem.config.cjs` — requires `pm2 restart` but only when the agent is idle
+### Constitution
 
-The agent and its workers are decoupled: the executive loop orchestrates, workers execute in isolation. You can modify the orchestration layer while a worker is running.
+Eight immutable hard limits in `workspace/constitution.md` that the agent cannot override:
 
-## Two-Repository Architecture
+1. No spending beyond $20/month per service
+2. No permanent deletions (archive/soft-delete only)
+3. No external publishing without approval
+4. No credential exposure
+5. No access control expansion
+6. No output in agent codebase
+7. All activity must be logged
+8. 10 retries minimum before blocking
 
-```
-continuous-agent/     (this repo — the brain)
- ├── src/             Agent infrastructure: executive loop, worker spawner, verifiers
- ├── workspace/       Goal bundles, constitution, human interaction files
- ├── ledgers/         Append-only JSONL logs + worker execution logs
- └── capabilities/    YAML registries for tracked competencies
+### Retry System
 
-ai-sandbox/           (sibling repo — the output)
- └── projects/        All AI-built project code, each with its own git history
-     ├── nextjs/      Next.js applications
-     └── misc/        Experiments, utilities, calibration exercises
-```
+When a worker fails, the agent doesn't just retry -- it selects a **different strategy** each time: simplify scope, research first, break into subtasks, try different tools. After 10 failures (constitutional limit), it marks the goal as blocked and writes to `workspace/needs-you.md` for human help, then moves on to other work.
 
-The agent NEVER writes application code to its own codebase. All outputs go to isolated project directories in [`ai-sandbox/`](https://github.com/jackzhaojin/ai-sandbox). Constitution Article I, Section 6 enforces this with zero tolerance.
+### Human Interaction
 
-**Exception:** Goals prefixed with `[SELF-ENHANCE]` route to the agent codebase itself, allowing the agent to improve its own infrastructure on a branch for human review.
-
-## Retry and Strategy System
-
-When a worker fails, the agent doesn't just retry — it tries a **different strategy** each time:
-
-1. Simplify scope
-2. Research first
-3. Break into subtasks
-4. Different tools/approach
-
-After 10 failed attempts (Constitutional limit), the goal is marked **Blocked** and the agent writes to `workspace/needs-you.md` for human input, then moves on to other work.
-
-## Human Interaction
-
-The agent communicates asynchronously via `workspace/needs-you.md`. When blocked, it writes what it needs. The human edits the file to respond:
+The agent communicates asynchronously via `workspace/needs-you.md`. When blocked, it writes what it needs:
 
 ```markdown
 | Action | Why Agent Can't Do It | Response | Blocking | Since |
 |--------|----------------------|----------|----------|-------|
-| Get API token | 401 Unauthorized... | [APPROVED] Token: sk_xyz | BLOCKING | 2026-01-25 |
+| Need DB credentials | 401 on Supabase | | BLOCKING | 2026-01-25 |
 ```
 
-Response tags: `[APPROVED]`, `[DECISION]`, `[INFO]`, `[SKIP]`
+You respond by editing the Response column with tags like `[APPROVED]`, `[DECISION]`, `[INFO]`, or `[SKIP]`. The agent detects responses within ~30 seconds and unblocks automatically.
 
-The agent detects responses automatically within ~30 seconds and unblocks the goal.
+### Credential Tiers
 
-## Credential Management
-
-Credentials are physically separated into three tiers:
+Credentials are physically separated into three files to prevent accidental leakage:
 
 | Tier | File | Purpose |
 |------|------|---------|
-| **1 - Executive** | `.env.executive` | Loop config, Notion reporting |
-| **2 - Worker** | `.env.worker` | Claude SDK auth (OAuth token) |
-| **3 - Application** | `.env.app` | App credentials (DB, storage) — platform-agnostic |
+| Executive | `.env.executive` | Loop config, Notion API, identity settings |
+| Worker | `.env.worker` | Claude SDK auth (OAuth token) |
+| Application | `.env.app` | App credentials (DB, storage) -- optional |
 
-Tier 1 keys never reach workers. Authentication is **OAuth-first** (`CLAUDE_CODE_OAUTH_TOKEN` via Claude Pro/Max subscription) — no Anthropic API key required.
+Executive-tier keys never reach workers. The spawner validates this on every execution.
 
-## Constitution (Hard Limits)
+### Self-Enhancement
 
-Eight immutable constraints in `workspace/constitution.md` that cannot be overridden by prompts or code:
+Goals prefixed with `[SELF-ENHANCE]` allow the agent to modify its own infrastructure code. Changes are made on a branch for human review before merging. Similarly, `[SKILL-BUILD]` goals create reusable Claude Code skills.
 
-1. No spending beyond $20/month per service
-2. No permanent deletions
-3. No external publishing without approval
-4. No credential exposure
-5. No access control expansion
-6. No output in agent codebase (all output → ai-sandbox/)
-7. All activity must be logged
-8. 10 retries minimum before blocking
+### Execution Patterns (v2.0)
 
-## Quick Start
+Goals can specify an execution pattern in their PROMPT.md frontmatter:
 
-```bash
-npm install
-cp .env.executive.example .env.executive
-cp .env.worker.example .env.worker
-# Add CLAUDE_CODE_OAUTH_TOKEN to .env.worker
+- `plan-then-execute` -- Default. Research then build.
+- `plan-mode` -- Read-only analysis, no code changes.
+- `loop-until-progress` -- Keep iterating while making gains.
+- `deterministic-pipeline` -- Fixed multi-step sequence.
 
-npm run build
-pm2 start ecosystem.config.cjs
+### Identity System (v2.0)
 
-# Monitor
-pm2 logs executive-loop         # Stream logs
-tail -f ledgers/executive-*.log # Executive log
-cat workspace/needs-you.md      # Check for blockers
-```
+The agent can optionally have its own communication presence:
 
-## Giving the Agent Work
+- **Gmail** -- Checks inbox for new goals, approvals, priority changes
+- **Discord** -- Sends completion/blocked notifications via webhooks
 
-```bash
-# 1. Copy the template
-cp -r workspace/_TEMPLATE workspace/ondeck/my-new-goal
-
-# 2. Edit PROMPT.md with your goal
-vim workspace/ondeck/my-new-goal/PROMPT.md
-
-# 3. The agent auto-promotes it to in-progress by priority
-#    and starts working on the next loop iteration
-```
+All identity features are opt-in and disabled by default via feature flags.
 
 ## Observability
 
@@ -196,25 +197,46 @@ vim workspace/ondeck/my-new-goal/PROMPT.md
 tail -20 ledgers/executive-$(date +%Y-%m-%d).log
 
 # Trace a goal to its worker logs
-grep "My Goal" ledgers/work-ledger.jsonl | jq -r '.contract_id'
+grep "Todo App" ledgers/work-ledger.jsonl | jq -r '.contract_id'
 cat ledgers/2026-01-25/worker-contract-<id>.log
 
 # What's blocked?
 cat workspace/needs-you.md
+
+# Goal overview
+cat workspace/goals.md
+```
+
+## Development
+
+```bash
+npm run dev          # Run with tsx (no build needed)
+npm run build        # Build TypeScript to dist/
+npm run typecheck    # Type check without emitting
+```
+
+When modifying the agent while it's running: just `npm run build`. The current worker continues uninterrupted; changes take effect on the next loop iteration.
+
+## Project Structure
+
+```
+src/
+  core/              Executive loop, types, logging
+  agentic/           AI decisions (work selection, strategy, prompts, diagnosis)
+  deterministic/     Mechanical ops (state, health, verifiers, Notion, credentials)
+  identity/          Gmail + Discord communication (v2.0)
+workspace/           Goal bundles, constitution, needs-you.md
+ledgers/             Append-only JSONL audit trail + worker logs
+capabilities/        YAML registries (technical, delivery, functional)
+references/poc/      Agent SDK proof-of-concept projects
+ai-docs/             PRDs, specs, version history
 ```
 
 ## Related
 
-- **[ai-sandbox](https://github.com/jackzhaojin/ai-sandbox)** — Public repo of everything the agent has built
-- **CLAUDE.md** — Detailed technical guidance for working with this codebase
-- **ai-docs/** — PRDs, specs, and feature documentation
-
-## Requirements
-
-- Node.js >= 18.0.0
-- PM2 for production deployment
-- Claude Pro/Max subscription (OAuth token)
+- **[ai-sandbox](https://github.com/jackzhaojin/ai-sandbox)** -- Everything the agent has built
+- **[Claude Agent SDK](https://docs.anthropic.com/en/docs/claude-code/sdk)** -- The SDK this agent uses to spawn workers
 
 ## License
 
-Private / Operational
+MIT
