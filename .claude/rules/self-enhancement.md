@@ -25,7 +25,7 @@ The agent can modify its own infrastructure through special goal prefixes.
 | Category | Examples | Allowed |
 |----------|----------|---------|
 | Agent source code | `src/**/*.ts` | Yes |
-| Prompt templates | `src/agentic/prompts/**/*.md` | Yes |
+| Prompt templates | `src/agentic/worker-prompts/**/*.md` | Yes |
 | Skills & Agents | `.claude/skills/`, `.claude/agents/` | Yes |
 | Configuration | `capabilities/*.yml`, `tsconfig.json` | Yes |
 | Documentation | `CLAUDE.md`, `README.md`, `ai-docs/` | Yes |

@@ -32,7 +32,7 @@ You have full access to modify:
 | Category | Examples |
 |----------|----------|
 | Agent source code | `src/**/*.ts` - executive loop, worker spawner, verifiers |
-| Prompt templates | `src/agentic/prompts/**/*.md` |
+| Prompt templates | `src/agentic/worker-prompts/**/*.md` |
 | Skills | `.claude/skills/**/*` |
 | Agents | `.claude/agents/**/*` (including yourself) |
 | Capabilities | `capabilities/*.yml` |

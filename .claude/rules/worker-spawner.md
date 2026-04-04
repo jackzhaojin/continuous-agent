@@ -38,4 +38,4 @@ paths:
 
 - Builds context-rich prompts including: Constitution, retry context, selected strategy, task contract
 - V2: When `V2_PROMPT_COMPOSITION=true`, loads skill+playbook libraries for deterministic composition
-- V1 fallback: Uses versioned template files from `src/agentic/prompts/`
+- V1 fallback: Uses versioned template files from `src/agentic/worker-prompts/`

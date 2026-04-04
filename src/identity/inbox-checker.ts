@@ -27,6 +27,7 @@ import {
 } from './gmail-client.js';
 import { log, logDeterministic } from '../core/logging.js';
 import { getChatCompletionProvider, resolveChatModel } from '../core/vendor/index.js';
+import { loadSkillPrompt } from '../agentic/intelligence/skill-prompt-loader.js';
 
 // ── Outbound Send Throttle ─────────────────────────────────────────
 // Hard safety limit: max 3 outbound emails per hour.
@@ -82,43 +83,10 @@ async function triageEmails(emails: FetchedEmail[], agentEmail: string): Promise
     `[${i}] From: ${e.from}\n    Subject: ${e.subject}\n    Body: ${e.body.slice(0, 800)}${e.body.length > 800 ? '...' : ''}`
   )).join('\n\n');
 
-  const prompt = `You are the communications agent for an autonomous executive AI system. You manage all inbound email for the agent's mailbox (${agentEmail}).
-
-Your job: look at each email below and decide what to do with it.
-
-## EMAILS
-
-${emailSummaries}
-
-## YOUR OPTIONS (per email)
-
-- **"archive"** — Silently archive. Use for: automated notifications, bounces, delivery failures, marketing, newsletters, system alerts, no-reply senders, emails from services (Notion, Discord, GitHub, etc.), anything that isn't a human trying to communicate with this agent. **When in doubt, archive.**
-- **"queue"** — This is a human with an actionable request. Extract the intent. Valid intents: new_goal, priority_change, approval, question_answer, skip.
-- **"reply"** — This is a human trying to communicate but the intent is unclear. Write a helpful, specific reply. **Use sparingly** — only when you're confident it's a real person who needs guidance. Never reply to automated systems. Never reply to bounce notifications.
-
-## SAFETY RULES
-
-1. NEVER reply to emails from: mailer-daemon, postmaster, noreply, no-reply, notifications@, or any automated service
-2. NEVER reply to delivery failure / bounce notifications — always archive
-3. NEVER reply to emails from ${agentEmail} (that's us)
-4. When in doubt between "reply" and "archive", choose "archive"
-5. Max 1-2 replies per batch — if many emails are unclear, archive most and reply to the most important one only
-
-Respond with JSON:
-{
-  "decisions": [
-    {
-      "index": 0,
-      "action": "archive" | "queue" | "reply",
-      "intentType": "new_goal" | "priority_change" | "approval" | "question_answer" | "skip",
-      "confidence": "high" | "medium" | "low",
-      "reasoning": "brief explanation",
-      "extractedData": { "goalDescription": "...", "newPriority": "P2", "responseText": "..." },
-      "replyBody": "only if action is reply",
-      "replySubject": "only if action is reply"
-    }
-  ]
-}`;
+  const prompt = await loadSkillPrompt('email-triage', {
+    AGENT_EMAIL: agentEmail,
+    EMAIL_SUMMARIES: emailSummaries,
+  });
 
   const result = await chatProvider.complete({
     model,

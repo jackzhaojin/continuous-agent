@@ -191,7 +191,7 @@ DISCORD_ENABLED=true           # Discord notifications
 | Identity (Gmail) | `src/identity/gmail-client.ts` |
 | Identity (Discord) | `src/identity/discord-client.ts` |
 | Constitution | `workspace/constitution.md` (**NEVER auto-modify**) |
-| Prompt templates | `src/agentic/prompts/{category}/` (versioned filenames) |
+| Prompt templates | `src/agentic/worker-prompts/{category}/` (versioned filenames) |
 | Capability registries | `capabilities/*.yml` |
 
 ## Code Modification Rules
@@ -199,7 +199,7 @@ DISCORD_ENABLED=true           # Discord notifications
 1. **Constitution** (`workspace/constitution.md`) -- NEVER auto-modify
 2. **Ledgers** -- Append-only JSONL, never truncate or modify existing entries
 3. **Verifiers** -- Must check `result.output_path`, NOT `process.cwd()`
-4. **Prompt templates** -- Changes affect all future tasks; organized in `src/agentic/prompts/{category}/`
+4. **Prompt templates** -- Changes affect all future tasks; organized in `src/agentic/worker-prompts/{category}/`
 5. **PM2** -- Rebuild only (`npm run build`), don't restart unless explicitly asked
 
 ## Debugging

@@ -1,6 +1,8 @@
-# Prompt Management System
+# Worker Prompt Library
 
-**For an agentic system, prompts ARE the code.** This directory contains all prompts used by the Continuous Executive Agent, with individual versioning and clear management practices.
+Shared prompt templates for all vendor workers (Claude, Codex, Kimi). These are the instructions given to workers when they execute goals — versioned, immutable, composable.
+
+**Executive intelligence** (email triage, diagnosis, goal breakdown, work selection) lives in `.claude/` agents, rules, and skills — not here.
 
 ## Philosophy
 

@@ -10,7 +10,7 @@ import path from 'path';
 import { logAgentic, log } from '../../core/logging.js';
 
 // Prompts live in src/ (not compiled to dist/), so use project root
-const PROMPTS_DIR = path.join(process.cwd(), 'src', 'agentic', 'prompts');
+const PROMPTS_DIR = path.join(process.cwd(), 'src', 'agentic', 'worker-prompts');
 
 /**
  * Prompt metadata from YAML frontmatter

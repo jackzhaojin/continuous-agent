@@ -132,7 +132,7 @@ Each phase of the executive loop is clearly marked:
 
 **For an agentic system, prompts ARE the code.** They're now **PRODUCTION-READY**:
 
-✅ **Visible** - 20+ prompts in `agentic/prompts/` across 11 categories
+✅ **Visible** - 20+ prompts in `agentic/worker-prompts/` across 11 categories
 ✅ **Individual versioning** - Each prompt has its own semantic version (X.Y.Z)
 ✅ **Markdown + YAML frontmatter** - Like Claude Skills, easy to read and edit
 ✅ **Simple variable replacement** - `{{VARIABLE}}` syntax (Node.js native)
@@ -144,7 +144,7 @@ Each phase of the executive loop is clearly marked:
 **Before:** Prompts were buried in TypeScript code, impossible to see or version
 **After:** Prompts are **first-class artifacts** with proper version control
 
-See `agentic/prompts/README.md` for full documentation on prompt management.
+See `agentic/worker-prompts/README.md` for full documentation on prompt management.
 See `PROMPT-SYSTEM-COMPLETE.md` for implementation details.
 
 ## What's Next

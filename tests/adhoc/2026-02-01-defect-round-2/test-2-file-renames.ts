@@ -35,7 +35,7 @@ assert(check('task-breakdown.ts', false, path.join(ROOT, 'src/agentic/work-selec
 assert(check('task-contractor.ts', false, path.join(ROOT, 'src/agentic/execution/task-contractor.ts')));
 assert(check('goals-index-generator.ts', false, path.join(ROOT, 'src/deterministic/goals-index-generator.ts')));
 assert(check('workspace/goals.md', false, path.join(ROOT, 'workspace/goals.md')));
-assert(check('contract-creation prompt', false, path.join(ROOT, 'src/agentic/prompts/contracts/contract-creation-v1.0.0.md')));
+assert(check('contract-creation prompt', false, path.join(ROOT, 'src/agentic/worker-prompts/contracts/contract-creation-v1.0.0.md')));
 
 // --- New files MUST exist ---
 assert(check('contracts-log-writer.ts', true, path.join(ROOT, 'src/deterministic/contracts-log-writer.ts')));

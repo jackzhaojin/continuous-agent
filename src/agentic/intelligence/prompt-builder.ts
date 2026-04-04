@@ -12,7 +12,7 @@
 import type { WorkerContract, WorkItem, ExecutionPattern } from '../../core/types.js';
 import { classifyIntent, type IntentClassification } from './intent-classifier.js';
 import { selectStrategy } from './strategy-selector.js';
-import { composePrompts } from '../prompts/loader.js';
+import { composePrompts } from '../worker-prompts/loader.js';
 import { buildProjectMemoryContext } from '../../deterministic/project-memory-store.js';
 import { loadSkillLibrary } from '../../deterministic/skill-loader.js';
 import { loadPlaybookLibrary } from '../../deterministic/playbook-loader.js';
@@ -177,7 +177,7 @@ export async function buildSimplePrompt(
   projectPath: string
 ): Promise<string> {
   // For simple tasks, just use the base worker prompt
-  const { rendered } = await import('../prompts/loader.js').then(m => m.loadAndRender(
+  const { rendered } = await import('../worker-prompts/loader.js').then(m => m.loadAndRender(
     'worker',
     'worker-base',
     {

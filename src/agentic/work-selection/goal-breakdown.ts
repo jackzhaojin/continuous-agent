@@ -13,6 +13,7 @@ import type { WorkItem, WorkStep } from '../../core/types.js';
 import { getChatCompletionProvider, resolveChatModel } from '../../core/vendor/index.js';
 import { createStepsFile, writeStepsJson, stepsJsonExists } from '../../deterministic/steps-json-handler.js';
 import { logBreakdownProgress } from '../../deterministic/progress-log-writer.js';
+import { loadSkillPrompt } from '../intelligence/skill-prompt-loader.js';
 
 // Configuration from environment
 const BREAKDOWN_THRESHOLD_TURNS = parseInt(process.env.BREAKDOWN_THRESHOLD_TURNS || '100', 10);
@@ -150,9 +151,9 @@ export function needsBreakdown(item: WorkItem): boolean {
 
 /**
  * Build the prompt for the LLM breakdown agent.
- * Accepts full bundle context and complexity estimate for adaptive step sizing.
+ * Loads from .claude/skills/goal-breakdown/SKILL.md and renders variables.
  */
-function buildBreakdownPrompt(item: WorkItem, bundleContext: string, complexityEstimate: number): string {
+async function buildBreakdownPrompt(item: WorkItem, bundleContext: string, complexityEstimate: number): Promise<string> {
   // Adaptive step count guidance based on complexity
   let stepGuidance: string;
   let turnRange: string;
@@ -170,44 +171,13 @@ function buildBreakdownPrompt(item: WorkItem, bundleContext: string, complexityE
     turnRange = '20-100';
   }
 
-  return `You are a task decomposition agent. Given a goal and its full context (PROMPT.md + requirements files), break it into concrete, actionable steps.
-
-COMPLEXITY ESTIMATE: ${complexityEstimate} turns → aim for ${stepGuidance}
-
-RULES:
-- Step 0 is ALWAYS a research/planning step (20-40 turns)
-- Each step must be a distinct, independently executable unit of work
-- Steps should be specific to THIS goal, not generic templates
-- Each step gets its own LLM agentic session, so scope accordingly
-- Step descriptions should be detailed enough that a worker agent can execute without ambiguity
-- Include specific commands, file paths, and validation criteria when possible
-- Each step depends on the previous one (sequential execution)
-- The final step should always include validation and cleanup
-- Assign each step a turn budget proportional to its complexity (${turnRange} turns)
-  - Research/planning steps: 20-40 turns
-  - Simple implementation steps: 40-60 turns
-  - Complex implementation steps: 60-100 turns
-- Be granular: prefer more smaller steps over fewer larger steps
-- Each step should produce a testable/verifiable deliverable
-
-GOAL TITLE: ${item.title}
-
-FULL CONTEXT:
-${bundleContext || item.description || '(no description)'}
-
-Respond with ONLY a JSON array of step objects. No markdown, no explanation, just the JSON array.
-Each step object must have:
-- "title": string (concise action title)
-- "description": string (detailed instructions for the worker, up to 2000 chars)
-- "estimated_turns": number (${turnRange})
-
-Example format:
-[
-  {"title": "Research and plan approach", "description": "Analyze requirements for...", "estimated_turns": 30},
-  {"title": "Set up project scaffolding", "description": "Initialize the project with...", "estimated_turns": 50},
-  {"title": "Implement database schema", "description": "Create tables for...", "estimated_turns": 80},
-  {"title": "Validate and finalize", "description": "Test all features...", "estimated_turns": 60}
-]`;
+  return loadSkillPrompt('goal-breakdown', {
+    COMPLEXITY_ESTIMATE: String(complexityEstimate),
+    STEP_GUIDANCE: stepGuidance,
+    TURN_RANGE: turnRange,
+    GOAL_TITLE: item.title,
+    BUNDLE_CONTEXT: bundleContext || item.description || '(no description)',
+  });
 }
 
 /**
@@ -221,7 +191,7 @@ export async function generateBreakdown(item: WorkItem): Promise<WorkStep[]> {
     : '';
 
   const complexityEstimate = estimateComplexity(item);
-  const prompt = buildBreakdownPrompt(item, bundleContext, complexityEstimate);
+  const prompt = await buildBreakdownPrompt(item, bundleContext, complexityEstimate);
 
   try {
     const model = resolveChatModel('BREAKDOWN_MODEL');
