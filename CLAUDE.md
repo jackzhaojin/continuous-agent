@@ -113,6 +113,24 @@ Workers NEVER write to the agent codebase. Enforced by Constitution Article I, S
 - `[SKILL-BUILD]` prefixed goals route to `.claude/agents/skill-builder.md`
 - Both work on branches for human review before merge
 
+## Agent Configuration (`.claude/`)
+
+The `.claude/` directory is where agentic behavior is defined — agents, rules, and skills that Claude loads when working on this codebase.
+
+| Directory | Purpose |
+|-----------|---------|
+| `.claude/agents/` | Subagent definitions (self-enhancer, skill-builder). Spawned for `[SELF-ENHANCE]` and `[SKILL-BUILD]` goals. |
+| `.claude/rules/` | Contextual rules loaded by Claude Code — domain knowledge about each subsystem (identity, verifiers, ledgers, credentials, etc.) |
+| `.claude/skills/` | Reusable skill definitions with `SKILL.md` files. Used by the executive loop, work selection, validation, and more. |
+
+**Key principle:** Communication, diagnosis, and decision-making are **agentic** — driven by LLM reasoning, not hardcoded TypeScript logic. The TypeScript is plumbing (fetch data, execute decisions, write state). The intelligence lives in prompts sent to `ChatCompletionProvider`.
+
+Examples of agentic (not deterministic) behavior:
+- **Email triage** (`inbox-checker.ts`) — LLM classifies each email and decides: queue, reply, or archive
+- **Goal breakdown** (`goal-breakdown.ts`) — LLM decides how to split complex goals into steps
+- **Diagnosis** (`agentic-diagnosis.ts`) — LLM investigates why a worker failed and suggests fixes
+- **Work selection** (`work-selector.ts`) — LLM-assisted prioritization when multiple goals compete
+
 ## Goal Bundles
 
 Goals are directories in `workspace/` containing `PROMPT.md` (YAML frontmatter + markdown body).
