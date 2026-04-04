@@ -172,6 +172,20 @@ Executive-tier keys never reach workers. The spawner validates this on every exe
 
 Goals prefixed with `[SELF-ENHANCE]` allow the agent to modify its own infrastructure code. Changes are made on a branch for human review before merging. Similarly, `[SKILL-BUILD]` goals create reusable Claude Code skills.
 
+### Multi-Vendor Workers (v2.1)
+
+The agent can spawn workers using different LLM backends. Each vendor implements the same `AgentWorkerProvider` interface, so goals execute identically regardless of backend:
+
+| Vendor | Backend | Auth |
+|--------|---------|------|
+| `claude` (default) | Claude Agent SDK | OAuth token |
+| `codex` | OpenAI Codex SDK | `codex login` |
+| `kimi` | Kimi Wire SDK or CLI | `kimi login` |
+
+Set globally via `WORKER_VENDOR` env, or per-goal with `worker_vendor:` in PROMPT.md frontmatter.
+
+**Live output comparison:** The same "build a finance dashboard" prompt was executed across all 4 vendor modes. Results deployed at [jackzhaojin.github.io/ai-sandbox](https://jackzhaojin.github.io/ai-sandbox/).
+
 ### Execution Patterns (v2.0)
 
 Goals can specify an execution pattern in their PROMPT.md frontmatter:
@@ -235,6 +249,7 @@ ai-docs/             PRDs, specs, version history
 ## Related
 
 - **[ai-sandbox](https://github.com/jackzhaojin/ai-sandbox)** -- Everything the agent has built
+- **[Live Deployments](https://jackzhaojin.github.io/ai-sandbox/)** -- All deployed projects on GitHub Pages
 - **[Claude Agent SDK](https://docs.anthropic.com/en/docs/claude-code/sdk)** -- The SDK this agent uses to spawn workers
 
 ## License

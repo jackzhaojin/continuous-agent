@@ -73,6 +73,8 @@ All providers normalize output to `AgentWorkerMessage` with structured `[tool_ca
 
 **Reference POCs:** `references/poc/{claude,codex,kimi}/` contain standalone proof-of-concept scripts.
 
+**Live comparison:** Same prompt executed across all 4 vendors, deployed at [jackzhaojin.github.io/ai-sandbox](https://jackzhaojin.github.io/ai-sandbox/). Analysis in `learning/finance-dashboard-comparison-2026-03-31.md`.
+
 ### Executive Loop Phases
 
 `src/core/executive-loop.ts` runs continuously:
@@ -103,6 +105,8 @@ Resolved via: PROMPT.md `execution_pattern` field > playbook match > system defa
 - **`ai-sandbox/`** (sibling directory) -- ALL worker outputs. Monorepo with isolated project directories.
 
 Workers NEVER write to the agent codebase. Enforced by Constitution Article I, Section 6.
+
+**GitHub Pages CI:** `ai-sandbox/.github/workflows/deploy-pages.yml` auto-deploys all Vite projects on push to main. Build script (`scripts/build-pages-site.mjs`) recursively discovers projects, builds with correct `--base` paths, and generates a landing page. Live at [jackzhaojin.github.io/ai-sandbox](https://jackzhaojin.github.io/ai-sandbox/).
 
 **Exceptions:**
 - `[SELF-ENHANCE]` prefixed goals route to agent codebase via `.claude/agents/self-enhancer.md`

@@ -2,6 +2,21 @@
 
 All notable changes to the Continuous Executive Agent.
 
+## [2.1.0] - 2026-04-01
+
+### Added
+- **Vendor Abstraction Layer** -- Multi-vendor LLM support for workers. `src/core/vendor/` provides two interfaces: `AgentWorkerProvider` (full agentic execution) and `ChatCompletionProvider` (simple text-in/text-out). Three vendor backends: Claude Agent SDK (default), OpenAI Codex SDK, and Kimi SDK (wire + CLI modes).
+- **Per-goal vendor override** -- Goals can specify `worker_vendor: codex` (or `kimi`) in PROMPT.md frontmatter. Priority: goal frontmatter > `WORKER_VENDOR` env > `claude` default.
+- **Kimi dual-mode support** -- `KIMI_MODE` env selects `wire` (bidirectional SDK) or `cli` (stream-json, simpler logs).
+- **Vendor E2E tests** -- `tests/e2e/vendor-workers/` with standalone test scripts for each vendor and the registry.
+- **GitHub Pages deployment** -- Automated CI pipeline deploys all React projects from `ai-sandbox/` to [jackzhaojin.github.io/ai-sandbox](https://jackzhaojin.github.io/ai-sandbox/). Recursive project discovery, per-project `--base` path injection, landing page grouped by date, SPA 404 fallback.
+- **Multi-vendor output comparison** -- Same prompt ("build a finance dashboard") executed across Claude, Codex, Kimi CLI, and Kimi Wire. [Live comparison](https://jackzhaojin.github.io/ai-sandbox/) with all 4 variants deployed. Detailed analysis in `learning/finance-dashboard-comparison-2026-03-31.md`.
+
+### Changed
+- Worker spawner routes to vendor-specific provider based on goal frontmatter or env config.
+- All vendor outputs normalized to `AgentWorkerMessage` with structured `[tool_call]`, `[tool_result]`, `[thinking]` prefixes for uniform logging.
+- `ai-sandbox` submodule-style project directories converted to regular tracked files for CI compatibility.
+
 ## [2.0.0] - 2026-03-29
 
 ### Added
