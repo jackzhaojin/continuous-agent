@@ -411,30 +411,54 @@ The verifier will check:
 ${contract.definition_of_done.map((d, i) => `- [ ] ${d}`).join('\n')}
 `);
 
-  // 7. Visual testing for web projects
+  // 7. Visual testing for web projects — MANDATORY playwright-cli usage
   const webKeywords = /next\.?js|react|vue|angular|html|css|website|web.?app|frontend|ui|component|page|form|dashboard/i;
   const itemText = `${item.title} ${item.description || ''}`;
   if (webKeywords.test(itemText)) {
-    sections.push(`## MANDATORY: Visual Testing
+    sections.push(`## ⚠️ PRE-FLIGHT CHECK: Verify the website loads BEFORE you start coding
 
-You MUST visually verify your UI work before completing. Use \`playwright-cli\` via shell:
+Before writing ANY new code, verify the existing site works:
 
 \`\`\`bash
-# Start dev server in background
-cd <project-path> && npm run dev &
+cd ${projectPath} && npm run dev &
 sleep 3
-
-# Open browser, verify page renders
-playwright-cli open http://localhost:3000
+playwright-cli open http://localhost:3000/shipments/new
 playwright-cli snapshot
-playwright-cli screenshot
-
-# Close when done
 playwright-cli close
+kill %1 2>/dev/null || true
 \`\`\`
 
-**Untested UI that compiles but renders blank is a failure.** Always verify visually.
-If \`playwright-cli\` is unavailable, at minimum run \`npm run build\` and \`curl http://localhost:3000\`.
+If the page does NOT load or shows errors, FIX THAT FIRST before doing your task. Do not build on a broken foundation.
+
+## ⚠️ MANDATORY: You MUST Use playwright-cli To Verify Your Work AFTER Building
+
+**THIS IS A HARD REQUIREMENT, NOT A SUGGESTION.** Your task is NOT complete until you have run \`playwright-cli\` to visually verify your UI renders correctly. Do NOT skip this. Do NOT substitute with curl or npm run build alone.
+
+**You MUST execute these exact shell commands after you finish building:**
+
+\`\`\`bash
+# Start dev server
+cd ${projectPath} && npm run dev &
+sleep 3
+
+# Open browser with playwright-cli (this is a real CLI tool installed on this machine)
+playwright-cli open http://localhost:3000/shipments/new
+
+# Take a snapshot to see what rendered
+playwright-cli snapshot
+
+# Take a screenshot for the record
+playwright-cli screenshot
+
+# Click on interactive elements to verify they work
+playwright-cli click <ref-from-snapshot>
+
+# Close browser and kill dev server
+playwright-cli close
+kill %1 2>/dev/null || true
+\`\`\`
+
+\`playwright-cli\` is installed at \`/Users/jackjin/.nvm/versions/node/v20.19.5/bin/playwright-cli\`. It is a real tool. Run it via your Shell tool. If you do not run playwright-cli, your work will be rejected by the verifier.
 `);
   }
 
