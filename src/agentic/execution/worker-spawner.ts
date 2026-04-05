@@ -22,6 +22,7 @@ import {
   type AgentWorkerMessage,
 } from '../../core/vendor/index.js';
 import yaml from 'js-yaml';
+import { BUILD_INFO } from '../../core/executive-loop.js';
 
 // Agent outputs directory - where workers create their projects
 const AGENT_OUTPUTS_BASE = process.env.AGENT_OUTPUTS_PATH || path.join(os.homedir(), 'dev', 'ai-sandbox');
@@ -711,6 +712,7 @@ export async function spawnWorker(
 
   // Log worker start with full context
   logger.log(`=== WORKER START ===`);
+  logger.log(`Build: ${BUILD_INFO.buildVersion}`);
   logger.log(`Task ID: ${contract.id}`);
   logger.log(`Project Path: ${projectPath}`);
   logger.log(`Relative Path: ${relativeProjectPath}`);

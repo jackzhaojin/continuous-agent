@@ -1,11 +1,11 @@
 {
   "name": "continuous-executive-agent",
-  "version": "1.0.0",
+  "version": "2.1.2-snapshot",
   "description": "Autonomous AI agent that finds and executes work",
   "main": "dist/executive-loop.js",
   "type": "module",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node scripts/generate-build-info.mjs && (pm2 sendSignal SIGUSR2 executive-loop 2>/dev/null || true)",
     "start": "node dist/executive-loop.js",
     "dev": "tsx src/executive-loop.ts",
     "typecheck": "tsc --noEmit",
