@@ -2,7 +2,7 @@
  * Vendor Registry - Resolves provider instances based on environment configuration
  *
  * Environment variables:
- *   WORKER_VENDOR  = 'claude' | 'codex'        (default: 'claude')
+ *   WORKER_VENDOR  = 'claude' | 'codex' | 'kimi' (default: 'kimi')
  *   CHAT_VENDOR    = 'claude' | 'openai' | 'moonshot' | 'custom' (default: 'claude')
  *   CHAT_MODEL     = model name for chat completions (overrides MODEL for chat calls)
  *   LLM_BASE_URL   = custom base URL for OpenAI-compatible APIs
@@ -61,7 +61,7 @@ let _chatProvider: ChatCompletionProvider | null = null;
  */
 export function getAgentWorkerProvider(): AgentWorkerProvider {
   if (!_agentProvider) {
-    const vendor = (process.env.WORKER_VENDOR || 'claude') as AgentWorkerVendor;
+    const vendor = (process.env.WORKER_VENDOR || 'kimi') as AgentWorkerVendor;
     _agentProvider = createAgentWorkerProvider(vendor);
     console.log(`[Vendor] Agent worker provider: ${_agentProvider.vendorName} (${_agentProvider.vendorId})`);
   }
@@ -86,7 +86,7 @@ export function getChatCompletionProvider(): ChatCompletionProvider {
  * Checks MODEL env var with vendor-appropriate defaults.
  */
 export function resolveWorkerModel(): string {
-  const vendor = (process.env.WORKER_VENDOR || 'claude') as AgentWorkerVendor;
+  const vendor = (process.env.WORKER_VENDOR || 'kimi') as AgentWorkerVendor;
   const model = process.env.MODEL;
 
   if (model) return model;
@@ -187,7 +187,7 @@ export function getAgentWorkerProviderForVendor(goalVendor?: AgentWorkerVendor):
  * Used alongside per-goal vendor overrides.
  */
 export function resolveWorkerModelForVendor(goalVendor?: AgentWorkerVendor): string {
-  const vendor = goalVendor || (process.env.WORKER_VENDOR || 'claude') as AgentWorkerVendor;
+  const vendor = goalVendor || (process.env.WORKER_VENDOR || 'kimi') as AgentWorkerVendor;
 
   switch (vendor) {
     case 'codex':

@@ -42,49 +42,17 @@ Analyze why this task keeps failing and determine:
 
 Respond with ONLY a JSON object (no markdown, no code blocks):
 
-```json
-{
-  "rootCause": "Brief description of why it's failing",
-  "shouldRetry": true,
-  "suggestedFix": "Specific actionable fix to apply (if shouldRetry=true)",
-  "escalateToHuman": false,
-  "diagnosis": "Detailed explanation for humans if escalating"
-}
-```
+  {"rootCause": "Brief description of why it's failing", "shouldRetry": true, "suggestedFix": "Specific actionable fix", "escalateToHuman": false, "diagnosis": "Detailed explanation for humans if escalating"}
 
 ### Examples
 
-**Automatic Fix:**
-```json
-{
-  "rootCause": "git_status_clean verifier failing because monorepo has uncommitted files from previous work",
-  "shouldRetry": true,
-  "suggestedFix": "Auto-commit all changes in the monorepo before starting this task.",
-  "escalateToHuman": false,
-  "diagnosis": ""
-}
-```
+Automatic Fix:
+  {"rootCause": "git_status_clean verifier failing because monorepo has uncommitted files", "shouldRetry": true, "suggestedFix": "Auto-commit all changes before starting this task.", "escalateToHuman": false, "diagnosis": ""}
 
-**Different Strategy:**
-```json
-{
-  "rootCause": "Worker is trying to build a JavaScript project but package.json has no build script",
-  "shouldRetry": true,
-  "suggestedFix": "Skip the build step for JavaScript projects.",
-  "escalateToHuman": false,
-  "diagnosis": ""
-}
-```
+Different Strategy:
+  {"rootCause": "Worker trying to build JS project but no build script", "shouldRetry": true, "suggestedFix": "Skip build step for JavaScript projects.", "escalateToHuman": false, "diagnosis": ""}
 
-**Human Needed:**
-```json
-{
-  "rootCause": "Notion API returning 401 Unauthorized - API key is invalid",
-  "shouldRetry": false,
-  "suggestedFix": "",
-  "escalateToHuman": true,
-  "diagnosis": "The Notion API key appears to be invalid or expired. Human needs to provide a valid API key in .env.executive."
-}
-```
+Human Needed:
+  {"rootCause": "Notion API returning 401 Unauthorized", "shouldRetry": false, "suggestedFix": "", "escalateToHuman": true, "diagnosis": "API key invalid or expired. Human needs to provide a valid key in .env.executive."}
 
 Analyze the evidence and respond with JSON only.
