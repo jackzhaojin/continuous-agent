@@ -1,89 +1,94 @@
-# Default Agent Monitor Instructions
+# Default Monitor Instructions — Continuous Agent
 
-This is the fallback monitoring configuration used when no custom instructions are provided.
-It also serves as a **template** — copy and customize this for your specific agent.
+Monitoring configuration for the continuous-agent executive loop system.
 
----
+## System Overview
 
-## Agent Identity
+- **Process**: `executive-loop` managed by PM2
+- **Entry point**: `dist/core/executive-loop.js`
+- **Config**: `ecosystem.config.cjs`
+- **Working directory**: `continuous-agent/` (agent infrastructure)
+- **Output directory**: `ai-sandbox/` (sibling directory, all worker output)
 
-- **Agent name**: unknown (discover from process list or CLAUDE.md)
-- **Runtime**: Node.js (default assumption)
-- **Process manager**: auto-detect (PM2, nohup, systemd, or bare process)
-- **Expected working directory**: target project root (usually agents work in a separate target env)
+## Key Locations
 
-## Startup
-
-- Read the project's `CLAUDE.md` for agent start instructions
-- If CLAUDE.md has no start instructions, check for `package.json` scripts, `Makefile`, or `docker-compose.yml`
-- Start the agent in the background using one of:
-  - **PM2**: `pm2 start <entry> --name <agent-name>`
-  - **nohup**: `nohup <command> > <logfile> 2>&1 &` (save PID with `echo $!`)
-- If the agent is already running, skip startup and proceed to monitoring
-
-### Process Discovery
-
-```bash
-# Check PM2
-pm2 list 2>/dev/null
-
-# Check nohup / bare processes
-ps aux | grep -E "node|python|cargo" | grep -v grep
-
-# Check for PID files
-find . -name "*.pid" -type f 2>/dev/null
-```
+| What | Path | Format |
+|------|------|--------|
+| PM2 combined log | `ledgers/pm2-combined.log` | Timestamped text |
+| PM2 error log | `ledgers/pm2-error.log` | Timestamped text |
+| PM2 stdout log | `ledgers/pm2-out.log` | Timestamped text |
+| Daily executive log | `ledgers/executive-YYYY-MM-DD.log` | Timestamped text |
+| Work ledger | `ledgers/work-ledger.jsonl` | Append-only JSONL |
+| Active goals | `workspace/in-progress/P{0-4}/` | Goal bundles |
+| Queued goals | `workspace/ondeck/` | Goal bundles |
+| Draft goals | `workspace/drafts/` | Goal bundles |
+| Completed goals | `workspace/completed/` | Goal bundles |
+| Blocked goals | `workspace/needs-you.md` | Markdown |
+| Work queue | `workspace/queue.md` | Markdown |
+| Constitution | `workspace/constitution.md` | Markdown (NEVER modify) |
+| Worker output | `../ai-sandbox/` | Project directories |
 
 ## Monitoring Cadence
 
-- **Check interval**: every 60 seconds
-- **Primary method**: check process status and read recent log output
-  - PM2: `pm2 logs <name> --lines 50 --nostream`
-  - nohup: `tail -30 <logfile>`
-  - Process: `ps -p <PID> -o pid,etime,pcpu,pmem`
-- **Also check**: recent git log, file modification times, output directories, and any structured state files (STATUS.json, progress logs, etc.)
+- **Check interval**: 60 seconds
+- **Full report**: every 10 iterations (or on demand)
+- **Delta reports**: between full reports, only report changes
 
-## What to Monitor
+## Health Indicators
 
-1. **Process health**: is the agent process alive and not in errored/stopped state?
-2. **Progress**: is the agent producing new output (files, logs, commits) between checks?
-3. **Repetition loops**: is the agent performing the same action repeatedly?
-4. **Scope violations**: is the agent modifying files outside its expected working directory?
-5. **Resource consumption**: is CPU or memory usage abnormally high? (`ps aux` or `pm2 monit`)
-6. **Structured state**: if the agent writes state files (JSON, markdown logs), parse them for anomalies
+### Healthy System
+- PM2 status: `online`
+- Low restart count relative to uptime
+- Memory well under 1G
+- Executive log shows phase cycling (0.5 → 1 → 2 → ... → 8)
+- Work ledger shows mix of completions
+- `needs-you.md` is empty or has only old entries
+
+### Warning Signs
+- PM2 restarts climbing quickly (crash loop)
+- Same goal failing 3+ times consecutively
+- No new log output for 15+ minutes (stall)
+- Worker spawned but no ai-sandbox changes appear
+- Memory approaching 1G limit
+- Auth errors in logs (token expiration)
+
+### Critical Issues
+- PM2 status: `stopped` or `erroring`
+- Goal blocked after 10+ failures (written to `needs-you.md`)
+- Disk space issues
+- Build failures (`npm run build` or `npm run typecheck`)
+- Worker writing to wrong directory (scope violation)
 
 ## Intervention Thresholds
 
 | Condition | Threshold | Action |
 |-----------|-----------|--------|
-| Same task/action repeated | > 5 times | Kill agent, report to user |
-| Process crashed / errored | Immediate | Check logs for cause, report to user |
-| No progress detected | > 15 minutes of no new output | Warn user, continue monitoring |
-| Scope violation | Any file outside working dir | Kill agent, revert changes, report |
-| Memory usage | > 90% system RAM | Kill agent, report |
-| Auth / credential error | Any occurrence | Kill agent, report (token may be expired) |
-
-## Intervention Actions
-
-- **Kill**: `kill <PID>` (graceful) or `pm2 stop <name>` if using PM2
-- **Revert**: `git checkout -- .` to undo uncommitted changes (only if safe)
-- **Codebase fix**: if the agent introduced a clear bug or bad pattern, fix it and note the change
-- **Report**: always summarize what happened and what action was taken
+| PM2 process down | Immediate | Report to user, do not restart |
+| Crash loop (rapid restarts) | 5+ restarts in 5 min | Report, suggest `pm2 stop` |
+| Goal failure streak | 3+ consecutive | Report, check Phase 7 diagnosis |
+| Goal blocked | 10+ failures | Check `needs-you.md`, report |
+| No progress | 15+ min no output | Warn user |
+| Memory high | > 800MB | Warn user |
+| Auth error in logs | Any occurrence | Report immediately |
 
 ## What NOT to Do
 
-- Do not restart an agent that was intentionally stopped by the user
-- Do not push commits on behalf of the monitored agent
-- Do not modify files unrelated to the agent's mess
-- Do not escalate by running the agent's tasks yourself — only monitor and intervene
+- Do not modify `workspace/constitution.md`
+- Do not truncate or edit ledger files (append-only)
+- Do not push commits to either repository
+- Do not restart PM2 without user approval
+- Do not modify goal bundles without user approval
 
 ## Log Format
 
-When reporting status, use this format:
-
 ```
-[MONITOR] <timestamp> | STATUS: <running|stopped|error|killed>
-  Progress: <summary of what agent did since last check>
-  Issues: <none | description>
-  Action taken: <none | description>
+[MONITOR] YYYY-MM-DD HH:mm:ss
+  PM2: <status> | uptime: <dur> | restarts: <n> | mem: <MB>
+  Active: <goal list with priorities>
+  Completed (24h): <count>
+  Failed (24h): <count>
+  Sandbox: <recent activity>
+  Blocked: <count>
+  Queue: <count>
+  Issues: <none | details>
 ```
