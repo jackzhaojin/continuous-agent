@@ -40,12 +40,31 @@
  *   MOONSHOT_API_KEY    = Moonshot AI API key
  */
 
+import { readFileSync } from 'fs';
+import path from 'path';
+import os from 'os';
 import type {
   AgentWorkerProvider,
   AgentWorkerConfig,
   AgentWorkerMessage,
   AuthValidation,
 } from './types.js';
+
+/**
+ * Read default_model from ~/.kimi/config.toml.
+ * Wire SDK doesn't read config.toml itself, so we need to pass the model explicitly.
+ */
+function resolveKimiDefaultModel(): string {
+  try {
+    const configPath = path.join(os.homedir(), '.kimi', 'config.toml');
+    const content = readFileSync(configPath, 'utf-8');
+    const match = content.match(/^default_model\s*=\s*"([^"]+)"/m);
+    if (match) return match[1];
+  } catch {
+    // Config not found or unreadable
+  }
+  return 'kimi-k2.5'; // Fallback
+}
 
 export class KimiWireAgentProvider implements AgentWorkerProvider {
   readonly vendorId = 'kimi' as const;
@@ -66,8 +85,8 @@ export class KimiWireAgentProvider implements AgentWorkerProvider {
     const { createSession } = KimiSDK;
 
     // Resolve configuration from env + config
-    // Omit model to use CLI default from ~/.config/kimi/config.toml
-    const model = process.env.KIMI_MODEL || config.model || undefined;
+    // Wire SDK requires model explicitly (unlike CLI which reads config.toml)
+    const model = process.env.KIMI_MODEL || config.model || resolveKimiDefaultModel();
     const executable = process.env.KIMI_EXECUTABLE || 'kimi';
     const thinking = process.env.KIMI_THINKING === 'true';
     // Workers auto-approve by default (equivalent to Claude's --dangerously-skip-permissions)
@@ -181,8 +200,8 @@ export class KimiWireAgentProviderWithTools extends KimiWireAgentProvider {
 
     const { createSession } = KimiSDK;
 
-    // Omit model to use CLI default from ~/.config/kimi/config.toml
-    const model = process.env.KIMI_MODEL || config.model || undefined;
+    // Wire SDK requires model explicitly (unlike CLI which reads config.toml)
+    const model = process.env.KIMI_MODEL || config.model || resolveKimiDefaultModel();
     const executable = process.env.KIMI_EXECUTABLE || 'kimi';
     const thinking = process.env.KIMI_THINKING === 'true';
     const yoloMode = process.env.KIMI_YOLO_MODE !== 'false';

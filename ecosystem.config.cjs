@@ -25,6 +25,7 @@ module.exports = {
         UNHEALTHY_SLEEP_SECONDS: '60',  // Sleep when system unhealthy
         MAX_TURNS_PER_STEP: '200',      // Default max turns per worker (higher for complex tasks)
         MODEL: 'claude-sonnet-4-5',
+        KIMI_MODEL: 'kimi-code/kimi-for-coding',
       },
       env_development: {
         NODE_ENV: 'development',
@@ -33,6 +34,7 @@ module.exports = {
         UNHEALTHY_SLEEP_SECONDS: '60',
         MAX_TURNS_PER_STEP: '200',      // Default max turns per worker
         MODEL: 'claude-sonnet-4-5',
+        KIMI_MODEL: 'kimi-code/kimi-for-coding',
       },
 
       // Restart policy

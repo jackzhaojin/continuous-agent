@@ -292,7 +292,7 @@ ${replaceLines.length > 0 ? `\n### Do NOT use local alternatives when a cloud se
 
   // Load CLAUDE.md template and render with dynamic sections
   const claudeMdPath = path.join(AGENT_OUTPUTS_BASE, 'CLAUDE.md');
-  const templatePath = path.join(AGENT_BASE, 'src', 'agentic', 'prompts', 'execution', 'ai-sandbox-claude-md-v1.0.0.md');
+  const templatePath = path.join(AGENT_BASE, 'src', 'agentic', 'worker-prompts', 'execution', 'ai-sandbox-claude-md-v1.0.0.md');
   let templateBody: string;
   try {
     const raw = readFileSync(templatePath, 'utf-8');
