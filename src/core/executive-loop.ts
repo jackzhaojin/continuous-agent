@@ -767,10 +767,12 @@ async function main(): Promise<void> {
   // SIGUSR2: graceful restart for new builds
   // `npm run build` sends this signal after compilation.
   // We finish the current iteration, then exit so PM2 restarts with new code.
+  let restartRequested = false;
   process.on('SIGUSR2', () => {
     log('');
     log('Received SIGUSR2 - new build detected, will restart after current iteration...');
     loopState.running = false;
+    restartRequested = true;
   });
 
   // === STARTUP: ORPHAN WORKER CLEANUP ===
@@ -915,8 +917,13 @@ async function main(): Promise<void> {
   }
 
   log('');
-  log('Executive loop stopped');
+  if (restartRequested) {
+    log('Executive loop restarting with new build...');
+  } else {
+    log('Executive loop stopped');
+  }
   closeLogStream();
+  process.exit(0); // Always exit cleanly so PM2 can restart
 }
 
 // Start the loop

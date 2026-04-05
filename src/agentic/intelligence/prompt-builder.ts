@@ -411,6 +411,33 @@ The verifier will check:
 ${contract.definition_of_done.map((d, i) => `- [ ] ${d}`).join('\n')}
 `);
 
+  // 7. Visual testing for web projects
+  const webKeywords = /next\.?js|react|vue|angular|html|css|website|web.?app|frontend|ui|component|page|form|dashboard/i;
+  const itemText = `${item.title} ${item.description || ''}`;
+  if (webKeywords.test(itemText)) {
+    sections.push(`## MANDATORY: Visual Testing
+
+You MUST visually verify your UI work before completing. Use \`playwright-cli\` via shell:
+
+\`\`\`bash
+# Start dev server in background
+cd <project-path> && npm run dev &
+sleep 3
+
+# Open browser, verify page renders
+playwright-cli open http://localhost:3000
+playwright-cli snapshot
+playwright-cli screenshot
+
+# Close when done
+playwright-cli close
+\`\`\`
+
+**Untested UI that compiles but renders blank is a failure.** Always verify visually.
+If \`playwright-cli\` is unavailable, at minimum run \`npm run build\` and \`curl http://localhost:3000\`.
+`);
+  }
+
   // Compose
   let finalPrompt = sections.join('\n\n---\n\n');
 
