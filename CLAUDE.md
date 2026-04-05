@@ -65,7 +65,7 @@ Worker vendors (`WORKER_VENDOR` env):
 | `codex` | OpenAI Codex SDK threads | `codex login` (ChatGPT) |
 | `kimi` | Wire SDK or CLI stream-json | `kimi login` (CLI session) |
 
-Kimi has two modes (`KIMI_MODE` env): `wire` (default, `@moonshot-ai/kimi-agent-sdk`, bidirectional) or `cli` (`--print --output-format=stream-json`, simpler, cleaner logs).
+Kimi has two modes (`KIMI_MODE` env): `cli` (default, `--print --output-format=stream-json`, accurate turn counting) or `wire` (`@moonshot-ai/kimi-agent-sdk`, bidirectional but inflates turn counts).
 
 **Per-goal vendor override:** Add `worker_vendor: codex` (or `kimi`) to PROMPT.md frontmatter. Priority: goal frontmatter > `WORKER_VENDOR` env > `claude` default.
 
@@ -113,17 +113,79 @@ Workers NEVER write to the agent codebase. Enforced by Constitution Article I, S
 - `[SKILL-BUILD]` prefixed goals route to `.claude/agents/skill-builder.md`
 - Both work on branches for human review before merge
 
-## Agent Configuration (`.claude/`)
+## Skills Architecture (Two-CWD Model)
 
-The `.claude/` directory is where agentic behavior is defined — agents, rules, and skills that Claude loads when working on this codebase.
+Skills are separated into **executive skills** and **worker skills** based on which process reads them. This separation is enforced by CWD — the executive runs from `continuous-agent/`, workers run from `ai-sandbox/`.
+
+### Executive Skills — `.claude/skills/`
+
+Located at `continuous-agent/.claude/skills/`. Read by the executive loop and Claude Code when working on the agent codebase.
+
+| Skill | Purpose |
+|-------|---------|
+| `executive-loop` | 8-phase loop orchestration |
+| `work-selection` | Priority-based goal selection |
+| `goal-breakdown` | LLM-based task decomposition |
+| `goal-drafter` | Goal bundle creation |
+| `task-contract` | Executive-worker contract creation |
+| `failure-diagnosis` | Root cause analysis after failures |
+| `validator` | Post-worker verification |
+| `email-triage` | Gmail inbox classification |
+| `practice-loop` | Idle-time skill improvement |
+| `retrospective` | Performance analysis |
+| `long-agent-monitor` | PM2/log monitoring |
+
+### Worker Skills — `claude-files-to-output/skills/`
+
+Located at `continuous-agent/claude-files-to-output/skills/`. **Synced to `ai-sandbox/.claude/skills/` before every worker spawn** by `worker-spawner.ts`. This is the pipeline:
+
+```
+continuous-agent/claude-files-to-output/    ──cpSync──>    ai-sandbox/.claude/
+├── skills/                                                ├── skills/
+│   ├── calibration-nextjs/SKILL.md                       │   ├── calibration-nextjs/SKILL.md
+│   ├── project-architect/SKILL.md                        │   ├── project-architect/SKILL.md
+│   ├── playwright-demo-video/SKILL.md                    │   ├── playwright-demo-video/SKILL.md
+│   └── ...                                               │   └── ...
+└── agents/                                               └── agents/
+    ├── code-validator.md                                     ├── code-validator.md
+    └── task-researcher.md                                    └── task-researcher.md
+```
+
+- **Claude workers** (CWD = `ai-sandbox/`) read `ai-sandbox/.claude/skills/` automatically via the SDK and can invoke them with the `Skill` tool
+- **Kimi/Codex workers** (CWD = `ai-sandbox/`) do NOT read `.claude/skills/`. All instructions must be injected into the prompt string by the V2 prompt builder
+- **To add a new worker skill:** create it in `claude-files-to-output/skills/{name}/SKILL.md` — it will be synced on next worker spawn
+
+### Other `.claude/` directories
 
 | Directory | Purpose |
 |-----------|---------|
 | `.claude/agents/` | Subagent definitions (self-enhancer, skill-builder). Spawned for `[SELF-ENHANCE]` and `[SKILL-BUILD]` goals. |
 | `.claude/rules/` | Contextual rules loaded by Claude Code — domain knowledge about each subsystem (identity, verifiers, ledgers, credentials, etc.) |
-| `.claude/skills/` | Reusable skill definitions with `SKILL.md` files. Used by the executive loop, work selection, validation, and more. |
 
-**Key principle:** Communication, diagnosis, and decision-making are **agentic** — driven by LLM reasoning, not hardcoded TypeScript logic. The TypeScript is plumbing (fetch data, execute decisions, write state). The intelligence lives in prompts sent to `ChatCompletionProvider`.
+## Prompt System (V2 Composition)
+
+Worker prompts are built by `buildV2ComposedPrompt()` in `src/agentic/intelligence/prompt-builder.ts`. This is the ONLY active prompt path (`V2_PROMPT_COMPOSITION=true`).
+
+**How V2 composes prompts:**
+1. **Objective** — task title, description, priority, contract ID, project path
+2. **Constraints** — tools allowed, max turns, definition of done
+3. **Execution pattern** — plan-then-execute, loop-until-progress, etc.
+4. **Playbook** — matched from `playbooks/` directory (if any exist)
+5. **Skill references** — loaded from `skills/` directory (if playbook references them)
+6. **Validation criteria** — definition of done as checklist
+7. **Web testing** — playwright-cli instructions injected for web projects (keyword detection)
+
+**IMPORTANT:** `src/agentic/worker-prompts/` (V1 templates) is legacy dead code. `worker-base-v2.1.0.md` and other templates are NOT loaded. Do not edit V1 templates expecting workers to see them.
+
+**Vendor-specific behavior:**
+
+| Vendor | Reads CLAUDE.md? | Reads Skills? | Tool Names | Prompt Source |
+|--------|-----------------|---------------|------------|---------------|
+| Claude | Yes (SDK auto-loads) | Yes (Skill tool) | Read, Write, Edit, Bash | V2 prompt + CLAUDE.md + Skills |
+| Kimi CLI | No | No | ReadFile, WriteFile, StrReplaceFile, Shell | V2 prompt ONLY (everything must be in prompt string) |
+| Codex | No | No | Own tool set | V2 prompt ONLY |
+
+**Key principle:** Communication, diagnosis, and decision-making are **agentic** — driven by LLM reasoning, not hardcoded TypeScript logic. The TypeScript is plumbing (fetch data, execute decisions, write state). The intelligence lives in skills loaded by the prompt builder.
 
 Examples of agentic (not deterministic) behavior:
 - **Email triage** (`inbox-checker.ts`) — LLM classifies each email and decides: queue, reply, or archive
@@ -194,7 +256,9 @@ DISCORD_ENABLED=true           # Discord notifications
 | Identity (Discord) | `src/identity/discord-client.ts` |
 | Constitution | `workspace/constitution.md` (**NEVER auto-modify**) |
 | Workspace docs | `workspace-instructions/` (git-tracked template, frontmatter reference, file docs) |
-| Prompt templates | `src/agentic/worker-prompts/{category}/` (versioned filenames) |
+| Prompt builder (V2) | `src/agentic/intelligence/prompt-builder.ts` (V2 composition, the only active path) |
+| Worker skills source | `claude-files-to-output/skills/` (synced to `ai-sandbox/.claude/skills/` before each spawn) |
+| Prompt templates (V1) | `src/agentic/worker-prompts/` (**DEAD CODE** — not loaded when V2 is active) |
 | Capability registries | `capabilities/*.yml` |
 
 ## Code Modification Rules
@@ -202,7 +266,7 @@ DISCORD_ENABLED=true           # Discord notifications
 1. **Constitution** (`workspace/constitution.md`) -- NEVER auto-modify
 2. **Ledgers** -- Append-only JSONL, never truncate or modify existing entries
 3. **Verifiers** -- Must check `result.output_path`, NOT `process.cwd()`
-4. **Prompt templates** -- Changes affect all future tasks; organized in `src/agentic/worker-prompts/{category}/`
+4. **Worker skills** -- Add to `claude-files-to-output/skills/` (synced to ai-sandbox). Do NOT edit V1 templates in `src/agentic/worker-prompts/` — they are dead code
 5. **PM2** -- Rebuild only (`npm run build`), don't restart unless explicitly asked
 
 ## Debugging
