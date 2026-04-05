@@ -20,6 +20,27 @@ When this skill is invoked:
 
 **The user expects you to keep watching.** If you finish one check and stop, you have failed the purpose of this skill. The whole point is persistent, ongoing supervision of a 24/7 autonomous system.
 
+## CRITICAL: No Subagents, No Delegation
+
+**ALL monitoring work MUST happen in the main context window.** Do NOT:
+- Spawn subagents (Agent tool) for any part of monitoring
+- Delegate log reading, file checks, or process checks to subtasks
+- Use Task tool to offload any monitoring work
+
+**Why:** This skill requires persistent state across cycles — you need to remember what the last check looked like to compute deltas. Subagents lose that context. You also need continuity to spot trends (slowly climbing memory, gradually increasing failure counts, a goal that's been stuck for 3 cycles). A subagent sees one snapshot; you see the movie.
+
+Run every command yourself. Read every log yourself. Keep the full picture in your head.
+
+## Mindset: Senior Developer On-Call
+
+You are not a passive log reader. You are a **senior developer actively supervising a production system**. Think like an on-call engineer:
+
+- **Read logs critically.** Don't just check "are there errors?" — understand what the system is doing. Is the worker making real progress or spinning? Is the goal breakdown sensible or did it produce garbage steps? Is the executive loop picking the right work?
+- **Spot patterns.** A single failure is noise. The same goal failing 3 times with different errors is a flaky dependency. The same goal failing 3 times with the same error is a bug in the prompt or the worker setup.
+- **Correlate across sources.** If a worker spawned 10 minutes ago but ai-sandbox has no new commits, that's suspicious. If ledger shows "completed" but STEPS.json shows 2/5 steps done, something is wrong. If PM2 memory is climbing each cycle, there's a leak.
+- **Think about root cause.** Don't just report "worker failed." Ask: was it an auth error (token expired)? A build error (bad TypeScript)? A scope error (worker tried to write to wrong directory)? A prompt error (worker misunderstood the goal)?
+- **Prioritize what matters.** A P0 goal failing is more urgent than a P3 goal failing. A crash loop is more urgent than a stalled idle queue. Act accordingly in your reporting.
+
 ## Step 1: PM2 Process Health
 
 Check the executive loop process managed by PM2:
@@ -247,17 +268,46 @@ If any of these are detected during a check, report immediately and prominently:
 - **NEVER exit the loop on your own.** Only stop when the user explicitly says to stop
 - If the context window is getting long, summarize prior checks and continue — do not stop
 
-## Intervention Guidelines
+## Active Triage When Things Go Wrong
 
-This skill is for **monitoring and reporting only** by default. Do NOT:
+When you detect a problem, don't just report it — **investigate it like a senior dev would.** Dig into the root cause before telling the user.
+
+### Triage Workflow
+
+1. **Detect** — something looks wrong (failure, crash, stall, anomaly)
+2. **Investigate** — immediately dig deeper:
+   - Read the full error from logs, not just the last line
+   - Check the worker log for the specific goal (`grep "Goal Name" ledgers/work-ledger.jsonl | jq -r '.contract_id'` then find that worker's log)
+   - Look at the goal's PROMPT.md — is the prompt reasonable? Are the steps well-defined?
+   - Check if the same goal succeeded before (previous ledger entries)
+   - Check if other goals are also failing (systemic issue vs. isolated)
+   - Look at ai-sandbox git log — did the worker make partial progress before failing?
+3. **Diagnose** — form an opinion:
+   - **Auth issue**: token expired, OAuth refresh failed → tell user to refresh credentials
+   - **Build issue**: TypeScript compilation error → read the error, identify the file and line
+   - **Prompt issue**: worker misunderstood the goal → the PROMPT.md needs rewriting
+   - **Environment issue**: missing dependency, disk full, wrong Node version → identify what's missing
+   - **Worker bug**: worker wrote to wrong directory, corrupted state → identify what happened
+   - **Systemic issue**: multiple goals failing → check if health check (Phase 1) is passing, look for common factor
+4. **Report with recommendation** — tell the user:
+   - What's wrong (specific, not vague)
+   - Why it's happening (root cause, not symptom)
+   - What you recommend (specific action, not "investigate further")
+   - Severity: is this blocking all work, or just one goal?
+
+### Example Triage (good vs bad)
+
+**Bad:** "Worker for finance-dashboard failed. Check logs."
+
+**Good:** "Worker for finance-dashboard (P2) failed 3 times in a row. All 3 failures show `CLAUDE_CODE_OAUTH_TOKEN` rejected with 401. The token in `.env.worker` likely expired. Last successful worker ran 6 hours ago, suggesting token TTL is ~6h. Recommend: refresh the OAuth token and restart the executive loop. All other goals are also likely blocked by this — no point retrying until auth is fixed."
+
+### Guardrails
+
+Even with active triage, do NOT:
 - Restart PM2 processes without user approval
-- Modify goal bundles or ledgers
+- Modify goal bundles, ledgers, or PROMPT.md files
 - Push commits on behalf of workers
-- Take over worker tasks
+- Take over worker tasks or run worker commands yourself
+- Modify `workspace/constitution.md` (ever)
 
-**Exception:** If the user explicitly grants intervention authority, you may:
-- `pm2 stop executive-loop` to halt a crash-looping process
-- `pm2 restart executive-loop` after a fix is applied
-- Flag specific goals for re-queue by updating their status
-
-Always explain what you found and what you recommend before taking action.
+**You investigate and recommend. The user decides and acts.** The one exception: if the user has explicitly told you "fix things if you can", then you may take corrective action — but still report what you did.
