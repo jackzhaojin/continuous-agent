@@ -705,14 +705,19 @@ export async function spawnWorker(
     // loop-until-progress — handled at executive-loop level (Phase 4 re-execution loop)
   }
 
+  // Resolve vendor provider before logging so we can include vendor info
+  const workerCwd = (isSelfEnhance || isSkillBuild) ? projectPath : AGENT_OUTPUTS_BASE;
+  const provider = getAgentWorkerProviderForVendor(workItem?.worker_vendor);
+
   // Log worker start with full context
   logger.log(`=== WORKER START ===`);
   logger.log(`Task ID: ${contract.id}`);
   logger.log(`Project Path: ${projectPath}`);
   logger.log(`Relative Path: ${relativeProjectPath}`);
-  logger.log(`CWD: ${(isSelfEnhance || isSkillBuild) ? projectPath : AGENT_OUTPUTS_BASE}`);
+  logger.log(`CWD: ${workerCwd}`);
   logger.log(`Category: ${category}`);
-  logger.log(`Model: ${model}`);
+  logger.log(`Vendor: ${provider.vendorName} (${provider.vendorId})`);
+  logger.log(`Model: ${model || '(vendor default)'}`);
   logger.log(`Max Turns: ${contract.max_turns}`);
   logger.log(`Tools: ${allowedTools.join(', ')}`);
   logger.log(`--- PROMPT ---`);
@@ -720,16 +725,6 @@ export async function spawnWorker(
   logger.log(`--- END PROMPT ---`);
 
   try {
-
-    // Determine cwd for the Agent SDK:
-    // - Self-enhance/skill-build: AGENT_BASE (the agent codebase)
-    // - Regular workers: AGENT_OUTPUTS_BASE (monorepo root, NOT per-project)
-    //   CLAUDE.md, .claude/skills, .claude/agents all live at ai-sandbox root.
-    //   Workers navigate to their project subdirectory via prompt instructions.
-    const workerCwd = (isSelfEnhance || isSkillBuild) ? projectPath : AGENT_OUTPUTS_BASE;
-
-    // Spawn worker via vendor provider — per-goal override > env config > claude default
-    const provider = getAgentWorkerProviderForVendor(workItem?.worker_vendor);
     const stream = provider.spawn({
       prompt,
       model,

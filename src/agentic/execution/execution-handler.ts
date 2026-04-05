@@ -232,8 +232,9 @@ export async function executeWork(
       }
     }
 
-    // AGENTIC: Spawn Agent SDK worker
-    log(`  Spawning Agent SDK worker...`);
+    // AGENTIC: Spawn worker via vendor provider
+    const vendorLabel = item.worker_vendor || process.env.WORKER_VENDOR || 'claude';
+    log(`  Spawning worker... (vendor: ${vendorLabel})`);
     if (scopedItem.execution_pattern) {
       log(`  Execution pattern: ${scopedItem.execution_pattern}`);
     }
