@@ -50,6 +50,60 @@ function recordSend(): void {
   sendTimestamps.push(Date.now());
 }
 
+
+const REPLY_DEDUP_WINDOW_MS = 24 * 60 * 60 * 1000;
+const recentReplySignatures = new Map<string, number>();
+
+function normalizeForSignature(value: string): string {
+  return value.toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+function extractEmailAddress(fromHeader: string): string {
+  const match = fromHeader.match(/<([^>]+)>/);
+  if (match?.[1]) {
+    return match[1].toLowerCase().trim();
+  }
+  return fromHeader.toLowerCase().trim();
+}
+
+function isLikelyAutomatedSender(fromHeader: string): boolean {
+  const address = extractEmailAddress(fromHeader);
+  const localPart = address.split('@')[0] || '';
+
+  if (/(?:^|[-_.])(no[-_.]?reply|noreply|mailer[-_.]?daemon|postmaster|notifications?)(?:$|[-_.])/.test(localPart)) {
+    return true;
+  }
+
+  if (/@(?:.+\.)?(notion\.so|makenotion\.com)$/.test(address)) {
+    return true;
+  }
+
+  return false;
+}
+
+function makeReplySignature(email: FetchedEmail, replyBody: string): string {
+  const sender = normalizeForSignature(extractEmailAddress(email.from));
+  const subject = normalizeForSignature(email.subject.replace(/^re:\s*/i, ''));
+  const bodySnippet = normalizeForSignature(replyBody).slice(0, 200);
+  return `${sender}::${subject}::${bodySnippet}`;
+}
+
+function hasRecentlySentSimilarReply(signature: string): boolean {
+  const now = Date.now();
+  for (const [key, ts] of recentReplySignatures.entries()) {
+    if (now - ts > REPLY_DEDUP_WINDOW_MS) {
+      recentReplySignatures.delete(key);
+    }
+  }
+
+  const existing = recentReplySignatures.get(signature);
+  return existing !== undefined && now - existing <= REPLY_DEDUP_WINDOW_MS;
+}
+
+function recordReplySignature(signature: string): void {
+  recentReplySignatures.set(signature, Date.now());
+}
+
 // ── Agentic Email Triage ───────────────────────────────────────────
 
 interface TriagedEmail {
@@ -92,7 +146,7 @@ async function triageEmails(emails: FetchedEmail[], agentEmail: string): Promise
     model,
     messages: [{ role: 'user', content: prompt }],
     maxTokens: 1500,
-    temperature: 0.1,
+    temperature: 0.5,
   });
 
   const jsonMatch = result.text.match(/\{[\s\S]*\}/);
@@ -154,6 +208,9 @@ export async function checkInbox(currentIteration: number): Promise<InboxCheckRe
       if (config.agentEmail && from.includes(config.agentEmail.toLowerCase())) {
         log(`  [SELF] Archiving self-sent email: "${email.subject}"`);
         await archiveEmail(email.messageId, config);
+      } else if (isLikelyAutomatedSender(email.from)) {
+        log(`  [AUTO] Archiving likely automated sender: "${email.subject}" from ${email.from}`);
+        await archiveEmail(email.messageId, config);
       } else {
         externalEmails.push(email);
       }
@@ -212,9 +269,22 @@ export async function checkInbox(currentIteration: number): Promise<InboxCheckRe
         await archiveEmail(email.messageId, config);
 
       } else if (decision.action === 'reply' && decision.replyBody) {
-        // Reply — but only if not throttled
+        // Reply — but only if not throttled and not loop-prone
+        if (isLikelyAutomatedSender(email.from)) {
+          log(`  [AUTO-BLOCK] LLM requested reply, but sender appears automated (${email.from}) — archiving`);
+          await archiveEmail(email.messageId, config);
+          continue;
+        }
+
         if (isSendThrottled()) {
           log(`  [THROTTLED] Skipping reply to ${email.from} — max ${SEND_MAX_PER_HOUR}/hour reached, archiving instead`);
+          await archiveEmail(email.messageId, config);
+          continue;
+        }
+
+        const signature = makeReplySignature(email, decision.replyBody);
+        if (hasRecentlySentSimilarReply(signature)) {
+          log(`  [DEDUP] Similar reply already sent in last 24h to ${email.from} — archiving instead`);
           await archiveEmail(email.messageId, config);
           continue;
         }
@@ -224,6 +294,7 @@ export async function checkInbox(currentIteration: number): Promise<InboxCheckRe
         if (sent) {
           repliesSent++;
           recordSend();
+          recordReplySignature(signature);
           log(`  Sent reply to ${email.from}`);
         }
         await archiveEmail(email.messageId, config);
