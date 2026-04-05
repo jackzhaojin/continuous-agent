@@ -1,8 +1,0 @@
-f45c25b feat: add script to overlay background music on video
-389cad2 feat: add highlights demo scripts for voice narration and video merging
-ac741a1 feat: add video recording configuration and update demo scripts for captioned playback
-279d33c feat: add highlights demo with on-screen captions for enhanced accessibility
-03c009e feat: expand full tour demo with comprehensive mobile walkthrough
-2d84732 feat(task-22): complete full tour demo script with voice-over and validation report
-8952392 feat(task-22): full tour demo script with voice-over narration
-1ba8c6b feat(task-21): Add highlights demo script with voice-over and toast timing fix

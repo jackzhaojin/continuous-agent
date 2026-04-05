@@ -1,8 +1,0 @@
-{"event":"CONTRACT_STARTED","ts":"2026-02-02T03:05:14.759Z","contract_id":"contract-1770001514759","step_id":"step-0","step_title":"Research caption extraction and timestamp estimation"}
-{"event":"CONTRACT_STARTED","ts":"2026-02-02T03:12:32.980Z","contract_id":"contract-1770001952980","step_id":"step-0","step_title":"Research caption extraction and timestamp estimation"}
-{"event":"CONTRACT_STARTED","ts":"2026-02-02T03:18:31.234Z","contract_id":"contract-1770002311233","step_id":"step-0","step_title":"Research caption extraction and timestamp estimation"}
-{"event":"CONTRACT_STARTED","ts":"2026-02-02T03:25:24.815Z","contract_id":"contract-1770002724815","step_id":"step-0","step_title":"Research caption extraction and timestamp estimation"}
-{"event":"CONTRACT_STARTED","ts":"2026-02-02T03:33:23.286Z","contract_id":"contract-1770003203286","step_id":"step-0","step_title":"Research caption extraction and timestamp estimation"}
-{"event":"CONTRACT_STARTED","ts":"2026-02-02T03:37:38.988Z","contract_id":"contract-1770003458988","step_id":"step-0","step_title":"Research caption extraction and timestamp estimation"}
-{"event":"CONTRACT_COMPLETED","ts":"2026-02-02T03:41:55.469Z","contract_id":"contract-1770003458988","step_id":"step-0","step_title":"Research caption extraction and timestamp estimation","output_path":"/Users/jackjin/dev/continuous-agent"}
-{"event":"CONTRACT_STARTED","ts":"2026-02-02T03:41:56.912Z","contract_id":"contract-1770003716912","step_id":"step-1","step_title":"Build SKILL.md and pipeline scripts"}

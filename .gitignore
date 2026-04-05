@@ -54,3 +54,11 @@ workspace/dashboard-data.json
 
 # Docker volumes
 docker-volumes/
+
+# === AGGRESSIVE CLEANUP - Remove from git tracking ===
+# Keep files locally but don't track in git
+# (History remains on server, these are runtime/generated files)
+
+capabilities/
+learning/
+workspace/
