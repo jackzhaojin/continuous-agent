@@ -6,154 +6,216 @@ description: |
 
 # Goal Drafter
 
-You are a goal authoring assistant. Your job is to take a user's project idea and produce a complete, thorough goal bundle that the autonomous executive loop can pick up and execute via worker agents.
+Draft goal bundles that the executive loop picks up and executes via worker agents. Guide the user through every decision with multiple-choice options.
 
-## Examples
+## Guided Interview Process
 
-This skill includes real examples at two complexity levels. **Read these before drafting** to calibrate your output.
+Walk the user through these decisions **in order**. Present each as a multiple-choice question. Do not skip ahead or assume answers. Wait for user input at each step before proceeding.
 
-### Simple Goals (single PROMPT.md, no requirements/ folder)
+### Step 1: What are we building?
 
-Three vendor variants of the same finance dashboard project -- same spec, different `worker_vendor`:
+Ask the user to describe the project in their own words. If they point to existing code or specs, read them thoroughly before proceeding.
 
-- `./examples/simple/finance-dashboard-claude/PROMPT.md` -- Claude vendor
-- `./examples/simple/finance-dashboard-codex/PROMPT.md` -- Codex vendor
-- `./examples/simple/finance-dashboard-kimi-cli/PROMPT.md` -- Kimi CLI vendor
+### Step 2: Complexity assessment
 
-**Key traits of simple goals:**
-- Single `PROMPT.md` (no separate requirements/ or references/ folders)
-- All requirements fit in the Definition of Done section
-- ~100 lines, complexity: `medium` (but actually simple scope)
-- No database, no API routes, no multi-step flow
-- Everything a worker needs is in one file
+Based on the description, present:
 
-### Medium Goals (multi-file requirements packet)
+```
+How complex is this project?
 
-A full B2B postal checkout flow with Supabase backend:
+  (a) Simple — Frontend-only, single page, no database, no API routes
+      → Single PROMPT.md, no requirements/ folder, ~100 lines
+      → Example: ./references/simple/finance-dashboard-claude/PROMPT.md
 
-- `./examples/medium/b2b-postal-checkout/PROMPT.md` -- Main goal file
-- `./examples/medium/b2b-postal-checkout/requirements/` -- 9 requirement documents (3,200+ lines)
-- `./examples/medium/b2b-postal-checkout/references/` -- Architecture and tech stack docs
+  (b) Medium — Fullstack with DB + API + UI, or multi-step flow
+      → PROMPT.md + 3-5 requirements docs + references
+      → Example: ./references/medium/b2b-postal-checkout/PROMPT.md
 
-**Key traits of medium goals:**
-- PROMPT.md references requirements docs (doesn't duplicate them)
-- Requirements split by concern: overview, data models, API endpoints, business logic, components, design system, validation rules, etc.
-- Every field, every validation rule, every API request/response documented
-- References folder has architecture decisions and tech stack setup commands
-- complexity: `high`, max_turns: 500, worker_vendor specified
+  (c) High — Large SaaS app, complex business logic, many pages
+      → PROMPT.md + 6-10 requirements docs + references
+      → Same structure as medium but more docs
+```
 
-### When to use which pattern
+### Step 3: Priority
 
-| Signal | Pattern | Example |
-|--------|---------|---------|
-| Frontend-only, no DB, single page | Simple (1 file) | Finance dashboard |
-| Fullstack, DB + API + UI, multi-step | Medium (multi-file) | B2B postal checkout |
-| Multiple pages, complex business logic | Medium (multi-file) | Any SaaS app |
-| CLI tool, script, or small utility | Simple (1 file) | Build tool, formatter |
+```
+What priority?
+
+  (a) P0 — Critical / immediate. Agent picks this up first.
+  (b) P1 — High priority.
+  (c) P2 — Normal priority. [recommended for most goals]
+  (d) P3 — Default queue priority.
+  (e) P4 — Backlog / low priority.
+```
+
+### Step 4: Worker vendor
+
+```
+Which LLM vendor should build this?
+
+  (a) claude  — Claude Agent SDK. Best quality, highest cost.
+  (b) codex   — OpenAI Codex SDK. Strong at code generation.
+  (c) kimi    — Kimi K2.5 (wire mode). Good balance of quality and speed.
+  (d) kimi-cli — Kimi K2.5 (CLI mode). Simpler, cleaner logs.
+  (e) Leave blank — Use system default (currently: claude)
+```
+
+### Step 5: Execution pattern
+
+```
+How should the worker approach this?
+
+  (a) plan-then-execute — [default] Research/plan first, then build.
+      Best for most tasks.
+  (b) loop-until-progress — Keep iterating while making forward progress.
+      Good for incremental/exploratory work.
+  (c) plan-mode — Read-only. For research and analysis only.
+  (d) deterministic-pipeline — Fixed step sequence.
+      For well-defined multi-stage builds.
+```
+
+### Step 6: Max turns
+
+```
+How many turns per step?
+
+  (a) 200 — Standard. Good for simple goals.
+  (b) 300 — Extended. Good for medium goals.
+  (c) 500 — Large. For complex goals, Playwright testing, fullstack.
+  (d) Custom — Enter a number.
+```
+
+### Step 7: Tech stack
+
+Ask the user to confirm or specify:
+- Language (TypeScript, Python, Rust, Go, etc.)
+- Framework (React, Next.js, Express, etc.)
+- Database (Supabase, PostgreSQL, SQLite, none)
+- Build system (npm, pip, cargo, etc.)
+- Any key libraries
+
+### Step 8: Existing code or references?
+
+```
+Are there existing codebases to reference?
+
+  (a) No — Building from scratch
+  (b) Yes — Point me to the path(s) and I'll reverse-engineer requirements
+  (c) source_project — Copy from a completed project in project-registry.yml
+```
+
+If (b): Read ALL referenced code thoroughly. Extract every feature, field, validation rule, business rule, data model, API endpoint, component, and algorithm. See "When Referencing Existing Code" below.
+
+### Step 9: Confirm and generate
+
+Summarize all choices in a table and ask for confirmation before writing files:
+
+```
+Goal Summary:
+  Title:             B2B Postal Checkout Flow
+  Slug:              b2b-postal-checkout
+  Priority:          P2
+  Complexity:        High (6-10 requirements docs)
+  Worker:            kimi
+  Pattern:           plan-then-execute
+  Max turns:         500
+  Stack:             Next.js 15, Supabase, Tailwind, shadcn/ui
+  Source project:    (none)
+
+Proceed? (y/n)
+```
 
 ## Output Location
 
-All output goes to `workspace/drafts/<slug>/` where `<slug>` is a URL-safe identifier derived from the goal title.
+All output goes to `workspace/drafts/<slug>/`.
 
 ## Bundle Structure
 
-Create this directory structure:
-
+**Simple goals** (complexity: low):
 ```
 workspace/drafts/<slug>/
-  PROMPT.md                          # Main goal file (YAML frontmatter + markdown)
-  requirements/                      # Detailed specs (multiple focused .md files)
+  PROMPT.md          # Everything in one file
+```
+
+**Medium/High goals** (complexity: medium or high):
+```
+workspace/drafts/<slug>/
+  PROMPT.md                          # Main goal (references requirement docs)
+  requirements/
     01-overview.md                   # Overview & user journey
     02-data-models.md                # Database schema / data structures
-    03-api-endpoints.md              # API route specs (if applicable)
+    03-api-endpoints.md              # API route specs
     04-business-logic.md             # Core business rules & algorithms
-    05-components.md                 # UI component specs (if applicable)
-    06-design-system.md              # Styling, colors, typography (if applicable)
+    05-components.md                 # UI component specs
+    06-design-system.md              # Styling, colors, typography
     ...additional as needed...
-  references/                        # Architecture notes, tech stack, examples
+  references/
     architecture.md                  # Architecture decisions
     tech-stack.md                    # Technology choices & setup commands
 ```
 
-For **simple goals**, skip the requirements/ and references/ folders entirely. Put everything in PROMPT.md.
-
 ## PROMPT.md Frontmatter
 
-Reference: `workspace-instructions/README.md` has the complete field reference.
-
-Required fields to set:
+Full field reference: `workspace-instructions/README.md`
 
 ```yaml
 ---
-title: "[Descriptive Title]"
-slug: "url-safe-slug"
-priority: P2                           # P0-P4 based on urgency
+title: "[from interview]"
+slug: "[derived from title]"
+priority: P2                           # From Step 3
 status: pending                        # Always 'pending' for drafts
-complexity: medium                     # low | medium | high
+complexity: medium                     # From Step 2
 created: "YYYY-MM-DD"                 # Today's date
 tags: [relevant, tags]
-execution_pattern: plan-then-execute   # Or loop-until-progress for incremental
-max_turns: 500                         # 200 for simple, 500 for complex
-worker_vendor:                         # claude | codex | kimi (leave blank for default)
-output_path:                           # Leave blank (auto-set by worker)
-branch:                                # Leave blank (unless self-enhance)
-source_project:                        # Slug of existing project to copy from (optional)
+execution_pattern: plan-then-execute   # From Step 5
+max_turns: 500                         # From Step 6
+worker_vendor:                         # From Step 4
+output_path:                           # Leave blank
+branch:                                # Leave blank (unless [SELF-ENHANCE])
+source_project:                        # From Step 8c if applicable
 ---
 ```
 
 ## Requirements Quality Standards
 
-**Be thorough.** Requirements documents are the worker agent's primary input. A worker that doesn't understand what to build will fail.
+**Be thorough.** Requirements are the worker's primary input. A worker that doesn't understand what to build will fail.
 
-### What makes good requirements:
+1. **Specificity**: Name exact fields, types, validation rules, error messages
+2. **Completeness**: Every page, API endpoint, component documented
+3. **Structure**: Tables for fields, code blocks for schemas, hierarchical headers
+4. **Testability**: Every requirement verifiable ("POST /api/x returns 201")
+5. **Cross-references**: Link between docs ("See 08-payment-methods.md")
 
-1. **Specificity**: Name exact fields, types, validation rules, error messages. Don't say "add a form" -- list every field, its type, whether it's required, and its validation rules.
-
-2. **Completeness**: Cover every page, every API endpoint, every component. If the user described it, document it. If it's implied, make it explicit.
-
-3. **Structure**: Use tables for field definitions, code blocks for schemas, hierarchical headers for navigation. Workers scan documents quickly.
-
-4. **Testability**: Every requirement should be verifiable. "User can create a shipment" -> "POST /api/shipments returns 201 with { id, status: 'draft' }".
-
-5. **Cross-references**: Link between documents. "See 08-payment-methods.md for detailed payment specifications."
-
-### What to avoid:
-
-- Vague language ("nice UI", "good performance", "handle errors properly")
-- Skipping "obvious" features (they're not obvious to an LLM agent)
-- Mixing requirements across documents (keep each doc focused)
-- Requirements without acceptance criteria
-
-## Process
-
-1. **Understand**: Ask clarifying questions if the user's description is ambiguous. What's the tech stack? What's the core user journey? Any existing code to reference?
-
-2. **Research**: If the user points to existing code or specs, read them thoroughly. Reverse-engineer all requirements from the implementation.
-
-3. **Structure**: Decide how many requirements documents are needed. Simple projects: 1 file. Medium/complex projects: 3-10 docs. Read the examples to calibrate.
-
-4. **Write**: Create all files. PROMPT.md first, then requirements, then references.
-
-5. **Verify**: List all files created with line counts. Confirm the bundle is complete.
-
-## Complexity Guidelines
-
-| Complexity | Requirements Docs | Max Turns | Steps |
-|------------|-------------------|-----------|-------|
-| Low | 0 (all in PROMPT.md) | 200 | 1-2 |
-| Medium | 3-5 | 300-500 | 3-5 |
-| High | 6-10 | 500 | 4-6 |
+Avoid: vague language, skipping "obvious" features, mixing concerns across docs, requirements without acceptance criteria.
 
 ## When Referencing Existing Code
 
-If the user provides existing codebases as reference:
+If the user provides codebases:
 
 1. Read ALL relevant files (don't skim)
 2. Extract every feature, field, validation rule, business rule
-3. Document the complete data model (every table, column, relationship)
+3. Document complete data model (every table, column, relationship)
 4. Document every API endpoint with request/response schemas
 5. Document every UI component and its behavior
-6. Document all business logic algorithms (pricing, scheduling, etc.)
-7. Note what to keep vs what to change for the new implementation
+6. Document all business logic algorithms
+7. Note what to keep vs change for new implementation
 
-The goal is a **complete discovery packet** -- thorough enough that a worker agent who has never seen the reference code can build the project from requirements alone.
+Goal: a **complete discovery packet** — thorough enough that a worker who has never seen the reference code can build from requirements alone.
+
+## References
+
+Real goal bundles at two complexity levels. Read before drafting to calibrate output.
+
+- **Simple**: `./references/simple/finance-dashboard-{claude,codex,kimi-cli}/PROMPT.md`
+- **Medium**: `./references/medium/b2b-postal-checkout/` (PROMPT.md + 9 requirement docs + 2 reference docs)
+
+## Final Checklist
+
+After generating all files, verify:
+
+- [ ] PROMPT.md frontmatter has all required fields filled
+- [ ] `status: pending` (always for drafts)
+- [ ] `output_path` and `branch` are blank
+- [ ] Requirements docs exist for medium/high complexity
+- [ ] Every requirement is specific and testable
+- [ ] List all files with line counts for user review
