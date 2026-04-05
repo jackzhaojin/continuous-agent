@@ -7,6 +7,19 @@ description: Monitor the continuous-agent executive loop running via PM2. Checks
 
 Monitor the continuous-agent executive loop and its spawned workers. This skill checks PM2 process health, reads ledgers, inspects ai-sandbox output, and reviews goal progress — giving a complete picture of the running system.
 
+## CRITICAL: This is a Continuous Monitoring Skill
+
+**This skill runs continuously until the user explicitly stops it.** It is NOT a one-shot status check.
+
+When this skill is invoked:
+1. **Immediately** run a full system check (Steps 1-8 below) — this is the aggressive initial pass
+2. **Then enter a continuous monitoring loop**, running a delta check every **5 minutes** (300 seconds)
+3. **Never stop on your own.** Keep looping until the user says "stop monitoring", "stop", "that's enough", or similar
+4. Between checks, use `sleep 300` to wait. This is expected — do not skip the sleep or exit early
+5. Use the `/loop 5m` skill if available, otherwise manage the timer manually with `sleep 300`
+
+**The user expects you to keep watching.** If you finish one check and stop, you have failed the purpose of this skill. The whole point is persistent, ongoing supervision of a 24/7 autonomous system.
+
 ## Step 1: PM2 Process Health
 
 Check the executive loop process managed by PM2:
@@ -153,37 +166,86 @@ This shows goals waiting to be ingested by Phase 2. Report:
 - Priority distribution
 - Any goals that look misconfigured or missing required fields
 
-## Step 8: Summary Report
+## Step 8: Summary Report (MUST print every cycle)
 
-Compile findings into a concise status report:
+**Every single monitoring cycle MUST produce visible output.** The user needs to see proof that monitoring is active and the system is being watched. Never run a silent check — always print the report.
+
+### Full Report (first check and every 6th cycle ~30 min)
 
 ```
-[MONITOR] <timestamp>
+========================================
+[MONITOR] YYYY-MM-DD HH:mm:ss | FULL CHECK
+========================================
   PM2: <online|stopped|erroring> | uptime: <duration> | restarts: <count> | memory: <MB>
-  Active goals: <count> (<list with priorities>)
-  Recent completions: <count in last 24h>
-  Recent failures: <count in last 24h>
-  AI Sandbox: <recent commits summary>
+  Active goals: <count> (<list with priorities and titles>)
+  Step progress: <e.g., "goal-name: Step 2/5 complete">
+  Recent completions (24h): <count> — <list>
+  Recent failures (24h): <count> — <list>
+  AI Sandbox: <recent commits, new projects>
   Blocked: <count in needs-you.md>
   Queue depth: <count>
   Issues: <none | list of problems found>
+  Next check in: 5 minutes
+========================================
 ```
 
-## Continuous Monitoring Mode
+### Delta Report (every other cycle)
 
-If the user asks to "keep watching" or "monitor continuously":
+```
+[MONITOR] YYYY-MM-DD HH:mm:ss | DELTA
+  PM2: <online> | mem: <MB>
+  Changes since last check:
+    - <what changed — new logs, goal progress, new commits, failures, etc.>
+    - <or "No changes detected — system idle">
+  Issues: <none | new issues>
+  Next check in: 5 minutes
+```
 
-1. Run Steps 1-8 as the initial check
-2. Sleep for 60 seconds between iterations
-3. On subsequent iterations, focus on **deltas** — what changed since last check
-4. Alert immediately if:
-   - PM2 process goes down
-   - A goal enters failure streak (3+ consecutive failures)
-   - `needs-you.md` gets new entries
-   - Worker appears stuck (no new log output for 15+ minutes)
-   - Memory usage approaching 1G limit
+**Why this matters:** The user is supervising a 24/7 autonomous system. If they glance at their terminal and see no recent monitor output, they don't know if the monitor is still running or if it crashed. Every cycle must produce visible output to confirm the monitor is alive and the system is being watched.
 
-Use the `/loop` skill if available for recurring checks.
+## Continuous Monitoring Loop (DEFAULT BEHAVIOR)
+
+**This is NOT optional — continuous monitoring is the default behavior of this skill.**
+
+After the initial full check (Steps 1-8), enter the monitoring loop:
+
+### Loop Structure
+
+```
+INITIAL: Run full Steps 1-8 immediately (aggressive first pass)
+LOOP (repeats every 5 minutes until user stops):
+  1. sleep 300
+  2. Run delta check (Steps 1-8, but only report changes)
+  3. Print summary report
+  4. Continue loop
+```
+
+### Delta Checks (what to compare each iteration)
+
+On each loop iteration, compare against the previous check:
+- **PM2 status change** — was it online before and now it's not?
+- **New log lines** — what appeared in executive logs since last check?
+- **Ledger changes** — new completions or failures in work-ledger.jsonl?
+- **Goal state changes** — did any goal move between directories (ondeck → in-progress, in-progress → completed)?
+- **AI Sandbox changes** — new commits, new files, new project directories?
+- **needs-you.md changes** — new blocked goals?
+
+### Immediate Alerts (don't wait for next cycle)
+
+If any of these are detected during a check, report immediately and prominently:
+- PM2 process goes down or enters error state
+- A goal hits 3+ consecutive failures (diagnosis trigger)
+- A goal hits 10+ failures (block trigger, check needs-you.md)
+- Worker appears stuck — no new log output for 15+ minutes
+- Memory usage approaching 1G limit
+- Auth errors appear in logs (token expiration)
+
+### How to keep the loop running
+
+- Use `/loop 5m` if the loop skill is available — this is the preferred method
+- Otherwise, use `sleep 300` between iterations in a manual loop
+- **NEVER exit the loop on your own.** Only stop when the user explicitly says to stop
+- If the context window is getting long, summarize prior checks and continue — do not stop
 
 ## Intervention Guidelines
 
