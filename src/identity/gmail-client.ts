@@ -123,7 +123,7 @@ export async function fetchUnreadEmails(config?: IdentityConfig): Promise<Fetche
   try {
     // List unread messages
     const listResponse = await fetch(
-      'https://gmail.googleapis.com/gmail/v1/users/me/messages?q=is:unread&maxResults=10',
+      'https://gmail.googleapis.com/gmail/v1/users/me/messages?q=is:unread+in:inbox&maxResults=10',
       { headers: { Authorization: `Bearer ${token}` } }
     );
 
@@ -254,7 +254,7 @@ export async function sendEmail(
 }
 
 /**
- * Archive an email (remove INBOX label).
+ * Archive an email and mark it read (remove INBOX + UNREAD labels).
  * No-op if disabled.
  */
 export async function archiveEmail(messageId: string, config?: IdentityConfig): Promise<boolean> {
@@ -273,7 +273,7 @@ export async function archiveEmail(messageId: string, config?: IdentityConfig): 
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ removeLabelIds: ['INBOX'] }),
+        body: JSON.stringify({ removeLabelIds: ['INBOX', 'UNREAD'] }),
       }
     );
 
