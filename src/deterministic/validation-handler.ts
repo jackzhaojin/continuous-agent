@@ -111,7 +111,13 @@ export async function validateWork(
     const passRatio = summary.pass_count / (summary.pass_count + summary.fail_count);
 
     // Blocking verifiers: if any of these fail, the goal cannot pass
-    const blockingVerifiers = ['git_status_clean', 'node_build', 'node_install'];
+    // For intermediate steps in multi-step goals, node_build is advisory (not blocking)
+    // — intermediate steps may modify types/schema that break builds transiently.
+    // node_build only blocks on the final step or single-step goals.
+    const isIntermediateStep = stepContext && stepContext.step_number < stepContext.total_steps - 1;
+    const blockingVerifiers = isIntermediateStep
+      ? ['git_status_clean', 'node_install']
+      : ['git_status_clean', 'node_build', 'node_install'];
     const hasBlockingFailures = failedVerifiers.some(v => blockingVerifiers.includes(v));
 
     // Require worker success AND reasonable pass ratio for partial pass
