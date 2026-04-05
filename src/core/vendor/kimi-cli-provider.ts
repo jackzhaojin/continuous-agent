@@ -12,8 +12,8 @@
  * - Good observability: assistant messages, tool_calls, tool results all visible
  *
  * Switch between wire and CLI via KIMI_MODE env var:
- *   KIMI_MODE=wire  → KimiWireAgentProvider (default, uses @moonshot-ai/kimi-agent-sdk)
- *   KIMI_MODE=cli   → KimiCliAgentProvider (this file, no SDK needed)
+ *   KIMI_MODE=cli   → KimiCliAgentProvider (default, this file, no SDK needed)
+ *   KIMI_MODE=wire  → KimiWireAgentProvider (uses @moonshot-ai/kimi-agent-sdk)
  *
  * Environment variables:
  *   KIMI_EXECUTABLE  = Path to kimi CLI (default: 'kimi')

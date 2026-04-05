@@ -29,7 +29,7 @@
  *
  *   # Use Kimi Wire for workers (bidirectional), Kimi for chat:
  *   WORKER_VENDOR=kimi
- *   KIMI_MODE=wire              # 'wire' (default, SDK) or 'cli' (--print stream-json)
+ *   KIMI_MODE=cli               # 'cli' (default, --print stream-json) or 'wire' (SDK)
  *   CHAT_VENDOR=moonshot
  *   CHAT_MODEL=kimi-k2.5
  *   MOONSHOT_API_KEY=sk-...
@@ -221,11 +221,11 @@ function createAgentWorkerProvider(vendor: AgentWorkerVendor): AgentWorkerProvid
     case 'kimi-wire':
       return new KimiWireAgentProvider();
     case 'kimi': {
-      const kimiMode = process.env.KIMI_MODE || 'wire';
-      if (kimiMode === 'cli') {
-        return new KimiCliAgentProvider();
+      const kimiMode = process.env.KIMI_MODE || 'cli';
+      if (kimiMode === 'wire') {
+        return new KimiWireAgentProvider();
       }
-      return new KimiWireAgentProvider();
+      return new KimiCliAgentProvider();
     }
     case 'claude':
     default:

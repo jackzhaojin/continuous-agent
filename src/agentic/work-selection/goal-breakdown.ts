@@ -155,20 +155,21 @@ export function needsBreakdown(item: WorkItem): boolean {
  */
 async function buildBreakdownPrompt(item: WorkItem, bundleContext: string, complexityEstimate: number): Promise<string> {
   // Adaptive step count guidance based on complexity
+  // Key principle: more smaller steps >> fewer larger steps
   let stepGuidance: string;
   let turnRange: string;
   if (complexityEstimate <= 150) {
-    stepGuidance = '3-5 steps';
-    turnRange = '20-100';
+    stepGuidance = '5-10 steps';
+    turnRange = '20-50';
   } else if (complexityEstimate <= 300) {
-    stepGuidance = '5-15 steps';
-    turnRange = '20-100';
+    stepGuidance = '10-25 steps';
+    turnRange = '20-60';
   } else if (complexityEstimate <= 600) {
-    stepGuidance = '15-40 steps';
-    turnRange = '20-100';
+    stepGuidance = '25-50 steps';
+    turnRange = '20-60';
   } else {
-    stepGuidance = '40-100+ steps';
-    turnRange = '20-100';
+    stepGuidance = '50-100+ steps';
+    turnRange = '20-60';
   }
 
   return loadSkillPrompt('goal-breakdown', {
@@ -228,7 +229,7 @@ export async function generateBreakdown(item: WorkItem): Promise<WorkStep[]> {
       description: (s.description || '').slice(0, 2000),
       status: 'pending' as const,
       dependencies: i === 0 ? [] : [i - 1],
-      estimated_turns: Math.max(20, Math.min(100, s.estimated_turns || 100)),
+      estimated_turns: Math.max(20, Math.min(60, s.estimated_turns || 50)),
     }));
 
     // Summary logging

@@ -24,10 +24,38 @@ Estimated complexity: {{COMPLEXITY_ESTIMATE}} turns → aim for {{STEP_GUIDANCE}
 - The final step should always include validation and cleanup
 - Assign each step a turn budget proportional to its complexity ({{TURN_RANGE}} turns)
   - Research/planning steps: 20-40 turns
-  - Simple implementation steps: 40-60 turns
-  - Complex implementation steps: 60-100 turns
-- Be granular: prefer more smaller steps over fewer larger steps
-- Each step should produce a testable/verifiable deliverable
+  - Simple implementation steps: 30-50 turns
+  - Complex implementation steps: 50-80 turns
+
+## GRANULARITY — CRITICAL
+
+You MUST keep each step small enough for a single focused worker session. Think like a developer: what would you tackle in one sitting?
+
+**Hard limits per step:**
+- MAX 2-3 UI components or features per step (NEVER 5+)
+- MAX 1 form with validation per step
+- MAX 1 API endpoint group (e.g., CRUD for one resource) per step
+- MAX 1 cross-cutting concern (e.g., responsive layout OR accessibility, not both)
+
+**Anti-patterns to AVOID:**
+- "Build Step 1: [everything]" — this is just restating the requirement, not breaking it down
+- Listing 10+ components in one step description
+- "Implement X, Y, Z, A, B, C, and test all of them" — too much
+- Steps with descriptions over 800 characters are almost certainly too large
+
+**Good granularity examples:**
+- "Build PresetSelector and PackageTypeSelector components" (2 components)
+- "Implement address input with validation" (1 feature)
+- "Create shipment CRUD API endpoints" (1 endpoint group)
+- "Add Zod validation schemas for Step 1 form fields" (1 concern)
+- "Wire up Step 1 form with React Hook Form and submission" (1 integration task)
+
+**Bad granularity examples (NEVER do this):**
+- "Build Step 1: 15 components, Zod schemas, React Hook Form, API wiring, and tests"
+- "Implement all 5 payment methods with forms, validation, and billing sections"
+- "Build responsive mobile UI and accessibility for all components"
+
+When in doubt, split further. 30 small steps is better than 10 large steps.
 
 ## GOAL
 

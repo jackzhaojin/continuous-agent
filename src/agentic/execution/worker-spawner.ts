@@ -27,8 +27,8 @@ import { BUILD_INFO } from '../../core/executive-loop.js';
 // Agent outputs directory - where workers create their projects
 const AGENT_OUTPUTS_BASE = process.env.AGENT_OUTPUTS_PATH || path.join(os.homedir(), 'dev', 'ai-sandbox');
 
-// Worker timeout: wall-clock limit to prevent indefinite hangs (default 30 min)
-const WORKER_TIMEOUT_MS = parseInt(process.env.WORKER_TIMEOUT_MS || '1800000', 10);
+// Worker timeout: wall-clock limit to prevent indefinite hangs (default 45 min)
+const WORKER_TIMEOUT_MS = parseInt(process.env.WORKER_TIMEOUT_MS || '2700000', 10);
 
 // Template directory for project setup files (lives in agent repo, not outputs)
 const AGENT_BASE = process.env.AGENT_PATH || path.join(os.homedir(), 'dev', 'continuous-agent');
