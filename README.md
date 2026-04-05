@@ -93,7 +93,7 @@ pm2 start ecosystem.config.cjs
 
 ```bash
 # Copy the goal template
-cp -r workspace/_TEMPLATE workspace/ondeck/my-first-goal
+cp -r workspace-instructions/_TEMPLATE workspace/ondeck/my-first-goal
 
 # Edit the prompt
 vim workspace/ondeck/my-first-goal/PROMPT.md
@@ -243,7 +243,8 @@ src/
   agentic/           AI decisions (work selection, strategy, prompts, diagnosis)
   deterministic/     Mechanical ops (state, health, verifiers, Notion, credentials)
   identity/          Gmail + Discord communication (v2.0)
-workspace/           Goal bundles, constitution, needs-you.md
+workspace/           Goal bundles, constitution, needs-you.md (runtime, gitignored)
+workspace-instructions/  Template, frontmatter reference, file docs (git-tracked)
 ledgers/             Append-only JSONL audit trail + worker logs
 capabilities/        YAML registries (technical, delivery, functional)
 references/poc/      Agent SDK proof-of-concept projects

@@ -135,6 +135,8 @@ Examples of agentic (not deterministic) behavior:
 
 Goals are directories in `workspace/` containing `PROMPT.md` (YAML frontmatter + markdown body).
 
+**Full reference:** See `workspace-instructions/` for the canonical template, frontmatter field reference (all valid values for status, priority, complexity, execution_pattern, worker_vendor), and workspace file documentation. This folder is git-tracked unlike `workspace/` itself.
+
 **Lifecycle:** `drafts/` -> `ondeck/` (auto-promoted by priority) -> `in-progress/P{0-4}/` -> `completed/`
 
 **Per-bundle files:**
@@ -191,6 +193,7 @@ DISCORD_ENABLED=true           # Discord notifications
 | Identity (Gmail) | `src/identity/gmail-client.ts` |
 | Identity (Discord) | `src/identity/discord-client.ts` |
 | Constitution | `workspace/constitution.md` (**NEVER auto-modify**) |
+| Workspace docs | `workspace-instructions/` (git-tracked template, frontmatter reference, file docs) |
 | Prompt templates | `src/agentic/worker-prompts/{category}/` (versioned filenames) |
 | Capability registries | `capabilities/*.yml` |
 
