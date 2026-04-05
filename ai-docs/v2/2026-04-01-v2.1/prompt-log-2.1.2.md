@@ -2,7 +2,7 @@
 
 **Date**: 2026-04-05
 **Agent**: claude-code
-**Status**: In Progress
+**Status**: Complete
 **Deliverable**: Documentation overhaul, jack-git-commit skill, goal-drafter skill, workspace-instructions, executive-agent-operator agent, Discord notification fix
 
 ---
@@ -498,3 +498,149 @@
 
 -> Response: Fixed Discord notifications to distinguish step completion from goal completion -- only reports goal done when all steps are done.
 -> Action: Updated notification logic, rebuilt without PM2 restart. ✅
+
+---
+
+### Prompt 55: Log Conversation (4:00 PM)
+
+> cool, also /conversation-logger to '/Users/jackjin/dev/continuous-agent/ai-docs/v2/2026-04-01-v2.1' with prompt-log-2.1.2.md with 2.1.2 stuff with all the hardening stuff we did today can be considered 2.1.2
+
+-> Response: Invoked conversation-logger to capture today's v2.1.2 session.
+-> Action: Created prompt-log-2.1.2.md with full session log. ✅
+
+---
+
+### Prompt 56: Commit Prompt Log (4:03 PM)
+
+> /jack-git-commit
+
+-> Response: Committed the prompt log and related changes.
+-> Action: Committed with jack-git-commit. ✅
+
+---
+
+### Prompt 57: Same Commit (4:05 PM)
+
+> Same commit / Yes
+
+-> Response: Confirmed and completed the commit.
+-> Action: Commit finalized. ✅
+
+---
+
+### Prompt 58: Worker Vendor Visibility in Ledger (4:09 PM)
+
+> How come in ledger i can't see what and worker contract i can't see what model and what make? ideally at this point we should know some how, i'm guessing i'm choosing kimi k2.5, can you see what's going on and where can we add this?
+
+-> Response: Identified that worker vendor/model info wasn't being recorded in ledger entries or contracts, added vendor tracking.
+-> Action: Updated ledger and contract code to include worker_vendor field. ✅
+
+---
+
+### Prompt 59: Commit Vendor Tracking (4:12 PM)
+
+> /jack-git-commit / Yes
+
+-> Response: Committed vendor tracking changes.
+-> Action: Committed with jack-git-commit. ✅
+
+---
+
+## Session 5: PM2 Hot Reload & Build Versioning (Apr 5, 2026)
+
+### Prompt 60: PM2 Loop vs Agent Loop (4:14 PM)
+
+> Guess I'm not convinced that the loop the PM2 loop when it is done with an iteration does it pick up the latest build or does it just kind of how many layers of loops are there?
+
+-> Response: Explained two loop layers -- PM2 process wrapper and the internal executive loop in TypeScript.
+-> Action: No code changes, architectural clarification.
+
+---
+
+### Prompt 61: Two Loops (4:14 PM)
+
+> Well maybe there's two loops, right? There's the PM2 and the loop inside the agent.
+
+-> Response: Confirmed: PM2 keeps the process alive, the inner loop runs continuously picking up work.
+-> Action: Discussion only.
+
+---
+
+### Prompt 62: PM2 Research (4:16 PM)
+
+> Well, let's not make any rash decisions. Let's do some internet research. I guess is PM2 a good way to kind of both keep the service alive and basically pick up the next build? I do like the concept of rebuilding and having the next iteration pick up the latest code without restarting PM2.
+
+-> Response: Researched PM2 hot reload patterns, recommended SIGUSR2 signal approach for graceful code reload after builds.
+-> Action: WebSearch on PM2 hot reload best practices.
+
+---
+
+### Prompt 63: SIGUSR2 + Build Version (4:19 PM)
+
+> OK let's go with your recommended pm2 send signal SIGUSR2 when we run npm run build, and would it be possible to have a build version so it's clear in the ledger which version it's running? both executive and the worker should know what build version it's running
+
+-> Response: Implemented SIGUSR2 signal handler for graceful restart after build, added build version stamp to ledger output.
+-> Action: Updated build script, executive-loop.ts, and ledger logging with build version.
+
+---
+
+### Prompt 64: Build Hash (4:22 PM)
+
+> what's the d7bd43? is this the git commit?
+
+-> Response: Confirmed that the hash is the short git commit SHA used as part of the build version identifier.
+-> Action: Clarification only.
+
+---
+
+### Prompt 65: Build Timestamp vs Commit (4:23 PM)
+
+> well then we'll need to tie this in with build, mm... ideally we should have a way to tell when it's last build (not just commit since we might build multiple times per commit)
+
+-> Response: Added build timestamp alongside git commit hash so builds are uniquely identifiable even within the same commit.
+-> Action: Updated build version to include timestamp + commit hash.
+
+---
+
+### Prompt 66: Eastern Time (4:23 PM)
+
+> can this be eastern time with the time change with daylight savings?
+
+-> Response: Configured build timestamp to use America/New_York timezone with automatic DST handling.
+-> Action: Updated timestamp formatting to ET.
+
+---
+
+### Prompt 67: SIGUSR2 Graceful Wait (4:25 PM)
+
+> Of course this time it just killed it right? next time it'll actually wait for it to finish with the new term/kill sig 2?
+
+-> Response: Confirmed -- this build killed the current worker, but with SIGUSR2 handler in place, future builds will wait for the current iteration to complete before reloading.
+-> Action: Verified signal handler implementation.
+
+---
+
+### Prompt 68: Commit Build Versioning (4:26 PM)
+
+> /jack-git-commit / yes
+
+-> Response: Committed PM2 hot reload and build versioning changes.
+-> Action: Committed with jack-git-commit. ✅
+
+---
+
+### Prompt 69: Monitor (4:27 PM)
+
+> /long-agent-monitor
+
+-> Response: Monitored PM2 executive loop with new build version visible in logs.
+-> Action: Tailed logs, verified build version in output.
+
+---
+
+### Prompt 70: Final Conversation Log (4:33 PM)
+
+> /conversation-logger '/Users/jackjin/dev/continuous-agent/ai-docs/v2/2026-04-01-v2.1/prompt-log-2.1.2.md'
+
+-> Response: Appended remaining session prompts (55-70) to the prompt log.
+-> Action: Updated prompt-log-2.1.2.md with complete session. ✅

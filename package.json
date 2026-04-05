@@ -1,6 +1,6 @@
 {
   "name": "continuous-executive-agent",
-  "version": "2.1.2-snapshot",
+  "version": "2.1.2",
   "description": "Autonomous AI agent that finds and executes work",
   "main": "dist/executive-loop.js",
   "type": "module",
