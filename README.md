@@ -1,22 +1,26 @@
-# Continuous Executive Agent
+# Continuous Coding Agent
 
-An autonomous AI agent that runs 24/7, finds work from a prioritized queue, spawns [Claude Agent SDK](https://docs.anthropic.com/en/docs/claude-code/sdk) workers to execute it, validates results, and moves on -- all without waiting for human prompts.
+An autonomous coding agent that runs 24/7, picks work from a prioritized queue, spawns multi-vendor coding workers (Claude, Codex, Kimi K2.5) to build software, validates results, and moves on -- all without waiting for human prompts.
 
 ## Why
 
-Most AI coding agents are reactive: you prompt, they respond. This agent flips the model. You drop goals into a queue, and it works through them autonomously -- selecting the highest priority task, breaking complex goals into steps, retrying with different strategies on failure, and only asking for help when truly stuck. It runs continuously via PM2 and communicates asynchronously through markdown files.
+Most coding agents are reactive: you prompt, they respond. This agent flips the model. You drop goals into a queue, and it works through them autonomously -- selecting the highest priority task, breaking complex goals into steps, spawning isolated coding workers, retrying with different strategies on failure, and only asking for help when truly stuck. It runs continuously via PM2 and communicates asynchronously through markdown files.
 
-The result is an AI that operates more like a junior developer with a task board than a chatbot waiting for instructions.
+The result is a coding agent that operates more like a junior developer with a task board than a chatbot waiting for instructions.
+
+## Technical Highlights
+
+For architecture deep dives, code walkthroughs, and talk prep, see the [Technical Highlights](docs/technical-highlights/) -- 7 highlights covering the executive brain, multi-vendor worker execution, and the self-correcting feedback loop, organized by version starting with [v2.1](docs/technical-highlights/2.1/).
 
 ## How It Works
 
-The agent runs a continuous **executive loop** with these phases:
+The coding agent runs a continuous **executive loop** with these phases:
 
 ```
 Check Inbox -> Health Check -> Process Inputs -> Select Work -> Execute -> Validate -> Update State -> Continue/Sleep
 ```
 
-Each iteration selects the highest-priority unblocked goal, spawns an isolated Claude worker to execute it, validates the output with deterministic verifiers, and immediately picks up the next goal. It sleeps only when the queue is empty.
+Each iteration selects the highest-priority unblocked goal, spawns an isolated coding worker to execute it, validates the output with deterministic verifiers, and immediately picks up the next goal. It sleeps only when the queue is empty.
 
 ### Work Hierarchy
 
@@ -44,7 +48,7 @@ The codebase enforces a strict separation:
 ### Two-Repository Design
 
 ```
-continuous-agent/     <-- This repo: the brain
+continuous-agent/     <-- This repo: the coding agent brain
   src/                Executive loop, worker spawner, verifiers
   workspace/          Goal bundles, constitution, human interaction
   ledgers/            Append-only audit trail (JSONL)
@@ -53,7 +57,7 @@ ai-sandbox/           <-- Sibling repo: the output
   projects/           Everything the agent builds, each with its own git history
 ```
 
-The agent never writes application code to its own codebase. All outputs go to isolated project directories in `ai-sandbox/`. This is enforced by the constitution.
+The coding agent never writes application code to its own codebase. All outputs go to isolated project directories in `ai-sandbox/`. This is enforced by the constitution.
 
 ## Quick Start
 
@@ -174,7 +178,7 @@ Goals prefixed with `[SELF-ENHANCE]` allow the agent to modify its own infrastru
 
 ### Multi-Vendor Workers (v2.1)
 
-The agent can spawn workers using different LLM backends. Each vendor implements the same `AgentWorkerProvider` interface, so goals execute identically regardless of backend:
+The coding agent can spawn workers using different LLM backends. Each vendor implements the same `AgentWorkerProvider` interface, so goals execute identically regardless of backend:
 
 | Vendor | Backend | Auth |
 |--------|---------|------|
@@ -197,7 +201,7 @@ Goals can specify an execution pattern in their PROMPT.md frontmatter:
 
 ### Identity System (v2.0)
 
-The agent can optionally have its own communication presence:
+The coding agent can optionally have its own communication presence:
 
 - **Gmail** -- Checks inbox for new goals, approvals, priority changes
 - **Discord** -- Sends completion/blocked notifications via webhooks
@@ -248,9 +252,9 @@ ai-docs/             PRDs, specs, version history
 
 ## Related
 
-- **[ai-sandbox](https://github.com/jackzhaojin/ai-sandbox)** -- Everything the agent has built
+- **[ai-sandbox](https://github.com/jackzhaojin/ai-sandbox)** -- Everything the coding agent has built
 - **[Live Deployments](https://jackzhaojin.github.io/ai-sandbox/)** -- All deployed projects on GitHub Pages
-- **[Claude Agent SDK](https://docs.anthropic.com/en/docs/claude-code/sdk)** -- The SDK this agent uses to spawn workers
+- **[Claude Agent SDK](https://docs.anthropic.com/en/docs/claude-code/sdk)** -- The SDK this coding agent uses to spawn workers
 
 ## License
 
