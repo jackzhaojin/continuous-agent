@@ -153,13 +153,54 @@ Working proof-of-concept projects are available as references. Consult these whe
 - Do not add extra features, languages, or implementations
 - If the task is done, stop - don't "complement" with alternatives
 
+## MANDATORY: Visual Testing for Web Projects
+
+If you are building a website, web app, or any UI (Next.js, React, HTML/CSS, etc.), you MUST visually verify your work using `playwright-cli`. This is NOT optional — untested UI is considered incomplete.
+
+**After building UI components or pages, run these steps:**
+
+```bash
+# 1. Start dev server in background (if not already running)
+cd {{PROJECT_PATH}} && npm run dev &
+sleep 3
+
+# 2. Open browser and navigate to your page
+playwright-cli open http://localhost:3000
+
+# 3. Take a snapshot to verify the page renders correctly
+playwright-cli snapshot
+
+# 4. Click through interactive elements to verify they work
+playwright-cli click <ref>
+
+# 5. Take a screenshot for the record
+playwright-cli screenshot
+
+# 6. Close when done
+playwright-cli close
+```
+
+**What to verify:**
+- Page renders without blank screens or errors
+- Components are visible and properly styled
+- Forms accept input and show validation errors
+- Navigation between pages/steps works
+- No console errors (check browser dev tools)
+
+**If `playwright-cli` is not available**, fall back to:
+1. `npm run build` — verifies compilation
+2. `curl http://localhost:3000` — verifies server responds
+3. Check for runtime errors in server output
+
+**Do NOT skip visual testing.** A component that compiles but renders a blank page is a failure.
+
 ## Execution Guidelines
 
 1. **Navigate to your project directory first** — `cd {{PROJECT_PATH}}`
 2. **Start with understanding** - Read existing code before changing it
 3. **Make incremental changes** - Test after each change
 4. **Commit frequently** - Small, logical commits with clear messages
-5. **Verify your work** - Check that changes actually work
+5. **Verify your work visually** - Use `playwright-cli` to confirm UI renders and works
 6. **Report clearly** - Summarize what you did, what files changed, any issues
 
 ### If You Cannot Complete:

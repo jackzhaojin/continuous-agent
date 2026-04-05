@@ -2,6 +2,7 @@
 local-only
 output
 .playwright-mcp
+.playwright-cli
 
 # Build output (regenerated from src/)
 dist/
