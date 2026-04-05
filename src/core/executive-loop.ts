@@ -68,7 +68,7 @@ import { runWeeklyRetrospective } from '../agentic/calibration/retrospective.js'
 
 // IDENTITY - Agent identity (Gmail + Discord)
 import { checkInbox } from '../identity/inbox-checker.js';
-import { sendCompletionNotification, sendBlockedNotification } from '../identity/discord-client.js';
+import { sendCompletionNotification, sendStepCompletionNotification, sendBlockedNotification } from '../identity/discord-client.js';
 
 // DASHBOARD - V2.0 dashboard projection
 import {
@@ -549,10 +549,32 @@ async function runIteration(): Promise<IterationResult> {
     // Reset backoff on success
     resetBackoff();
 
-    // Fire-and-forget Discord notification on completion
-    sendCompletionNotification(workItem.title, workItem.priority, result.output_path).catch(e => {
-      log(`  Discord completion notification failed (non-blocking): ${e}`);
-    });
+    // Fire-and-forget Discord notification
+    if (isStepExecution && currentStep && workItem.steps) {
+      const totalSteps = workItem.steps.length;
+      const completedSteps = workItem.steps.filter(s => s.status === 'complete').length;
+      const isLastStep = completedSteps >= totalSteps;
+      if (isLastStep) {
+        // All steps done — send goal completion notification
+        sendCompletionNotification(workItem.title, workItem.priority, result.output_path).catch(e => {
+          log(`  Discord completion notification failed (non-blocking): ${e}`);
+        });
+      } else {
+        // Intermediate step — send step progress notification
+        sendStepCompletionNotification(
+          workItem.title, workItem.priority,
+          currentStep.step_number + 1, totalSteps,
+          currentStep.title
+        ).catch(e => {
+          log(`  Discord step notification failed (non-blocking): ${e}`);
+        });
+      }
+    } else {
+      // Non-step execution (single goal) — send goal completion notification
+      sendCompletionNotification(workItem.title, workItem.priority, result.output_path).catch(e => {
+        log(`  Discord completion notification failed (non-blocking): ${e}`);
+      });
+    }
 
     loopState.last_work_at = new Date().toISOString();
     return 'work_completed';

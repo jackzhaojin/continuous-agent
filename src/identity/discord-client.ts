@@ -211,7 +211,7 @@ export async function sendDiscordMessage(message: DiscordMessage, config?: Ident
 // ── Notification Helpers ────────────────────────────────────────────
 
 /**
- * Send a goal completion notification.
+ * Send a goal completion notification (all steps done or single-step goal).
  * Sends DM if configured, otherwise falls back to webhook.
  * Fire-and-forget: catches errors, never blocks the loop.
  */
@@ -246,6 +246,44 @@ export async function sendCompletionNotification(
     const sent = await sendDiscordDM(message, c);
     if (sent) return true;
     // Fall back to webhook if DM fails
+  }
+
+  return sendDiscordMessage(message, c);
+}
+
+/**
+ * Send a step completion notification for multi-step goals.
+ * Shows which step finished and how many remain.
+ * Fire-and-forget: catches errors, never blocks the loop.
+ */
+export async function sendStepCompletionNotification(
+  goalTitle: string,
+  priority: string,
+  stepNumber: number,
+  totalSteps: number,
+  stepTitle: string,
+  config?: IdentityConfig
+): Promise<boolean> {
+  const c = config || loadIdentityConfig();
+
+  const embed: DiscordEmbed = {
+    title: 'Step Completed',
+    color: 0x3399ff, // blue
+    fields: [
+      { name: 'Goal', value: goalTitle, inline: true },
+      { name: 'Priority', value: priority, inline: true },
+      { name: 'Progress', value: `Step ${stepNumber}/${totalSteps}: ${stepTitle}` },
+    ],
+  };
+
+  const message: DiscordMessage = {
+    content: `Step ${stepNumber}/${totalSteps} done: ${goalTitle} [${priority}] — ${stepTitle}`,
+    embeds: [embed],
+  };
+
+  if (isDiscordDmEnabled(c)) {
+    const sent = await sendDiscordDM(message, c);
+    if (sent) return true;
   }
 
   return sendDiscordMessage(message, c);
