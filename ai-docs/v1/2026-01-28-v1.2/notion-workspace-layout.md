@@ -112,7 +112,7 @@ All Notion writes are fire-and-forget. Failures are logged but never block the a
 
 ## Related Documentation
 
-- **Setup runbook:** `ai-docs/v1/2026-01-28-v1.2/notion-api-automation.md`
-- **Setup steps (manual reference):** `ai-docs/v1/2026-01-28-v1.2/notion-setup-steps.md`
+- **Setup runbook:** `notion-api-automation.md` (same directory)
+- **Setup steps (manual reference):** `notion-setup-steps.md` (same directory)
 - **Setup script:** `scripts/setup-notion-workspace.ts`
 - **Reporter implementation:** `src/deterministic/notion-reporter.ts` (if exists)

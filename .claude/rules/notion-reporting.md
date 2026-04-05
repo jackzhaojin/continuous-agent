@@ -2,7 +2,7 @@
 paths:
   - "src/deterministic/notion-reporter.ts"
   - "scripts/setup-notion-workspace.ts"
-  - "ai-docs/notion/**"
+  - "ai-docs/v1/2026-01-28-v1.2/notion-*"
 ---
 
 # Notion Reporting
@@ -26,7 +26,7 @@ At the start of each month, create a new summaries page in Notion and update `NO
 npx tsx scripts/setup-notion-workspace.ts <PARENT_PAGE_ID> --write-env
 ```
 
-See `ai-docs/notion/workspace-layout.md` for page hierarchy, database schema, and IDs.
+See `ai-docs/v1/2026-01-28-v1.2/notion-workspace-layout.md` for page hierarchy, database schema, and IDs.
 
 ## Troubleshooting
 
