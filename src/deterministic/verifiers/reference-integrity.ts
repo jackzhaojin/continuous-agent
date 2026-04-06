@@ -31,7 +31,7 @@ const REGISTRY_PATH = path.join(REFERENCES_BASE, 'reference-registry.yaml');
 interface Reference {
   id: string;
   mode: 'A' | 'B' | 'C';
-  source_path?: string;
+  source_path?: string;  // Explicit path from registry (relative to repo root or absolute)
 }
 
 interface Registry {
@@ -144,6 +144,7 @@ export function checkNoOrphanForks(): IntegrityCheckResult {
 
 /**
  * Check: No missing folders (every registry entry must have corresponding folder)
+ * Uses source_path from registry when available, falls back to convention-based paths.
  */
 export function checkNoMissingFolders(): IntegrityCheckResult {
   const registry = loadRegistry();
@@ -153,16 +154,24 @@ export function checkNoMissingFolders(): IntegrityCheckResult {
     for (const ref of registry.references) {
       let expectedPath: string;
 
-      switch (ref.mode) {
-        case 'A':
-        case 'B':
-          expectedPath = path.join(REFERENCES_BASE, 'sources', ref.id);
-          break;
-        case 'C':
-          expectedPath = path.join(REFERENCES_BASE, 'forks', ref.id);
-          break;
-        default:
-          continue;
+      // Prefer explicit source_path from registry (may be relative to repo root)
+      if (ref.source_path) {
+        expectedPath = path.isAbsolute(ref.source_path)
+          ? ref.source_path
+          : path.join(process.cwd(), ref.source_path);
+      } else {
+        // Fallback to convention-based paths
+        switch (ref.mode) {
+          case 'A':
+          case 'B':
+            expectedPath = path.join(REFERENCES_BASE, 'sources', ref.id);
+            break;
+          case 'C':
+            expectedPath = path.join(REFERENCES_BASE, 'forks', ref.id);
+            break;
+          default:
+            continue;
+        }
       }
 
       if (!existsSync(expectedPath)) {
