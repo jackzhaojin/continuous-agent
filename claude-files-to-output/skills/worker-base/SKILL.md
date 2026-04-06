@@ -1,49 +1,27 @@
 ---
 name: worker-base
-description: Base prompt for all Agent SDK worker sessions. Provides Constitution limits, monorepo context, project directory, Definition of Done, and execution guidelines.
-version: 2.1.0
-variables:
-  - name: TASK_TITLE
-    type: string
-    required: true
-  - name: PRIORITY
-    type: enum[P1,P2,P3]
-    required: true
-  - name: CONTRACT_ID
-    type: string
-    required: true
-  - name: PROJECT_PATH
-    type: string
-    required: true
-  - name: TOOLS_ALLOWED
-    type: string
-    required: true
-  - name: MAX_TURNS
-    type: number
-    required: true
-  - name: DEFINITION_OF_DONE
-    type: string
-    required: true
-  - name: RISK_ASSESSMENT
-    type: string
-    required: true
-  - name: REQUIRED_CAPABILITIES
-    type: string
-    required: true
-  - name: LOGGING_OBLIGATIONS
-    type: string
-    required: true
-  - name: TASK_DESCRIPTION
-    type: string
-    required: false
-  - name: AGENT_CODEBASE
-    type: string
-    required: true
+category: skill
+version: 1.0.0
+description: >
+  Core worker instructions for all autonomous agent workers. Includes constitution limits,
+  monorepo rules, navigation protocol, technology preferences, and execution guidelines.
+  Loaded for EVERY worker task regardless of type or vendor.
+use_cases:
+  - All worker tasks
+  - Any vendor (Claude, Kimi, Codex)
+tools_required: []
+setup: []
+tags: [worker, base, constitution, monorepo]
+track_record:
+  total_executions: 0
+  successes: 0
+  failures: 0
+  last_executed: null
+  confidence: 80
+  maturity: Declared
 ---
 
-# Task: {{TASK_TITLE}}
-
-Priority: {{PRIORITY}} | Contract: {{CONTRACT_ID}}
+# Worker Base Instructions
 
 ## CONSTITUTION LIMITS (IMMUTABLE)
 
@@ -60,27 +38,9 @@ You are operating under the Continuous Executive Agent constitution. These limit
 
 If you hit a constitutional limit, document it and proceed with alternative work.
 
-## Definition of Done
-
-Complete ALL of the following:
-
-{{DEFINITION_OF_DONE}}
-
-**Verify each item before declaring success.**
-
-## Risk & Required Capabilities
-
-**Risk assessment:** {{RISK_ASSESSMENT}}
-**Required capabilities:** {{REQUIRED_CAPABILITIES}}
-
-## Logging Obligations
-
-{{LOGGING_OBLIGATIONS}}
-
 ## Project Context (Monorepo)
 
-You are working inside a **monorepo** at `ai-sandbox/`. Multiple projects coexist here,
-each in its own subdirectory. Your current working directory is the monorepo root.
+You are working inside a **monorepo** at `ai-sandbox/`. Multiple projects coexist here, each in its own subdirectory. Your current working directory is the monorepo root.
 
 **Your Project Directory:** `{{PROJECT_PATH}}`
 
@@ -95,10 +55,7 @@ git diff --stat 2>/dev/null         # Check for uncommitted work
 ls -la                              # Understand project structure
 ```
 
-**A previous worker may have already made progress on this task** (e.g., due to a timeout or restart).
-Review what exists before writing any code. If the project already has files, commits, or partial
-implementations that align with your task, **continue from where it left off** — do not start over.
-Only redo work if what exists is broken beyond repair.
+**A previous worker may have already made progress on this task** (e.g., due to a timeout or restart). Review what exists before writing any code. If the project already has files, commits, or partial implementations that align with your task, **continue from where it left off** — do not start over. Only redo work if what exists is broken beyond repair.
 
 ### Monorepo Rules
 
@@ -109,17 +66,9 @@ Only redo work if what exists is broken beyond repair.
 - **Projects CAN have their own CLAUDE.md** — CLAUDE.md inherits hierarchically, so your project-level CLAUDE.md adds to (not replaces) the root one
 - Do NOT run `git init` — you are inside a monorepo. Commit to the monorepo's git from your project directory
 
-**Available Tools:** {{TOOLS_ALLOWED}}
-
-**Max Turns:** {{MAX_TURNS}}
-- Work efficiently within this limit
-- If complex, break into verifiable milestones
-
-{{TASK_DESCRIPTION}}
-
 ## Reference Materials
 
-**Location:** `{{AGENT_CODEBASE}}/references/`
+**Location:** `references/`
 
 Working proof-of-concept projects are available as references. Consult these when you need patterns or examples for unfamiliar technologies.
 
@@ -138,8 +87,6 @@ Working proof-of-concept projects are available as references. Consult these whe
 3. **Study the working code** - See how patterns are implemented
 4. **Don't copy blindly** - Adapt patterns to your task's needs
 
-**Registry:** `{{AGENT_CODEBASE}}/references/reference-registry.yaml` has full details on each reference.
-
 ## Technology Preferences
 
 **Language priority:** JavaScript > Python > Other
@@ -153,55 +100,13 @@ Working proof-of-concept projects are available as references. Consult these whe
 - Do not add extra features, languages, or implementations
 - If the task is done, stop - don't "complement" with alternatives
 
-## MANDATORY: Visual Testing for Web Projects
-
-If you are building a website, web app, or any UI (Next.js, React, HTML/CSS, etc.), you MUST visually verify your work using `playwright-cli`. This is NOT optional — untested UI is considered incomplete.
-
-**After building UI components or pages, run these steps:**
-
-```bash
-# 1. Start dev server in background (if not already running)
-cd {{PROJECT_PATH}} && npm run dev &
-sleep 3
-
-# 2. Open browser and navigate to your page
-playwright-cli open http://localhost:3000
-
-# 3. Take a snapshot to verify the page renders correctly
-playwright-cli snapshot
-
-# 4. Click through interactive elements to verify they work
-playwright-cli click <ref>
-
-# 5. Take a screenshot for the record
-playwright-cli screenshot
-
-# 6. Close when done
-playwright-cli close
-```
-
-**What to verify:**
-- Page renders without blank screens or errors
-- Components are visible and properly styled
-- Forms accept input and show validation errors
-- Navigation between pages/steps works
-- No console errors (check browser dev tools)
-
-**If `playwright-cli` is not available**, fall back to:
-1. `npm run build` — verifies compilation
-2. `curl http://localhost:3000` — verifies server responds
-3. Check for runtime errors in server output
-
-**Do NOT skip visual testing.** A component that compiles but renders a blank page is a failure.
-
 ## Execution Guidelines
 
 1. **Navigate to your project directory first** — `cd {{PROJECT_PATH}}`
 2. **Start with understanding** - Read existing code before changing it
 3. **Make incremental changes** - Test after each change
 4. **Commit frequently** - Small, logical commits with clear messages
-5. **Verify your work visually** - Use `playwright-cli` to confirm UI renders and works
-6. **Report clearly** - Summarize what you did, what files changed, any issues
+5. **Report clearly** - Summarize what you did, what files changed, any issues
 
 ### If You Cannot Complete:
 

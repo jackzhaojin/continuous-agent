@@ -232,21 +232,25 @@ export async function generateBreakdown(item: WorkItem): Promise<WorkStep[]> {
       estimated_turns: Math.max(20, Math.min(60, s.estimated_turns || 50)),
     }));
 
+    // Insert regression test steps for web projects
+    const finalSteps = insertRegressionSteps(steps, item);
+
     // Summary logging
-    const totalEstimated = steps.reduce((sum, s) => sum + (s.estimated_turns || 100), 0);
-    const turnValues = steps.map(s => s.estimated_turns || 100);
+    const totalEstimated = finalSteps.reduce((sum, s) => sum + (s.estimated_turns || 100), 0);
+    const turnValues = finalSteps.map(s => s.estimated_turns || 100);
     const minTurns = Math.min(...turnValues);
     const maxTurns = Math.max(...turnValues);
-    console.log(`[Breakdown] LLM produced ${steps.length} steps for "${item.title}" (total: ${totalEstimated} estimated turns, range: ${minTurns}-${maxTurns} per step)`);
-    for (const s of steps) {
+    console.log(`[Breakdown] LLM produced ${steps.length} steps, ${finalSteps.length} after regression insertion for "${item.title}" (total: ${totalEstimated} estimated turns, range: ${minTurns}-${maxTurns} per step)`);
+    for (const s of finalSteps) {
       console.log(`  Step ${s.step_number}: ${s.title} (${s.estimated_turns} turns)`);
     }
 
-    return steps;
+    return finalSteps;
   } catch (error) {
     console.log(`[Breakdown] LLM breakdown failed for "${item.title}": ${error}`);
     console.log(`[Breakdown] Falling back to generic 3-step breakdown`);
-    return generateGenericBreakdown(item);
+    const genericSteps = generateGenericBreakdown(item);
+    return insertRegressionSteps(genericSteps, item);
   }
 }
 
@@ -289,6 +293,59 @@ function generateGenericBreakdown(item: WorkItem): WorkStep[] {
   });
 
   return steps;
+}
+
+// Web project detection regex (shared with prompt-builder, word-bounded to avoid false positives)
+const WEB_PROJECT_KEYWORDS = /next\.?js|react|vue|angular|\bhtml\b|\bcss\b|website|web.?app|frontend|\bui\b|component|page|form|dashboard/i;
+
+/** Interval of build steps between regression test insertions */
+const REGRESSION_STEP_INTERVAL = 6;
+
+/**
+ * Insert playwright-cli regression test steps into a step list for web projects.
+ * After every REGRESSION_STEP_INTERVAL build steps, inserts a verification-only step.
+ * No-op for non-web projects.
+ */
+function insertRegressionSteps(steps: WorkStep[], item: WorkItem): WorkStep[] {
+  const text = `${item.title} ${item.description || ''}`;
+  if (!WEB_PROJECT_KEYWORDS.test(text)) return steps;
+
+  // Don't insert if too few steps
+  if (steps.length <= REGRESSION_STEP_INTERVAL) return steps;
+
+  const result: WorkStep[] = [];
+  let buildStepCount = 0;
+
+  for (let i = 0; i < steps.length; i++) {
+    result.push(steps[i]);
+    buildStepCount++;
+
+    // Insert regression step after every N build steps (but not after the last step)
+    if (buildStepCount >= REGRESSION_STEP_INTERVAL && i < steps.length - 1) {
+      buildStepCount = 0;
+      result.push({
+        step_number: 0, // Will be renumbered below
+        title: '[REGRESSION] Visual verification with playwright-cli',
+        description: 'No build work. Open the site with playwright-cli, take snapshots of all key pages, verify no regressions from previous steps. Report any broken layouts, missing elements, or console errors.',
+        status: 'pending' as const,
+        dependencies: [],
+        estimated_turns: 30,
+      });
+    }
+  }
+
+  // Renumber all steps sequentially and fix dependency chain
+  for (let i = 0; i < result.length; i++) {
+    result[i].step_number = i;
+    result[i].dependencies = i === 0 ? [] : [i - 1];
+  }
+
+  const inserted = result.length - steps.length;
+  if (inserted > 0) {
+    console.log(`[Breakdown] Inserted ${inserted} regression test step(s) for web project "${item.title}"`);
+  }
+
+  return result;
 }
 
 /**

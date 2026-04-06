@@ -36,6 +36,7 @@ paths:
 
 ## Prompt Builder (`prompt-builder.ts`)
 
-- Builds context-rich prompts including: Constitution, retry context, selected strategy, task contract
-- V2: When `V2_PROMPT_COMPOSITION=true`, loads skill+playbook libraries for deterministic composition
-- V1 fallback: Uses versioned template files from `src/agentic/worker-prompts/`
+- Builds context-rich prompts from skill libraries, playbooks, and vendor adaptation
+- Loads worker skills from `claude-files-to-output/skills/` (worker-base, web-testing, etc.)
+- Applies vendor adaptation via `vendor-adapter.ts` (tool name mappings for Kimi/Codex)
+- Web project detection auto-loads `web-testing` skill with playwright-cli protocol

@@ -97,7 +97,7 @@ Example PROMPT.md frontmatter after branch creation:
 title: "[SELF-ENHANCE] Improve retry logic"
 slug: "improve-retry-logic"
 priority: P2
-status: in-progress
+status: in_progress
 branch: self-enhance/improve-retry-logic
 ---
 ```

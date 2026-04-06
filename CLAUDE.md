@@ -162,28 +162,28 @@ continuous-agent/claude-files-to-output/    ──cpSync──>    ai-sandbox/.c
 | `.claude/agents/` | Subagent definitions (self-enhancer, skill-builder). Spawned for `[SELF-ENHANCE]` and `[SKILL-BUILD]` goals. |
 | `.claude/rules/` | Contextual rules loaded by Claude Code — domain knowledge about each subsystem (identity, verifiers, ledgers, credentials, etc.) |
 
-## Prompt System (V2 Composition)
+## Prompt System (Skill-Based Composition)
 
-Worker prompts are built by `buildV2ComposedPrompt()` in `src/agentic/intelligence/prompt-builder.ts`. This is the ONLY active prompt path (`V2_PROMPT_COMPOSITION=true`).
+Worker prompts are built by `buildV2ComposedPrompt()` in `src/agentic/intelligence/prompt-builder.ts`. V1 templates have been removed — this is the only path.
 
-**How V2 composes prompts:**
+**How prompts are composed:**
 1. **Objective** — task title, description, priority, contract ID, project path
 2. **Constraints** — tools allowed, max turns, definition of done
-3. **Execution pattern** — plan-then-execute, loop-until-progress, etc.
-4. **Playbook** — matched from `playbooks/` directory (if any exist)
-5. **Skill references** — loaded from `skills/` directory (if playbook references them)
-6. **Validation criteria** — definition of done as checklist
-7. **Web testing** — playwright-cli instructions injected for web projects (keyword detection)
-
-**IMPORTANT:** `src/agentic/worker-prompts/` (V1 templates) is legacy dead code. `worker-base-v2.1.0.md` and other templates are NOT loaded. Do not edit V1 templates expecting workers to see them.
+3. **Worker-base skill** — constitution limits, monorepo rules, execution guidelines (from `claude-files-to-output/skills/worker-base/SKILL.md`)
+4. **Execution pattern** — plan-then-execute, loop-until-progress, etc.
+5. **Playbook** — matched from `playbooks/` directory (if any exist)
+6. **Skill references** — loaded from `claude-files-to-output/skills/` (if playbook references them)
+7. **Web-testing skill** — playwright-cli protocol, auto-loaded for web projects (from `claude-files-to-output/skills/web-testing/SKILL.md`)
+8. **Validation criteria** — definition of done as checklist
+9. **Vendor adaptation** — tool name mappings for non-Claude vendors (via `vendor-adapter.ts`)
 
 **Vendor-specific behavior:**
 
-| Vendor | Reads CLAUDE.md? | Reads Skills? | Tool Names | Prompt Source |
-|--------|-----------------|---------------|------------|---------------|
-| Claude | Yes (SDK auto-loads) | Yes (Skill tool) | Read, Write, Edit, Bash | V2 prompt + CLAUDE.md + Skills |
-| Kimi CLI | No | No | ReadFile, WriteFile, StrReplaceFile, Shell | V2 prompt ONLY (everything must be in prompt string) |
-| Codex | No | No | Own tool set | V2 prompt ONLY |
+| Vendor | Reads CLAUDE.md? | Reads Skills? | Tool Names | Prompt Adaptation |
+|--------|-----------------|---------------|------------|-------------------|
+| Claude | Yes (SDK auto-loads) | Yes (Skill tool) | Read, Write, Edit, Bash | Lighter prompt (SDK provides context) |
+| Kimi CLI | No | No | ReadFile, WriteFile, StrReplaceFile, Shell | Full prompt + tool name mappings appended |
+| Codex | No | No | Own tool set | Full prompt + tool name mappings appended |
 
 **Key principle:** Communication, diagnosis, and decision-making are **agentic** — driven by LLM reasoning, not hardcoded TypeScript logic. The TypeScript is plumbing (fetch data, execute decisions, write state). The intelligence lives in skills loaded by the prompt builder.
 
@@ -226,12 +226,13 @@ Loading order: `.env.executive` -> `.env.worker` -> `.env` (legacy fallback). Wo
 All default OFF:
 
 ```
-V2_PROMPT_COMPOSITION=true    # Skill+playbook composition in prompts
 V2_TRACK_RECORDS=true          # Update track_record in SKILL.md files
 IDENTITY_ENABLED=true          # Master switch for Gmail + Discord
 GMAIL_ENABLED=true             # Gmail inbox checking
 DISCORD_ENABLED=true           # Discord notifications
 ```
+
+Note: `V2_PROMPT_COMPOSITION` flag has been removed — V2 skill-based composition is now the only path.
 
 ## Key Files Quick Reference
 
@@ -256,9 +257,10 @@ DISCORD_ENABLED=true           # Discord notifications
 | Identity (Discord) | `src/identity/discord-client.ts` |
 | Constitution | `workspace/constitution.md` (**NEVER auto-modify**) |
 | Workspace docs | `workspace-instructions/` (git-tracked template, frontmatter reference, file docs) |
-| Prompt builder (V2) | `src/agentic/intelligence/prompt-builder.ts` (V2 composition, the only active path) |
+| Prompt builder | `src/agentic/intelligence/prompt-builder.ts` (skill-based composition) |
+| Vendor adapter | `src/agentic/intelligence/vendor-adapter.ts` (tool name mappings per vendor) |
 | Worker skills source | `claude-files-to-output/skills/` (synced to `ai-sandbox/.claude/skills/` before each spawn) |
-| Prompt templates (V1) | `src/agentic/worker-prompts/` (**DEAD CODE** — not loaded when V2 is active) |
+| CLAUDE.md template | `claude-files-to-output/templates/ai-sandbox-claude-md.md` (generated at ai-sandbox root) |
 | Capability registries | `capabilities/*.yml` |
 
 ## Code Modification Rules
@@ -266,7 +268,7 @@ DISCORD_ENABLED=true           # Discord notifications
 1. **Constitution** (`workspace/constitution.md`) -- NEVER auto-modify
 2. **Ledgers** -- Append-only JSONL, never truncate or modify existing entries
 3. **Verifiers** -- Must check `result.output_path`, NOT `process.cwd()`
-4. **Worker skills** -- Add to `claude-files-to-output/skills/` (synced to ai-sandbox). Do NOT edit V1 templates in `src/agentic/worker-prompts/` — they are dead code
+4. **Worker skills** -- Add to `claude-files-to-output/skills/` (synced to ai-sandbox)
 5. **PM2** -- Rebuild only (`npm run build`), don't restart unless explicitly asked
 
 ## Debugging

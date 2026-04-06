@@ -1,17 +1,3 @@
----
-name: ai-sandbox-claude-md
-description: Template for the CLAUDE.md generated at the ai-sandbox root. Workers read this as their workspace-level instructions.
-version: 1.0.0
-variables:
-  - name: SERVICES_SECTION
-    type: string
-    required: false
-    description: Generated cloud services section from services-registry.yml
-  - name: APP_CREDS_SECTION
-    type: string
-    required: false
-    description: Generated app credentials section from .env.app
----
 # Agent Outputs Workspace
 
 This is a **monorepo** containing all projects built by the Continuous Executive Agent.

@@ -9,4 +9,4 @@
 
 export { classifyIntent, needsResearch, type IntentType, type IntentClassification } from './intent-classifier.js';
 export { selectStrategy, getStrategyGuidance, recordStrategyAttempt, type Strategy, type StrategySelection } from './strategy-selector.js';
-export { buildIntelligentPrompt, buildSimplePrompt } from './prompt-builder.js';
+export { buildIntelligentPrompt } from './prompt-builder.js';

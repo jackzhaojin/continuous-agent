@@ -11,8 +11,7 @@ import { execSync } from 'child_process';
 import os from 'os';
 import path from 'path';
 import type { WorkerContract, WorkerResult, WorkItem, ExecutionPattern } from '../../core/types.js';
-import { buildIntelligentPrompt, buildSimplePrompt } from '../intelligence/prompt-builder.js';
-import { classifyIntent } from '../intelligence/intent-classifier.js';
+import { buildIntelligentPrompt } from '../intelligence/prompt-builder.js';
 import { selectStrategy } from '../intelligence/strategy-selector.js';
 import { findProjectBySlug } from '../../deterministic/project-registry.js';
 import { getAvailableAppCredentialNames, checkWorkerEnvForLeaks } from '../../deterministic/credential-tiers.js';
@@ -293,13 +292,10 @@ ${replaceLines.length > 0 ? `\n### Do NOT use local alternatives when a cloud se
 
   // Load CLAUDE.md template and render with dynamic sections
   const claudeMdPath = path.join(AGENT_OUTPUTS_BASE, 'CLAUDE.md');
-  const templatePath = path.join(AGENT_BASE, 'src', 'agentic', 'worker-prompts', 'execution', 'ai-sandbox-claude-md-v1.0.0.md');
+  const templatePath = path.join(AGENT_BASE, 'claude-files-to-output', 'templates', 'ai-sandbox-claude-md.md');
   let templateBody: string;
   try {
-    const raw = readFileSync(templatePath, 'utf-8');
-    // Strip YAML frontmatter
-    const fmEnd = raw.indexOf('---', raw.indexOf('---') + 3);
-    templateBody = raw.slice(fmEnd + 3).trim();
+    templateBody = readFileSync(templatePath, 'utf-8').trim();
   } catch {
     console.warn(`[Worker] Warning: Could not load CLAUDE.md template from ${templatePath}`);
     return;
@@ -533,30 +529,31 @@ Report:
 }
 
 /**
- * Build the system prompt for a worker agent
- * Now uses intelligent prompt builder with research phase and strategy context
+ * Build the system prompt for a worker agent.
+ * Uses V2 skill-based prompt composition with vendor adaptation.
  */
 async function buildWorkerPrompt(
   contract: WorkerContract,
   projectPath: string,
   workItem?: WorkItem,
-  retryContext?: WorkerRetryContext
+  retryContext?: WorkerRetryContext,
+  vendor?: string,
 ): Promise<string> {
-  // If we have full context, use intelligent prompt
+  const resolvedVendor = (vendor || process.env.WORKER_VENDOR || 'claude') as import('../../core/vendor/types.js').AgentWorkerVendor;
+
   if (workItem) {
-    const intent = await classifyIntent(workItem);
-
-    // For simple, well-specified tasks, use simple prompt
-    if (intent.type === 'what_and_how' && !retryContext?.attempts) {
-      return await buildSimplePrompt(contract, projectPath);
-    }
-
-    // For complex/vague tasks or retries, use intelligent prompt
-    return await buildIntelligentPrompt(contract, workItem, projectPath, retryContext);
+    return await buildIntelligentPrompt(contract, workItem, projectPath, retryContext, resolvedVendor);
   }
 
-  // Fallback to simple prompt if no work item context
-  return await buildSimplePrompt(contract, projectPath);
+  // Fallback: create a minimal work item from contract for the prompt builder
+  const minimalItem: WorkItem = {
+    id: contract.id,
+    title: contract.prompt,
+    description: '',
+    priority: 'P2',
+    status: 'in_progress',
+  };
+  return await buildIntelligentPrompt(contract, minimalItem, projectPath, retryContext, resolvedVendor);
 }
 
 /** Tools that are read-only (allowed in plan-mode) */
@@ -670,7 +667,8 @@ export async function spawnWorker(
     prompt = buildSkillBuildPrompt(contract, workItem);
   } else {
     // Pass relative path so workers navigate from the ai-sandbox cwd
-    prompt = await buildWorkerPrompt(contract, relativeProjectPath, workItem, retryContext);
+    const vendorId = workItem?.worker_vendor || process.env.WORKER_VENDOR || 'claude';
+    prompt = await buildWorkerPrompt(contract, relativeProjectPath, workItem, retryContext, vendorId);
   }
 
   // Track which strategy we're using if retrying
