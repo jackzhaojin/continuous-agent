@@ -342,6 +342,9 @@ export async function updateStepState(
   const ledgerPath = path.join(LEDGERS_DIR, 'work-ledger.jsonl');
   const now = new Date().toISOString();
 
+  // Use actual step ID from STEPS.json when available, fall back to generated
+  const actualStepId = step.id || stepId(step.step_number);
+
   try {
     if (success) {
       // Update the step in the local copy for progress calculation
@@ -353,7 +356,7 @@ export async function updateStepState(
 
       if (item.source_path) {
         // Primary: update STEPS.json (source of truth for step status)
-        await updateStepInStepsJson(item.source_path, stepId(step.step_number), 'complete', {
+        await updateStepInStepsJson(item.source_path, actualStepId, 'complete', {
           completed_at: now,
           completed_by_contract: contractId,
         });
@@ -361,7 +364,7 @@ export async function updateStepState(
         // Append to PROGRESS_LOG.md
         await logStepCompletedProgress(
           item.source_path,
-          stepId(step.step_number),
+          actualStepId,
           step.step_number + 1,
           item.steps?.length || 1,
           step.title,
@@ -388,7 +391,7 @@ export async function updateStepState(
           event: 'CONTRACT_COMPLETED',
           ts: now,
           contract_id: contractId,
-          step_id: `step-${step.step_number}`,
+          step_id: actualStepId,
           step_title: step.title,
           output_path: outputPath,
         });
@@ -435,7 +438,7 @@ export async function updateStepState(
           event: 'CONTRACT_FAILED',
           ts: now,
           contract_id: contractId,
-          step_id: `step-${step.step_number}`,
+          step_id: actualStepId,
           step_title: step.title,
           error: errorInfo?.slice(0, 500),
         });
@@ -675,14 +678,18 @@ export async function markStepBlocked(item: WorkItem, stepNumber: number): Promi
 
   if (item.source_path) {
     try {
-      // Primary: update TASKS.json (source of truth for step status)
-      await updateStepInStepsJson(item.source_path, stepId(stepNumber), 'blocked');
+      // Use actual step ID from STEPS.json when available
+      const step = item.steps?.[stepNumber];
+      const actualStepId = step?.id || stepId(stepNumber);
+
+      // Primary: update STEPS.json (source of truth for step status)
+      await updateStepInStepsJson(item.source_path, actualStepId, 'blocked');
 
       // Append to PROGRESS_LOG.md
-      const stepTitle = item.steps?.[stepNumber]?.title || `Step ${stepNumber + 1}`;
+      const stepTitle = step?.title || `Step ${stepNumber + 1}`;
       await logStepBlockedProgress(
         item.source_path,
-        stepId(stepNumber),
+        actualStepId,
         stepNumber + 1,
         item.steps?.length || 1,
         stepTitle,
@@ -693,8 +700,8 @@ export async function markStepBlocked(item: WorkItem, stepNumber: number): Promi
         event: 'CONTRACT_BLOCKED',
         ts: new Date().toISOString(),
         contract_id: item.id || 'unknown',
-        step_id: stepId(stepNumber),
-        step_title: item.steps?.[stepNumber]?.title,
+        step_id: actualStepId,
+        step_title: step?.title,
       });
 
       log(`  Step ${stepNumber + 1} marked as blocked`);

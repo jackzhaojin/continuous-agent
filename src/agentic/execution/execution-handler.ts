@@ -429,13 +429,14 @@ export async function logWorkStart(
 
   // Update STEPS.json + PROGRESS_LOG.md for step starts
   if (step && item.source_path) {
-    await updateStepInStepsJson(item.source_path, stepId(step.step_number), 'in_progress', {
+    const actualStepId = step.id || stepId(step.step_number);
+    await updateStepInStepsJson(item.source_path, actualStepId, 'in_progress', {
       started_at: now,
     });
 
     await logStepStartedProgress(
       item.source_path,
-      stepId(step.step_number),
+      actualStepId,
       step.step_number + 1,
       item.steps?.length || 1,
       step.title,
