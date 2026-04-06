@@ -61,7 +61,9 @@ export async function loadSkillLibrary(rootDir = path.join(process.cwd(), 'skill
         continue;
       }
 
-      const category = toStringValue(fm.category, 'skill');
+      // Accept category from top-level (legacy) or metadata.category (Agent Skills spec)
+      const metadata = (fm.metadata && typeof fm.metadata === 'object') ? fm.metadata as Record<string, unknown> : {};
+      const category = toStringValue(fm.category) || toStringValue(metadata.category, 'skill');
       if (category !== 'skill') {
         warnings.push(createWarning(filePath, 'SKILL_CATEGORY_INVALID', `Expected category "skill" but got "${category}". Skipping file.`));
         continue;
