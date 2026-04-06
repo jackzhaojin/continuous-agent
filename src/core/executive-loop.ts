@@ -47,7 +47,7 @@ import { appendInputLog } from '../deterministic/inputs-log.js';
 import { isRateLimitError, isInCooldown, enterCooldown, resetBackoff } from '../deterministic/backoff-manager.js';
 import { resolveExecutionPattern } from '../deterministic/execution-pattern-resolver.js';
 import { loadPlaybookLibrary } from '../deterministic/playbook-loader.js';
-import { validateWork } from '../deterministic/validation-handler.js';
+import { validateWork, validateWorkDetailed } from '../deterministic/validation-handler.js';
 import {
   updateGoalState,
   updateStepState,
@@ -59,7 +59,14 @@ import {
   commitOutputsMonorepo,
 } from '../deterministic/state-handler.js';
 import { closeMilestone } from '../deterministic/notion-reporter.js';
-import { incrementStepRetryCount, readStepRetryCount, readStepsJson, writeStepsJson, stepId as makeStepId } from '../deterministic/steps-json-handler.js';
+import {
+  incrementStepRetryCount,
+  readStepRetryCount,
+  readStepsJson,
+  writeStepsJson,
+  stepId as makeStepId,
+  updateStepStatus as updateStepInStepsJson,
+} from '../deterministic/steps-json-handler.js';
 
 // SELF-IMPROVEMENT - Idle and scheduled triggers
 import { checkSelfImprovementTriggers } from '../agentic/calibration/self-improvement-triggers.js';
@@ -513,7 +520,25 @@ async function runIteration(): Promise<IterationResult> {
   setDashboardPhase(5);
   logAgentic('PHASE 5: Validate Work');
   // Pass current step for step-aware validation
-  const isValid = await validateWork(workItem, result, currentStep);
+  const validation = await validateWorkDetailed(workItem, result, currentStep);
+  const isValid = validation.isValid;
+
+  if (isStepExecution && currentStep && workItem.source_path) {
+    const buildHealth = !validation.buildCheckRan
+      ? 'skip'
+      : validation.failedVerifiers.includes('node_build')
+        ? 'fail'
+        : 'pass';
+    await updateStepInStepsJson(
+      workItem.source_path,
+      currentStep.id || makeStepId(currentStep.step_number),
+      currentStep.status,
+      {
+        build_health: buildHealth,
+        build_error: validation.buildError || null,
+      },
+    );
+  }
 
   // Log capability result (only for standard execution path where capabilities were tracked)
   if (patternResolution.pattern !== 'deterministic-pipeline') {
@@ -609,7 +634,11 @@ async function runIteration(): Promise<IterationResult> {
   }
 
   retry.attempts++;
-  retry.lastError = result?.errors.join(', ') || 'Unknown error';
+  const workerError = result?.errors.join(', ');
+  const buildError = validation.buildError;
+  retry.lastError = buildError
+    ? `Build verification failed: ${buildError}`
+    : workerError || 'Unknown error';
   retry.lastAttemptAt = new Date().toISOString();
 
   // Persist retry count to STEPS.json (survives PM2 restarts)

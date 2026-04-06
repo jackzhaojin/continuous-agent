@@ -106,7 +106,7 @@ export async function updateStepStatus(
   bundlePath: string,
   stepId: string,
   newStatus: WorkStep['status'],
-  extras?: Partial<Pick<WorkStep, 'started_at' | 'completed_at' | 'completed_by_contract'>>
+  extras?: Partial<Pick<WorkStep, 'started_at' | 'completed_at' | 'completed_by_contract' | 'build_health' | 'build_error'>>
 ): Promise<boolean> {
   const stepsFile = await readStepsJson(bundlePath);
   if (!stepsFile) {
@@ -124,6 +124,8 @@ export async function updateStepStatus(
   if (extras?.started_at) step.started_at = extras.started_at;
   if (extras?.completed_at) step.completed_at = extras.completed_at;
   if (extras?.completed_by_contract) step.completed_by_contract = extras.completed_by_contract;
+  if (extras?.build_health) step.build_health = extras.build_health;
+  if (extras?.build_error !== undefined) step.build_error = extras.build_error;
 
   return writeStepsJson(bundlePath, stepsFile);
 }
@@ -208,6 +210,8 @@ export function stepsJsonToWorkSteps(diskSteps: WorkStep[]): WorkStep[] {
     completed_by_contract: ts.completed_by_contract,
     re_breakdown_count: ts.re_breakdown_count,
     retry_count: ts.retry_count,
+    build_health: ts.build_health,
+    build_error: ts.build_error,
     id: ts.id,
     order: ts.order,
   }));

@@ -17,6 +17,20 @@ import {
 import type { WorkItem, WorkStep, WorkerResult } from '../core/types.js';
 import { logAgentic, logDeterministic, log } from '../core/logging.js';
 
+export interface ValidationOutcome {
+  isValid: boolean;
+  failedVerifiers: string[];
+  blockingFailures: string[];
+  buildError?: string;
+  buildCheckRan: boolean;
+}
+
+function isLikelyWebProject(item: WorkItem): boolean {
+  const text = `${item.title} ${item.description}`.toLowerCase();
+  return ['next.js', 'nextjs', 'react', 'vue', 'angular', 'vite', 'frontend', 'web ui', 'website']
+    .some(keyword => text.includes(keyword));
+}
+
 /**
  * Validate work using verifiers
  * MIXED: Deterministic verifier execution + Agentic result interpretation
@@ -37,9 +51,18 @@ export async function validateWork(
   result: WorkerResult | null,
   currentStep?: WorkStep
 ): Promise<boolean> {
+  const outcome = await validateWorkDetailed(item, result, currentStep);
+  return outcome.isValid;
+}
+
+export async function validateWorkDetailed(
+  item: WorkItem,
+  result: WorkerResult | null,
+  currentStep?: WorkStep
+): Promise<ValidationOutcome> {
   if (!result) {
     log('  No result to validate');
-    return false;
+    return { isValid: false, failedVerifiers: [], blockingFailures: [], buildCheckRan: false };
   }
 
   if (!result.output_path) {
@@ -48,9 +71,9 @@ export async function validateWork(
     // not block completion (some tasks may not produce a file-system artifact).
     if (result.success) {
       logAgentic('  Worker reported success but no output path — accepting as valid (advisory)');
-      return true;
+      return { isValid: true, failedVerifiers: [], blockingFailures: [], buildCheckRan: false };
     }
-    return false;
+    return { isValid: false, failedVerifiers: [], blockingFailures: [], buildCheckRan: false };
   }
 
   try {
@@ -99,7 +122,7 @@ export async function validateWork(
 
     if (overallStatus === 'PASS') {
       logAgentic('  All verifiers passed');
-      return true;
+      return { isValid: true, failedVerifiers: [], blockingFailures: [], buildCheckRan: verifierResults.some(v => v.verifier_id === 'node_build') };
     }
 
     // --- Verifiers did not all pass ---
@@ -115,31 +138,36 @@ export async function validateWork(
     // — intermediate steps may modify types/schema that break builds transiently.
     // node_build only blocks on the final step or single-step goals.
     const isIntermediateStep = stepContext && stepContext.step_number < stepContext.total_steps - 1;
+    const webProject = isLikelyWebProject(item);
     const blockingVerifiers = isIntermediateStep
-      ? ['git_status_clean', 'node_install']
+      ? (webProject ? ['git_status_clean', 'node_build', 'node_install'] : ['git_status_clean', 'node_install'])
       : ['git_status_clean', 'node_build', 'node_install'];
     const hasBlockingFailures = failedVerifiers.some(v => blockingVerifiers.includes(v));
+    const buildVerifier = verifierResults.find(v => v.verifier_id === 'node_build' && v.result === 'FAIL');
+    const buildError = buildVerifier?.message || (typeof buildVerifier?.evidence?.error === 'string' ? buildVerifier.evidence.error : undefined);
+    const buildCheckRan = verifierResults.some(v => v.verifier_id === 'node_build');
+    const blockingFailures = failedVerifiers.filter(v => blockingVerifiers.includes(v));
 
     // Require worker success AND reasonable pass ratio for partial pass
     if (overallStatus === 'PARTIAL' && !hasBlockingFailures && result.success && passRatio >= 0.5) {
       logAgentic('  Partial pass - some optional verifiers failed');
       log(`  Pass ratio: ${(passRatio * 100).toFixed(0)}% (${summary.pass_count}/${summary.pass_count + summary.fail_count})`);
       log(`  Advisory failures: ${failedVerifiers.join(', ')}`);
-      return true;
+      return { isValid: true, failedVerifiers, blockingFailures: [], buildError, buildCheckRan };
     }
 
     // Worker reported success but verifiers show critical failures — don't trust it
     if (result.success && hasBlockingFailures) {
       logAgentic('  Worker reported SUCCESS but blocking verifiers failed — rejecting');
-      log(`  Blocking failures: ${failedVerifiers.filter(v => blockingVerifiers.includes(v)).join(', ')}`);
-      return false;
+      log(`  Blocking failures: ${blockingFailures.join(', ')}`);
+      return { isValid: false, failedVerifiers, blockingFailures, buildError, buildCheckRan };
     }
 
     // Worker reported success with no blocking failures but low pass ratio
     if (result.success && !hasBlockingFailures && passRatio < 0.5) {
       logAgentic('  Worker reported SUCCESS but too many verifiers failed — rejecting');
       log(`  Pass ratio: ${(passRatio * 100).toFixed(0)}% (below 50% threshold)`);
-      return false;
+      return { isValid: false, failedVerifiers, blockingFailures: [], buildError, buildCheckRan };
     }
 
     // Worker reported success, no blocking failures, decent ratio — accept
@@ -148,7 +176,7 @@ export async function validateWork(
       if (failedVerifiers.length > 0) {
         log(`  Advisory verifier warnings: ${failedVerifiers.join(', ')}`);
       }
-      return true;
+      return { isValid: true, failedVerifiers, blockingFailures: [], buildError, buildCheckRan };
     }
 
     // Worker failed AND verifiers failed — genuine failure, trigger retry
@@ -159,14 +187,14 @@ export async function validateWork(
       log(`  Failed verifiers: ${failedVerifiers.join(', ')}`);
     }
 
-    return false;
+    return { isValid: false, failedVerifiers, blockingFailures, buildError, buildCheckRan };
   } catch (error) {
     log(`  Validation error: ${error}`);
     // If verifier execution itself errors but worker succeeded, don't block
     if (result.success) {
       logAgentic('  Verifier error but worker reported success — accepting as valid');
-      return true;
+      return { isValid: true, failedVerifiers: [], blockingFailures: [], buildCheckRan: false };
     }
-    return false;
+    return { isValid: false, failedVerifiers: [], blockingFailures: [], buildCheckRan: false };
   }
 }

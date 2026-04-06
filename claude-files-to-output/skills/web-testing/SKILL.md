@@ -18,7 +18,10 @@ Before writing ANY new code, verify the existing site works:
 ```bash
 cd {{PROJECT_PATH}} && npm run dev &
 sleep 3
-playwright-cli open http://localhost:3000
+PORT=$(lsof -nP -iTCP -sTCP:LISTEN | awk '/node/ && /127.0.0.1|localhost/ {print $9}' | sed -E 's/.*:([0-9]+)->?/\1/' | head -1)
+[ -z "$PORT" ] && PORT=$(grep -oE 'localhost:[0-9]+' .next/dev/logs/* 2>/dev/null | head -1 | cut -d: -f2)
+[ -z "$PORT" ] && PORT=3000
+playwright-cli open "http://localhost:$PORT"
 playwright-cli snapshot
 playwright-cli close
 kill %1 2>/dev/null || true
@@ -36,9 +39,12 @@ If the page does NOT load or shows errors, FIX THAT FIRST before doing your task
 # Start dev server
 cd {{PROJECT_PATH}} && npm run dev &
 sleep 3
+PORT=$(lsof -nP -iTCP -sTCP:LISTEN | awk '/node/ && /127.0.0.1|localhost/ {print $9}' | sed -E 's/.*:([0-9]+)->?/\1/' | head -1)
+[ -z "$PORT" ] && PORT=$(grep -oE 'localhost:[0-9]+' .next/dev/logs/* 2>/dev/null | head -1 | cut -d: -f2)
+[ -z "$PORT" ] && PORT=3000
 
 # Open browser with playwright-cli (this is a real CLI tool installed on this machine)
-playwright-cli open http://localhost:3000
+playwright-cli open "http://localhost:$PORT"
 
 # Take a snapshot to see what rendered
 playwright-cli snapshot
@@ -68,7 +74,7 @@ kill %1 2>/dev/null || true
 
 If `playwright-cli` is not available, fall back to:
 1. `npm run build` — verifies compilation
-2. `curl http://localhost:3000` — verifies server responds
+2. `curl "http://localhost:${PORT:-3000}"` — verifies server responds
 3. Check for runtime errors in server output
 
 **Do NOT skip visual testing.** A component that compiles but renders a blank page is a failure.

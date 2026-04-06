@@ -199,6 +199,14 @@ function copySourceProject(sourcePath: string, targetPath: string): boolean {
  * Skipped for self-enhance/skill-build workers (they use the agent repo directly).
  */
 function setupAgentOutputsRoot(): void {
+  // Best-effort cleanup of stale local dev servers from previous worker sessions.
+  // Prevents port collisions (3000, 3001, ...) across step retries.
+  try {
+    execSync('pkill -f "(next-server|next dev|vite|react-scripts start)" || true', { stdio: 'pipe' });
+  } catch {
+    // Non-blocking: cleanup is best effort.
+  }
+
   // Create root if needed
   if (!existsSync(AGENT_OUTPUTS_BASE)) {
     mkdirSync(AGENT_OUTPUTS_BASE, { recursive: true });
