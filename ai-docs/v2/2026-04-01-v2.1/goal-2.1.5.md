@@ -62,17 +62,17 @@ When a build fails after step N, the retry should focus specifically on fixing t
 - Pass it to the retry prompt as structured context: "Your last attempt broke the build. Error: [exact error]. Fix the build first, then continue."
 - The `web-testing` skill's post-build check already verifies rendering — this just makes build failure a hard gate
 
-### R5: Update or Prune Reference POCs
+### R5: Add Multi-Vendor POC References to Skills
 
-The `worker-base` skill references 3 POCs from early v1:
-- `references/poc/claude/chat-cli/` — Agent SDK basics
-- `references/poc/claude/agent-sdk-skills-poc/` — Skills integration
-- `references/poc/claude/agent-sdk-subagents-poc/` — Subagent delegation
+The `worker-base` skill does not currently reference any POCs. Meanwhile, `references/poc/` contains vendor-specific examples that could help workers:
+- `references/poc/claude/` — Agent SDK basics, skills integration, subagent delegation
+- `references/poc/codex/` — Codex worker examples
+- `references/poc/kimi/` — Kimi worker examples
 
-These are all Claude-specific SDK experiments. For Kimi/Codex workers, they're irrelevant. Options:
-- Move POC references to a Claude-specific section (only injected for Claude vendor)
-- Update with Kimi/Codex POC references from `references/poc/{codex,kimi}/`
-- Remove from `worker-base` entirely — workers rarely consult them
+Options:
+- Add vendor-specific POC references to skills (only injected for matching vendor via prompt builder)
+- Add a shared "reference examples" section to `worker-base` with pointers to `references/poc/`
+- Leave as-is — workers rarely consult POCs and the prompt is already long enough
 
 ### R6: Step-Level Build Health Tracking
 
