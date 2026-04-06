@@ -1,61 +1,67 @@
-# Technical Highlight 5: Worker Prompt System
+# Technical Highlight 5: Skill-Based Prompt Composition
 
-**Directory:** [`src/agentic/worker-prompts/`](../../../src/agentic/worker-prompts/)
+**File:** [`src/agentic/intelligence/prompt-builder.ts`](../../../src/agentic/intelligence/prompt-builder.ts)
 
 ## What It Does
 
-Worker prompts are versioned markdown templates that define *exactly what a worker agent sees* when it starts coding. The prompt builder composes these templates with runtime context (task details, retry history, strategy guidance) to produce the full prompt sent to the worker.
+Worker prompts are composed from **skill files** at spawn time, not hardcoded in TypeScript. The prompt builder loads SKILL.md files from `claude-files-to-output/skills/`, renders template variables, and applies vendor-specific adaptation -- producing a tailored prompt for each worker regardless of which LLM backend runs it.
 
 ```
-src/agentic/worker-prompts/
-  worker/                  Base worker prompts (versioned)
-    worker-base-v2.1.0.md  Current: Constitution, monorepo rules, Definition of Done
-    worker-base-v2.0.0.md  Previous versions kept for rollback
-    worker-base.md         Symlink to current version
+claude-files-to-output/skills/
+  worker-base/SKILL.md      Constitution, monorepo rules, execution guidelines
+  web-testing/SKILL.md       Playwright-cli visual verification protocol
+  project-architect/SKILL.md Architecture planning
+  calibration-nextjs/SKILL.md Next.js patterns
+  ...10 skills total
 
-  execution/               Execution context
-    ai-sandbox-claude-md-v1.0.0.md   CLAUDE.md injected into ai-sandbox
-    incremental-execution-v1.0.0.md  Continue-from-existing instructions
-
-  strategy/                Retry strategy guidance
-    strategy-guidance-v1.0.0.md      Different approaches per retry attempt
-
-  evaluations/             Output evaluation criteria
-  metadata/                Prompt metadata and loading
-  research/                Research-phase prompts
-  retry/                   Retry-specific context
+claude-files-to-output/templates/
+  ai-sandbox-claude-md.md   Generated CLAUDE.md for ai-sandbox root
 ```
+
+## Prompt Composition Pipeline
+
+The prompt builder assembles sections from skill libraries and runtime context:
+
+```
+1. Objective        Task title, description, priority, contract, project path
+2. Constraints      Tools allowed, max turns, Definition of Done
+3. Worker-base      Constitution limits, monorepo rules, execution guidelines
+4. Exec pattern     Plan-then-execute, loop-until-progress, plan-mode, etc.
+5. Playbook         Matched from playbooks/ directory (if any)
+6. Skill refs       From playbook's composes_skills list
+7. Web testing      Playwright-cli protocol (auto-loaded for web projects)
+8. Validation       Definition of Done as checklist
+9. Vendor adapt     Tool name mappings for non-Claude vendors
+```
+
+## Vendor Adaptation
+
+The same skill content serves all vendors. A post-composition adapter layer (`vendor-adapter.ts`) handles the differences:
+
+| Vendor | Reads CLAUDE.md? | Reads Skills? | Adaptation |
+|--------|-----------------|---------------|------------|
+| Claude | Yes (SDK) | Yes (Skill tool) | Lighter prompt -- SDK provides context |
+| Kimi | No | No | Full prompt + tool mappings (Bash->Shell, Read->ReadFile, etc.) |
+| Codex | No | No | Full prompt + tool mappings |
+
+For Kimi and Codex, everything must be in the prompt string -- they can't discover `.claude/skills/` on their own. The adapter translates backtick-quoted tool references and appends a mapping section.
 
 ## Template Variables
 
-The base worker prompt uses `{{VARIABLE}}` interpolation:
+Skills use `{{VARIABLE}}` placeholders rendered at composition time:
 
 ```markdown
-# Task: {{TASK_TITLE}}
-Priority: {{PRIORITY}} | Contract: {{CONTRACT_ID}}
-
-## CONSTITUTION LIMITS (IMMUTABLE)
-...8 hard limits injected into every worker...
-
-## Definition of Done
-{{DEFINITION_OF_DONE}}
-
-## Project Context
+## Project Context (Monorepo)
 Your Project Directory: {{PROJECT_PATH}}
+
+### Navigate and Assess First
+cd {{PROJECT_PATH}}
+git log --oneline -10
 ```
-
-## Prompt Composition (V2)
-
-When `V2_PROMPT_COMPOSITION=true`, the prompt builder uses library-based composition:
-
-```
-objective -> constraints -> execution-pattern -> playbook -> skill references -> validation
-```
-
-This lets you change worker behavior by editing markdown files, not TypeScript.
 
 ## Talk Points
 
-- Every worker starts with the Constitution baked in -- safety is non-negotiable
-- Versioned templates mean you can A/B test prompt changes and roll back
-- The prompt builder is the bridge between "what to build" (PROMPT.md) and "how to build it" (worker instructions)
+- Zero hardcoded instruction text in TypeScript -- the prompt builder is a thin composer
+- Change worker behavior by editing a SKILL.md file, not redeploying code
+- Vendor adaptation is post-composition: write skills once, adapt per vendor automatically
+- The worker-base skill encodes the Constitution into every worker session -- safety is structural
