@@ -27,6 +27,15 @@ const FRAMEWORK_ARTIFACT_PATTERNS = [
 ];
 
 /**
+ * Path prefixes for directories that contain agent/tool artifacts (not worker code).
+ * Files under these paths are excluded from git_status_clean checks.
+ */
+const ARTIFACT_DIR_PREFIXES = [
+  '.playwright-cli/',
+  '.playwright-mcp/',
+];
+
+/**
  * Detect the actual git project root within an output_path.
  * Workers sometimes create apps in a subdirectory (e.g., output_path/music-player/).
  * Returns the subdirectory path if a .git dir is found there, or null.
@@ -52,9 +61,17 @@ function findSubdirectoryGitRoot(projectPath: string): string | null {
  */
 function filterFrameworkArtifacts(changedFiles: string[]): string[] {
   return changedFiles.filter(line => {
-    // Extract filename from git status line (format: "XY filename" or "XY path/filename")
-    const fileName = line.replace(/^.{2}\s+/, '').split('/').pop() || '';
-    return !FRAMEWORK_ARTIFACT_PATTERNS.some(pattern => pattern.test(fileName));
+    // Extract the full relative path from git status line (format: "XY path/to/file")
+    const filePath = line.replace(/^.{2}\s+/, '').replace(/^"(.*)"$/, '$1');
+    const fileName = filePath.split('/').pop() || '';
+
+    // Exclude files matching known framework artifact patterns
+    if (FRAMEWORK_ARTIFACT_PATTERNS.some(pattern => pattern.test(fileName))) return false;
+
+    // Exclude files under known artifact directories
+    if (ARTIFACT_DIR_PREFIXES.some(prefix => filePath.startsWith(prefix))) return false;
+
+    return true;
   });
 }
 
