@@ -28,6 +28,21 @@
 
 import * as path from 'node:path';
 import * as fs from 'node:fs';
+import * as dotenv from 'dotenv';
+
+// ── Load env tiers ───────────────────────────────────────────────
+// The continuous-agent repo uses three-tier credential separation
+// (.env.executive → .env.worker → .env). Standalone harness runs only
+// need Tier 2 (worker) secrets — CLAUDE_CODE_OAUTH_TOKEN, model strings,
+// vendor API keys. Load .env.worker first (highest precedence), then
+// fall back to .env. dotenv doesn't overwrite existing keys by default,
+// so the first file's values win.
+const envCandidates = ['.env.worker', '.env'];
+for (const candidate of envCandidates) {
+  const full = path.resolve(process.cwd(), candidate);
+  if (fs.existsSync(full)) dotenv.config({ path: full });
+}
+
 import { getHarness, listHarnesses } from './core/harness-registry.js';
 import { getAgentWorkerProviderForVendor } from '../core/vendor/vendor-registry.js';
 import type { AgentWorkerVendor } from '../core/vendor/types.js';

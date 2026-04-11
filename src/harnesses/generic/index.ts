@@ -20,15 +20,12 @@ import {
   runShellOutHarness,
 } from '../shellout-runner.js';
 
-const PHASE_LIST = [
-  'SPEC_WHY',
-  'SPEC_WHAT',
-  'SPEC_HOW',
-  'SPEC_WHEN',
-  'TASK_RESEARCH',
-  'TASK_BUILD',
-  'TASK_VALIDATE',
-] as const;
+// P1/P2: phase names mirror what shellout-runner's normalizeGenericPhase emits
+// from PROGRESS_LOG.md `Phase: …` markers in the JS harness. The full per-agent
+// spec breakdown (WHY/WHAT/HOW/WHEN) collapses into a single SPEC row here
+// because the JS orchestrator logs them as sub-agents, not as top-level phases.
+// P3 native port will surface finer granularity.
+const PHASE_LIST = ['SPEC', 'RESEARCH', 'BUILD', 'VALIDATE', 'COMPLETE'] as const;
 
 export class GenericHarness implements HarnessOrchestrator {
   readonly name = 'generic';
