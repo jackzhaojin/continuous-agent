@@ -19,7 +19,16 @@ In addition to the 24x7 executive loop, this repo ships **harnesses** -- dedicat
 - **Standalone** via the unified CLI: `npm run harness -- --name generic --prompt path/to/PROMPT.md`
 - **Integrated** by dropping a goal bundle with `execution_pattern: harness` into `workspace/ondeck/`, letting the executive loop drive it through the normal goal/contract/steps lifecycle.
 
-See **[HARNESS.md](HARNESS.md)** for the full reference: CLI flags, frontmatter fields, vendor parity status, and the phased delivery plan.
+All three harnesses are native TypeScript and invoke LLMs through a single vendor-agnostic chokepoint (`runHarnessAgent()`), so generic + EDS work with Claude, Codex, or Kimi. Study is Claude-only because its coordinator relies on the Claude SDK's native Task/Skill tools; `__spawn__` emulation for other vendors is deferred to v2.3.
+
+A mock-provider test suite exercises the full orchestrator for all three harnesses end-to-end without API calls:
+
+```bash
+npm run test:harness           # unit + mock e2e (~1s, no API calls)
+npm run test:harness:live      # gated real Claude run
+```
+
+See **[HARNESS.md](HARNESS.md)** for the full reference: CLI flags, frontmatter fields, phased delivery state, tests, and troubleshooting.
 
 ## How It Works
 
@@ -277,4 +286,6 @@ ai-docs/             PRDs, specs, version history
 
 ## License
 
-MIT
+Apache-2.0. See [LICENSE](LICENSE) for the full text and [NOTICE](NOTICE) for third-party SDK attributions (Claude Agent SDK, OpenAI Codex SDK, Kimi Agent SDK, Playwright MCP, dotenv).
+
+Contributions welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for TypeScript conventions and the "writing a new harness" guide.

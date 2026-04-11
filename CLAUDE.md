@@ -28,6 +28,9 @@ pm2 start ecosystem.config.cjs    # Production (requires build first)
 - No test framework -- validation is done through runtime verifiers, not unit tests
 - Ad-hoc tests live in `tests/adhoc/` and run via `npx tsx tests/adhoc/<file>.ts`
 - E2E vendor tests: `npx tsx tests/e2e/vendor-workers/<test>.ts` (Claude, Codex, Kimi wire, Kimi CLI, registry)
+- Harness v2.2 tests: `npm run test:harness` (unit + mock-provider e2e, no API calls); `npm run test:harness:live` for gated real Claude run
+
+**Develop worktree note:** NEVER run `npm run build` in a non-main worktree (e.g. `continuous-agent-develop`). The `build` script ends with `pm2 sendSignal SIGUSR2 executive-loop` which fires at whatever PM2 has registered — that's the main worktree's compiled `dist/`, not develop's. Use `npm run typecheck` in secondary worktrees.
 
 ## Architecture
 
@@ -98,6 +101,47 @@ Resolved via: PROMPT.md `execution_pattern` field > playbook match > system defa
 - `loop-until-progress` -- Keep trying while making gains (uses standard worker for now).
 - `plan-mode` -- Read-only tools only.
 - `deterministic-pipeline` -- Fixed step sequence (executor built, not yet wired into loop).
+- `harness` -- v2.2: delegates to a registered harness under `src/harnesses/<name>/`. Dispatched via `src/agentic/execution/harness-executor.ts` at `src/core/executive-loop.ts:~413`. See Harness Mode section.
+
+### Harness Mode (v2.2)
+
+Harnesses are multi-agent plan-then-build pipelines living at `src/harnesses/<name>/` and implementing `HarnessOrchestrator`. Three ship: `generic`, `eds`, `study`. Two ways to run:
+
+- **Standalone**: `npm run harness -- --name <name> --prompt <path>` (unified CLI at `src/harnesses/cli.ts`)
+- **Integrated**: drop a goal bundle with `execution_pattern: harness` into `workspace/ondeck/`
+
+**Vendor-agnostic chokepoint**: every harness invokes LLMs via `src/harnesses/core/harness-agent-runner.ts:runHarnessAgent()`. Do NOT import `@anthropic-ai/claude-agent-sdk` directly from inside `src/harnesses/*` — that breaks Codex/Kimi parity. The provider is injected through `HarnessRunConfig.provider`.
+
+**Layout per harness**:
+```
+src/harnesses/<name>/
+├── index.ts              # class <Name>Harness implements HarnessOrchestrator
+├── orchestrator.ts       # run loop, calls runHarnessAgent() only
+├── state-store.ts        # STATUS.json / TASKS.json / PROGRESS_LOG.md helpers
+├── prompt-loader.ts      # loads prompts/*.md with {{VAR}} substitution
+├── model-defaults.ts     # per-agent tools + default models
+├── mode-detector.ts      # scenario detection
+└── prompts/              # prompt templates, copied verbatim from JS source
+```
+
+**State schemas (byte-compatible with JS originals — never break these):**
+- `generic` + `eds`: `<target>/ai-docs/SPEC/STATUS.json` + `TASKS.json` + `PROGRESS_LOG.md`
+- `study`: `<target>/ai-docs/STATUS.json` with per-phase objects (7 phases)
+
+**Harness-specific deltas:**
+- **generic**: 4-agent spec (WHY/WHAT/HOW/WHEN) → per-task RESEARCH → BUILD retries → VALIDATE retries → subtask on failure
+- **eds**: same as generic + `ensureIgnoreFiles()` (writes `.gitignore` for `.playwright-mcp`, `.hlxignore` for `ai-docs/` + `.playwright-mcp`). da.live push to `jack-da-live-harness-built` is performed by the build agent via Bash (NOT in TypeScript)
+- **study**: single coordinator agent uses Claude's native Task/Skill tools to spawn specialists from `src/harnesses/study/agents/` and invoke skills from `src/harnesses/study/skills/`. **Claude-only vendor parity**; `__spawn__` emulation for Codex/Kimi deferred to v2.3
+
+**Executive-mode invariant**: internal harness retries do NOT count against the executive's 3-failure threshold. A harness run = one worker execution. Only `run_complete(success=false)` or `run_failed` bumps the failure count.
+
+**Registering a new harness**:
+1. Create `src/harnesses/<name>/` with the files above
+2. Add `REGISTRY.set('<name>', new <Name>Harness());` to `src/harnesses/core/harness-registry.ts`
+3. Verify: `npm run harness -- --list`
+4. Add mock tests: `tests/e2e/harnesses/mock-<name>-orchestrator.e2e.ts`
+
+See `HARNESS.md` for the full CLI/frontmatter reference and `.claude/rules/harnesses.md` for implementation details.
 
 ## Two-Repository Architecture
 
@@ -262,6 +306,12 @@ Note: `V2_PROMPT_COMPOSITION` flag has been removed — V2 skill-based compositi
 | Worker skills source | `claude-files-to-output/skills/` (synced to `ai-sandbox/.claude/skills/` before each spawn) |
 | CLAUDE.md template | `claude-files-to-output/templates/ai-sandbox-claude-md.md` (generated at ai-sandbox root) |
 | Capability registries | `capabilities/*.yml` |
+| Harness CLI entry | `src/harnesses/cli.ts` (`npm run harness --`) |
+| Harness core types | `src/harnesses/core/types.ts` (`HarnessOrchestrator`, `HarnessEvent`, `HarnessRunConfig`, `StepSink`) |
+| Harness agent runner | `src/harnesses/core/harness-agent-runner.ts` (vendor-agnostic LLM chokepoint) |
+| Harness registry | `src/harnesses/core/harness-registry.ts` (`REGISTRY.set('generic', ...)`) |
+| Harness executor | `src/agentic/execution/harness-executor.ts` (executive-loop bridge for `execution_pattern: harness`) |
+| Harness reference doc | `HARNESS.md` (root) |
 
 ## Code Modification Rules
 
