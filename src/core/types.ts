@@ -51,6 +51,8 @@ export interface WorkStep {
   re_breakdown_count?: number; // Track re-breakdowns for exit code 1 handling
   retry_count?: number;        // Persisted retry attempts (survives PM2 restarts)
   completed_by_contract?: string;
+  build_health?: 'pass' | 'fail' | 'skip';
+  build_error?: string | null;
   // On-disk STEPS.json fields (optional at runtime)
   id?: string;                  // Stable identifier (e.g., "step-0")
   order?: number;               // Execution order (0-based, mirrors step_number)

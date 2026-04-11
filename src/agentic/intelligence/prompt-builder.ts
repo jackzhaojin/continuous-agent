@@ -34,7 +34,7 @@ export interface RetryContext {
 }
 
 /** Web project detection regex (word-bounded to avoid false positives like "build" matching "ui") */
-const WEB_KEYWORDS = /next\.?js|react|vue|angular|\bhtml\b|\bcss\b|website|web.?app|frontend|\bui\b|component|page|form|dashboard/i;
+export const WEB_KEYWORDS = /next\.?js|react|vue|angular|\bhtml\b|\bcss\b|website|web.?app|frontend|\bui\b|component|page|form|dashboard/i;
 
 /** Path to worker skills source directory (synced to ai-sandbox/.claude/skills/ by worker-spawner) */
 const WORKER_SKILLS_ROOT = path.join(process.cwd(), 'claude-files-to-output', 'skills');

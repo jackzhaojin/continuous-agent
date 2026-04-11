@@ -1,6 +1,6 @@
 # V2.1.5 Goal: Worker Reliability & Verification Hardening
 
-**Status:** Planning (2026-04-06)
+**Status:** In Progress (2026-04-06)
 
 ## Problem
 
@@ -97,10 +97,10 @@ Track build health in STEPS.json alongside step status. After each step, record 
 
 ## Success Criteria
 
-- [ ] `node_build` is a hard failure for web projects — broken builds trigger retry
-- [ ] `web-testing` skill detects actual dev server port dynamically
-- [ ] Orphan processes are cleaned up between worker sessions
-- [ ] Build errors are included in retry context for targeted fixes
+- [x] `node_build` is a hard failure for web projects — broken builds trigger retry
+- [x] `web-testing` skill detects actual dev server port dynamically
+- [x] Orphan processes are cleaned up between worker sessions
+- [x] Build errors are included in retry context for targeted fixes
 - [ ] Reference POCs updated or pruned for multi-vendor relevance
-- [ ] Build health tracked per-step in STEPS.json
+- [x] Build health tracked per-step in STEPS.json
 - [ ] End-to-end: a 32-step web project completes with a working, renderable app
