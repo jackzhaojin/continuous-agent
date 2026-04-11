@@ -31,6 +31,11 @@ Thumbs.db
 .idea/
 *.code-workspace
 
+# Claude Code runtime / per-machine state
+# (keep .claude/agents/, .claude/rules/, .claude/skills/ tracked — those are source of truth)
+.claude/scheduled_tasks.lock
+.claude/settings.local.json
+
 # Ledgers directory - runtime logs, not tracked
 ledgers/
 
