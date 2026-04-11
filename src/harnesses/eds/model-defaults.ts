@@ -74,14 +74,18 @@ export const DEFAULT_AGENT_MODELS: Record<EdsAgentName, string> = {
 export function resolveAgentModel(
   agent: EdsAgentName,
   overrides: Record<string, string>,
+  vendor?: AgentWorkerVendor,
 ): string {
   const envKey = `MODEL_${agent.toUpperCase().replace(/-/g, '_')}`;
-  return (
-    overrides[envKey] ||
-    overrides[agent] ||
-    process.env[envKey] ||
-    DEFAULT_AGENT_MODELS[agent]
-  );
+  const explicit = overrides[envKey] || overrides[agent] || process.env[envKey];
+  if (explicit) return explicit;
+
+  // For non-Claude vendors, return empty string to let SDK use its default
+  if (vendor && vendor !== 'claude') {
+    return '';
+  }
+
+  return DEFAULT_AGENT_MODELS[agent];
 }
 
 export function resolveMaxTurns(

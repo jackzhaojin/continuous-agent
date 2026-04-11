@@ -91,14 +91,19 @@ export const DEFAULT_AGENT_MODELS: Record<GenericAgentName, string> = {
 export function resolveAgentModel(
   agent: GenericAgentName,
   overrides: Record<string, string>,
+  vendor?: AgentWorkerVendor,
 ): string {
   const envKey = `MODEL_${agent.toUpperCase().replace(/-/g, '_')}`;
-  return (
-    overrides[envKey] ||
-    overrides[agent] ||
-    process.env[envKey] ||
-    DEFAULT_AGENT_MODELS[agent]
-  );
+  const explicit = overrides[envKey] || overrides[agent] || process.env[envKey];
+  if (explicit) return explicit;
+
+  // For non-Claude vendors, return empty string to let SDK use its default
+  // (avoids passing Claude model names to Kimi/Codex)
+  if (vendor && vendor !== 'claude') {
+    return '';
+  }
+
+  return DEFAULT_AGENT_MODELS[agent];
 }
 
 /**

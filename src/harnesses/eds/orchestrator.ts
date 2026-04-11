@@ -831,7 +831,7 @@ async function runAgent(args: RunAgentArgs): Promise<HarnessAgentResult> {
   const { agent, sessionId, context, config, bus, outputDir, workDir } = args;
   const agentConfig = EDS_AGENT_CONFIGS[agent];
   const promptMarkdown = await loadPrompt(agentConfig.prompt, context);
-  const model = resolveAgentModel(agent, config.modelOverrides);
+  const model = resolveAgentModel(agent, config.modelOverrides, config.vendor);
   const maxTurns = resolveMaxTurns(config.vendor, config.maxTurnsPerAgent);
 
   const outputPath = sessionToPath(sessionId, outputDir);
