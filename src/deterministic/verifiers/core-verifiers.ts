@@ -364,10 +364,17 @@ export async function verifyNodeBuild(config: VerifierConfig): Promise<VerifierR
     };
   }
 
+  // Force NODE_ENV=production for build. PM2 runs the executive with NODE_ENV=development
+  // (so worker `npm install` picks up devDependencies), but that value leaks into verifier
+  // subprocesses and Next.js then emits a noisy "non-standard NODE_ENV" warning on every
+  // `npm run build`. The warning was being mistaken for a real build failure.
+  const buildEnv = { ...process.env, NODE_ENV: 'production' };
+
   try {
     const { stdout, stderr } = await execAsync('npm run build', {
       cwd: project_path,
       timeout: config.timeout_ms || 300000, // 5 min timeout
+      env: buildEnv,
     });
 
     return {
@@ -381,13 +388,18 @@ export async function verifyNodeBuild(config: VerifierConfig): Promise<VerifierR
       duration_ms: Date.now() - start,
     };
   } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
+    const rawMsg = error instanceof Error ? error.message : String(error);
+    // Drop the NODE_ENV warning lines so the real failure surfaces in the truncated message.
+    const cleanedMsg = rawMsg
+      .split('\n')
+      .filter((line) => !/non-standard "?NODE_ENV"? value/i.test(line))
+      .join('\n');
     return {
       verifier_id: 'node_build',
       result: 'FAIL',
-      message: `Build failed: ${errorMsg.slice(0, 200)}`,
+      message: `Build failed: ${cleanedMsg.slice(0, 400)}`,
       evidence: {
-        error: errorMsg.slice(0, 1000),
+        error: cleanedMsg.slice(0, 2000),
       },
       duration_ms: Date.now() - start,
     };
@@ -785,6 +797,89 @@ export async function verifySkillFormat(config: VerifierConfig): Promise<Verifie
 }
 
 /**
+ * Verifier: journey_spec_grows (v2.1.7)
+ *
+ * For user-visible web steps, asserts that tests/e2e/journey.spec.ts exists
+ * and has at least one `test(...)` block. Workers are expected to EXTEND it
+ * every user-visible step — this is the cheap guardrail. The full journey
+ * walk is performed by the integration-validator worker in Phase 5b.
+ *
+ * PASS conditions:
+ *   - tests/e2e/journey.spec.ts exists, OR
+ *   - no `tests/e2e/` directory exists at all (project hasn't adopted E2E — advisory only)
+ *
+ * FAIL conditions:
+ *   - tests/e2e/ exists but journey.spec.ts does not
+ *   - journey.spec.ts exists but contains zero `test(` blocks
+ */
+export async function verifyJourneySpecGrows(config: VerifierConfig): Promise<VerifierResult> {
+  const start = Date.now();
+  let { project_path } = config;
+
+  // Discover git root if project is in a subdir
+  if (!existsSync(path.join(project_path, 'package.json'))) {
+    const subRoot = findSubdirectoryGitRoot(project_path);
+    if (subRoot) project_path = subRoot;
+  }
+
+  const e2eDir = path.join(project_path, 'tests', 'e2e');
+  if (!existsSync(e2eDir)) {
+    return {
+      verifier_id: 'journey_spec_grows',
+      result: 'PASS',
+      message: 'No tests/e2e/ directory — journey spec not required (advisory)',
+      evidence: { e2e_dir_exists: false },
+      duration_ms: Date.now() - start,
+    };
+  }
+
+  const journeyPath = path.join(e2eDir, 'journey.spec.ts');
+  if (!existsSync(journeyPath)) {
+    // Also accept .js variant
+    const jsPath = path.join(e2eDir, 'journey.spec.js');
+    if (!existsSync(jsPath)) {
+      return {
+        verifier_id: 'journey_spec_grows',
+        result: 'FAIL',
+        message: 'tests/e2e/ exists but tests/e2e/journey.spec.ts is missing — every user-visible step must extend the journey spec',
+        evidence: { e2e_dir_exists: true, journey_spec_exists: false },
+        duration_ms: Date.now() - start,
+      };
+    }
+  }
+
+  try {
+    const content = readFileSync(existsSync(journeyPath) ? journeyPath : path.join(e2eDir, 'journey.spec.js'), 'utf-8');
+    const testBlocks = content.match(/\btest\s*\(/g) || [];
+    const count = testBlocks.length;
+    if (count === 0) {
+      return {
+        verifier_id: 'journey_spec_grows',
+        result: 'FAIL',
+        message: 'journey.spec.ts exists but contains zero test() blocks',
+        evidence: { test_count: 0 },
+        duration_ms: Date.now() - start,
+      };
+    }
+    return {
+      verifier_id: 'journey_spec_grows',
+      result: 'PASS',
+      message: `journey.spec.ts has ${count} test block(s)`,
+      evidence: { test_count: count },
+      duration_ms: Date.now() - start,
+    };
+  } catch (error) {
+    return {
+      verifier_id: 'journey_spec_grows',
+      result: 'FAIL',
+      message: `Failed to read journey.spec.ts: ${error instanceof Error ? error.message : String(error)}`,
+      evidence: { error: true },
+      duration_ms: Date.now() - start,
+    };
+  }
+}
+
+/**
  * Task type for routing validation logic
  */
 export type GoalType = 'standard' | 'skill-build' | 'self-enhance';
@@ -878,6 +973,12 @@ export async function runAllVerifiers(
   results.push(await verifyNodeTest(config));
   results.push(await verifyLintPass(config));
   results.push(await verifyDocsChecklist(config));
+
+  // v2.1.7: journey spec must grow on user-visible web steps.
+  // Treat "implementation" and "testing" as user-visible; research/setup get a pass.
+  if (stepType === 'implementation' || stepType === 'testing') {
+    results.push(await verifyJourneySpecGrows(config));
+  }
 
   return results;
 }

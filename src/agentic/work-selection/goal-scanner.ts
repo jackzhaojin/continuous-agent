@@ -9,7 +9,7 @@ import path from 'path';
 import { parsePromptMd, type PromptMdFile } from '../../deterministic/prompt-md-parser.js';
 import type { WorkItem, WorkStep, ExecutionPattern } from '../../core/types.js';
 import type { SelectableWork } from './work-selector.js';
-import { readStepsJson, stepsJsonToWorkSteps, migrateFromPromptMd } from '../../deterministic/steps-json-handler.js';
+import { readStepsJson, stepsJsonToWorkSteps, migrateFromPromptMd, selectNextExecutableStep } from '../../deterministic/steps-json-handler.js';
 
 const WORKSPACE_DIR = path.join(process.cwd(), 'workspace');
 
@@ -346,6 +346,16 @@ async function bundleToWorkItemAsync(bundle: GoalBundle): Promise<WorkItem> {
       frontmatter.model_overrides && typeof frontmatter.model_overrides === 'object'
         ? (frontmatter.model_overrides as Record<string, string>)
         : undefined,
+    // v2.1.7: integration/data contract fields
+    definition_of_done_journey: typeof frontmatter.definition_of_done_journey === 'string'
+      ? frontmatter.definition_of_done_journey
+      : undefined,
+    data_requirements: typeof frontmatter.data_requirements === 'string'
+      ? frontmatter.data_requirements
+      : undefined,
+    integration_gate_cadence: frontmatter.integration_gate_cadence
+      ? Number(frontmatter.integration_gate_cadence)
+      : undefined,
   };
 }
 
@@ -377,25 +387,17 @@ export async function buildSelectableWorkFromBundles(): Promise<SelectableWork[]
     if (workItem.status === 'complete' || workItem.status === 'blocked') continue;
 
     if (workItem.steps && workItem.steps.length > 0) {
-      // Multi-step: find first available step whose dependencies are all complete
-      for (const step of workItem.steps) {
-        if (step.status === 'complete' || step.status === 'blocked') continue;
-
-        // Check if all dependencies are complete before selecting this step
-        if (step.dependencies && step.dependencies.length > 0) {
-          const allDepsComplete = step.dependencies.every(depNum =>
-            workItem.steps![depNum]?.status === 'complete'
-          );
-          if (!allDepsComplete) continue;
-        }
-
+      // Multi-step: depth-first selection — open defect subtasks of any parent
+      // win over the next sibling top-level step. This is how validator-filed
+      // defects get fixed before we move on.
+      const nextStep = selectNextExecutableStep(workItem.steps);
+      if (nextStep) {
         selectableWork.push({
           type: 'step',
           goal: workItem,
-          step,
+          step: nextStep,
           priority: workItem.priority,
         });
-        break; // Only first available step
       }
     } else {
       selectableWork.push({

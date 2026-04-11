@@ -38,6 +38,64 @@ export interface HealthStatus {
  * uses `id` (string like "step-0") + `order`. Both sets of fields are present here;
  * runtime code primarily uses `step_number`, while STEPS.json I/O uses `id`/`order`.
  */
+/**
+ * Origin of a step — how it landed in STEPS.json.
+ *
+ * - `breakdown`         — created by the initial LLM breakdown of the goal
+ * - `re_breakdown`      — created when an earlier step failed and was re-broken
+ * - `prerequisite`      — hard-locked setup step (e.g., DB schema + seed data)
+ * - `integration_gate`  — end-to-end journey verification gate
+ * - `validator_defect`  — filed by an integration-validator worker after a failed gate
+ */
+export type StepOrigin =
+  | 'breakdown'
+  | 're_breakdown'
+  | 'prerequisite'
+  | 'integration_gate'
+  | 'validator_defect';
+
+/**
+ * "Kind" of a step — what pattern of worker should handle it.
+ *
+ * - `build`              — normal implementation work (default)
+ * - `user_visible_build` — build step where the change is user-facing; triggers Phase 5b validator worker
+ * - `integration_gate`   — a dedicated E2E journey-verification step (also triggers Phase 5b)
+ * - `prerequisite`       — schema/seed/setup step that blocks all downstream UI
+ */
+export type StepKind =
+  | 'build'
+  | 'user_visible_build'
+  | 'integration_gate'
+  | 'prerequisite';
+
+/**
+ * Structured evidence attached to a validator-filed defect step.
+ */
+export interface DefectEvidence {
+  title: string;
+  root_cause?: string;
+  evidence?: string;
+  acceptance_criteria?: string[];
+  filed_by_contract?: string;
+  filed_at?: string;
+  parent_step_id?: string;
+  regression_failures?: string[];
+}
+
+/**
+ * Structured handoff content written by a worker at the end of a step.
+ * Read by the next step's worker AND by the integration-validator.
+ */
+export interface StructuredHandoff {
+  step_id?: string;
+  what_i_built?: string;
+  what_connects?: string;
+  what_i_verified?: string;
+  known_gaps?: string;
+  next_step_should_know?: string;
+  journey_blocks_added?: number;  // How many blocks added to tests/e2e/journey.spec.ts this step
+}
+
 export interface WorkStep {
   step_number: number;
   title: string;
@@ -55,8 +113,20 @@ export interface WorkStep {
   build_health?: 'pass' | 'fail' | 'skip';
   build_error?: string | null;
   // On-disk STEPS.json fields (optional at runtime)
-  id?: string;                  // Stable identifier (e.g., "step-0")
+  id?: string;                  // Stable identifier (e.g., "step-0", "step-5.1", "step-5.1.1")
   order?: number;               // Execution order (0-based, mirrors step_number)
+
+  // Hierarchical defect-subtask fields (v2.1.7)
+  parent_id?: string | null;        // Parent step ID if this is a subtask (e.g., "step-5" for "step-5.1")
+  subtask_of?: string | null;       // Alias of parent_id used by filing APIs — same value
+  origin?: StepOrigin;              // How this step landed in STEPS.json
+  kind?: StepKind;                  // What kind of worker should handle this step
+  blocks_parent?: boolean;          // Parent cannot be marked complete until this passes (default: true for defect subtasks)
+  blocked_on_subtask?: boolean;     // Set on parent when it has an open defect subtask
+  defect_evidence?: DefectEvidence; // Attached by the validator when origin === 'validator_defect'
+
+  // Structured handoff from the worker that completed this step
+  handoff?: StructuredHandoff;
 }
 
 /**
@@ -126,6 +196,20 @@ export interface WorkItem {
   harness_target?: string;        // Absolute or repo-relative target dir for harness run
   harness_mode?: 'bootstrap' | 'adopt' | 'extend' | 'extend-deep' | 'resume';
   model_overrides?: Record<string, string>;  // Per-agent model overrides for harness
+
+  // v2.1.7: Integration/data contract fields from PROMPT.md frontmatter
+  //
+  // `definition_of_done_journey`: concrete user flow the product must execute end-to-end.
+  //   Required on UI goals — the executive refuses to start without it.
+  //   Example: "Fill shipment form → submit → rates page loads quote → select → payment → confirm → reference number displayed"
+  definition_of_done_journey?: string;
+
+  // `data_requirements`: prerequisites for the goal — schema, seed data, endpoints.
+  //   Breakdown Pass A reads this and prepends a hard-locked prerequisite step.
+  data_requirements?: string;
+
+  // `integration_gate_cadence`: override the automatic N-step gate spacing. Default: auto.
+  integration_gate_cadence?: number;
 }
 
 /**

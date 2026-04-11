@@ -90,6 +90,9 @@ import { executePipeline } from '../harness/pipeline-executor.js';
 import { executeHarness } from '../agentic/execution/harness-executor.js';
 import { spawnWorker } from '../agentic/execution/worker-spawner.js';
 
+// v2.1.7 - Integration validator (Phase 5b)
+import { runIntegrationValidator, shouldRunIntegrationValidator } from '../agentic/execution/integration-validator-runner.js';
+
 // Load environment variables (tiered)
 const envFiles = ['.env.executive', '.env.worker', '.env'];
 for (const envFile of envFiles) {
@@ -560,6 +563,37 @@ async function runIteration(): Promise<IterationResult> {
     const intent = await classifyIntent(workItem);
     const capabilities = inferCapabilitiesFromGoal(workItem, intent);
     await logCapabilityResult(workItem, capabilities, isValid, contractId);
+  }
+
+  // === PHASE 5b: INTEGRATION VALIDATOR (v2.1.7) ===
+  // For integration_gate and user_visible_build steps on goals that declared a
+  // definition_of_done_journey, run an independent validator that reviews the
+  // structured evidence and can file defect subtasks before Phase 6 promotes
+  // the step to "complete". This is the pathway the postal-checkout retro
+  // identified as missing — product-level failures get a repair route that
+  // runs depth-first before the next sibling step.
+  if (isValid && result && isStepExecution && currentStep && workItem.source_path) {
+    if (shouldRunIntegrationValidator(currentStep, workItem)) {
+      setDashboardPhase(5);
+      logAgentic('PHASE 5b: Integration Validator');
+      try {
+        const validatorResult = await runIntegrationValidator(workItem, currentStep, contractId);
+        if (validatorResult.result === 'fail') {
+          logAgentic(`[Phase 5b] FAIL — ${validatorResult.reason}`);
+          if (validatorResult.defectSubtaskId) {
+            logAgentic(`[Phase 5b] Filed defect subtask: ${validatorResult.defectSubtaskId}`);
+          }
+          // Keep the current step in_progress — do NOT call updateStepState success
+          // path below. The depth-first work-selector will pick up the new defect
+          // subtask before any sibling step in the next loop iteration.
+          loopState.last_work_at = new Date().toISOString();
+          return 'work_completed';
+        }
+        logAgentic(`[Phase 5b] PASS — ${validatorResult.reason}`);
+      } catch (err) {
+        log(`[Phase 5b] Integration validator error (soft pass): ${err}`);
+      }
+    }
   }
 
   // === PHASE 6: UPDATE STATE ===
