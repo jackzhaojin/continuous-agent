@@ -201,8 +201,18 @@ function copySourceProject(sourcePath: string, targetPath: string): boolean {
 function setupAgentOutputsRoot(): void {
   // Best-effort cleanup of stale local dev servers from previous worker sessions.
   // Prevents port collisions (3000, 3001, ...) across step retries.
+  // Scoped to processes rooted under AGENT_OUTPUTS_BASE so we don't nuke the
+  // user's unrelated local dev servers.
   try {
-    execSync('pkill -f "(next-server|next dev|vite|react-scripts start)" || true', { stdio: 'pipe' });
+    const psOutput = execSync('ps -eo pid,command', { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'ignore'] });
+    const devServerPattern = /(next-server|next dev|vite|react-scripts start)/;
+    for (const line of psOutput.split('\n')) {
+      if (!line.includes(AGENT_OUTPUTS_BASE)) continue;
+      if (!devServerPattern.test(line)) continue;
+      const pid = parseInt(line.trim().split(/\s+/)[0], 10);
+      if (!pid || pid === process.pid) continue;
+      try { process.kill(pid); } catch { /* already gone */ }
+    }
   } catch {
     // Non-blocking: cleanup is best effort.
   }

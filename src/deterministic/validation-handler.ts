@@ -14,6 +14,7 @@ import {
   updateCapabilitiesFromVerifierResults,
   DEFAULT_CAPABILITY_MAPPINGS,
 } from '../agentic/learning/capability-updater.js';
+import { WEB_KEYWORDS } from '../agentic/intelligence/prompt-builder.js';
 import type { WorkItem, WorkStep, WorkerResult } from '../core/types.js';
 import { logAgentic, logDeterministic, log } from '../core/logging.js';
 
@@ -25,10 +26,10 @@ export interface ValidationOutcome {
   buildCheckRan: boolean;
 }
 
+// Reuses the same regex that prompt-builder uses to auto-load the web-testing skill,
+// so "what counts as a web project" is decided in exactly one place.
 function isLikelyWebProject(item: WorkItem): boolean {
-  const text = `${item.title} ${item.description}`.toLowerCase();
-  return ['next.js', 'nextjs', 'react', 'vue', 'angular', 'vite', 'frontend', 'web ui', 'website']
-    .some(keyword => text.includes(keyword));
+  return WEB_KEYWORDS.test(`${item.title} ${item.description}`);
 }
 
 /**
