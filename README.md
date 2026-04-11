@@ -12,6 +12,15 @@ The result is a coding agent that operates more like a junior developer with a t
 
 For architecture deep dives, code walkthroughs, and talk prep, see the [Technical Highlights](docs/technical-highlights/) -- 7 highlights covering the executive brain, multi-vendor worker execution, and the self-correcting feedback loop, organized by version starting with [v2.1](docs/technical-highlights/2.1/).
 
+## Harness Mode (v2.2)
+
+In addition to the 24x7 executive loop, this repo ships **harnesses** -- dedicated multi-agent plan-then-build pipelines (`generic`, `eds`, `study`) that can run two ways:
+
+- **Standalone** via the unified CLI: `npm run harness -- --name generic --prompt path/to/PROMPT.md`
+- **Integrated** by dropping a goal bundle with `execution_pattern: harness` into `workspace/ondeck/`, letting the executive loop drive it through the normal goal/contract/steps lifecycle.
+
+See **[HARNESS.md](HARNESS.md)** for the full reference: CLI flags, frontmatter fields, vendor parity status, and the phased delivery plan.
+
 ## How It Works
 
 The coding agent runs a continuous **executive loop** with these phases:
