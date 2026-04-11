@@ -568,7 +568,8 @@ function parseStructuredHandoffFromLog(logContent: string): StructuredHandoff | 
 
   const fenceRegex = /```ya?ml\s*\n([\s\S]*?)\n```/gi;
   const matches = Array.from(logContent.matchAll(fenceRegex));
-  // Walk from the last block backwards — want the most recent handoff the worker emitted
+  // Walk from the last block backwards — want the most recent handoff the worker emitted.
+  // Skip blocks whose values are the skeleton from the prompt (placeholder literals).
   for (let i = matches.length - 1; i >= 0; i--) {
     const body = matches[i][1];
     if (!/what_i_built|what_connects|what_i_verified/i.test(body)) continue;
@@ -593,9 +594,44 @@ function parseStructuredHandoffFromLog(logContent: string): StructuredHandoff | 
       const n = parseInt(jb, 10);
       if (!isNaN(n)) handoff.journey_blocks_added = n;
     }
+    if (isPlaceholderHandoff(handoff)) continue;
     return handoff;
   }
   return null;
+}
+
+/**
+ * Detect a handoff that's actually the skeleton from the prompt (placeholder
+ * literals like `<...>`, or verbatim text from the worker-base SKILL.md).
+ * Happens when the worker never emitted its own YAML and the parser picked
+ * up the template block from the injected skill body.
+ */
+function isPlaceholderHandoff(h: StructuredHandoff): boolean {
+  const fields = [
+    h.what_i_built,
+    h.what_connects,
+    h.what_i_verified,
+    h.known_gaps,
+    h.next_step_should_know,
+  ];
+  const meaningful = fields.filter((v) => v && v.length > 0);
+  if (meaningful.length === 0) return true;
+  const placeholderPattern = /^<.*>$/;
+  const placeholderHits = meaningful.filter((v) => placeholderPattern.test(v!.trim()));
+  if (placeholderHits.length >= 2) return true;
+  const skeletonMarkers = [
+    'the step id assigned to you',
+    'ONE concrete sentence about what YOU produced',
+    'Where does YOUR code read state FROM',
+    'The actual commands YOU ran this step',
+    'What you knowingly did NOT do',
+    'non-obvious facts the next worker',
+  ];
+  const markerHits = meaningful.filter((v) =>
+    skeletonMarkers.some((m) => v!.includes(m)),
+  );
+  if (markerHits.length >= 1) return true;
+  return false;
 }
 
 function formatStructuredHandoffYaml(h: StructuredHandoff): string {

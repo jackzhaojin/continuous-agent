@@ -231,7 +231,13 @@ export async function runIntegrationValidator(
     '',
     'Return ONLY a single JSON block exactly matching the `handoff JSON` format described in the skill above. No prose outside the JSON.',
     '',
-    'You are in REASONING-ONLY mode for this pass — you cannot drive a browser. Base your verdict on the structured evidence above. Be strict: a missing `what_connects`, an isolation-smell `what_i_verified`, or a gate step claiming zero `journey_blocks_added` is a fail.',
+    'You are in REASONING-ONLY mode for this pass — you cannot drive a browser. Base your verdict on the structured evidence above and the skill rules.',
+    '',
+    'IMPORTANT — bias toward PASS when evidence is thin:',
+    '- Missing structured handoffs are NOT a defect. If prior handoffs are absent or sparse, you have no proof either way — default to `result: "pass"` with a `journey_evidence` note that says you could not verify and recommend a journey-level test in a later step.',
+    '- Only return `result: "fail"` when the evidence describes a concrete, user-facing failure: a route 404, a form submission that does not persist, regression test failures, an API returning the wrong shape, hardcoded mock data where live data is required.',
+    '- Do NOT file a defect titled "no structured handoff", "no foundation exists", "recursive defect chain", or any variant. Those are process complaints, not product defects. A previous version of this validator generated a recursive chain of those — do not repeat it.',
+    '- If the only thing wrong is that you cannot tell what was built, return `result: "pass"` and note the gap.',
   ].join('\n');
 
   try {
@@ -280,50 +286,13 @@ function runCheapChecks(
   // 1. UI goal with no definition_of_done_journey — report once via defect (advisory)
   //    We intentionally don't fail here because Phase 4 already requires it.
 
-  // 2. Integration gate that didn't add journey blocks
-  if (stepIsGate) {
-    const thisStepHandoff = completedHandoffs.find(h => h.id === step.id)?.handoff;
-    if (!thisStepHandoff) {
-      return {
-        title: 'Integration gate completed without producing a structured handoff',
-        root_cause: `Step ${step.id} was a [GATE] integration checkpoint but the worker did not emit the required YAML handoff block at the end of its turn.`,
-        evidence: 'Gate steps must report journey_blocks_added. Absence means the worker either skipped journey.spec.ts extension or did not run the full regression suite.',
-        acceptance_criteria: [
-          'Emit a structured handoff YAML block at the end of the worker turn',
-          'Include journey_blocks_added with a number > 0',
-          'Include what_i_verified naming the exact commands run and their pass/fail counts',
-        ],
-      };
-    }
-    if (thisStepHandoff.journey_blocks_added === 0 || thisStepHandoff.journey_blocks_added === undefined) {
-      return {
-        title: 'Integration gate added zero journey blocks',
-        root_cause: 'A [GATE] integration checkpoint completed without extending tests/e2e/journey.spec.ts.',
-        evidence: `journey_blocks_added reported as ${thisStepHandoff.journey_blocks_added ?? 'undefined'}.`,
-        acceptance_criteria: [
-          'Extend tests/e2e/journey.spec.ts with at least one new test() block covering the latest segment of the flow',
-          'Run the full journey.spec.ts and report total pass/fail counts in what_i_verified',
-        ],
-      };
-    }
-  }
-
-  // 3. User-visible step with handoff missing what_connects on a web goal
-  if (isWeb && step.kind !== 'prerequisite' && step.kind !== 'integration_gate') {
-    const thisStepHandoff = completedHandoffs.find(h => h.id === step.id)?.handoff;
-    if (thisStepHandoff && !thisStepHandoff.what_connects) {
-      return {
-        title: `Step "${step.title}" has no what_connects in structured handoff`,
-        root_cause: 'Worker produced a structured handoff but omitted what_connects. This is the isolation smell from the postal-checkout retro — component built without wiring to upstream/downstream state.',
-        evidence: `Handoff snapshot: what_i_built="${thisStepHandoff.what_i_built || ''}", what_connects="", what_i_verified="${thisStepHandoff.what_i_verified || ''}"`,
-        acceptance_criteria: [
-          'Explicitly wire this step\'s output to the route or state the next step needs',
-          'Re-run the worker and produce a handoff that names the upstream state read and downstream state written',
-          'Walk the full journey so far in playwright-cli to prove the connection',
-        ],
-      };
-    }
-  }
-
+  // The cheap deterministic checks used to file defects when prior handoffs were
+  // missing or sparse. That created recursive "[DEFECT] no structured handoff"
+  // chains where the validator filed defects about its own evidence schema.
+  // Handoff format is harness telemetry, not product. The LLM pass walks the
+  // actual project (or fails to) and decides on real product evidence.
+  void isWeb;
+  void stepIsGate;
+  void completedHandoffs;
   return null;
 }

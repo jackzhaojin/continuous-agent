@@ -613,13 +613,17 @@ async function runIteration(): Promise<IterationResult> {
       const totalSteps = workItem.steps.length;
       const completedSteps = workItem.steps.filter(s => s.status === 'complete').length;
       const isLastStep = completedSteps >= totalSteps;
+      // Defect subtasks (origin=validator_defect) are internal repair steps that
+      // get injected on the fly — broadcasting them as "Step Completed" produces
+      // confusing Discord noise ("Step 48/55 done: [DEFECT] ..."). Skip them.
+      const isDefectSubtask = currentStep.origin === 'validator_defect';
       if (isLastStep) {
         // All steps done — send goal completion notification
         sendCompletionNotification(workItem.title, workItem.priority, result.output_path).catch(e => {
           log(`  Discord completion notification failed (non-blocking): ${e}`);
         });
-      } else {
-        // Intermediate step — send step progress notification
+      } else if (!isDefectSubtask) {
+        // Intermediate non-defect step — send step progress notification
         sendStepCompletionNotification(
           workItem.title, workItem.priority,
           currentStep.step_number + 1, totalSteps,
@@ -675,9 +679,13 @@ async function runIteration(): Promise<IterationResult> {
     : workerError || 'Unknown error';
   retry.lastAttemptAt = new Date().toISOString();
 
-  // Persist retry count to STEPS.json (survives PM2 restarts)
+  // Persist retry count to STEPS.json (survives PM2 restarts).
+  // Prefer the actual stored id (which may be hierarchical for defect subtasks,
+  // e.g. "step-1.1.2"); fall back to the linear `step-${N}` form only when the
+  // step doesn't carry an explicit id.
   if (isStepExecution && currentStep && workItem.source_path) {
-    await incrementStepRetryCount(workItem.source_path, makeStepId(currentStep.step_number));
+    const retryTargetId = currentStep.id || makeStepId(currentStep.step_number);
+    await incrementStepRetryCount(workItem.source_path, retryTargetId);
   }
 
   // Store output_path in memory for retries within this session

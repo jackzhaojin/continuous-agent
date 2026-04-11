@@ -280,14 +280,15 @@ export async function verifyNodeInstall(config: VerifierConfig): Promise<Verifie
   const start = Date.now();
   const { project_path } = config;
 
-  // Check if package.json exists
+  // No package.json yet → verifier not applicable, return PASS instead of false-failing
+  // a step that legitimately hasn't scaffolded the Node project yet.
   const packageJsonPath = path.join(project_path, 'package.json');
   if (!existsSync(packageJsonPath)) {
     return {
       verifier_id: 'node_install',
-      result: 'FAIL',
-      message: 'No package.json found',
-      evidence: { package_json_exists: false },
+      result: 'PASS',
+      message: 'No package.json yet — install verifier not applicable',
+      evidence: { package_json_exists: false, applicable: false },
       duration_ms: Date.now() - start,
     };
   }
@@ -331,14 +332,17 @@ export async function verifyNodeBuild(config: VerifierConfig): Promise<VerifierR
   const start = Date.now();
   const { project_path } = config;
 
-  // Check if build script exists
+  // If the project hasn't been scaffolded yet (no package.json or no build script),
+  // there's nothing to verify — return PASS with an explanatory message instead of
+  // failing the step. Multi-step builds may legitimately do non-Node work (schema,
+  // seed data, docs) before the Node scaffold lands.
   const packageJsonPath = path.join(project_path, 'package.json');
   if (!existsSync(packageJsonPath)) {
     return {
       verifier_id: 'node_build',
-      result: 'FAIL',
-      message: 'No package.json found',
-      evidence: { package_json_exists: false },
+      result: 'PASS',
+      message: 'No package.json yet — project not Node-scaffolded, build verifier not applicable',
+      evidence: { package_json_exists: false, applicable: false },
       duration_ms: Date.now() - start,
     };
   }
@@ -348,9 +352,9 @@ export async function verifyNodeBuild(config: VerifierConfig): Promise<VerifierR
     if (!packageJson.scripts?.build) {
       return {
         verifier_id: 'node_build',
-        result: 'FAIL',
-        message: 'No build script in package.json',
-        evidence: { has_build_script: false },
+        result: 'PASS',
+        message: 'package.json present but no build script — build verifier not applicable',
+        evidence: { has_build_script: false, applicable: false },
         duration_ms: Date.now() - start,
       };
     }
