@@ -20,10 +20,16 @@ definition_of_done_journey: >
    quote from /api/rates → pick carrier → payment → confirm → reference number saved in
    Supabase and visible on /shipments/{id}." NOT a checklist. NOT 'all 6 steps render'.]
 data_requirements: >
-  [Name the persistence layer (cloud-first) and the seed rows the UI needs to render.
-   Example: "Cloud Supabase via .env.app (APP_SUPABASE_URL / APP_SUPABASE_ANON_KEY /
-   APP_SUPABASE_SERVICE_ROLE_KEY). Tables: shipments, rates, payments. Seed 3 shipments
-   with ids 1..3 so the rates page renders against real data."]
+  [Name the persistence layer (cloud-first), the DEDICATED schema/namespace, and the
+   seed rows the UI needs to render. The cloud Supabase project is shared across goals,
+   so always pin a dedicated Postgres schema — never `public`. Example:
+   "Cloud Supabase via .env.app (APP_SUPABASE_URL / APP_SUPABASE_ANON_KEY /
+   APP_SUPABASE_SERVICE_ROLE_KEY). ALL tables live in a dedicated `<goal_slug>_v1`
+   schema — never `public`. Step 0 prerequisite authorized to run
+   `DROP SCHEMA IF EXISTS <goal_slug>_v1 CASCADE; CREATE SCHEMA <goal_slug>_v1;`
+   before applying migrations. Tables: shipments, rates, payments. Seed 3 shipments
+   with ids 1..3 so the rates page renders against real data. Supabase clients
+   configured with db: { schema: '<goal_slug>_v1' }."]
 integration_gate_cadence:          # Optional integer override. Default auto (clamped 3–8).
 ---
 

@@ -269,3 +269,155 @@
 ---
 
 **2.1.6 Summary**: Discovery spanned Apr 5 (diagnosis gap + blocked postal checkout) -> Apr 6 (headful playwright cli testing revealed only pieces work, no holistic flow, no supabase data) -> Apr 11 (single-pass fix landing defect-subtask pipeline + journey-first worker discipline). Key shipped artifacts: `goal-2.1.6.md`, `retro-b2b-postal-checkout.md`, commits `76c2106` (goal), `f99943b` (retro), `1de5f15` (pipeline).
+
+---
+
+## Session 8: Post-Compact Shakedown - Prompt Packet Tuning (Apr 11, 2026)
+
+### Prompt 26: Log 2.1.6 to prompt-log (1:27 PM)
+
+> /conversation-logger to '/Users/jackjin/dev/continuous-agent/ai-docs/v1/2026-01-28-v1.2' with prompt-log-2.1.6.md with all the 2.1.6 relevant logs
+
+-> Response: Captured full 2.1.6 arc (Apr 5 - Apr 11) into prompt-log-2.1.6.md.
+-> Action: Created prompt-log-2.1.6.md with 7 sessions, 25 prompts.
+
+---
+
+### Prompt 27: Compact (1:31 PM)
+
+> /compact
+
+-> Response: Compacted context to continue with clean slate.
+-> Action: /compact.
+
+---
+
+### Prompt 28: Thorough test + prompt packet tune (1:34 PM)
+
+> OK - after compacting let's give this thing a thorough test. let's see if we need to adjust the prompt packet (input) to have better and more consistent output, for example, we should be using a supabase and need to make sure we do, etc. we should have more consistent language and have more consistent usage of playwright cli and mcp.
+
+-> Response: Reviewed prompt builder output vs recent worker transcripts, flagged gaps on supabase usage and playwright CLI/MCP language consistency, tuned the worker-base skill + prompt builder wording.
+-> Action: Edited `claude-files-to-output/skills/worker-base/SKILL.md`, `src/agentic/intelligence/prompt-builder.ts`, ran build. OK.
+
+---
+
+### Prompt 29: Commit (1:42 PM)
+
+> /jack-git-commit 1 commit please
+
+-> Response: Staged and committed prompt packet tuning.
+-> Action: Single commit with prompt builder + worker-base changes.
+
+---
+
+### Prompt 30: jack-git-commit should include prompt log (1:43 PM)
+
+> can you add in the prompt log? ideally we alaways have all commits in this. can you fix up /jack-git-commit ?
+
+-> Response: Updated jack-git-commit skill so it always appends the new commit hash/title into the active prompt log.
+-> Action: Edited `jack-git-commit` skill.
+
+---
+
+### Prompt 31: Re-run postal checkout on kimi (1:47 PM)
+
+> Anythingwe need to give this another run? sine this is something we'll want to keep trying, can you update '/Users/jackjin/dev/continuous-agent/workspace/drafts/b2b-postal-checkout/PROMPT.md' to kimi?
+
+-> Response: Switched b2b-postal-checkout goal to `worker_vendor: kimi` in frontmatter for the next run.
+-> Action: Edited `workspace/drafts/b2b-postal-checkout/PROMPT.md`.
+
+---
+
+### Prompt 32: Bump date (1:48 PM)
+
+> Also update date to today's date which is 2025-04-11
+
+-> Response: Updated PROMPT.md date field to 2026-04-11 (user typo for year).
+-> Action: Edited frontmatter date.
+
+---
+
+### Prompt 33: Readiness check before promoting to ondeck (1:48 PM)
+
+> Anything else we need to update befor we copy '/Users/jackjin/dev/continuous-agent/workspace/drafts/b2b-postal-checkout' into on deck and monitor closely?
+
+-> Response: Walked the bundle - confirmed playbook refs, supabase schema note, sprint-demo gate, journey-first DoD. Minor tightening, ready to promote.
+-> Action: Final polish on PROMPT.md + supporting files.
+
+---
+
+### Prompt 34: Commit all (1:49 PM)
+
+> /jack-git-commit one commit with all files please
+
+-> Response: Single commit covering prompt bundle updates.
+-> Action: One commit, all files staged together.
+
+---
+
+## Session 9: HARNESS.md + Sub-Agent Harness Test (Apr 11, 2026)
+
+### Prompt 35: Write HARNESS.md (1:51 PM)
+
+> Can you create a separate makrdown file on how to execute things in harness mode? maybe HARNESS.md in the root and update '/Users/jackjin/dev/continuous-agent-develop/README.md' to point to it.
+
+-> Response: Created `HARNESS.md` documenting harness-mode execution, updated README to point to it.
+-> Action: Created `continuous-agent-develop/HARNESS.md`, edited `README.md`.
+
+---
+
+### Prompt 36: Vendor split - claude executive + kimi worker, no API keys (1:53 PM)
+
+> Oh uhmm... for executive we can use claude, for worker we need to use kimi, also uhmm... we don't need api keys for workers (it worked many tiems before), kimi and kimi-cli uses the current auth token
+
+-> Response: Corrected HARNESS.md - executive=claude, worker=kimi, auth via existing `kimi login` session (no API key budget).
+-> Action: Updated HARNESS.md vendor/auth section.
+
+---
+
+### Prompt 37: Spawn sub-agent to test harness end-to-end (1:56 PM)
+
+> Can you spawn a sub agent / Task to test out the harness and monitor? dosen't have to be somehting complex, maybe start with generic v2 and make sure we're able to still write to harness-v2-test / http://localhost:...
+
+-> Response: Launched sub-agent against generic v2 harness to verify output path writes + monitor reports.
+-> Action: Task/sub-agent spawned, harness-v2-test target verified.
+
+---
+
+### Prompt 38: Supabase schema requirement + prompt library entry (2:00 PM)
+
+> Ya let's add in to prompt library or data baes rquiremetn and provide exact schema name in supabase, if it previous exist we can delete it via oru worker or executive agent. for 2,3,4,5 up to you, let's do it.
+
+-> Response: Added explicit supabase schema requirement (named schema, idempotent drop+create) to the prompt library/data section and let the agent proceed with the remaining items 2-5.
+-> Action: Edited prompt library / goal bundle with schema name and cleanup rule.
+
+---
+
+### Prompt 39: Sub-branch strategy reminder (2:04 PM)
+
+> Nice i thik it's running, just to remind me real quick - for my generic agent v2, does it use a sub-branch strategy where each projecdt is a sub branch? it's fine that's what it's suppsoed to do
+
+-> Response: Confirmed - generic agent v2 uses per-project sub-branches (expected behavior).
+-> Action: Verified against harness docs.
+
+---
+
+### Prompt 40: Log to notion-workspace-layout (2:04 PM)
+
+> /conversation-logger to '/Users/jackjin/dev/continuous-agent/ai-docs/v1/2026-01-28-v1.2/notion-workspace-layout.md'
+
+-> Response: Routed logger to notion-workspace-layout.md (separate thread).
+-> Action: Logged elsewhere.
+
+---
+
+### Prompt 41: Append 2.1.6 log with new session (2:05 PM)
+
+> /conversation-logger to '/Users/jackjin/dev/continuous-agent/ai-docs/v1/2026-01-28-v1.2/prompt-log-2.1.6.md'
+
+-> Response: Appended Session 8 (prompt packet tuning) and Session 9 (HARNESS.md + sub-agent harness test) to this file.
+-> Action: Edited `prompt-log-2.1.6.md` with 16 new prompts.
+
+---
+
+**2.1.6 Extended Summary**: Post-ship shakedown added prompt-packet tuning for supabase/playwright consistency, jack-git-commit now auto-logs commits into the active prompt log, b2b-postal-checkout rebooted on kimi worker with explicit supabase schema requirement, HARNESS.md written with claude-executive + kimi-worker split (no API keys, uses existing kimi login session), sub-agent spawned to validate generic v2 harness end-to-end.
