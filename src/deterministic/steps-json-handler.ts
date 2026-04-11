@@ -14,7 +14,7 @@
 import { readFile, writeFile, rename } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
-import type { StepsFile, WorkStep } from '../core/types.js';
+import type { StepsFile, WorkStep, DefectEvidence, StructuredHandoff } from '../core/types.js';
 import { log } from '../core/logging.js';
 import { appendProgressEntry } from './progress-log-writer.js';
 
@@ -214,6 +214,15 @@ export function stepsJsonToWorkSteps(diskSteps: WorkStep[]): WorkStep[] {
     build_error: ts.build_error,
     id: ts.id,
     order: ts.order,
+    // v2.1.7 fields
+    parent_id: ts.parent_id,
+    subtask_of: ts.subtask_of,
+    origin: ts.origin,
+    kind: ts.kind,
+    blocks_parent: ts.blocks_parent,
+    blocked_on_subtask: ts.blocked_on_subtask,
+    defect_evidence: ts.defect_evidence,
+    handoff: ts.handoff,
   }));
 }
 
@@ -238,6 +247,236 @@ export function createStepsFile(
  */
 export function stepId(stepNumber: number): string {
   return `step-${stepNumber}`;
+}
+
+// =====================================================================
+// DEFECT SUBTASK + DEPTH-FIRST SELECTION (v2.1.7)
+// =====================================================================
+
+/**
+ * Compute the next subtask ID for a given parent.
+ * `step-5` → `step-5.1`; if `step-5.1` exists → `step-5.2`; etc.
+ * `step-5.1` → `step-5.1.1`.
+ *
+ * Matches the harness scheme from `generic-harness-v2026-01-v2`.
+ */
+export function nextSubtaskId(parentId: string, existingIds: string[]): string {
+  // Strip optional "step-" prefix to work on the numeric part
+  const parentNumeric = parentId.replace(/^step-/, '');
+
+  // Find direct children of this parent (not grandchildren)
+  const childPattern = new RegExp(`^(?:step-)?${parentNumeric.replace(/\./g, '\\.')}\\.(\\d+)$`);
+  let maxChild = 0;
+  for (const id of existingIds) {
+    const match = id.match(childPattern);
+    if (match) {
+      const n = parseInt(match[1], 10);
+      if (n > maxChild) maxChild = n;
+    }
+  }
+  return `step-${parentNumeric}.${maxChild + 1}`;
+}
+
+/**
+ * File a defect subtask under a parent step.
+ *
+ * - Computes the next subtask ID (5 → 5.1 → 5.1.1)
+ * - Appends it to STEPS.json with origin="validator_defect", blocks_parent=true
+ * - Marks the parent as blocked_on_subtask so the depth-first selector will
+ *   pick the subtask before any sibling of the parent.
+ *
+ * Does NOT set the parent's status — it remains pending/in_progress. The
+ * caller (Phase 5b) should also roll back the parent from `complete` to
+ * `in_progress` if the defect was filed after the parent had been marked done.
+ */
+export async function insertDefectSubtask(
+  bundlePath: string,
+  parentId: string,
+  defect: DefectEvidence & { description?: string; estimated_turns?: number }
+): Promise<string | null> {
+  const stepsFile = await readStepsJson(bundlePath);
+  if (!stepsFile) {
+    log(`  Cannot file defect subtask: no STEPS.json at ${bundlePath}`);
+    return null;
+  }
+
+  const parent = stepsFile.steps.find(s => s.id === parentId);
+  if (!parent) {
+    log(`  Cannot file defect subtask: parent ${parentId} not found`);
+    return null;
+  }
+
+  const existingIds = stepsFile.steps.map(s => s.id || '').filter(Boolean);
+  const newId = nextSubtaskId(parentId, existingIds);
+
+  const maxOrder = stepsFile.steps.reduce((m, s) => Math.max(m, s.order ?? s.step_number ?? 0), 0);
+
+  const subtask: WorkStep = {
+    id: newId,
+    order: maxOrder + 1,
+    step_number: maxOrder + 1,
+    title: `[DEFECT] ${defect.title}`,
+    description: [
+      defect.root_cause ? `**Root cause:** ${defect.root_cause}` : '',
+      defect.evidence ? `**Evidence:** ${defect.evidence}` : '',
+      defect.acceptance_criteria && defect.acceptance_criteria.length > 0
+        ? `**Acceptance criteria:**\n${defect.acceptance_criteria.map(c => `- ${c}`).join('\n')}`
+        : '',
+      defect.description || '',
+    ].filter(Boolean).join('\n\n'),
+    status: 'pending',
+    dependencies: [],
+    estimated_turns: defect.estimated_turns ?? 60,
+    parent_id: parentId,
+    subtask_of: parentId,
+    origin: 'validator_defect',
+    kind: 'build',
+    blocks_parent: true,
+    defect_evidence: {
+      title: defect.title,
+      root_cause: defect.root_cause,
+      evidence: defect.evidence,
+      acceptance_criteria: defect.acceptance_criteria,
+      filed_by_contract: defect.filed_by_contract,
+      filed_at: defect.filed_at || new Date().toISOString(),
+      parent_step_id: parentId,
+      regression_failures: defect.regression_failures,
+    },
+  };
+
+  stepsFile.steps.push(subtask);
+
+  // Flag parent as blocked on subtask so depth-first selector routes work here first
+  parent.blocked_on_subtask = true;
+
+  const written = await writeStepsJson(bundlePath, stepsFile);
+  if (!written) return null;
+
+  log(`  ✓ Filed defect subtask ${newId} under ${parentId}: ${defect.title}`);
+  return newId;
+}
+
+/**
+ * Check whether a parent step has any open (non-complete) subtasks.
+ */
+export function hasOpenSubtasks(steps: WorkStep[], parentId: string): boolean {
+  return steps.some(s =>
+    (s.parent_id === parentId || s.subtask_of === parentId) &&
+    s.status !== 'complete' &&
+    s.status !== 'blocked'
+  );
+}
+
+/**
+ * Depth-first step selection.
+ *
+ * Preference order:
+ *   1. An `in_progress` step's open subtask (deepest first, recursive)
+ *   2. Any open subtask of any parent that is `blocked_on_subtask`
+ *   3. The first pending top-level step whose dependencies are all complete
+ *
+ * Returns null if nothing is selectable.
+ */
+export function selectNextExecutableStep(steps: WorkStep[]): WorkStep | null {
+  const isOpen = (s: WorkStep) => s.status !== 'complete' && s.status !== 'blocked';
+
+  // 1. Follow any subtask chain of a parent that is blocked_on_subtask
+  //    (depth-first: pick the deepest open subtask first)
+  const parentsWithOpenChildren = steps.filter(s =>
+    s.blocked_on_subtask && hasOpenSubtasks(steps, s.id || '')
+  );
+  for (const parent of parentsWithOpenChildren) {
+    // Find the deepest open descendant
+    const deepest = findDeepestOpenSubtask(steps, parent.id || '');
+    if (deepest) return deepest;
+  }
+
+  // 2. Any orphan defect subtask (shouldn't happen, but defensive)
+  const orphanSubtask = steps.find(s =>
+    isOpen(s) &&
+    s.origin === 'validator_defect' &&
+    (s.parent_id || s.subtask_of)
+  );
+  if (orphanSubtask) return orphanSubtask;
+
+  // 3. First pending top-level step with deps satisfied
+  for (const step of steps) {
+    if (!isOpen(step)) continue;
+    if (step.parent_id || step.subtask_of) continue; // skip subtasks here
+    if (step.blocked_on_subtask) continue;           // skip parents with open children
+
+    if (step.dependencies && step.dependencies.length > 0) {
+      const allComplete = step.dependencies.every(depNum =>
+        steps[depNum]?.status === 'complete'
+      );
+      if (!allComplete) continue;
+    }
+    return step;
+  }
+
+  return null;
+}
+
+/**
+ * Walk down the subtask tree from a parent and return the deepest open subtask.
+ * Used by the depth-first selector so that `step-5.1.1` runs before `step-5.1`.
+ */
+function findDeepestOpenSubtask(steps: WorkStep[], parentId: string): WorkStep | null {
+  const children = steps.filter(s =>
+    (s.parent_id === parentId || s.subtask_of === parentId) &&
+    s.status !== 'complete' &&
+    s.status !== 'blocked'
+  );
+  if (children.length === 0) return null;
+
+  // Prefer a child that itself has open grandchildren
+  for (const child of children) {
+    const grand = findDeepestOpenSubtask(steps, child.id || '');
+    if (grand) return grand;
+  }
+  // Otherwise first open child
+  return children[0];
+}
+
+/**
+ * Write a structured handoff blob onto a completed step's STEPS.json entry.
+ * Separate from the markdown handoff file written by state-handler.
+ */
+export async function writeStepHandoffToStepsJson(
+  bundlePath: string,
+  stepIdToUpdate: string,
+  handoff: StructuredHandoff
+): Promise<boolean> {
+  const stepsFile = await readStepsJson(bundlePath);
+  if (!stepsFile) return false;
+
+  const step = stepsFile.steps.find(s => s.id === stepIdToUpdate);
+  if (!step) return false;
+
+  step.handoff = { ...handoff, step_id: stepIdToUpdate };
+  return writeStepsJson(bundlePath, stepsFile);
+}
+
+/**
+ * Check if a parent's open subtasks have all completed and unblock it if so.
+ * Returns true if the parent was unblocked.
+ */
+export async function unblockParentIfSubtasksComplete(
+  bundlePath: string,
+  parentId: string
+): Promise<boolean> {
+  const stepsFile = await readStepsJson(bundlePath);
+  if (!stepsFile) return false;
+
+  const parent = stepsFile.steps.find(s => s.id === parentId);
+  if (!parent || !parent.blocked_on_subtask) return false;
+
+  if (hasOpenSubtasks(stepsFile.steps, parentId)) return false;
+
+  parent.blocked_on_subtask = false;
+  await writeStepsJson(bundlePath, stepsFile);
+  log(`  ✓ Unblocked parent ${parentId} — all defect subtasks complete`);
+  return true;
 }
 
 /**

@@ -20,6 +20,7 @@ import { buildProjectMemoryContext } from '../../deterministic/project-memory-st
 import { loadSkillLibrary } from '../../deterministic/skill-loader.js';
 import { loadPlaybookLibrary } from '../../deterministic/playbook-loader.js';
 import { resolveExecutionPattern } from '../../deterministic/execution-pattern-resolver.js';
+import { readLatestStructuredHandoff } from '../../deterministic/state-handler.js';
 import type { SkillDefinition, PlaybookDefinition } from '../../deterministic/library-loader-types.js';
 import { adaptPromptForVendor } from './vendor-adapter.js';
 import { logAgentic } from '../../core/logging.js';
@@ -263,6 +264,57 @@ ${contract.definition_of_done.map((d, i) => `${i + 1}. ${d}`).join('\n')}
 ### Logging
 ${contract.logging_obligations.map(o => `- ${o}`).join('\n')}
 `);
+
+  // 2b. Definition of Done — JOURNEY (v2.1.7)
+  // The top-line contract: what user flow must work end-to-end when the goal is done.
+  // Every individual step contributes to THIS flow. The worker is expected to see
+  // the whole journey, not just its assigned slice.
+  if (isWebProject && item.definition_of_done_journey) {
+    sections.push(`## Definition of Done — User Journey (the WHOLE goal, not just this step)
+
+The final state of this goal must execute the following user flow end-to-end, in a real running app, with real data:
+
+> ${item.definition_of_done_journey}
+
+Your step is one piece of this flow. When you finish, walk the journey from its natural start through your change and verify data persists across screens. See the \`web-testing\` skill section on Journey Verification.
+
+**Do NOT build components in isolation against hardcoded mock data.** That was the exact failure mode of the 2026-04-06 B2B postal-checkout run — 32 steps, 52 commits, 0 working end-to-end flows. Read \`ai-docs/v2/2026-04-01-v2.1/retro-b2b-postal-checkout.md\` if you need the history.
+`);
+  }
+
+  // 2c. Structured handoff from the previous step (v2.1.7)
+  // If a prior step completed and left a structured handoff on STEPS.json, surface it
+  // verbatim so the current worker starts with the previous worker's map of what connects
+  // to what — not a free-text summary extracted from a log.
+  if (item.source_path) {
+    try {
+      const priorHandoff = await readLatestStructuredHandoff(item.source_path);
+      if (priorHandoff) {
+        const formatField = (label: string, value?: string | number) =>
+          value !== undefined && value !== '' ? `- **${label}:** ${value}` : null;
+        const lines = [
+          formatField('Step', priorHandoff.step_id),
+          formatField('What was built', priorHandoff.what_i_built),
+          formatField('What connects', priorHandoff.what_connects),
+          formatField('What was verified', priorHandoff.what_i_verified),
+          formatField('Known gaps', priorHandoff.known_gaps),
+          formatField('Next step should know', priorHandoff.next_step_should_know),
+          formatField('Journey blocks added', priorHandoff.journey_blocks_added),
+        ].filter((l): l is string => l !== null);
+        if (lines.length > 0) {
+          sections.push(`## Prior Step Handoff (structured)
+
+The previous step left this handoff for you. Read it carefully — these are the connection points you need.
+
+${lines.join('\n')}
+
+If "Known gaps" lists anything that belongs to your step, fix it before building anything new.`);
+        }
+      }
+    } catch (err) {
+      logAgentic(`[V2 Prompt] Could not load prior structured handoff: ${err}`);
+    }
+  }
 
   // 3. Worker-base skill (constitution, monorepo rules, execution guidelines)
   if (workerBaseSkill) {

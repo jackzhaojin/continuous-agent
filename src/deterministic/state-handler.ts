@@ -19,7 +19,8 @@ import { closeMilestone } from './notion-reporter.js';
 import { parsePromptMd, updateFrontmatter } from './prompt-md-parser.js';
 import { appendProjectMemory, type ProjectMemoryEntry } from './project-memory-store.js';
 import { registerProject, generateProjectSlug, findProjectBySlug, type ProjectRegistryEntry } from './project-registry.js';
-import { readStepsJson, writeStepsJson, updateStepStatus as updateStepInStepsJson, stepId } from './steps-json-handler.js';
+import { readStepsJson, writeStepsJson, updateStepStatus as updateStepInStepsJson, stepId, writeStepHandoffToStepsJson } from './steps-json-handler.js';
+import type { StructuredHandoff } from '../core/types.js';
 import { logStepCompletedProgress, logStepBlockedProgress } from './progress-log-writer.js';
 import { appendContractEvent } from './contracts-log-writer.js';
 
@@ -484,9 +485,11 @@ export async function writeStepHandoff(
 
   // Extract final output summary from worker log (last assistant text)
   let workerSummary = '(no summary available)';
+  let rawLogForParsing = '';
   if (workerLogPath && existsSync(workerLogPath)) {
     try {
       const logContent = await readFile(workerLogPath, 'utf-8');
+      rawLogForParsing = logContent;
       // Look for PROJECT_SUMMARY or final text output
       const summaryMatch = logContent.match(/PROJECT_SUMMARY[\s\S]*?(?=\[MSG\]|\[TURN\]|=== WORKER|$)/i);
       if (summaryMatch) {
@@ -501,14 +504,30 @@ export async function writeStepHandoff(
     } catch { /* ignore */ }
   }
 
+  // v2.1.7: parse structured handoff YAML block if the worker produced one
+  const structured = parseStructuredHandoffFromLog(rawLogForParsing);
+
+  // Persist structured handoff to STEPS.json so the next step's prompt-builder can read it
+  if (structured && step.id) {
+    try {
+      await writeStepHandoffToStepsJson(item.source_path, step.id, structured);
+    } catch (err) {
+      log(`  Warning: failed to persist structured handoff to STEPS.json: ${err}`);
+    }
+  }
+
+  const structuredMarkdown = structured
+    ? `\n## Structured Handoff\n\n\`\`\`yaml\n${formatStructuredHandoffYaml(structured)}\n\`\`\`\n`
+    : '\n## Structured Handoff\n\n_Worker did not produce a structured handoff block. This is a process failure — the next step has no reliable context about what connects._\n';
+
   const content = `# Step ${stepNum} Handoff: ${step.title}
 
 **Task:** ${item.title}
 **Completed:** ${now}
 **Contract:** ${contractId || 'unknown'}
 **Output Path:** ${outputPath || 'none'}
-
-## What Was Done
+${structuredMarkdown}
+## What Was Done (raw log excerpt)
 
 ${workerSummary}
 
@@ -520,10 +539,103 @@ Worker log: \`ledgers/${today}/worker-${contractId}.log\`
 
   try {
     await writeFile(handoffPath, content, 'utf-8');
-    log(`  Wrote step ${stepNum} handoff to ${handoffPath}`);
+    log(`  Wrote step ${stepNum} handoff to ${handoffPath}${structured ? ' (with structured block)' : ' (no structured block)'}`);
   } catch (error) {
     log(`  Failed to write step handoff: ${error}`);
   }
+}
+
+/**
+ * Parse a structured handoff YAML block from the worker log.
+ *
+ * Workers are instructed to emit a block like:
+ *
+ * ```yaml
+ * step: step-14
+ * what_i_built: "..."
+ * what_connects: "..."
+ * what_i_verified: "..."
+ * known_gaps: "..."
+ * next_step_should_know: "..."
+ * ```
+ *
+ * We search for the last occurrence of such a block in the log. This is a
+ * best-effort regex parse — we only care about the listed fields, we don't
+ * support nested YAML.
+ */
+function parseStructuredHandoffFromLog(logContent: string): StructuredHandoff | null {
+  if (!logContent) return null;
+
+  const fenceRegex = /```ya?ml\s*\n([\s\S]*?)\n```/gi;
+  const matches = Array.from(logContent.matchAll(fenceRegex));
+  // Walk from the last block backwards — want the most recent handoff the worker emitted
+  for (let i = matches.length - 1; i >= 0; i--) {
+    const body = matches[i][1];
+    if (!/what_i_built|what_connects|what_i_verified/i.test(body)) continue;
+
+    const get = (key: string): string | undefined => {
+      const re = new RegExp(`^\\s*${key}\\s*:\\s*(?:"([^"\\n]*)"|'([^'\\n]*)'|(.+))\\s*$`, 'im');
+      const m = body.match(re);
+      if (!m) return undefined;
+      return (m[1] || m[2] || m[3] || '').trim() || undefined;
+    };
+
+    const handoff: StructuredHandoff = {
+      step_id: get('step') || get('step_id'),
+      what_i_built: get('what_i_built'),
+      what_connects: get('what_connects'),
+      what_i_verified: get('what_i_verified'),
+      known_gaps: get('known_gaps'),
+      next_step_should_know: get('next_step_should_know'),
+    };
+    const jb = get('journey_blocks_added');
+    if (jb) {
+      const n = parseInt(jb, 10);
+      if (!isNaN(n)) handoff.journey_blocks_added = n;
+    }
+    return handoff;
+  }
+  return null;
+}
+
+function formatStructuredHandoffYaml(h: StructuredHandoff): string {
+  const lines: string[] = [];
+  const put = (k: string, v: string | number | undefined) => {
+    if (v === undefined || v === null || v === '') return;
+    if (typeof v === 'number') {
+      lines.push(`${k}: ${v}`);
+    } else {
+      const escaped = String(v).replace(/"/g, '\\"');
+      lines.push(`${k}: "${escaped}"`);
+    }
+  };
+  put('step', h.step_id);
+  put('what_i_built', h.what_i_built);
+  put('what_connects', h.what_connects);
+  put('what_i_verified', h.what_i_verified);
+  put('known_gaps', h.known_gaps);
+  put('next_step_should_know', h.next_step_should_know);
+  put('journey_blocks_added', h.journey_blocks_added);
+  return lines.join('\n');
+}
+
+/**
+ * Read the most recent completed step's structured handoff from STEPS.json.
+ * Returns null if none exists. Used by the prompt-builder to inject context
+ * into the next step's worker prompt.
+ */
+export async function readLatestStructuredHandoff(sourcePath: string): Promise<StructuredHandoff | null> {
+  const stepsFile = await readStepsJson(sourcePath);
+  if (!stepsFile) return null;
+  // Walk steps in reverse completed-at order; fall back to last completed by order
+  const completed = stepsFile.steps.filter(s => s.status === 'complete' && s.handoff);
+  if (completed.length === 0) return null;
+  completed.sort((a, b) => {
+    const ta = a.completed_at ? Date.parse(a.completed_at) : 0;
+    const tb = b.completed_at ? Date.parse(b.completed_at) : 0;
+    return tb - ta;
+  });
+  return completed[0].handoff || null;
 }
 
 /**

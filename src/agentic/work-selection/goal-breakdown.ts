@@ -232,17 +232,17 @@ export async function generateBreakdown(item: WorkItem): Promise<WorkStep[]> {
       estimated_turns: Math.max(20, Math.min(60, s.estimated_turns || 50)),
     }));
 
-    // Insert regression test steps for web projects
-    const finalSteps = insertRegressionSteps(steps, item);
+    // v2.1.7: apply prerequisite + integration gate passes
+    const finalSteps = applyBreakdownPasses(steps, item);
 
     // Summary logging
     const totalEstimated = finalSteps.reduce((sum, s) => sum + (s.estimated_turns || 100), 0);
     const turnValues = finalSteps.map(s => s.estimated_turns || 100);
     const minTurns = Math.min(...turnValues);
     const maxTurns = Math.max(...turnValues);
-    console.log(`[Breakdown] LLM produced ${steps.length} steps, ${finalSteps.length} after regression insertion for "${item.title}" (total: ${totalEstimated} estimated turns, range: ${minTurns}-${maxTurns} per step)`);
+    console.log(`[Breakdown] LLM produced ${steps.length} steps, ${finalSteps.length} after prereq+gate passes for "${item.title}" (total: ${totalEstimated} estimated turns, range: ${minTurns}-${maxTurns} per step)`);
     for (const s of finalSteps) {
-      console.log(`  Step ${s.step_number}: ${s.title} (${s.estimated_turns} turns)`);
+      console.log(`  Step ${s.step_number} [${s.kind || 'build'}/${s.origin || 'breakdown'}]: ${s.title} (${s.estimated_turns} turns)`);
     }
 
     return finalSteps;
@@ -250,7 +250,7 @@ export async function generateBreakdown(item: WorkItem): Promise<WorkStep[]> {
     console.log(`[Breakdown] LLM breakdown failed for "${item.title}": ${error}`);
     console.log(`[Breakdown] Falling back to generic 3-step breakdown`);
     const genericSteps = generateGenericBreakdown(item);
-    return insertRegressionSteps(genericSteps, item);
+    return applyBreakdownPasses(genericSteps, item);
   }
 }
 
@@ -298,38 +298,135 @@ function generateGenericBreakdown(item: WorkItem): WorkStep[] {
 // Web project detection regex (shared with prompt-builder, word-bounded to avoid false positives)
 const WEB_PROJECT_KEYWORDS = /next\.?js|react|vue|angular|\bhtml\b|\bcss\b|website|web.?app|frontend|\bui\b|component|page|form|dashboard/i;
 
-/** Interval of build steps between regression test insertions */
-const REGRESSION_STEP_INTERVAL = 6;
+// Data-backend detection — triggers a prerequisite seed step
+const DATA_BACKEND_KEYWORDS = /supabase|postgres|prisma|\bmongo|\bmysql|sqlite|firestore|\bdb\b|database|schema|\bapi\b|endpoint|auth|backend/i;
+
+/** Default interval of build steps between integration gates (user can override with integration_gate_cadence in PROMPT.md) */
+function defaultGateCadence(totalSteps: number): number {
+  // More steps = more frequent gates. Clamp to [3, 8].
+  if (totalSteps <= 8) return 4;
+  if (totalSteps <= 16) return 5;
+  if (totalSteps <= 32) return 6;
+  return 8;
+}
 
 /**
- * Insert playwright-cli regression test steps into a step list for web projects.
- * After every REGRESSION_STEP_INTERVAL build steps, inserts a verification-only step.
- * No-op for non-web projects.
+ * Pass A — Prerequisite detection.
+ *
+ * For goals that touch a data backend (DB, API, auth), prepend a hard-locked
+ * "Prerequisites" step that must run before any UI work:
+ *   schema → seed test data → smoke-test API endpoints return expected shapes.
+ *
+ * This is the piece the postal-checkout run missed: the Supabase schema was set up
+ * but no seed data existed, so every UI step that hit the API got 404s and the
+ * workers silently filled in hardcoded mocks instead.
  */
-function insertRegressionSteps(steps: WorkStep[], item: WorkItem): WorkStep[] {
+function insertPrerequisiteStep(steps: WorkStep[], item: WorkItem): WorkStep[] {
+  const text = `${item.title} ${item.description || ''}`;
+  const isWeb = WEB_PROJECT_KEYWORDS.test(text);
+  const hasBackend = DATA_BACKEND_KEYWORDS.test(text) || !!item.data_requirements;
+  if (!isWeb || !hasBackend) return steps;
+
+  // Don't insert if the first step already looks like a schema/seed/init step
+  const first = steps[0];
+  if (first && /schema|seed|init|database|setup|supabase/i.test(`${first.title} ${first.description}`)) {
+    return steps;
+  }
+
+  const dataReqLine = item.data_requirements
+    ? `\n\n**Data requirements (from PROMPT.md):** ${item.data_requirements}`
+    : '';
+
+  const prerequisite: WorkStep = {
+    step_number: 0,
+    title: '[PREREQUISITE] Database schema, seed data, and API smoke test',
+    description: [
+      'Hard-locked prerequisite — no UI work may start until this passes.',
+      '',
+      '1. Create/verify the database schema for this goal.',
+      '2. Seed realistic test data (not hardcoded mocks in components) that downstream UI can read.',
+      '3. Smoke-test each API endpoint with curl or the JS client and confirm it returns the expected shape.',
+      '4. Fill out the structured handoff with exact endpoint paths and sample response shapes — every downstream worker will read this instead of inventing mocks.',
+      '',
+      'This step blocks every subsequent UI step. If the schema or seed data is wrong, the rest of the goal will silently build against hardcoded data and ship undemoable.',
+      dataReqLine,
+    ].join('\n'),
+    status: 'pending',
+    dependencies: [],
+    estimated_turns: 80,
+    origin: 'prerequisite',
+    kind: 'prerequisite',
+    blocks_parent: false,
+  };
+
+  // Prepend and force every existing step to depend on this new step 0
+  const result: WorkStep[] = [prerequisite, ...steps];
+  for (let i = 1; i < result.length; i++) {
+    result[i].step_number = i;
+    // Point every existing step's first dependency at the new prereq
+    if (i === 1) {
+      result[i].dependencies = [0];
+    } else {
+      result[i].dependencies = [i - 1];
+    }
+  }
+  console.log(`[Breakdown] Inserted [PREREQUISITE] step for "${item.title}" (web + data backend detected)`);
+  return result;
+}
+
+/**
+ * Pass B — Integration gate insertion.
+ *
+ * After every N build steps, insert a dedicated integration gate step whose
+ * only job is to extend tests/e2e/journey.spec.ts and walk the full flow so far.
+ * Phase 5b spawns an integration-validator worker after these steps complete.
+ *
+ * Replaces the old `insertRegressionSteps` helper which only asked for visual
+ * snapshots — this version demands end-to-end journey verification.
+ */
+function insertIntegrationGates(steps: WorkStep[], item: WorkItem): WorkStep[] {
   const text = `${item.title} ${item.description || ''}`;
   if (!WEB_PROJECT_KEYWORDS.test(text)) return steps;
 
+  const cadence = item.integration_gate_cadence && item.integration_gate_cadence > 0
+    ? item.integration_gate_cadence
+    : defaultGateCadence(steps.length);
+
   // Don't insert if too few steps
-  if (steps.length <= REGRESSION_STEP_INTERVAL) return steps;
+  if (steps.length <= cadence) return steps;
 
   const result: WorkStep[] = [];
   let buildStepCount = 0;
+  let gateNumber = 0;
 
   for (let i = 0; i < steps.length; i++) {
     result.push(steps[i]);
-    buildStepCount++;
+    // Only build steps count toward cadence (prereqs and existing gates don't)
+    if (steps[i].kind !== 'prerequisite' && steps[i].kind !== 'integration_gate') {
+      buildStepCount++;
+    }
 
-    // Insert regression step after every N build steps (but not after the last step)
-    if (buildStepCount >= REGRESSION_STEP_INTERVAL && i < steps.length - 1) {
+    if (buildStepCount >= cadence && i < steps.length - 1) {
       buildStepCount = 0;
+      gateNumber++;
       result.push({
-        step_number: 0, // Will be renumbered below
-        title: '[REGRESSION] Visual verification with playwright-cli',
-        description: 'No build work. Open the site with playwright-cli, take snapshots of all key pages, verify no regressions from previous steps. Report any broken layouts, missing elements, or console errors.',
+        step_number: 0, // renumbered below
+        title: `[GATE] End-to-end journey verification — checkpoint ${gateNumber}`,
+        description: [
+          'No new build work. Your ONLY job is to prove the user journey so far is demoable end-to-end.',
+          '',
+          '1. Extend `tests/e2e/journey.spec.ts` with a new block that walks from the flow\'s natural start through the latest step. Use the existing `completePriorSteps()` helper — create it if this is the first gate.',
+          '2. Run the FULL `journey.spec.ts` file. Not just your new block — the whole file. If earlier blocks now fail, investigate and fix.',
+          '3. If you cannot get the journey green because an earlier step built something broken, STOP — do not paper over it. Write the structured handoff with specific `known_gaps` describing what\'s broken and where. The integration-validator will file a defect subtask.',
+          '4. On success, fill out the structured handoff with exact counts: journey_blocks_added, total journey blocks now, regression pass/fail counts.',
+          '',
+          'The executive loop will spawn an independent integration-validator worker after this step to double-check your claim.',
+        ].join('\n'),
         status: 'pending' as const,
         dependencies: [],
-        estimated_turns: 30,
+        estimated_turns: 45,
+        origin: 'integration_gate',
+        kind: 'integration_gate',
       });
     }
   }
@@ -342,10 +439,27 @@ function insertRegressionSteps(steps: WorkStep[], item: WorkItem): WorkStep[] {
 
   const inserted = result.length - steps.length;
   if (inserted > 0) {
-    console.log(`[Breakdown] Inserted ${inserted} regression test step(s) for web project "${item.title}"`);
+    console.log(`[Breakdown] Inserted ${inserted} [GATE] integration checkpoint(s) for "${item.title}" (cadence ${cadence})`);
   }
 
   return result;
+}
+
+/**
+ * Orchestrate the full post-breakdown transformation pipeline:
+ *   raw LLM steps → + prerequisite → + integration gates
+ *
+ * Kept as a single function so tests can call it in isolation.
+ */
+export function applyBreakdownPasses(steps: WorkStep[], item: WorkItem): WorkStep[] {
+  const withPrereq = insertPrerequisiteStep(steps, item);
+  const withGates = insertIntegrationGates(withPrereq, item);
+  // Default every non-special step to `kind: build`
+  for (const s of withGates) {
+    if (!s.kind) s.kind = 'build';
+    if (!s.origin) s.origin = 're_breakdown' in (s as object) ? 're_breakdown' : 'breakdown';
+  }
+  return withGates;
 }
 
 /**

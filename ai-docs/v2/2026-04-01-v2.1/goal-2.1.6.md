@@ -128,6 +128,19 @@ Seed the self-triage skill with known patterns from operational experience:
 
 These patterns let the self-triage skill match against known issues before attempting novel fixes, making recovery faster and more predictable.
 
+### R7: Failure class routing — product vs infrastructure (2026-04-11)
+
+Phase 7's `failure_class` field (R1) must distinguish *where* a failure lives, because the repair pathway differs:
+
+- **infrastructure** → spawn self-triage (R2/R3). Fix is in the agent codebase — verifier, skill, config. Actor: self-enhancer agent. Target: `continuous-agent/`. Persistence: self-triage ledger.
+- **product** → file a defect subtask via the Phase 5b integration-validator pipeline (see `ai-docs/v2/2026-04-01-v2.1/retro-b2b-postal-checkout.md` and the `iterative-roaming-haven` plan). Fix is in the worker's output project. Actor: a fresh build worker picking up the subtask. Target: `ai-sandbox/{project}/`. Persistence: STEPS.json with `origin: validator_defect`.
+- **worker** → retry with enhanced context (existing behavior).
+- **environment** → escalate to human (existing behavior).
+
+**Why this split matters:** the postal-checkout retro made it clear that *most* of our "failed to ship a demoable product" outcomes are product-level, not infrastructure-level. Self-triage alone (this goal's original scope) would not have caught any of the 32-step postal run's real failures, because the verifiers passed at every step. The defect-subtask pathway — depth-first, inserted into STEPS.json, pulled by the work-selector before the next sibling — is the higher-impact fix, and it complements self-triage rather than replacing it.
+
+**Implementation status (2026-04-11):** The defect-subtask pathway (STEPS.json schema, `insertDefectSubtask`, depth-first `selectNextExecutableStep`, Phase 5b integration-validator hook) is built and typechecks clean. Self-triage (R1–R6 above) remains TODO under this goal.
+
 ## Lessons Learned (2026-04-06 Incident)
 
 1. **Diagnosis without action is theater** — the system correctly identified the root cause ("git status not clean with playwright artifacts") but couldn't do anything about it. A human had to add 5 lines to `core-verifiers.ts`.
@@ -135,6 +148,7 @@ These patterns let the self-triage skill match against known issues before attem
 3. **Retry counter bug amplified the problem** — instead of getting 10 retries to potentially work around the issue, the system blocked after 3 via the Phase 7 consecutive failure heuristic.
 4. **The self-enhancer is capable but unreachable** — it already has write access to verifiers and skills. The missing piece is a trigger from the failure loop, not new capabilities.
 5. **Infrastructure failures are predictable** — the `.playwright-cli/` artifact pattern is a category, not a one-off. New tools will create new artifact directories. The fix should be extensible.
+6. **Self-triage alone is insufficient** (added 2026-04-11 after the postal-checkout retro) — most shippable-product failures are product-level, not infrastructure-level. A system that self-heals its verifiers but cannot self-repair its own application output will still ship undemoable products. Goal-2.1.6 needs R7 (product routing) to be whole.
 
 ## Success Criteria
 

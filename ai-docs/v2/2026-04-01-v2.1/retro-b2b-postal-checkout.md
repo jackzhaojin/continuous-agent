@@ -254,3 +254,23 @@ This is not unit testing (waste of time for autonomous workers). This is scoped 
 5. **Finer initial breakdown for UI goals.** Don't start with 6 steps and wait for re-breakdown. For high-complexity UI, start with 20+ steps immediately.
 6. **Scoped E2E > unit tests.** Don't write unit tests for autonomous worker output. Write focused E2E tests that verify "the thing I just built works in the browser." This is the only testing that catches integration failures.
 7. **Executive must understand fullstack.** When breaking down a "Next.js + Supabase" goal, the executive should know: schema → seed data → API endpoints → verify API → UI → verify UI → integration test. Not: research → init → schema → design system → API → UI → UI → UI...
+
+---
+
+## Decisions (2026-04-11)
+
+Plan filed at `/Users/jackjin/.claude/plans/iterative-roaming-haven.md` and implemented in the same pass. Four highest-leverage commitments:
+
+1. **`definition_of_done_journey` required on UI goals** — PROMPT.md frontmatter gains this field; the prompt builder injects it into every step so workers see the full flow they contribute to, not just their slice.
+2. **Seed data is a locked prerequisite step** — `goal-breakdown.ts` now has a Pass A that prepends a `[PREREQUISITE]` step (schema + seed data + API smoke test) for any web goal that touches a data backend. Blocks all UI work until it passes.
+3. **Integration gate steps every N build steps** — `goal-breakdown.ts` Pass B inserts `[GATE]` checkpoints whose only job is to extend `tests/e2e/journey.spec.ts` and walk the full flow so far. Replaces the older `insertRegressionSteps` (which only asked for screenshots, not journeys).
+4. **Validator files defect subtasks that run depth-first before siblings** — STEPS.json gained hierarchical subtask support (`step-5` → `step-5.1` → `step-5.1.1`, matching the generic-harness-v2026-01-v2 scheme). A new Phase 5b between Phase 5 (verifiers) and Phase 6 (success state) runs an integration-validator that reviews structured handoffs and can file a defect subtask; the work-selector's `selectNextExecutableStep` walks the tree depth-first so subtasks run before the next sibling.
+
+Worker-layer complements:
+
+- `worker-base` skill rewritten around a "vertical slice, not horizontal layer" protocol with an explicit anti-patterns list naming the exact failure modes from this retro (hardcoded mock data, aspirational test specs, wizard buttons that don't persist).
+- `web-testing` skill extended with a Journey Verification section: append-only `journey.spec.ts` that grows every user-visible step, full spec run before declaring a step done.
+- New `integration-validator` skill (synced to worker CWD) — authority to file one defect per failed gate.
+- New `journey_spec_grows` verifier (in `core-verifiers.ts`) enforces that `tests/e2e/journey.spec.ts` exists and has at least one `test(...)` block for user-visible steps.
+
+Current gap (deliberate, documented): Phase 5b's validator is reasoning-only on this first pass — it reviews structured handoffs via a chat-completion call rather than driving a real browser with Playwright. The `integration-validator/SKILL.md` is written for the browser-walking upgrade; wiring a full Agent SDK worker into Phase 5b is follow-up work. Even the reasoning-only version catches the biggest smells (missing `what_connects`, gate steps with `journey_blocks_added = 0`, isolation red flags) and exercises the full defect-subtask pipeline end-to-end.
