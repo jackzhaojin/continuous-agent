@@ -67,7 +67,7 @@ Resume paths MUST work against on-disk bundles last touched by the JS harnesses.
 
 **eds** — Same structure as generic plus `ensureIgnoreFiles()` (`src/harnesses/eds/ignore-files.ts`) which writes `.gitignore` (`.playwright-mcp`) and `.hlxignore` (`ai-docs/`, `.playwright-mcp`) so AEM EDS ingest excludes them. The da.live push flow lives **in the build agent prompt** (Bash tool), not in TypeScript — the agent runs `git push` to `jack-da-live-harness-built` itself.
 
-**study** — Delegates the entire 7-phase pipeline to a single `coordinator` agent (see `src/harnesses/study/agents/coordinator/AGENT.md`). Coordinator uses Claude's native Task/Skill tools to spawn specialists from `src/harnesses/study/agents/` and invoke skills from `src/harnesses/study/skills/`. **Vendor parity is Claude-only** — the `__spawn__` JSON emulation for Codex/Kimi is deferred to v2.3 (documented in `src/harnesses/study/orchestrator.ts` header).
+**study** — 7-phase pipeline with dual execution paths. On **Claude**, it delegates to a single `coordinator` agent (see `src/harnesses/study/agents/coordinator/AGENT.md`) that uses native Task/Skill tools to spawn specialists. On **Codex/Kimi**, it runs an orchestrator-managed specialist fallback path (Task/Skill-free) for end-to-end compatibility.
 
 ## Tests
 

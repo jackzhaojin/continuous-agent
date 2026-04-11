@@ -6,9 +6,9 @@ Harness mode is a v2.2 execution pattern that runs a dedicated multi-agent plan-
 |---|---|---|---|
 | `generic` | Rust/Go/Python/Node/web projects from a PROMPT.md | SPEC (WHY → WHAT → HOW → WHEN) → RESEARCH → BUILD → VALIDATE | Claude / Codex / Kimi (structurally) |
 | `eds` | Adobe AEM Edge Delivery Services sites; build agent pushes to `jack-da-live-harness-built` | Same 4-agent spec + per-task loop as generic, plus `ensureIgnoreFiles()` | Claude / Codex / Kimi (structurally) |
-| `study` | React + ShadCN study apps with TTS, quizzes, podcast content | DECOMPOSE → RESEARCH → SYNTHESIZE → CONTENT → TTS → DEPOSIT → VALIDATE (single-coordinator) | **Claude only** |
+| `study` | React + ShadCN study apps with TTS, quizzes, podcast content | DECOMPOSE → RESEARCH → SYNTHESIZE → CONTENT → TTS → DEPOSIT → VALIDATE (coordinator on Claude, specialist fallback on Codex/Kimi) | Claude / Codex / Kimi |
 
-> **Status:** P1 through P5 plus partial P7 are landed and on disk. All three harnesses are native TypeScript — the transitional shell-out runner is deleted. Generic + EDS can run under Claude today and are wired to receive Codex/Kimi without code changes (only real live runs remain unproven). Study is Claude-only because the coordinator relies on Claude SDK's native Task/Skill tools; `__spawn__` emulation for Codex/Kimi is deferred to v2.3. `npm run harness:list` prints all three registered harnesses.
+> **Status:** P1 through P5 plus partial P7 are landed and on disk. All three harnesses are native TypeScript — the transitional shell-out runner is deleted. Generic + EDS run across Claude/Codex/Kimi through the vendor abstraction. Study now supports all vendors as well: Claude uses the native coordinator Task/Skill flow, while Codex/Kimi use an orchestrator-managed specialist fallback path. `npm run harness:list` prints all three registered harnesses.
 
 You can run a harness two ways: **standalone** (just the harness, no executive loop) or **integrated** (the 24x7 executive picks it up as a goal and drives it through the normal goal → contract → steps lifecycle).
 
@@ -27,7 +27,7 @@ npm run harness -- --name <generic|eds|study> --prompt <path/to/PROMPT.md> [flag
 | `--name <harness>` | yes | Which harness to run. `npm run harness:list` prints registered harnesses. |
 | `--prompt <path>` | yes | Path to the `PROMPT.md` file that defines the work. Relative paths resolve against CWD. |
 | `--target <dir>` | no | Target working directory. If omitted, derived from the prompt path (dir-of-prompt, or two levels up if inside `ai-docs/SPEC/`). |
-| `--vendor <name>` | no | `claude` \| `codex` \| `kimi` \| `kimi-cli` \| `kimi-wire`. Defaults to `$WORKER_VENDOR` or `claude`. Study requires `claude`. |
+| `--vendor <name>` | no | `claude` \| `codex` \| `kimi` \| `kimi-cli` \| `kimi-wire`. Defaults to `$WORKER_VENDOR` or `claude`. |
 | `--mode <mode>` | no | `auto` (default) \| `bootstrap` \| `adopt` \| `extend` \| `extend-deep` \| `resume`. Overrides the harness's own mode detection. |
 | `--max-turns <n>` | no | Max turns per internal agent call. |
 | `--list` | — | Print registered harnesses and exit. |
@@ -124,7 +124,7 @@ harness: generic                # <- generic | eds | study
 harness_target: /tmp/auth-svc   # <- absolute or ai-sandbox-relative
 harness_mode: auto              # <- optional; defaults to auto-detect
 
-worker_vendor: claude           # <- study requires claude; generic/eds accept any
+worker_vendor: claude           # <- claude | codex | kimi | kimi-cli | kimi-wire
 
 model_overrides:                # <- optional per-agent model routing
   spec_why: claude-opus-4-5
@@ -177,7 +177,7 @@ The `eds` harness must push generated AEM blocks to `https://github.com/jackzhao
 | **P2** — `'harness'` execution pattern + executive dispatch | ✅ done | Goal bundles with `execution_pattern: harness` route through `harness-executor.ts` |
 | **P3** — Port generic harness JS → TS | ✅ done | `src/harnesses/generic/` is native TS and goes through `runHarnessAgent()` |
 | **P4** — Port EDS harness | ✅ done | `src/harnesses/eds/` is native TS with `ensureIgnoreFiles()`; da.live push stays in the build agent prompt |
-| **P5** — Port study harness | ⚠️ partial | `src/harnesses/study/` is native TS for Claude. `__spawn__` JSON emulation for Codex/Kimi is deferred to v2.3 |
+| **P5** — Port study harness | ✅ done | `src/harnesses/study/` is native TS with dual execution paths: native coordinator for Claude + specialist fallback for Codex/Kimi |
 | **P6** — Consolidate generic + EDS shared base | ⏸ deferred | Per plan — revisit in v2.3 if maintenance cost bites |
 | **P7** — OSS scrubbing | ⚠️ partial | `LICENSE` is Apache-2.0, `NOTICE` + `CONTRIBUTING.md` landed. Still open: hardcoded path scrub, README rewrite, gitleaks sweep, package rename |
 
@@ -198,7 +198,7 @@ The transitional `src/harnesses/shellout-runner.ts` from P1/P2 has been **delete
 | `src/harnesses/eds/index.ts` | `EdsHarness implements HarnessOrchestrator` |
 | `src/harnesses/eds/ignore-files.ts` | `ensureIgnoreFiles()` — `.gitignore` + `.hlxignore` writer |
 | `src/harnesses/study/index.ts` | `StudyHarness implements HarnessOrchestrator` |
-| `src/harnesses/study/orchestrator.ts` | Single-coordinator pipeline (header documents the Claude-only limitation) |
+| `src/harnesses/study/orchestrator.ts` | Study pipeline orchestrator (Claude coordinator path + non-Claude specialist fallback path) |
 | `src/harnesses/study/agent-loader.ts` | Parses `agents/<name>/AGENT.md` frontmatter |
 | `src/harnesses/study/agents/**` | 10 specialist agents + coordinator (copied from study-harness-v1 `.claude/agents/`) |
 | `src/harnesses/study/skills/**` | 16 skills (copied from study-harness-v1 `.claude/skills/`) |
@@ -235,8 +235,8 @@ Only those three are registered. Add one via `src/harnesses/core/harness-registr
 **`[harness] vendor 'codex' auth invalid`**
 Non-Claude vendors go through the vendor registry, which validates authentication at the provider level. `claude` requires `CLAUDE_CODE_OAUTH_TOKEN`. `codex` requires `codex login`. `kimi-cli` / `kimi-wire` require `kimi login`.
 
-**Study harness run hangs or times out under `--vendor codex`/`--vendor kimi-*`**
-Expected — the study coordinator relies on Claude's native `Task` / `Skill` tools which Codex/Kimi don't support. Run study with `--vendor claude`. The orchestrator header (`src/harnesses/study/orchestrator.ts`) documents the gap and the `__spawn__` emulation is scheduled for v2.3.
+**Study harness behavior differs by vendor (`--vendor claude` vs `--vendor codex`/`--vendor kimi-*`)**
+Expected — Claude runs the native single-coordinator Task/Skill flow, while Codex/Kimi run the orchestrator-managed specialist fallback (Task/Skill-free). Both are valid end-to-end harness paths.
 
 **`STEPS.json` shows harness phases but no progress**
 Check `ledgers/executive-$(date +%Y-%m-%d).log` for `[harness-executor]` lines. If events stop arriving, the harness's `run()` generator is blocked inside a provider.spawn() call — check the worker transcript log.

@@ -2,10 +2,11 @@
  * Study harness — native TypeScript orchestrator (P5).
  *
  * Runs a 7-phase study-material pipeline (DECOMPOSE → RESEARCH → SYNTHESIZE →
- * CONTENT → TTS → DEPOSIT → VALIDATE) via a coordinator agent that uses
- * Claude's native Task/Skill tools to spawn specialists. Vendor parity is
- * **Claude-only** in P5; Codex/Kimi support is deferred to v2.3 (requires
- * `__spawn__` JSON emulation + stream interception).
+ * CONTENT → TTS → DEPOSIT → VALIDATE).
+ *
+ * Claude uses the native coordinator flow (Task/Skill orchestration).
+ * Codex/Kimi run via a deterministic orchestrator-managed specialist fallback
+ * so the full study pipeline remains runnable across vendors.
  */
 
 import { readFile } from 'node:fs/promises';
