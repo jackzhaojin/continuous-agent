@@ -364,10 +364,17 @@ export async function verifyNodeBuild(config: VerifierConfig): Promise<VerifierR
     };
   }
 
+  // Force NODE_ENV=production for build. PM2 runs the executive with NODE_ENV=development
+  // (so worker `npm install` picks up devDependencies), but that value leaks into verifier
+  // subprocesses and Next.js then emits a noisy "non-standard NODE_ENV" warning on every
+  // `npm run build`. The warning was being mistaken for a real build failure.
+  const buildEnv = { ...process.env, NODE_ENV: 'production' };
+
   try {
     const { stdout, stderr } = await execAsync('npm run build', {
       cwd: project_path,
       timeout: config.timeout_ms || 300000, // 5 min timeout
+      env: buildEnv,
     });
 
     return {
@@ -381,13 +388,18 @@ export async function verifyNodeBuild(config: VerifierConfig): Promise<VerifierR
       duration_ms: Date.now() - start,
     };
   } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
+    const rawMsg = error instanceof Error ? error.message : String(error);
+    // Drop the NODE_ENV warning lines so the real failure surfaces in the truncated message.
+    const cleanedMsg = rawMsg
+      .split('\n')
+      .filter((line) => !/non-standard "?NODE_ENV"? value/i.test(line))
+      .join('\n');
     return {
       verifier_id: 'node_build',
       result: 'FAIL',
-      message: `Build failed: ${errorMsg.slice(0, 200)}`,
+      message: `Build failed: ${cleanedMsg.slice(0, 400)}`,
       evidence: {
-        error: errorMsg.slice(0, 1000),
+        error: cleanedMsg.slice(0, 2000),
       },
       duration_ms: Date.now() - start,
     };

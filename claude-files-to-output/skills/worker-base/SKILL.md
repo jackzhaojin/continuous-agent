@@ -90,20 +90,47 @@ Workers who build in isolation produce beautiful parts that don't connect. This 
 - **Writing test cases for pages that don't exist yet.** Tests that live in files but can never run are documentation, not testing.
 - **Treating your step as isolated.** Your task exists in a flow. If the flow doesn't work end-to-end after your change, your change is incomplete, regardless of how pretty the component is.
 
-### Structured Handoff (required on every step)
+### Structured Handoff (MANDATORY — your task is REJECTED without it)
 
-At the END of your turn, write out these fields. The next step and the Validator will both read them:
+**Your FINAL assistant message before stopping MUST contain a fenced ```yaml block in the exact format below.** Not a summary sentence. Not "here's what I did." An actual fenced YAML block with every field filled in. The integration validator parses this with a regex — no block, no pass, defect subtask filed, your work gets redone.
+
+This is not optional and it is not the same as your progress report. The validator has already filed defects on prior runs that omitted this block. Do not be the next one.
+
+**⚠️ CRITICAL: every value must describe YOUR actual work in THIS step. Do not copy text from this skill file. Do not invent work you didn't do. Honest under-claiming beats fabricated over-claiming every time.**
+
+**Emit EXACTLY this YAML shape, replacing each `<...>` placeholder with a real sentence describing what YOU did:**
 
 ```yaml
-step: step-{N}
-what_i_built: "One sentence. The smallest honest description."
-what_connects: "What upstream state does this read? What downstream state does this write? Name files, routes, hooks, DB tables."
-what_i_verified: "What I ran, in what order, and what I saw. Name the commands. If I walked the journey, say how far."
-known_gaps: "Things I did NOT wire that I know are still broken. Be specific."
-next_step_should_know: "Architectural facts the next worker won't find by reading the diff."
+step: "<the step id assigned to you — e.g. step-4, or step-4.1 if this is a defect subtask>"
+what_i_built: "<ONE concrete sentence about what YOU produced this step. For a research/planning step, name the plan document you wrote. For a scaffold step, name the files and directories you created. For a feature step, name the components/routes/tables. Do NOT describe work that belongs to a future step.>"
+what_connects: "<Where does YOUR code read state FROM, and where does it write state TO? Name real file paths, route names, hook names, table names. If this step is pure research and connects to nothing yet, say 'none yet — research step, no runtime wiring.'>"
+what_i_verified: "<The actual commands YOU ran this step, and what YOU saw. Examples of valid answers: 'Read prior project at path X, noted 12 API routes, no commands run.' OR 'Ran npm install (succeeded), npm run build (succeeded, NODE_ENV=production), npm run dev served / at localhost:3000 with default page.' Do NOT write verification you did not perform.>"
+known_gaps: "<What you knowingly did NOT do in this step. Be specific. If truly nothing is missing, say 'none known'.>"
+next_step_should_know: "<One or two non-obvious facts the next worker won't spot in the diff — env expectations, file-naming conventions, gotchas you hit.>"
+journey_blocks_added: 0
 ```
 
-**If `what_i_verified` is just "npm run build passed" on a user-facing change, your task is NOT done.** `npm run build` verifies compilation, not behavior.
+**Forbidden — these cause automatic rejection:**
+- Copying any text from this skill file verbatim (including the phrase `postal_v2` if your task doesn't actually use it, or `Next.js 15 scaffold` if you didn't run the scaffold, etc.).
+- Writing values that describe a future step's work as if it were yours.
+- Placeholder literals like `<...>`, `TODO`, `see above`, `same as before`, `N/A`.
+- Multi-line folded scalars (`>` or `|`). Every value is a single-line double-quoted string.
+- Any content after the closing ``` of the YAML block — the harness reads to the last closing fence and ignores the rest.
+
+**Research/planning steps (no code built):** A valid handoff still uses the YAML block. Example field values for a research step:
+- `what_i_built`: `"Research plan document at <your actual path>.md covering stack choice, table schema, and 6-step wizard flow."`
+- `what_connects`: `"none yet — research step, no runtime wiring."`
+- `what_i_verified`: `"Read prior-run project files at /path/..., grepped for API routes and table names, wrote plan.md with the findings. No commands run."`
+- `known_gaps`: `"Nothing built yet — all implementation is in subsequent steps."`
+- `journey_blocks_added`: `0`
+
+**Scaffold/build steps (actual code):** A valid handoff names real filenames YOU created and real commands YOU ran with their exit codes and observed behavior.
+
+**Failure modes the validator checks for (don't be these):**
+- `what_connects` that lists no upstream and no downstream → you built in isolation.
+- `what_i_verified` that says "npm run build passed" on a user-facing change → compilation isn't verification of behavior.
+- Handoff text matching another step's handoff word-for-word → you copied someone else's work.
+- `journey_blocks_added` > 0 but `tests/e2e/journey.spec.ts` has no new `test(...)` blocks → you lied.
 
 ### If You Cannot Complete
 
