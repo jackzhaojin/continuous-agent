@@ -1,8 +1,9 @@
 /**
- * Generic harness — native TypeScript orchestrator (P3).
+ * EDS harness — native TypeScript orchestrator (P4).
  *
- * Delegates to runGenericOrchestrator() under ./orchestrator.ts. No shell-out.
- * Vendor-agnostic: runs under Claude, Codex, or Kimi via the AgentWorkerProvider.
+ * Delegates to runEdsOrchestrator() under ./orchestrator.ts. Builds AEM Edge
+ * Delivery Services (EDS) blocks and pushes to da.live-compatible branches.
+ * Vendor-agnostic via AgentWorkerProvider (Claude / Codex / Kimi).
  */
 
 import { readFile } from 'node:fs/promises';
@@ -17,14 +18,14 @@ import type {
   HarnessState,
   HarnessStatePhase,
 } from '../core/types.js';
-import { runGenericOrchestrator } from './orchestrator.js';
+import { runEdsOrchestrator } from './orchestrator.js';
 import { detectHarnessMode } from './mode-detector.js';
-import type { GenericHarnessState } from './state-store.js';
+import type { GenericHarnessState } from '../generic/state-store.js';
 
 const PHASE_LIST = ['SPEC', 'RESEARCH', 'BUILD', 'VALIDATE', 'COMPLETE'] as const;
 
-export class GenericHarness implements HarnessOrchestrator {
-  readonly name = 'generic';
+export class EdsHarness implements HarnessOrchestrator {
+  readonly name = 'eds';
   readonly phaseList = PHASE_LIST;
 
   detectMode(targetDir: string, promptFile: string): Promise<HarnessMode> {
@@ -32,7 +33,7 @@ export class GenericHarness implements HarnessOrchestrator {
   }
 
   run(config: HarnessRunConfig): AsyncIterable<HarnessEvent> {
-    return runGenericOrchestrator(config);
+    return runEdsOrchestrator(config);
   }
 
   async getState(targetDir: string): Promise<HarnessState> {
@@ -51,9 +52,7 @@ export class GenericHarness implements HarnessOrchestrator {
       try {
         const raw = await readFile(statusPath, 'utf-8');
         const state = JSON.parse(raw) as Partial<GenericHarnessState>;
-        if (state.mode) {
-          mode = (state.mode as HarnessState['mode']) || 'bootstrap';
-        }
+        if (state.mode) mode = (state.mode as HarnessState['mode']) || 'bootstrap';
         const statePhase = state.phase || 'INIT';
         phases = PHASE_LIST.map((name) => ({
           name,
@@ -89,6 +88,5 @@ function derivePhaseStatus(
     if (phase === 'COMPLETE') return 'pending';
     return 'in_progress';
   }
-  if (statePhase === 'PAUSED') return 'pending';
   return 'pending';
 }

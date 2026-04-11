@@ -8,12 +8,14 @@
 
 import type { HarnessOrchestrator } from './types.js';
 import { GenericHarness } from '../generic/index.js';
+import { EdsHarness } from '../eds/index.js';
+import { StudyHarness } from '../study/index.js';
 
 const REGISTRY: Map<string, HarnessOrchestrator> = new Map();
 
 REGISTRY.set('generic', new GenericHarness());
-
-// eds and study register here in P4 / P5.
+REGISTRY.set('eds', new EdsHarness());
+REGISTRY.set('study', new StudyHarness());
 
 export function getHarness(name: string): HarnessOrchestrator {
   const h = REGISTRY.get(name);

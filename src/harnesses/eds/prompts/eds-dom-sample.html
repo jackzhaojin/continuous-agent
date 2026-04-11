@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>EDS DOM Structure Reference</title>
+    <meta name="description" content="Sample EDS page showing exact DOM structure for agent reference">
+    <link rel="stylesheet" href="/styles/styles.css">
+    <script src="/scripts/aem.js" type="module"></script>
+    <script src="/scripts/scripts.js" type="module"></script>
+  </head>
+  <body>
+    <header></header>
+    <main>
+      <!-- ========================================
+           SECTION 1: Plain <div>, NO class name
+           ======================================== -->
+      <div>
+        <!-- BLOCK: Hero block with style variant -->
+        <div class="hero style-main">
+          <!-- Row 1: Image + heading -->
+          <div>
+            <div>
+              <p>
+                <picture>
+                  <img src="./hero-image.jpg" alt="Hero image" width="1600" height="900">
+                </picture>
+              </p>
+              <h1>Welcome to Our Site</h1>
+            </div>
+          </div>
+          <!-- Row 2: Subtitle -->
+          <div>
+            <div>
+              <p>This is a subtitle describing our awesome service</p>
+            </div>
+          </div>
+          <!-- Row 3: CTA link -->
+          <div>
+            <div>
+              <p><a href="/contact">Get Started</a></p>
+            </div>
+          </div>
+        </div>
+
+        <!-- DEFAULT CONTENT: Regular HTML (not a block) -->
+        <p>This is regular paragraph content between blocks.</p>
+        <h2>This is a regular heading</h2>
+
+        <!-- BLOCK: Columns block (class="columns") -->
+        <div class="columns">
+          <!-- Column 1 -->
+          <div>
+            <div>
+              <h3>Feature 1</h3>
+              <p>Description of feature 1</p>
+            </div>
+            <div>
+              <picture>
+                <img src="./feature1.jpg" alt="Feature 1" width="800" height="600">
+              </picture>
+            </div>
+          </div>
+          <!-- Column 2 -->
+          <div>
+            <div>
+              <picture>
+                <img src="./feature2.jpg" alt="Feature 2" width="800" height="600">
+              </picture>
+            </div>
+            <div>
+              <h3>Feature 2</h3>
+              <p>Description of feature 2</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========================================
+           SECTION 2: Another plain <div>
+           ======================================== -->
+      <div>
+        <h2>Our Services</h2>
+        <p>Check out what we offer below:</p>
+
+        <!-- BLOCK: Cards block with style variant -->
+        <div class="cards style-strong">
+          <!-- Card 1 -->
+          <div>
+            <div>
+              <picture>
+                <img src="./card1.jpg" alt="Service 1" width="600" height="400">
+              </picture>
+            </div>
+            <div>
+              <h3>Service 1</h3>
+              <p>Description of service 1</p>
+            </div>
+          </div>
+          <!-- Card 2 -->
+          <div>
+            <div>
+              <picture>
+                <img src="./card2.jpg" alt="Service 2" width="600" height="400">
+              </picture>
+            </div>
+            <div>
+              <h3>Service 2</h3>
+              <p>Description of service 2</p>
+            </div>
+          </div>
+          <!-- Card 3 -->
+          <div>
+            <div>
+              <picture>
+                <img src="./card3.jpg" alt="Service 3" width="600" height="400">
+              </picture>
+            </div>
+            <div>
+              <h3>Service 3</h3>
+              <p>Description of service 3</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- SPECIAL BLOCK: Section metadata (for styling) -->
+        <div class="section-metadata">
+          <div>
+            <div>Style</div>
+            <div>highlight</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========================================
+           SECTION 3: Empty section
+           ======================================== -->
+      <div></div>
+    </main>
+    <footer></footer>
+  </body>
+</html>
+
+<!--
+KEY PATTERNS FOR AGENTS:
+
+1. SECTIONS are plain <div> elements (NO class name)
+   - Located directly under <main>
+   - Can contain blocks, default content, or both
+
+2. BLOCKS have class names matching da.live table names
+   - Examples: class="hero", class="columns", class="cards"
+   - Optional style variants: class="hero style-main", class="cards style-strong"
+   - Style variants are ADDITIONAL classes (space-separated from block name)
+   - Structure: <div class="blockname [style-variant]"><div><div>content</div></div></div>
+   - Each row in da.live table becomes <div><div>content</div></div>
+
+3. DEFAULT CONTENT is regular HTML (p, h2, etc.)
+   - Not wrapped in a block div
+   - Lives alongside blocks within a section
+
+4. SECTION-METADATA is a special block
+   - Used to apply styling/theming to the section container
+   - Structure: <div class="section-metadata"><div><div>key</div><div>value</div></div></div>
+
+5. BLOCK DECORATION
+   - Your blocks/*/blockname.js exports a decorate(block) function
+   - Receives the <div class="blockname"> element
+   - Transforms nested divs into semantic HTML
+   - CSS in blocks/*/blockname.css is automatically loaded
+
+6. AEM UP BEHAVIOR
+   - Fetches content from da.live URLs
+   - Applies local block JavaScript and CSS
+   - Changes to local code = instant browser update
+   - Content on da.live is NOT modified
+-->
