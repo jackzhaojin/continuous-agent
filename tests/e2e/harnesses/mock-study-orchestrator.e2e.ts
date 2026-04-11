@@ -48,14 +48,14 @@ function check(label: string, fn: () => Promise<void>): Promise<void> {
 class MockStudyProvider implements AgentWorkerProvider {
   readonly vendorId = 'mock';
   readonly vendorName = 'mock';
-  calls: Array<{ agent: string; toolCount: number }> = [];
+  calls: Array<{ toolCount: number }> = [];
 
   validateAuth(): AuthValidation {
     return { valid: true, method: 'mock', error: null };
   }
 
   async *spawn(config: AgentWorkerConfig): AsyncIterable<AgentWorkerMessage> {
-    this.calls.push({ agent: 'coordinator', toolCount: config.allowedTools.length });
+    this.calls.push({ toolCount: config.allowedTools.length });
     const body = `Coordinator done\n\n\`\`\`json\n${JSON.stringify({ result: 'pass' })}\n\`\`\``;
     yield { type: 'assistant', text: body, raw: {} };
     yield {
@@ -212,6 +212,35 @@ async function main(): Promise<void> {
         0,
         'coordinator should not be invoked on COMPLETE pipeline',
       );
+    });
+  });
+
+  await check('non-Claude vendors use specialist fallback path', async () => {
+    await withTmp(async (dir) => {
+      const manifestPath = join(dir, 'manifest.yaml');
+      await writeFile(manifestPath, 'title: Test Study\ndomains: []\n');
+
+      const harness = new StudyHarness();
+      const provider = new MockStudyProvider();
+      const mode = await harness.detectMode(dir, manifestPath);
+
+      const events = await collectEvents(
+        harness.run({
+          promptFile: manifestPath,
+          targetDir: dir,
+          mode,
+          provider,
+          vendor: 'kimi-wire',
+          modelOverrides: {},
+        }),
+      );
+
+      assert.equal(provider.calls.length, STUDY_PHASES.length);
+      const status = JSON.parse(await readFile(join(dir, 'ai-docs', 'STATUS.json'), 'utf-8'));
+      assert.equal(status.pipeline, 'COMPLETE');
+
+      const agentStarts = events.filter((e) => e.type === 'agent_start');
+      assert.equal(agentStarts.length, STUDY_PHASES.length);
     });
   });
 

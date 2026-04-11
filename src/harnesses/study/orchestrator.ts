@@ -8,17 +8,13 @@
  * src/harnesses/study/agents/<name>/AGENT.md and invoke skills from
  * src/harnesses/study/skills/<name>/SKILL.md.
  *
- * ## Vendor support (P5)
+ * ## Vendor support
  *
- * Vendor parity for the study harness is currently **Claude-only**. The
- * coordinator relies on the Claude Agent SDK's `Task` and `Skill` tools,
- * which are provider-native and can't be emulated without a custom
- * `__spawn__` JSON protocol + stream interception layer. The scaffolding
- * for that emulation is intentionally NOT shipped in P5 — it's a large and
- * risky piece that would block the rest of v2.2.
- *
- * A Codex/Kimi port of the coordinator is tracked as a known-gap and should
- * be done in v2.3 alongside the P6 consolidation (generic + eds shared base).
+ * Claude continues to use the native coordinator flow (Task/Skill tooling).
+ * Non-Claude vendors (Codex/Kimi) use a deterministic fallback path that
+ * runs specialist agents phase-by-phase from the orchestrator. This keeps the
+ * study harness runnable end-to-end across vendors without requiring
+ * provider-native Task/Skill support.
  *
  * ## What this orchestrator does
  *
@@ -96,17 +92,6 @@ export function runStudyOrchestrator(config: HarnessRunConfig): AsyncIterable<Ha
 async function orchestrate(config: HarnessRunConfig, bus: HarnessEventBus): Promise<void> {
   const targetDir = config.targetDir;
 
-  // Vendor gate — warn loudly if not Claude.
-  if (config.vendor !== 'claude') {
-    const msg =
-      `[study] WARNING: vendor '${config.vendor}' is not fully supported yet. ` +
-      `The coordinator relies on Claude SDK's native Task/Skill tools. ` +
-      `Run with --vendor claude for a supported configuration. P5 deferred __spawn__ emulation to v2.3.`;
-    // eslint-disable-next-line no-console
-    console.warn(msg);
-    await appendProgress(targetDir, msg);
-  }
-
   // Setup directories
   await mkdir(join(targetDir, 'ai-docs', 'phases'), { recursive: true });
   await mkdir(join(targetDir, 'research'), { recursive: true });
@@ -168,6 +153,15 @@ async function orchestrate(config: HarnessRunConfig, bus: HarnessEventBus): Prom
     QUIZ_QUESTIONS_PER_DOMAIN: '5',
     ENHANCEMENT_MODE: 'false',
   };
+
+  if (config.vendor !== 'claude') {
+    await appendProgress(
+      targetDir,
+      `[study] vendor=${config.vendor}: using orchestrator-managed specialist flow (Task/Skill-free compatibility mode)`,
+    );
+    await runSpecialistFallback(config, bus, state, harnessRoot, coordinatorContext);
+    return;
+  }
 
   const coordinator = await loadAgent('coordinator', coordinatorContext);
 
@@ -240,6 +234,158 @@ async function orchestrate(config: HarnessRunConfig, bus: HarnessEventBus): Prom
       `Study coordinator failed: ${result.errors.join(', ') || 'unknown error'}`,
     );
   }
+}
+
+async function runSpecialistFallback(
+  config: HarnessRunConfig,
+  bus: HarnessEventBus,
+  state: Awaited<ReturnType<typeof loadState>>,
+  harnessRoot: string,
+  coordinatorContext: Record<string, string>,
+): Promise<void> {
+  const pipeline = [
+    { phase: 'DECOMPOSE', agent: 'topic-decompose' },
+    { phase: 'RESEARCH', agent: 'research' },
+    { phase: 'SYNTHESIZE', agent: 'synthesize' },
+    { phase: 'CONTENT', agent: 'podcast-script' },
+    { phase: 'TTS', agent: 'quiz-gen' },
+    { phase: 'DEPOSIT', agent: 'ui-scaffold' },
+    { phase: 'VALIDATE', agent: 'ui-validate' },
+  ] as const;
+
+  for (const step of pipeline) {
+    const phaseState = state.phases[step.phase];
+    if (phaseState?.status === 'complete') {
+      bus.emit({
+        type: 'phase_complete',
+        phase: step.phase,
+        success: true,
+        at: new Date().toISOString(),
+      });
+      continue;
+    }
+
+    const context = buildFallbackContext(config, coordinatorContext);
+    const specialist = await loadAgent(step.agent, context);
+    const model = specialist.model || config.modelOverrides[step.agent] || 'claude-sonnet-4-6';
+
+    bus.emit({
+      type: 'agent_start',
+      agent: step.agent,
+      model,
+      vendor: config.vendor,
+      at: new Date().toISOString(),
+    });
+
+    const result = await runHarnessAgent({
+      agentName: step.agent,
+      promptMarkdown: specialist.prompt,
+      model,
+      cwd: harnessRoot,
+      allowedTools: specialist.tools.length ? specialist.tools : ['Read', 'Write', 'Bash', 'Glob', 'Grep'],
+      maxTurns: config.maxTurnsPerAgent ?? 160,
+      provider: config.provider,
+      vendor: config.vendor,
+      abortSignal: config.abortSignal,
+    });
+
+    for (const msg of result.messages) {
+      bus.emit({
+        type: 'agent_message',
+        agent: step.agent,
+        role: toRole(msg),
+        text: msg.text,
+        raw: msg.raw,
+      });
+    }
+
+    const pass = didAgentPass(result);
+    bus.emit({
+      type: 'agent_complete',
+      agent: step.agent,
+      success: pass,
+      errors: result.errors,
+      duration_ms: result.durationMs,
+    });
+
+    await markPhase(state, step.phase, pass, result.errors.join(', ') || null);
+    await saveState(config.targetDir, state);
+    await appendProgress(
+      config.targetDir,
+      `[study] ${step.phase} via ${step.agent} (${config.vendor}) => ${pass ? 'pass' : 'fail'}`,
+    );
+
+    bus.emit({
+      type: 'phase_complete',
+      phase: step.phase,
+      success: pass,
+      at: new Date().toISOString(),
+    });
+
+    if (!pass) {
+      state.pipeline = 'FAILED';
+      await saveState(config.targetDir, state);
+      throw new Error(`Study phase ${step.phase} failed with ${config.vendor}: ${result.errors.join(', ') || 'unknown error'}`);
+    }
+  }
+
+  state.pipeline = 'COMPLETE';
+  state.currentPhase = null;
+  state.currentActivity = null;
+  await saveState(config.targetDir, state);
+}
+
+function buildFallbackContext(
+  config: HarnessRunConfig,
+  coordinatorContext: Record<string, string>,
+): Record<string, string> {
+  const base = {
+    ...coordinatorContext,
+    INPUT_PATH: config.promptFile,
+    SOURCE_URL: config.promptFile,
+    TOPIC_ID: 'topic-1',
+    TOPIC_TITLE: 'Primary Study Topic',
+    TOPIC_DESCRIPTION: 'Core content extracted from manifest',
+    RESEARCH_DIR: join(config.targetDir, 'research'),
+    SYNTHESIS_PATH: join(config.targetDir, 'research', 'synthesis.md'),
+    QUESTIONS_PER_DOMAIN: '5',
+    DOMAIN_ID: 'domain-1',
+    DOMAIN_TITLE: 'Primary Domain',
+    DEV_SERVER_URL: 'http://localhost:4173',
+    SCAFFOLD_MODE: 'bootstrap',
+  };
+  return {
+    ...base,
+    OUTPUT_PATH: join(config.targetDir, 'ai-docs', 'phases', 'fallback-output.md'),
+    RESEARCH_PATH: join(config.targetDir, 'research', 'synthesis.md'),
+  };
+}
+
+async function markPhase(
+  state: Awaited<ReturnType<typeof loadState>>,
+  phase: (typeof PHASES)[number],
+  success: boolean,
+  error: string | null,
+): Promise<void> {
+  const now = new Date().toISOString();
+  const prev = state.phases[phase];
+  const startedAt = prev.startedAt ?? now;
+  const durationSeconds = Math.max(
+    0,
+    Math.round((Date.parse(now) - Date.parse(startedAt)) / 1000),
+  );
+
+  state.currentPhase = phase;
+  state.currentActivity = success ? 'complete' : 'failed';
+  state.phases[phase] = {
+    ...prev,
+    status: success ? 'complete' : 'failed',
+    attempts: (prev.attempts ?? 0) + 1,
+    error: success ? null : error,
+    startedAt,
+    completedAt: now,
+    durationSeconds,
+  };
 }
 
 function toRole(msg: AgentWorkerMessage): 'assistant' | 'user' | 'system' {
