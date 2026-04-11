@@ -108,6 +108,16 @@ You are executing a fixed-step pipeline. Follow the pipeline steps exactly as de
 Do NOT deviate from the prescribed sequence. Each step's output feeds the next step.
 
 If a step fails, report the failure with details — do NOT skip ahead.`,
+
+  'harness': `## Execution Pattern: Harness
+
+This task is executed by a harness (a dedicated multi-agent plan-then-build pipeline
+with its own orchestrator). The executive loop hands off to the harness via
+src/agentic/execution/harness-executor.ts. Internal harness retries are handled by
+the harness itself and do NOT count against the executive's failure threshold.
+
+This behavior description is informational only — the harness owns prompt composition
+for its own internal agent calls.`,
 };
 
 // =====================================================================

@@ -9,7 +9,8 @@ export type ExecutionPattern =
   | 'plan-then-execute'
   | 'loop-until-progress'
   | 'plan-mode'
-  | 'deterministic-pipeline';
+  | 'deterministic-pipeline'
+  | 'harness';
 
 /**
  * Individual health check result
@@ -119,6 +120,12 @@ export interface WorkItem {
   // V2.1: Per-goal worker vendor override from PROMPT.md frontmatter
   // Priority: goal frontmatter > WORKER_VENDOR env > 'claude' default
   worker_vendor?: 'claude' | 'codex' | 'kimi' | 'kimi-cli' | 'kimi-wire';
+
+  // V2.2: Harness execution pattern fields (only meaningful when execution_pattern='harness')
+  harness?: string;               // 'generic' | 'eds' | 'study' — which harness to run
+  harness_target?: string;        // Absolute or repo-relative target dir for harness run
+  harness_mode?: 'bootstrap' | 'adopt' | 'extend' | 'extend-deep' | 'resume';
+  model_overrides?: Record<string, string>;  // Per-agent model overrides for harness
 }
 
 /**

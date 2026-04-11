@@ -87,6 +87,7 @@ import {
 
 // PIPELINE - V2.0 deterministic pipeline executor
 import { executePipeline } from '../harness/pipeline-executor.js';
+import { executeHarness } from '../agentic/execution/harness-executor.js';
 import { spawnWorker } from '../agentic/execution/worker-spawner.js';
 
 // Load environment variables (tiered)
@@ -410,7 +411,21 @@ async function runIteration(): Promise<IterationResult> {
   // V2.0: Route by execution pattern
   let result: WorkerResult | null = null;
 
-  if (patternResolution.pattern === 'deterministic-pipeline'
+  if (patternResolution.pattern === 'harness') {
+    // === V2.2 HARNESS EXECUTION PATH ===
+    log(`  [ROUTING] harness: ${workItem.harness ?? '(unset)'} target=${workItem.harness_target ?? '(default)'}`);
+
+    setDashboardActiveWorker({
+      goal_slug: workItem.title,
+      execution_pattern: 'harness',
+      started_at: new Date().toISOString(),
+    });
+
+    await logWorkStart(workItem, currentStep, contractId);
+    result = await executeHarness(workItem, currentStep, contractId);
+
+    setDashboardActiveWorker(null);
+  } else if (patternResolution.pattern === 'deterministic-pipeline'
       && matchedPlaybook?.pipeline_steps?.length) {
     // === PIPELINE EXECUTION PATH ===
     log(`  [ROUTING] deterministic-pipeline: Executing via pipeline executor`);

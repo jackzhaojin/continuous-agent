@@ -20,6 +20,7 @@ const VALID_PATTERNS: ExecutionPattern[] = [
   'loop-until-progress',
   'plan-mode',
   'deterministic-pipeline',
+  'harness',
 ];
 
 export interface PatternResolution {

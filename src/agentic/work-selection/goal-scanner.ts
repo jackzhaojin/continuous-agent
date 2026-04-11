@@ -334,6 +334,18 @@ async function bundleToWorkItemAsync(bundle: GoalBundle): Promise<WorkItem> {
     worker_vendor: (['claude', 'codex', 'kimi', 'kimi-cli', 'kimi-wire'].includes(frontmatter.worker_vendor as string)
       ? frontmatter.worker_vendor as 'claude' | 'codex' | 'kimi' | 'kimi-cli' | 'kimi-wire'
       : undefined), // V2.1: Per-goal vendor override
+    // V2.2: harness fields
+    harness: (frontmatter.harness as string) || undefined,
+    harness_target: (frontmatter.harness_target as string) || undefined,
+    harness_mode: (['bootstrap', 'adopt', 'extend', 'extend-deep', 'resume'].includes(
+      frontmatter.harness_mode as string,
+    )
+      ? (frontmatter.harness_mode as 'bootstrap' | 'adopt' | 'extend' | 'extend-deep' | 'resume')
+      : undefined),
+    model_overrides:
+      frontmatter.model_overrides && typeof frontmatter.model_overrides === 'object'
+        ? (frontmatter.model_overrides as Record<string, string>)
+        : undefined,
   };
 }
 

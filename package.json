@@ -9,6 +9,8 @@
     "start": "node dist/executive-loop.js",
     "dev": "tsx src/executive-loop.ts",
     "typecheck": "tsc --noEmit",
+    "harness": "tsx src/harnesses/cli.ts",
+    "harness:list": "tsx src/harnesses/cli.ts --list",
     "test:adhoc:v2-loaders": "tsx tests/adhoc/v2-library-loaders.adhoc.ts"
   },
   "dependencies": {
