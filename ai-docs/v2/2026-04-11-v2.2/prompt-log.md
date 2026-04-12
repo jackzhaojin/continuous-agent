@@ -228,3 +228,386 @@
 → Response: Appended Session 2 to prompt-log.md with real history.jsonl timestamps and authored outcome.md summarizing v2.2 delivery state.
 → Action: Edited prompt-log.md, Created outcome.md. ✅
 
+---
+
+## Session 3: Validator Fix + 24x7 Monitoring + Kimi K2.5 Harness Run (Apr 11, 2026 — evening)
+
+### Prompt 31: Check Build Again (5:07 PM)
+
+> Check again pleae
+
+→ Response: Re-ran typecheck/build, found remaining issues from merge.
+→ Action: npm run typecheck. ⚠️
+
+### Prompt 32: Screenshot — Build Errors (5:08 PM)
+
+> [Image #1]
+
+→ Response: Identified the specific TS errors from screenshot.
+→ Action: Diagnosed type mismatches in validator and harness modules.
+
+### Prompt 33: Build and Fix (5:10 PM)
+
+> ya let's build and fix if you haven't
+
+→ Response: Fixed all build errors so typecheck passes clean.
+→ Action: Edited multiple TS files, npm run typecheck passing. ✅
+
+### Prompt 34: Validator Philosophy — Don't Over-Index on Defects (5:22 PM)
+
+> Let's monitor closely. The goal of the validation thing is to check for errors. If we're over-indexing on defects, that's not good either. We should focus on value fixing the right defects and accepting minor imperfections.
+
+→ Response: Acknowledged — recalibrated validator to focus on value-blocking defects, not cosmetic ones.
+→ Action: Adjusted validation thresholds/logic. ✅
+
+### Prompt 35: Be Reasonable With Errors (5:24 PM)
+
+> We need to stop having error out and we also need to kinda just be a reasonable here. I don't know. Do whatever you think is best. Let's make sure that we fix this properly.
+
+→ Response: Hardened the validator to stop recursive handoff-format defect loops; made it pragmatic rather than pedantic.
+→ Action: Commit 16545dc (fix(validator): stop recursive handoff-format defect loop). ✅
+
+### Prompt 36: Fix Discord + Validator Issues (6:26 PM)
+
+> ya let's fix!!! [Image #2] the hwole thing doesn't make sene to me from discord either, now understanding what's happenign, please fix
+
+→ Response: Diagnosed Discord notification confusion + validator loop; fixed root cause.
+→ Action: Updated validator logic, fixed Discord message formatting. ✅
+
+### Prompt 37: Commit Fix (6:27 PM)
+
+> /jack-git-commit one commit please
+
+→ Response: Committed validator fix.
+→ Action: jack-git-commit. ✅
+
+### Prompt 38: Keep Monitoring (6:30 PM)
+
+> OK - keep monitoring!
+
+→ Response: Continued /long-agent-monitor on PM2 executive loop.
+→ Action: Tailed logs, watched for regressions. ✅
+
+### Prompt 39: Supabase Setup Check (7:05 PM)
+
+> can you see if supabase is set up correctly? do you need supabase mcp?
+
+→ Response: Checked Supabase configuration for the worker's target project.
+→ Action: Verified DB schema setup. ✅
+
+### Prompt 40: Supabase Done (7:08 PM)
+
+> done - [Image #3]
+
+→ Response: Acknowledged Supabase confirmation from user screenshot.
+→ Action: None needed.
+
+### Prompt 41: Continue Monitoring (7:19 PM)
+
+> Continue to monitor!
+
+→ Response: Resumed long-agent-monitor loop.
+→ Action: /long-agent-monitor. ✅
+
+### Prompt 42: Long Agent Monitor Check (7:46 PM)
+
+> /long-agent-monitor
+
+→ Response: Ran monitor check on PM2 executive loop and worker logs.
+→ Action: Reported status from ledgers. ✅
+
+---
+
+## Session 4: Kimi K2.5 + Codex + Claude Harness Comparison (Apr 11, 2026 — late evening)
+
+### Prompt 43: Run Kimi K2.5 Through Harness (8:17 PM)
+
+> OK we're trying to run a KIMI k 2.5 through one time - can you help? '/Users/jackjin/dev/harness-v2-test' new branch please in here with something simple
+
+→ Response: Attempted to set up Kimi K2.5 harness run against harness-v2-test repo.
+→ Action: Created branch, prepared harness input. ⚠️ (git state issues)
+
+### Prompt 44–46: Git Reset / Branch Cleanup (8:20 PM – 8:21 PM)
+
+> git reset and checkout develop please / check out develop / sorry go back to /Users/jackjin/dev/continuous-agent-develop / git reset and go back to develop
+
+→ Response: Cleaned up git state across both repos, returned to develop branch in continuous-agent-develop.
+→ Action: git reset, git checkout develop. ✅
+
+### Prompt 47: Use HARNESS.md to Run Kimi (8:22 PM)
+
+> '/Users/jackjin/dev/continuous-agent-develop/HARNESS.md' now exist - i wonder why we struggled so much - with this, can you create a kimi k 2.5 run with HARNESS.md as reference?
+
+→ Response: Used HARNESS.md as the reference to properly invoke harness with Kimi K2.5 vendor.
+→ Action: Kicked off harness run with --vendor kimi. ✅
+
+### Prompt 48: Monitor Until Done (8:23 PM)
+
+> yes please - also monitor until it's done
+
+→ Response: Monitored Kimi K2.5 harness execution through completion.
+→ Action: Tailed logs, watched task progression. ✅
+
+### Prompt 49: Research Quality Check (8:31 PM)
+
+> Research is supposed to return real research no? what is this thing? [Image #1]
+
+→ Response: Identified that Kimi's research phase returned shallow/placeholder content instead of real research.
+→ Action: Diagnosed prompt injection gap for non-Claude vendors.
+
+### Prompt 50: Harness Is the Point, Not the Output (8:32 PM)
+
+> Oh the point is to have a working harness. Oh, it's important. It's not about what we're building, right? It's about the harness working correctly. When you're monitoring this, it's really important for the harness to work.
+
+→ Response: Reframed monitoring focus — harness mechanics (state transitions, retries, validation loops) matter more than output quality.
+→ Action: Shifted monitoring criteria to harness health. ✅
+
+### Prompt 51: Fix and Rerun Tasks (8:34 PM)
+
+> Ya let's fix, and maybe rerun tasks, reset STATUS.json and TASKS, start fresh
+
+→ Response: Reset harness state files, prepared for clean rerun.
+→ Action: Reset STATUS.json, cleared TASKS directory. ✅
+
+### Prompt 52: Stop and Fix (8:34 PM)
+
+> Stop current run and fix
+
+→ Response: Killed running harness process, applied fixes.
+→ Action: Process stopped, fixes applied.
+
+### Prompt 53: Rerun with Kimi (8:35 PM)
+
+> ya let's rerun / let's try kimi
+
+→ Response: Relaunched harness with Kimi K2.5 vendor after fixes.
+→ Action: Harness restarted. ✅
+
+### Prompt 54: Extra Frontmatter in Research Output (8:37 PM)
+
+> '/Users/jackjin/dev/harness-v2-test/ai-docs/TASKS/1/research.md' has more frontmatter than what's expected, lower priority thing but uhmm... expected is to just have the resulting output
+
+→ Response: Noted — Kimi injecting excess YAML frontmatter into output files. Low priority cosmetic issue.
+→ Action: Logged as known limitation.
+
+### Prompt 55: Read the Ledger (8:38 PM)
+
+> Read the ledger - what's going on?
+
+→ Response: Read harness execution ledger, reported task progress and any errors.
+→ Action: Parsed ledger JSONL. ✅
+
+### Prompt 56: Kimi Didn't Translate the How (8:40 PM)
+
+> looks like kimi k 2.5 didn't translate the how from the prompt.md [Image #2]
+
+→ Response: Confirmed Kimi K2.5 failed to translate the HOW phase properly — prompt injection for non-Claude vendors needs strengthening.
+→ Action: Diagnosed root cause in prompt adaptation layer.
+
+### Prompt 57: Honest E2E Assessment (8:41 PM)
+
+> Do an honest assessment. Are we actually doing end to end testing or we're just kind of ignoring it? So like we need to make sure that the pieces we're building are in running integration with each other.
+
+→ Response: Delivered honest assessment — unit + mock e2e green, but live e2e across vendors was shallow. Real integration gaps exist between harness orchestrator and Kimi/Codex paths.
+→ Action: Outlined gaps. ⚠️
+
+### Prompt 58–63: Playwright CLI / MCP Evidence Deep Dive (8:43 PM – 8:45 PM)
+
+> how is the playwright cli or mcp in the ledgers? / sorry we using playwright cli, or mcp by agent adhocly? / Are there any evidence that we're using playwright mcp or cli to do the testing? / like, sorry, AI running it, not just writing it / adhocly / like, AI using playwright cli with adhoc, or mcp, yes agent itself
+
+→ Response: Investigated whether agents were actually running Playwright CLI (not just writing tests). Found evidence of playwright-cli invocations in worker logs — agents are using it adhoc during builds.
+→ Action: Confirmed playwright-cli usage pattern. ✅
+
+### Prompt 64: Browser Check (8:46 PM)
+
+> [Image #3] we should be ok here - i just refreshed
+
+→ Response: Acknowledged browser screenshot showing working app.
+→ Action: Confirmed visual state.
+
+### Prompt 65: RCA the Harness Issue (8:47 PM)
+
+> No? i mean we need to RCA this, again the output is not what's important, but the harness itself
+
+→ Response: Root-caused the harness failure — Kimi K2.5 was exceeding token budget on task 3, causing incomplete output.
+→ Action: Identified token budget as bottleneck. ⚠️
+
+### Prompt 66: Run Simple Adhoc Test (8:51 PM)
+
+> ya run a simple adhoc test
+
+→ Response: Ran a simple adhoc Kimi K2.5 test to isolate whether the issue is harness or Kimi.
+→ Action: npx tsx adhoc test. ✅
+
+### Prompt 67: Try 20k Token Limit (8:52 PM)
+
+> try something 20k token with adhoc
+
+→ Response: Ran adhoc test with 20k token budget — Kimi completed successfully.
+→ Action: Confirmed 20k tokens sufficient for simple tasks. ✅
+
+### Prompt 68: Retry Task 3 (8:52 PM)
+
+> Ya if works with 20k token we should retry task 3
+
+→ Response: Retried harness task 3 with adjusted token budget.
+→ Action: Reran task. ✅
+
+### Prompt 69: Run Without Harness + Playwright CLI Test (9:03 PM)
+
+> Nice, can you run it without the harness and see if it works? use playwright cli skill /playwright-cli and test it for me after starting it, let me see, test this in headful mode (not default for cli)
+
+→ Response: Ran the built app outside harness, used /playwright-cli in headful mode to visually test.
+→ Action: Playwright CLI headful browser test. ✅
+
+### Prompt 70: Headful Mode Clarification (9:04 PM – 9:05 PM)
+
+> Use playwright cli headful mode, it's not default / i do not though, mm... / now i see it
+
+→ Response: Switched to headful mode so user could see the browser visually.
+→ Action: Playwright --headed flag. ✅
+
+### Prompt 71: Add 20 Todos (9:07 PM)
+
+> can you add 20 todos?
+
+→ Response: Added 20 todo items via Playwright CLI to test the app interactively.
+→ Action: Playwright fill + click x20. ✅
+
+### Prompt 72: Retrospective on Harness Files (9:08 PM)
+
+> Very nice, ok, we can be happy with this, we can close up. now do a retrospective on all the harness files, did we feel like we did spec driven development with what why how and then when, and also the tasks, research build validate? is there anything missing?
+
+→ Response: Delivered retrospective — spec-driven development pattern (WHY/WHAT/HOW/WHEN) confirmed working. Identified that gates between phases could be stronger and that Kimi needs prompt reinforcement for HOW translation.
+→ Action: Summarized findings. ✅
+
+### Prompt 73: What Are Gates? (9:09 PM)
+
+> What are gates again? sorry i feel like it's a new term, we used to have goals steps and contracts
+
+→ Response: Clarified — "gates" = validation checkpoints between harness phases (e.g., SPEC must pass before BUILD starts). Not a new formal concept, just the harness's internal phase-transition checks. Goals/steps/contracts remain the executive's model.
+→ Action: Explained terminology. ✅
+
+### Prompt 74: WHY_WHAT.md + Constitution Check (9:10 PM)
+
+> ideally what is here right? '/Users/jackjin/dev/harness-v2-test/ai-docs/SPEC/WHY_WHAT.md' and we do have a constitution? '/Users/jackjin/dev/harness-v2-test/ai-docs/SPEC/CONSTITUTION.md', but yeah, we need to figure out how much we need
+
+→ Response: Reviewed harness-v2-test spec files — confirmed WHY_WHAT.md and CONSTITUTION.md exist and are populated. Noted the constitution is harness-scoped (project rules), separate from the executive's constitution.
+→ Action: Read + assessed spec files. ✅
+
+### Prompt 75: Commit Harness Test Results (9:14 PM)
+
+> /jack-git-commit
+
+→ Response: Committed Kimi K2.5 harness test results and fixes.
+→ Action: jack-git-commit. ✅
+
+### Prompt 76: Generate Codex Comparison Run (9:15 PM)
+
+> ya let's have you generate a similar test, go to the codex branch from main, and do the same thing, however this time we'll use codex
+
+→ Response: Set up harness run with Codex vendor for comparison against the Kimi K2.5 run.
+→ Action: Checked out new branch, configured --vendor codex. ✅
+
+### Prompt 77: Add harness-v2-test Directory (9:16 PM)
+
+> /add-dir /Users/jackjin/dev/harness-v2-test
+
+→ Response: Added harness-v2-test as additional working directory.
+→ Action: Directory added to context. ✅
+
+### Prompt 78: Reference Codex Provider (9:17 PM – 9:18 PM)
+
+> mm... we had codex working before with @src/core/vendor/codex-agent-provider.ts and @tests/e2e/vendor-workers/codex-worker-e2e.ts / without an API key / no sorry, don't change the provider but reference it
+
+→ Response: Referenced existing Codex provider for harness integration without modifying the provider code.
+→ Action: Used existing codex-agent-provider.ts as reference. ✅
+
+### Prompt 79: Add Harness E2E Unit Test (9:20 PM)
+
+> Oh after it's running, can you add in a unit test for this? Because ideally, you know the harness capabilities we need to make sure we can run Kimi K2.5 as well as codex in e2e testing / this is for harness / harness e2e
+
+→ Response: Added harness e2e test validating that both Kimi K2.5 and Codex vendors can be invoked through the harness framework.
+→ Action: Created harness e2e test file. ✅
+
+### Prompt 80: Validate This Is Codex (9:23 PM)
+
+> is there anyway for us to validate this is codex?
+
+→ Response: Showed how to verify Codex execution — checked provider logs, model identification in output, and agent metadata.
+→ Action: Inspected worker logs for Codex fingerprint. ✅
+
+### Prompt 81: Different Prompts Between Runs? (9:25 PM)
+
+> did we feed a diff prompt? i feel like kimi k 2.5 we did a todo list? / nah it's fine, we can keep going
+
+→ Response: Confirmed prompts differed slightly between Kimi and Codex runs; user accepted this for comparison purposes.
+→ Action: Noted. ✅
+
+---
+
+## Session 5: Claude Sonnet Comparison + Visual Assessment + PR Merge (Apr 11, 2026 — night)
+
+### Prompt 82: Stop PM2 for Testing (10:09 PM)
+
+> let's stop pm2 for now, i wanna do another test / yes stop pm2
+
+→ Response: Stopped PM2 executive loop to free resources for manual harness testing.
+→ Action: pm2 stop executive-loop. ✅
+
+### Prompt 83: Run Claude Sonnet 4.6 Comparison (10:09 PM)
+
+> OK let's try the samething in claude sonnet 4.6, and add it to the comparison
+
+→ Response: Ran harness with Claude Sonnet 4.6 as the third vendor comparison (alongside Kimi K2.5 and Codex).
+→ Action: Harness run with --vendor claude. ✅
+
+### Prompt 84: Testing Restart (10:10 PM)
+
+> sorry i'm testing restarting of this
+
+→ Response: Acknowledged user testing Claude Code restart behavior.
+→ Action: None.
+
+### Prompt 85: Commit Comparison Results (10:10 PM)
+
+> /jack-git-commit
+
+→ Response: Committed all three vendor comparison results.
+→ Action: jack-git-commit. ✅
+
+### Prompt 86: Save Comparison Somewhere (10:35 PM)
+
+> can you save this somewhere? it's too bad that it's not the same thing with the same prompt packet in '/Users/jackjin/dev/continuous-agent-develop/docs/technical-highlights' for 2.2
+
+→ Response: Saved the 3-vendor harness comparison (Kimi K2.5 vs Codex vs Claude Sonnet) to technical-highlights directory.
+→ Action: Created comparison doc. ✅
+
+### Prompt 87: Visual Assessment of All 3 Vendors (10:39 PM)
+
+> Can you do a visual assessment and turn off all 3 monitors? check out each branch, actually like, look at it, and judge how it works and use playwright cli and really look at it
+
+→ Response: Checked out each vendor's branch in harness-v2-test, ran Playwright CLI headful to visually assess each build. Compared UI quality, functionality, and completeness across Kimi K2.5, Codex, and Claude Sonnet.
+→ Action: Playwright CLI visual assessment x3 branches. ✅
+
+### Prompt 88: Update Markdown With Visual Findings (10:44 PM)
+
+> Cool, update that markdown with visual stuff
+
+→ Response: Updated comparison doc with visual assessment findings — screenshots descriptions, UI quality ratings per vendor.
+→ Action: Edited comparison markdown. ✅
+
+### Prompt 89: PR 19 Merged — FF From Main (10:48 PM)
+
+> OK I did a PR 19 merge - do a ff merge from main if that works
+
+→ Response: Fast-forwarded develop branch from origin/main after user merged PR #19.
+→ Action: git fetch origin && git merge --ff-only origin/main. ✅
+
+### Prompt 90: Log All V2.2 + Update Outcome (10:49 PM)
+
+> /conversation-logger all 2.2 stuff more to '/Users/jackjin/dev/continuous-agent-develop/ai-docs/v2/2026-04-11-v2.2/prompt-log.md', and document further in '/Users/jackjin/dev/continuous-agent-develop/ai-docs/v2/2026-04-11-v2.2/outcome.md'
+
+→ Response: Appended Sessions 3–5 to prompt-log.md and updated outcome.md with final delivery state.
+→ Action: Edited prompt-log.md, Updated outcome.md. ✅
+
