@@ -9,20 +9,31 @@
 import type { AgentWorkerVendor } from '../../core/vendor/types.js';
 
 /** Tool name mappings for non-Claude vendors */
-const KIMI_TOOL_MAP: Record<string, string> = {
+export const KIMI_TOOL_MAP: Record<string, string> = {
   'Bash': 'Shell',
   'Read': 'ReadFile',
   'Write': 'WriteFile',
   'Edit': 'StrReplaceFile',
 };
 
-const CODEX_TOOL_MAP: Record<string, string> = {
+export const CODEX_TOOL_MAP: Record<string, string> = {
   // Codex uses its own tool naming — placeholder until investigated
   'Bash': 'shell',
   'Read': 'read_file',
   'Write': 'write_file',
   'Edit': 'apply_diff',
 };
+
+/**
+ * Translate a list of Claude-native tool names to the vendor's native names.
+ * Returns the original array unchanged if the vendor has no mapping.
+ * Tools not in the map pass through as-is.
+ */
+export function mapToolNames(tools: string[], vendor: AgentWorkerVendor): string[] {
+  const toolMap = getToolMap(vendor);
+  if (!toolMap) return tools;
+  return tools.map((t) => toolMap[t] ?? t);
+}
 
 interface SkillBody {
   name: string;
@@ -90,7 +101,7 @@ export function adaptPromptForVendor(
 /**
  * Get the tool name mapping for a vendor, or null if none needed.
  */
-function getToolMap(vendor: AgentWorkerVendor): Record<string, string> | null {
+export function getToolMap(vendor: AgentWorkerVendor): Record<string, string> | null {
   switch (vendor) {
     case 'kimi':
     case 'kimi-cli':

@@ -9,7 +9,11 @@
     "start": "node dist/executive-loop.js",
     "dev": "tsx src/executive-loop.ts",
     "typecheck": "tsc --noEmit",
-    "test:adhoc:v2-loaders": "tsx tests/adhoc/v2-library-loaders.adhoc.ts"
+    "harness": "tsx src/harnesses/cli.ts",
+    "harness:list": "tsx src/harnesses/cli.ts --list",
+    "test:adhoc:v2-loaders": "tsx tests/adhoc/v2-library-loaders.adhoc.ts",
+    "test:harness": "tests/adhoc/2026-04-11-harness-v22/run-all.sh",
+    "test:harness:live": "RUN_LIVE_E2E=1 tsx tests/e2e/harnesses/claude-live-generic.e2e.ts"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.29",

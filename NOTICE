@@ -1,0 +1,47 @@
+continuous-agent
+Copyright 2026 Jack Jin
+
+This product includes software developed by Jack Jin and contributors.
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not
+use this software except in compliance with the License. A copy of the
+License is included in LICENSE.
+
+----
+
+This product bundles and/or depends on the following third-party software:
+
+* @anthropic-ai/claude-agent-sdk
+  License: MIT
+  https://github.com/anthropics/claude-agent-sdk-typescript
+  Used to drive Claude-vendor agentic workers and harness agents.
+
+* @openai/codex-sdk
+  License: Apache-2.0
+  https://github.com/openai/openai-node
+  Used to drive Codex-vendor agentic workers.
+
+* @moonshot-ai/kimi-agent-sdk
+  License: see upstream
+  https://github.com/moonshotai/kimi-agent-sdk
+  Used to drive Kimi wire-mode agentic workers.
+
+* dotenv
+  License: BSD-2-Clause
+  https://github.com/motdotla/dotenv
+  Used for three-tier environment variable loading.
+
+* js-yaml (optional dependency of some ported harnesses)
+  License: MIT
+  https://github.com/nodeca/js-yaml
+
+* Playwright / @playwright/mcp
+  License: Apache-2.0
+  https://github.com/microsoft/playwright
+  Used for browser automation in the web-testing skill and EDS harness.
+
+----
+
+The generic, eds, and study harnesses under src/harnesses/ are ports of
+standalone Node.js harnesses previously developed separately. The original
+structure and prompt content are reused here under the Apache-2.0 license.

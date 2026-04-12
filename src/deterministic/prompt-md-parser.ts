@@ -17,6 +17,11 @@ export interface PromptMdFrontmatter {
   output_path?: string;
   branch?: string;
   source_project?: string;
+  // V2.2: harness execution pattern fields
+  harness?: string;                 // 'generic' | 'eds' | 'study'
+  harness_target?: string;          // absolute or repo-relative target dir
+  harness_mode?: string;            // bootstrap|adopt|extend|extend-deep|resume
+  model_overrides?: Record<string, string>;
   [key: string]: unknown;
 }
 
