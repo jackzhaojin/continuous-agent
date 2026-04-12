@@ -51,27 +51,31 @@ Both harnesses and the executive agent read a single PROMPT.md input packet that
 Create an isolated branch + worktree off the `ai-demos` repository.
 
 **How it works:**
-- `ai-demos` is a manually-created repo with a minimal init commit: Apache 2.0 license, baseline `.gitignore` for AI-built projects, and a README
-- Each new project gets `git worktree add` off that init commit, on a new branch
+- `ai-demos` is a manually-created repo with two long-lived branches:
+  - **`base`** — minimal init commit (Apache 2.0 license, baseline `.gitignore`). All worktrees branch from here.
+  - **`main`** — where finished demos get merged in. This is the public-facing branch with completed work.
+- Each new project gets `git worktree add` off the `base` branch, on a new `proj/<slug>` branch
 - The worktree directory becomes the worker's `output_path` / harness's `targetDir`
 - Local state (`.env`, caches, `node_modules`, build artifacts) stays in the worktree and is gitignored
 - Switching projects = switching worktrees, not branches in a shared checkout
 
 **Directory structure (decided):**
 ```
-~/dev/ai-demos/                ← actual repo checkout (main branch, minimal files)
-~/dev/ai-demos-worktrees/      ← all worktrees live here, one per project
-  ├── player-mcp/                   ← branch: proj/player-mcp
-  ├── supabase-migration/           ← branch: proj/supabase-migration
-  ├── portfolio-refresh/            ← branch: proj/portfolio-refresh
+~/dev/ai-demos/                     ← actual repo checkout (main branch — merged demos)
+~/dev/ai-demos-worktrees/           ← all worktrees live here, one per project
+  ├── player-mcp/                   ← branch: proj/player-mcp (forked from base)
+  ├── supabase-migration/           ← branch: proj/supabase-migration (forked from base)
+  ├── portfolio-refresh/            ← branch: proj/portfolio-refresh (forked from base)
   └── ...
 ```
 
 - **Branch naming:** `proj/<slug>` (e.g. `proj/player-mcp`)
+- **Worktree base point:** `base` branch (not `main` — keeps worktrees clean of other projects' code)
 - **Worktree path:** `~/dev/ai-demos-worktrees/<slug>/`
-- **Creation command:** `git -C ~/dev/ai-demos worktree add ~/dev/ai-demos-worktrees/<slug> -b proj/<slug>`
+- **Creation command:** `git -C ~/dev/ai-demos worktree add ~/dev/ai-demos-worktrees/<slug> -b proj/<slug> base`
+- **Promotion:** When a project is ready, merge `proj/<slug>` → `main`. The `base` branch never moves.
 - Worktrees share the git object database with the main repo — lightweight, no duplicated history
-- The main repo checkout stays clean (just LICENSE, `.gitignore`, README) and is never the build target itself
+- The main repo checkout on `main` accumulates finished demos; `base` stays minimal forever
 
 **When to use:**
 - New projects (the default for any build that doesn't specify otherwise)
@@ -336,7 +340,7 @@ These are functional and wired to real code, but only relevant for UI goals with
 
 ## Decisions Made
 
-1. **Worktree directory structure:** Option A — dedicated parent directory. Main repo at `~/dev/ai-demos/`, all worktrees at `~/dev/ai-demos-worktrees/<slug>/`. Branch convention: `proj/<slug>`.
+1. **Worktree directory structure:** Option A — dedicated parent directory. Main repo at `~/dev/ai-demos/`, all worktrees at `~/dev/ai-demos-worktrees/<slug>/`. Branch convention: `proj/<slug>`, forked from `base` branch. Finished demos merge to `main`. The `base` branch is frozen at the init commit (LICENSE + `.gitignore`) and never moves.
 
 2. **`.gitignore` template:** Maintain a baseline template in `continuous-agent/workspace-instructions/gitignore-template`. The agent copies this into new worktrees. The `ai-demos` repo's own `.gitignore` covers the init commit, but the template in `continuous-agent/` is the authoritative source for updates.
 
