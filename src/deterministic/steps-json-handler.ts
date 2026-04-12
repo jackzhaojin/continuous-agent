@@ -403,7 +403,11 @@ export function selectNextExecutableStep(steps: WorkStep[]): WorkStep | null {
   for (const step of steps) {
     if (!isOpen(step)) continue;
     if (step.parent_id || step.subtask_of) continue; // skip subtasks here
-    if (step.blocked_on_subtask) continue;           // skip parents with open children
+    // `blocked_on_subtask` is a cache of "has open children right now". Verify
+    // against the real children — when the validator defect chain unwinds, the
+    // flag stays true but the children are all done, and without this check
+    // the parent would be skipped forever ("No work available in queue").
+    if (step.blocked_on_subtask && hasOpenSubtasks(steps, step.id || '')) continue;
 
     if (step.dependencies && step.dependencies.length > 0) {
       const allComplete = step.dependencies.every(depNum =>
