@@ -1,8 +1,8 @@
-# V2.2 Goal: Migrate Ledgers & AI State to Cloud Database
+# V2.3 Goal: Migrate Ledgers & AI State to Cloud Database (Without Losing Local AI Monitoring)
 
 ## Vision
 
-Move all mutable agent operational data out of local flat files and into a cloud database (Supabase or Cosmos DB). Local files become optional cache/fallback — the cloud DB becomes the source of truth. This unlocks queryability, durability, concurrent access, and real-time observability.
+Move mutable operational data into a cloud database (Supabase or Cosmos DB) **without regressing local AI observability**. The cloud DB is the canonical source of truth, while a deterministic local mirror keeps monitor-oriented workflows (e.g., local file watchers and out-of-the-box model monitor skills) functional.
 
 ## Why
 
@@ -11,6 +11,15 @@ Move all mutable agent operational data out of local flat files and into a cloud
 - **No concurrent access** — Multiple processes reading/writing JSONL files risk corruption
 - **No scalability** — As ledgers grow, file I/O becomes a bottleneck
 - **Limited observability** — No dashboards or real-time queries against operational data
+
+## Non-Regression Principle: Keep AI Monitoring First-Class
+
+Cloud migration must not break existing monitor patterns that rely on local files. We should explicitly support both:
+
+- **Cloud canonical writes** for durability + shared observability
+- **Local append-only mirror writes** for local monitor compatibility and quick debugging
+
+This keeps us from taking a step backwards while we gain cloud capabilities.
 
 ## What Moves to Cloud DB
 
@@ -67,6 +76,11 @@ Two implementations:
 - `LocalFileProvider` — wraps current fs-based behavior (fallback)
 - `CloudDbProvider` — Supabase or Cosmos DB implementation
 
+Plus a composition strategy:
+- `DualWriteProvider` — writes to Cloud first (canonical) and local mirror second (best effort, health-signaled)
+
+The goal is to preserve compatibility with local monitor tooling while moving operational truth to cloud records.
+
 ### 3. Rewire Deterministic Layer
 Replace direct `fs` calls in these files with `StorageProvider` calls:
 - `src/deterministic/state-handler.ts` — ledger appends, goal state reads
@@ -86,8 +100,18 @@ Create `scripts/migrate-to-cloud.ts`:
 ### 5. Feature Flag & Rollout
 - `V2_CLOUD_DB=true` — feature flag (default OFF)
 - `CLOUD_DB_PROVIDER=supabase|cosmos` — backend selection
+- `V2_LOCAL_MIRROR=true` — maintain local append-only mirror writes for monitor compatibility (default ON initially)
 - Connection config in `.env.executive` (Tier 1)
 - Setting `V2_CLOUD_DB=false` reverts to local files with zero breakage
+
+### 6. Monitoring Compatibility Gates (Must Pass Before Flip)
+
+Before declaring migration complete:
+
+1. **Parity gate** — local monitor can detect goal lifecycle and worker progress from mirror files.
+2. **Lag gate** — mirror write lag from canonical cloud write stays under an agreed threshold.
+3. **Failure gate** — cloud outages degrade gracefully with explicit telemetry while local monitoring remains available.
+4. **Reconciliation gate** — deterministic replay/checkpoint process can verify cloud vs local mirror drift.
 
 ## Key Files Affected
 
@@ -111,4 +135,4 @@ Create `scripts/migrate-to-cloud.ts`:
 
 ## Priority
 
-High — this is foundational infrastructure that unblocks better observability, reliability, and multi-machine operation. Prioritized before integration wiring (now v2.3) to tighten the codebase first.
+High — but only if we preserve (or improve) AI observability during migration. “Cloud-first + local-monitor-compatible mirror” is the intended path.
