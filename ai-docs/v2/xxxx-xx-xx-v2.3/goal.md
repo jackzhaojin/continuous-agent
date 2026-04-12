@@ -66,50 +66,72 @@ Merge the harness and executive agent output paths into a single build-target mo
 
 Validate v2.2 claims and strengthen the system. This work runs on the new build target model from Phase 1.
 
-### A. Validation & Test Matrix
+### v2.2 Verification Gap
 
-1. Create a v2.2 capability matrix (the "7 things" + sub-capabilities) and map each to test evidence.
-2. Add/expand harness test suites to cover:
+The v2.2 outcome (`ai-docs/v2/2026-04-11-v2.2/outcome.md`) claims four things delivered:
+
+| v2.2 Claim | Actual evidence | Real status |
+|---|---|---|
+| Standalone harness runs | All 3 harnesses ran via CLI, 3 vendors, visually verified via Playwright headful | **Verified** |
+| Meta-worker integration (executive → harness) | Mock e2e tests only (`mock-{generic,eds,study}-orchestrator.e2e.ts`). No real executive loop run with a live LLM. | **Unverified** |
+| Multi-vendor (Claude + Codex + Kimi) | Standalone runs only. Codex only tested on generic, not eds/study. Kimi CLI intermittent. | **Partially verified** |
+| OSS-prep | LICENSE, CONTRIBUTING, README, docs updated. No publishing pipeline. | **Verified** (docs only) |
+
+**The critical gap is executive → harness integration.** The entire path — `harness-executor.ts` resolving the harness, consuming `HarnessOrchestrator.run()` events, bridging them into STEPS.json via `StepSink`, Phase 5 verifiers running against harness output, Phase 7 diagnosis on harness failure, Phase 8 blocking — has never been tested with a real LLM and a real goal bundle in `workspace/ondeck/`.
+
+### A. Executive → Harness Integration (the must-test)
+
+This is the highest priority item in Phase 2. Everything else is secondary until this works.
+
+1. **Create a real goal bundle** with `execution_pattern: harness` and `harness: generic`, drop it into `workspace/ondeck/`, and let the executive loop pick it up.
+2. **Verify the full event flow**: harness phases appear as steps in STEPS.json, `PROGRESS_LOG.md` updates in real time, `CONTRACTS.jsonl` records the contract lifecycle.
+3. **Verify phase-to-step mapping**: each harness phase (WHY/WHAT/HOW/WHEN/RESEARCH/BUILD/VALIDATE) maps to a step in STEPS.json with correct status transitions.
+4. **Verify failure handling**: intentionally trigger a harness failure (e.g. bad prompt that causes BUILD to fail) and confirm:
+   - The failure propagates to Phase 7 diagnosis
+   - Phase 8 blocks the goal appropriately
+   - Internal harness retries are NOT counted against the executive's 3-failure threshold (as documented in `.claude/rules/harnesses.md`)
+5. **Verify verifier behavior**: Phase 5 verifiers run against the harness output directory and produce meaningful pass/fail signals.
+6. **Repeat with `harness: eds`** if generic passes — at minimum two harnesses validated in integrated mode.
+
+### B. Validation & Test Matrix
+
+7. Create a v2.2 capability matrix mapping each claim to test evidence (using the gap table above as a starting point).
+8. Expand harness test suites to cover:
    - standalone vs integrated mode parity
    - all 3 harnesses (`generic`, `eds`, `study`)
-   - vendor permutations (Claude, Codex, Kimi CLI, Kimi Wire)
-3. Mark each item as: `Verified`, `Partially Verified`, `Unverified`, or `Deferred`.
-4. Treat "claim without evidence" as failing hardening acceptance.
-
-### B. Harness + Executive Integration Reliability
-
-5. Run at least one real multi-step goal via `execution_pattern: harness` inside the executive loop.
-6. Verify phase-to-step mapping, verifier behavior, retries, and defect-subtask handling under integrated mode.
-7. Ensure harness failures propagate cleanly into Phase 7 diagnosis and Phase 8 blocking behavior.
+   - vendor permutations where feasible (Claude primary, Codex on generic, Kimi wire on generic)
+9. Mark each item as: `Verified`, `Partially Verified`, `Unverified`, or `Deferred`.
+10. Treat "claim without evidence" as failing hardening acceptance.
 
 ### C. Prompting Hardening (Executive + Worker)
 
-8. Strengthen executive prompts for:
-   - gate enforcement decisions
-   - defect escalation boundaries
-   - re-breakdown behavior preserving completed work
-9. Strengthen worker prompts/skills for:
-   - structured handoffs
-   - explicit verification sequencing (build/API/UI)
-   - tool-use compliance
-10. Add explicit "documentation adherence" cues for lower-cost vendors (especially Kimi).
+11. Strengthen executive prompts for:
+    - gate enforcement decisions
+    - defect escalation boundaries
+    - re-breakdown behavior preserving completed work
+12. Strengthen worker prompts/skills for:
+    - structured handoffs
+    - explicit verification sequencing (build/API/UI)
+    - tool-use compliance
+13. Add explicit "documentation adherence" cues for lower-cost vendors (especially Kimi).
 
 ### D. Ledger-Driven Tooling Policy
 
-11. Define Playwright CLI usage policy from ledger evidence:
+14. Define Playwright CLI usage policy from ledger evidence:
     - **Required**: web UI change verification and critical journey gates
     - **Recommended**: ambiguous UI-impact tasks
     - **Optional/Skip**: backend-only or non-visual work
-12. Encode policy into prompts/skills/verifier expectations — use Playwright when it improves confidence, avoid ritualized overuse.
+15. Encode policy into prompts/skills/verifier expectations — use Playwright when it improves confidence, avoid ritualized overuse.
 
 ### E. Vendor-Specific Prompting & Adapter Audit
 
-13. Audit vendor adapter behavior and prompt injection across all worker paths.
-14. Confirm Kimi-specific mappings/instructions are consistently active for all Kimi variants (`kimi`, `kimi-cli`, `kimi-wire`).
-15. Identify where vendor-specific logic is missing (e.g., study-harness coordinator emulation, HOW translation) and prioritize fixes.
+16. Audit vendor adapter behavior and prompt injection across all worker paths.
+17. Confirm Kimi-specific mappings/instructions are consistently active for all Kimi variants (`kimi`, `kimi-cli`, `kimi-wire`).
+18. Identify where vendor-specific logic is missing (e.g., study-harness coordinator emulation, HOW translation) and prioritize fixes.
 
 ### Phase 2 Success Criteria
 
+- **Executive → harness integration works end-to-end with a real LLM** — not just mock tests. A goal bundle with `execution_pattern: harness` completes successfully through the full executive loop lifecycle.
 - Every major v2.2 capability claim has explicit evidence or explicit deferral
 - Harness runs are reliable in both standalone and integrated modes
 - Kimi K2.5 path shows materially improved instruction adherence and deterministic handoffs
