@@ -72,6 +72,7 @@ Claude Code auto-loads these via `.claude/rules/`. **Other agents (Codex, Kimi, 
 | [`.claude/rules/capabilities.md`](.claude/rules/capabilities.md) | Capability registries under `capabilities/*.yml` |
 | [`.claude/rules/reference-pocs.md`](.claude/rules/reference-pocs.md) | Standalone vendor POCs at `references/poc/{claude,codex,kimi}/` |
 | [`.claude/rules/key-files-and-debugging.md`](.claude/rules/key-files-and-debugging.md) | File index for fast navigation + common issues + debug commands |
+| [`.claude/rules/ai-docs.md`](.claude/rules/ai-docs.md) | Planning, retros, prompt logs — traceability and incremental improvement history |
 
 ## Other Key Docs
 
