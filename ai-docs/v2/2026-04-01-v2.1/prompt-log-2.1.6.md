@@ -585,3 +585,88 @@
 Key commits: `76c2106` (goal draft), `f99943b` (retro), `1de5f15` (defect-subtask pipeline + journey-first), plus prompt tuning and defect calibration commits.
 
 R1-R6 (self-triage skill, failure classification, automatic recovery pipeline, needs-you.md fix, retry counter fix, known patterns) remain TODO. R7 (product vs infrastructure routing) shipped with the defect-subtask pipeline.
+
+---
+
+## Session 14: Post-Run Execution Analysis (Apr 12, 2026)
+
+### Prompt 58: Handoff consistency breakdown (12:41 PM)
+
+> how did we lose all the hand offs? don't we have a bunch of steps? why is this so inconsistent? [Image #8]
+
+-> Response: Investigated step handoff loss - steps existed but handoffs between them were not enforced consistently.
+-> Action: Reviewed STEPS.json and completed bundle structure.
+
+---
+
+### Prompt 59: Error in every output file (12:44 PM)
+
+> also in each file it says an error [Pasted text #9 +20 lines]
+> add this to retrospective
+
+-> Response: Found recurring error pattern across output files, added to v2.1.6 retrospective.
+-> Action: Updated `retro-b2b-postal-checkout-v2.1.6.md` with error evidence.
+
+---
+
+### Prompt 60: Did defect-subtask system actually fire? (12:48 PM)
+
+> and uhmm... did we actually execute the steps with defect? or did the defect system work at all? '/Users/jackjin/dev/continuous-agent/workspace/completed/b2b-postal-checkout-2026-04-12/STEPS.json' and '/Users/jackjin/dev/continuous-agent/workspace/completed/b2b-postal-checkout-2026-04-12'? the goal is that uhmm... if step 17 has a defect, 17.1 is opened and worked on before step 18
+
+-> Response: Investigated whether defect subtask pipeline (step 17 -> 17.1 before 18) actually triggered during the run.
+-> Action: Inspected STEPS.json and completed bundle for defect evidence.
+
+---
+
+### Prompt 61: Restructure retro for actionability (12:49 PM)
+
+> yes, let's restruture retro to must fix in harness and/or input, the goal of retro is to talk about what went really well, as well as stuff like this, it must be clear for human + ai to work on before next iteration
+
+-> Response: Restructured retrospective with clear "what went well" and "must fix" sections for human + AI actionability.
+-> Action: Rewrote `retro-b2b-postal-checkout-v2.1.6.md` structure.
+
+---
+
+### Prompt 62: Keep other info, add focused sections (12:50 PM)
+
+> other information is good too, don't delete them
+> but yeah have a focused section on what went well and what didn't go well
+
+-> Response: Preserved existing retro content, added focused went-well/went-poorly sections.
+-> Action: Updated retro without deleting existing analysis.
+
+---
+
+### Prompt 63: Discord positive signal (12:53 PM)
+
+> Discord notification went fairly well I think.
+
+-> Response: Acknowledged Discord notifications as a positive signal, noted in retro.
+-> Action: Added Discord to "went well" section.
+
+---
+
+### Prompt 64: Deep ledger + workspace re-review (1:03 PM)
+
+> Okay, before we move on, let's really have you take another look at all the things that we did that went well and went poorly in both our workspace as well as our ledgers as well as you know everything else. ledgers are pretty good in '/Users/jackjin/dev/continuous-agent/ledgers/2026-04-12/worker-contract-1775955130706.log' for example, however uhmm... i thik we're trimming a bit and i can't see all the stuff, let's add a lower proirty item to fully output the message from AI for each turn
+
+-> Response: Deep re-review of ledgers + workspace for comprehensive went-well/went-poorly. Noted ledger trimming as lower priority fix.
+-> Action: Re-read ledger files, updated retro with full execution evidence.
+
+---
+
+### Prompt 65: Input prompt packet improvements (1:05 PM)
+
+> Oh also consider how the input promptt packet could be better (not just prompt.md, but all the other files)
+
+-> Response: Analyzed full prompt packet (PROMPT.md + supporting files) for improvement opportunities based on retro findings.
+-> Action: Added input packet recommendations to retrospective.
+
+---
+
+### Prompt 66: Log this session (1:13 PM)
+
+> /conversation-logger to '/Users/jackjin/dev/continuous-agent/ai-docs/v2/2026-04-01-v2.1/prompt-log-2.1.6.md'
+
+-> Response: Appended Session 14 prompts to prompt log.
+-> Action: Updated `prompt-log-2.1.6.md` with prompts 58-66.
