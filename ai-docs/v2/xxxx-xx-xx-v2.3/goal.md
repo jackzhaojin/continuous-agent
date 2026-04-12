@@ -1,55 +1,152 @@
-# v2.3 — Hardening Release
+# v2.3 — Hardening Release (Revised)
 
-**Focus:** Validate and harden both the harness system (v2.2) and the continuous-agent executive pipeline (v2.1.6) based on findings from the B2B Postal Checkout v2.1.6 retro and harness v2.2 delivery.
+**Status:** Draft for execution planning  
+**Focus:** Convert v2.2 delivery into production confidence by closing validation gaps, strengthening vendor-specific behavior (especially Kimi K2.5), and hardening harness + executive integration.
 
-**Trigger:** The v2.1.6 re-run (55 steps, ~15h, Kimi K2.5) exposed critical gaps in the defect-subtask pipeline, handoff parsing, gate enforcement, and backend testing — all documented in `retro-b2b-postal-checkout-v2.1.6.md`. The harness v2.2 system needs production validation beyond the initial vendor comparison tests.
+## Why v2.3 Exists
 
-## Goals
+v2.2 shipped major harness capabilities, but evidence across v2.2 docs and prior retros shows we still have a reliability gap between **"feature implemented"** and **"system proven under realistic autonomous runs."**
 
-### Continuous-Agent Executive Fixes (from retro H1-H6)
+v2.3 is therefore a **hardening release**, not a net-new feature release.
 
-1. **H1: Fix Kimi handoff parser** — `parseStructuredHandoffFromLog()` must JSON-parse `[MSG]` lines before searching for YAML fences. The entire handoff chain (validator, prompt builder, next-step context) is broken for Kimi vendor.
+## Inputs Reviewed
 
-2. **H2: Defect subtask pipeline real-world validation** — The 17→17.1→18 pattern was never exercised for a real product defect. Run a goal where the validator actually files a mid-build defect and the depth-first resolution produces a fix before the next sibling step.
+- v2.0 blueprint (`plan-2.0.md`) for execution-order and validation discipline
+- v2.1 goals/retros for quality regressions and autonomous-run failure modes
+- v2.2 goals/outcome/prompt-log/validation report for what was claimed vs what was actually tested
 
-3. **H3: Gate enforcement** — Gates must block progress when regression test count increases. Gate workers need authority to file defect subtasks, not just document failures.
+## Gaps to Close from v2.2 + Retros
 
-4. **H4: Defect recursion depth limit** — Hard cap at 2-3 levels in `insertDefectSubtask()`. Escalate to `needs-you.md` instead of infinite recursion.
+### G1) "7 things built" but test coverage confidence is incomplete
 
-5. **H5: Re-breakdown preserves completed steps** — Don't regenerate steps 0-N when only step N+1 failed.
+We have evidence of substantial delivery in v2.2, but not all shipped surfaces were proven equally across:
+- standalone harness mode
+- integrated (meta-worker) harness mode
+- all harness types (`generic`, `eds`, `study`)
+- all vendors (Claude, Codex, Kimi CLI, Kimi Wire)
 
-6. **H6: Worker log full output** — Remove `.slice(0, 500)` truncation on `msg.raw` in worker-spawner.ts line 764.
+**v2.3 intent:** define and run an explicit test matrix so every major shipped claim is either verified, downgraded, or deferred with rationale.
 
-### Continuous-Agent Input/Skill Improvements (from retro I0-I4)
+### G2) Harness integration is implemented, but needs production-grade validation
 
-7. **I0: Enrich prompt packet** — Inject API surface summary, last gate test count, health check result, move `data_requirements` into Constraints section.
+v2.2 established integration paths; v2.3 must prove the executive can repeatedly run harness-backed goals end-to-end with stable contracts, gates, and failure handling.
 
-8. **I1: Backend testing skill** — Separate `backend-testing` skill for API smoke tests without browser.
+### G3) Kimi K2.5 affordability is attractive, but instruction-following is weaker
 
-9. **I2: Backend-first build order** — For fullstack goals, API endpoints + smoke test gate before any UI work.
+Retros and v2.2 notes indicate Kimi can under-follow documentation and HOW-phase translation unless prompts are explicit.
 
-10. **I3: Journey definition includes API verification** — `definition_of_done_journey` must cover backend round-trips, not just UI navigation.
+**v2.3 intent:** strengthen both:
+- **executive-side instructions** (selection, gating, escalation, defect handling)
+- **worker-side instructions** (tool usage, verification expectations, handoff format)
 
-11. **I4: Workers use UI libraries** — Skill guidance to use shadcn/radix instead of building custom Select/Combobox/DatePicker from scratch.
+### G4) Ledger logs are under-utilized for behavior steering
 
-### Harness v2.2 Validation
+We need stronger feedback loops from ledger evidence into prompting and routing:
+- when Playwright CLI usage should be enforced
+- when it should be suggested (avoid over-prescription)
+- when backend/API verification must take precedence
 
-12. **Run harness on a real multi-step goal** — Validate the phased delivery, vendor-agnostic chokepoint, and per-harness deltas work in a production scenario (not just unit/mock tests).
+### G5) Vendor-specific prompting/logic needs explicit assessment
 
-13. **Harness + executive integration** — Verify that harness-mode execution pattern correctly delegates to HarnessOrchestrator and results flow back through Phase 5 verifiers.
+We need a clear status and gap list for vendor adapters and vendor-targeted prompts, including whether Kimi K2.5-specific logic is consistently applied to **all Kimi worker paths**.
+
+---
+
+## v2.3 Goals
+
+### A. Validation & Test Matrix Hardening
+
+1. Create a single v2.2 capability matrix (the "7 things" + sub-capabilities) and map each item to test evidence.
+2. Add/expand harness test suites to cover:
+   - standalone vs integrated mode parity
+   - all 3 harnesses
+   - vendor permutations (Claude, Codex, Kimi CLI, Kimi Wire)
+3. Mark each matrix item as: `Verified`, `Partially Verified`, `Unverified`, or `Deferred`.
+4. Treat "claim without evidence" as failing hardening acceptance.
+
+### B. Harness + Executive Integration Reliability
+
+5. Run at least one real multi-step goal via harness execution_pattern inside the executive loop.
+6. Verify phase-to-step mapping, verifier behavior, retries, and defect-subtask handling under integrated mode.
+7. Ensure harness failures propagate cleanly into Phase 7 diagnosis and Phase 8 blocking behavior.
+
+### C. Prompting Hardening (Executive + Worker)
+
+8. Strengthen executive prompts for:
+   - gate enforcement decisions
+   - defect escalation boundaries
+   - re-breakdown behavior preserving completed work
+9. Strengthen worker prompts/skills for:
+   - structured handoffs
+   - explicit verification sequencing (build/API/UI)
+   - tool-use compliance
+10. Add explicit "documentation adherence" cues for lower-cost vendors (especially Kimi).
+
+### D. Ledger-Driven Tooling Policy (Playwright CLI, not overused)
+
+11. Define a policy from ledger evidence:
+   - **Required**: web UI change verification and critical journey gates
+   - **Recommended**: ambiguous UI-impact tasks
+   - **Optional/Skip**: backend-only or non-visual work
+12. Encode this policy into prompts/skills/verifier expectations so workers use Playwright CLI when it improves confidence, but avoid ritualized overuse.
+
+### E. Vendor-Specific Prompting & Adapter Audit
+
+13. Audit vendor adapter behavior and prompt injection across all worker paths.
+14. Confirm Kimi-specific mappings/instructions are consistently active for all Kimi variants (`kimi`, `kimi-cli`, `kimi-wire`).
+15. Identify where vendor-specific logic is missing (e.g., study-harness coordinator emulation, HOW translation) and prioritize fixes.
+
+### F. Retro Carry-Forward (H/I items)
+
+16. Complete unresolved hardening items carried from v2.1.6 retro and v2.2 known issues, including:
+   - Kimi handoff parsing and determinism
+   - gate regression blocking
+   - defect recursion limits
+   - preserving completed steps during re-breakdown
+   - full worker-log context capture
+   - backend-testing skill and backend-first validation flow
+
+---
+
+## Deliverables
+
+1. Updated hardening implementation plan (v2.3 scoped backlog with owners/status).
+2. Capability test matrix artifact with linked evidence.
+3. Prompt/skill revisions (executive + worker) reflecting vendor-aware and ledger-driven guidance.
+4. Validation report per vendor and per harness mode.
+5. Final v2.3 outcome report that distinguishes:
+   - shipped
+   - verified
+   - partially verified
+   - deferred
 
 ## Success Criteria
 
-- A fullstack goal (with DB + API + UI) completes with:
-  - At least one defect subtask filed and resolved mid-build (not just at step 1)
-  - Gate enforcement blocks a regression and it gets fixed before proceeding
-  - Backend health check runs at every gate
-  - Prior step handoff contains real structured content (not "no structured handoff")
-  - The final product is demoable end-to-end in a browser
-- Harness v2.2 runs a multi-phase goal to completion
+v2.3 is successful only if all are true:
+
+- Every major v2.2 capability claim has explicit evidence or explicit deferral.
+- Harness runs are reliable in both standalone and integrated modes for representative goals.
+- Kimi K2.5 path shows materially improved instruction adherence and deterministic handoffs.
+- Playwright CLI usage is targeted (high-value), not blanket.
+- Vendor-specific prompt/adapter behavior is documented and consistently enforced.
+- No unresolved contradiction between goals, outcome claims, and validation reports.
+
+## Non-Goals
+
+- Shipping major new product features unrelated to hardening.
+- Re-architecting harnesses from scratch.
+- Expanding dashboard/observability scope beyond what is required to validate hardening claims.
 
 ## References
 
-- `ai-docs/v2/2026-04-01-v2.1/retro-b2b-postal-checkout-v2.1.6.md` — Full retro with H1-H6 and I0-I4
-- `ai-docs/v2/2026-04-01-v2.1/retro-b2b-postal-checkout.md` — Original v2.1.4 retro
-- `HARNESS.md` — Harness v2.2 reference
+- `ai-docs/v2/2026-03-29-v2.0/plan-2.0.md`
+- `ai-docs/v2/2026-04-01-v2.1/goal.md`
+- `ai-docs/v2/2026-04-01-v2.1/goal-2.1.4.md`
+- `ai-docs/v2/2026-04-01-v2.1/goal-2.1.5.md`
+- `ai-docs/v2/2026-04-01-v2.1/goal-2.1.6.md`
+- `ai-docs/v2/2026-04-01-v2.1/retro-b2b-postal-checkout-v2.1.5.md`
+- `ai-docs/v2/2026-04-01-v2.1/retro-b2b-postal-checkout-v2.1.6.md`
+- `ai-docs/v2/2026-04-11-v2.2/goals.md`
+- `ai-docs/v2/2026-04-11-v2.2/outcome.md`
+- `ai-docs/v2/2026-04-11-v2.2/validation-report-kimi-k2.5.md`
+- `ai-docs/v2/2026-04-11-v2.2/prompt-log.md`
