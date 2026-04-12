@@ -12,7 +12,7 @@ Jack Jin
 
 Today the harness system and the 24x7 executive agent write output to different places (`harness-v2-test/` vs `ai-sandbox/`) with different isolation models. This PRD defines a unified build-target selection layer so both execution paths — harness multi-agent pipelines and executive-loop worker spawns — share the same three options for where work lands:
 
-1. **Git Worktree** (new default) — isolated branch + worktree off a new `ai-sandbox-v2` repo
+1. **Git Worktree** (new default) — isolated branch + worktree off a new `ai-demos` repo
 2. **Existing Project** — work directly in an external repo/directory the user already owns
 3. **Monorepo Folder** (legacy) — subfolder inside the current `ai-sandbox/` flat structure
 
@@ -48,10 +48,10 @@ Both harnesses and the executive agent read a single PROMPT.md input packet that
 
 ### Option 1: Git Worktree (Default)
 
-Create an isolated branch + worktree off the `ai-sandbox-v2` repository.
+Create an isolated branch + worktree off the `ai-demos` repository.
 
 **How it works:**
-- `ai-sandbox-v2` is a manually-created repo with a minimal init commit: Apache 2.0 license, baseline `.gitignore` for AI-built projects, and a README
+- `ai-demos` is a manually-created repo with a minimal init commit: Apache 2.0 license, baseline `.gitignore` for AI-built projects, and a README
 - Each new project gets `git worktree add` off that init commit, on a new branch
 - The worktree directory becomes the worker's `output_path` / harness's `targetDir`
 - Local state (`.env`, caches, `node_modules`, build artifacts) stays in the worktree and is gitignored
@@ -59,8 +59,8 @@ Create an isolated branch + worktree off the `ai-sandbox-v2` repository.
 
 **Directory structure (decided):**
 ```
-~/dev/ai-sandbox-v2/                ← actual repo checkout (main branch, minimal files)
-~/dev/ai-sandbox-v2-worktrees/      ← all worktrees live here, one per project
+~/dev/ai-demos/                ← actual repo checkout (main branch, minimal files)
+~/dev/ai-demos-worktrees/      ← all worktrees live here, one per project
   ├── player-mcp/                   ← branch: proj/player-mcp
   ├── supabase-migration/           ← branch: proj/supabase-migration
   ├── portfolio-refresh/            ← branch: proj/portfolio-refresh
@@ -68,8 +68,8 @@ Create an isolated branch + worktree off the `ai-sandbox-v2` repository.
 ```
 
 - **Branch naming:** `proj/<slug>` (e.g. `proj/player-mcp`)
-- **Worktree path:** `~/dev/ai-sandbox-v2-worktrees/<slug>/`
-- **Creation command:** `git -C ~/dev/ai-sandbox-v2 worktree add ~/dev/ai-sandbox-v2-worktrees/<slug> -b proj/<slug>`
+- **Worktree path:** `~/dev/ai-demos-worktrees/<slug>/`
+- **Creation command:** `git -C ~/dev/ai-demos worktree add ~/dev/ai-demos-worktrees/<slug> -b proj/<slug>`
 - Worktrees share the git object database with the main repo — lightweight, no duplicated history
 - The main repo checkout stays clean (just LICENSE, `.gitignore`, README) and is never the build target itself
 
@@ -85,7 +85,7 @@ build_target: worktree          # or omit — worktree is the default
 ```
 
 **Implications for existing code:**
-- `worker-spawner.ts` project directory setup changes from `ai-sandbox/<slug>/` to `git worktree add` in the `ai-sandbox-v2` repo
+- `worker-spawner.ts` project directory setup changes from `ai-sandbox/<slug>/` to `git worktree add` in the `ai-demos` repo
 - `output_path` in PROMPT.md frontmatter points to the worktree directory
 - Retry context preservation still works — `output_path` persists across attempts
 - GitHub Pages CI (`ai-sandbox/.github/workflows/deploy-pages.yml`) does NOT apply to the new repo; deployment is per-project
@@ -146,7 +146,7 @@ build_target: monorepo
 
 **Implications for existing code:**
 - This is the current `worker-spawner.ts` behavior — no changes needed
-- Existing goals without `build_target` should fall back to `monorepo` during migration, then to `worktree` once `ai-sandbox-v2` is ready
+- Existing goals without `build_target` should fall back to `monorepo` during migration, then to `worktree` once `ai-demos` is ready
 
 ---
 
@@ -288,7 +288,7 @@ These are functional and wired to real code, but only relevant for UI goals with
 
 ### Phase 1: Add build_target to PROMPT.md (v2.3)
 
-1. Jack manually creates `ai-sandbox-v2` repo with Apache 2.0 license, baseline `.gitignore`, README
+1. Jack manually creates `ai-demos` repo with Apache 2.0 license, baseline `.gitignore`, README
 2. Add `build_target` field to `prompt-md-parser.ts` (default: `monorepo` during transition)
 3. Add worktree creation logic to worker-spawner (or a shared `build-target-resolver.ts`)
 4. Add `existing` target support — validate `target_dir`, skip scaffold
@@ -326,7 +326,7 @@ These are functional and wired to real code, but only relevant for UI goals with
 
 ## Non-Goals
 
-- Auto-creating the `ai-sandbox-v2` repo (Jack does this manually)
+- Auto-creating the `ai-demos` repo (Jack does this manually)
 - Replacing the two-repo split for agent infra (`continuous-agent/` stays separate)
 - Changing `[SELF-ENHANCE]` / `[SKILL-BUILD]` routing (still targets agent codebase)
 - Fully automating worktree-to-standalone-repo promotion in v2.3
@@ -336,16 +336,16 @@ These are functional and wired to real code, but only relevant for UI goals with
 
 ## Decisions Made
 
-1. **Worktree directory structure:** Option A — dedicated parent directory. Main repo at `~/dev/ai-sandbox-v2/`, all worktrees at `~/dev/ai-sandbox-v2-worktrees/<slug>/`. Branch convention: `proj/<slug>`.
+1. **Worktree directory structure:** Option A — dedicated parent directory. Main repo at `~/dev/ai-demos/`, all worktrees at `~/dev/ai-demos-worktrees/<slug>/`. Branch convention: `proj/<slug>`.
 
-2. **`.gitignore` template:** Maintain a baseline template in `continuous-agent/workspace-instructions/gitignore-template`. The agent copies this into new worktrees. The `ai-sandbox-v2` repo's own `.gitignore` covers the init commit, but the template in `continuous-agent/` is the authoritative source for updates.
+2. **`.gitignore` template:** Maintain a baseline template in `continuous-agent/workspace-instructions/gitignore-template`. The agent copies this into new worktrees. The `ai-demos` repo's own `.gitignore` covers the init commit, but the template in `continuous-agent/` is the authoritative source for updates.
 
 3. **Branch strategy by target type:**
    - **worktree:** If `target_branch` is not provided, auto-generate as `proj/<slug>` where slug is derived from the goal (e.g. `proj/2026-04-12-nextjs-dashboard`). Always a new branch off init commit.
    - **monorepo:** Commit on the current branch. No branch creation.
    - **existing:** Commit on the current branch of the target repo. No branch creation. If the user wants a branch, they specify `target_branch` explicitly.
 
-4. **Migration from `ai-sandbox/`:** No migration. `ai-sandbox/` stays as-is — it's work from a previous era. New work goes to `ai-sandbox-v2`. If individual projects are worth continuing, they can be manually migrated.
+4. **Migration from `ai-sandbox/`:** No migration. `ai-sandbox/` stays as-is — it's work from a previous era. New work goes to `ai-demos`. If individual projects are worth continuing, they can be manually migrated.
 
 5. **Model configuration scope:**
    - **Executive agent:** Always Claude. No vendor/model override — hardcoded, not configurable.

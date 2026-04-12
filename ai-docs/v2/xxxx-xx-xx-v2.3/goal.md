@@ -38,15 +38,15 @@ Merge the harness and executive agent output paths into a single build-target mo
 
 | Target | Description | When to use |
 |---|---|---|
-| **worktree** (default) | Git worktree off `ai-sandbox-v2` repo | New projects, incubating work, parallel builds |
+| **worktree** (default) | Git worktree off `ai-demos` repo | New projects, incubating work, parallel builds |
 | **existing** | Work directly in an external repo/directory | Improving existing projects, migrations |
 | **monorepo** (legacy) | Subfolder in current `ai-sandbox/` | Backward compat, scratch experiments |
 
 ### Phase 1 Goals
 
-1. **P1-1:** Jack creates `ai-sandbox-v2` repo (Apache 2.0, baseline `.gitignore`, init commit)
+1. **P1-1:** Jack creates `ai-demos` repo (Apache 2.0, baseline `.gitignore`, init commit)
 2. **P1-2:** Add `build_target`, `target_dir`, `target_branch` to PROMPT.md frontmatter parser (`prompt-md-parser.ts`)
-3. **P1-3:** Implement worktree creation in worker-spawner — `git worktree add` off `ai-sandbox-v2` init commit
+3. **P1-3:** Implement worktree creation in worker-spawner — `git worktree add` off `ai-demos` init commit
 4. **P1-4:** Implement `existing` target — validate `target_dir`, skip project scaffold, respect existing conventions
 5. **P1-5:** Wire harness `targetDir` resolution through PROMPT.md instead of CLI `--target`
 6. **P1-6:** Run one harness goal and one executive goal using worktree target end-to-end
@@ -55,7 +55,7 @@ Merge the harness and executive agent output paths into a single build-target mo
 
 ### Phase 1 Success Criteria
 
-- Both harness and executive agent can create and write to a worktree off `ai-sandbox-v2`
+- Both harness and executive agent can create and write to a worktree off `ai-demos`
 - An executive goal can work directly in an existing external project via `target_dir`
 - Legacy `ai-sandbox/` monorepo path still works for goals without `build_target`
 - `output_path` persistence and retry context work correctly for all three targets
@@ -184,7 +184,7 @@ See [`harness-build-target-prd.md`](harness-build-target-prd.md) "Unified Input 
 - Re-architecting harnesses from scratch
 - Full unified input packet (post-v2.3, see above)
 - Automating worktree-to-standalone-repo promotion
-- Auto-creating the `ai-sandbox-v2` repo (Jack does this manually)
+- Auto-creating the `ai-demos` repo (Jack does this manually)
 
 ## Deliverables
 
