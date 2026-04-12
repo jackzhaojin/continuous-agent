@@ -113,6 +113,7 @@ export async function runHarnessAgent(args: RunHarnessAgentArgs): Promise<Harnes
 
   result.durationMs = Date.now() - startedAt;
   result.handoff = extractHandoffJson(result.output);
+  result.output = cleanAgentOutput(result.output);
   return result;
 }
 
@@ -133,6 +134,31 @@ export function extractHandoffJson(output: string): Record<string, unknown> | nu
   } catch {
     return null;
   }
+}
+
+/**
+ * Strip tool-call / tool-result noise from agent output so persisted files
+ * contain only the agent's own written content.  Kimi and Codex providers
+ * normalize tool traffic into `[tool_call] ...` and `[tool_result] ...`
+ * prefixed lines that get concatenated into result.output.  These are useful
+ * in the raw transcript (result.messages) but shouldn't end up in the
+ * research.md / build_attempt_N.md files.
+ *
+ * NOTE: handoff extraction runs BEFORE this filter so the ```json block
+ * (which may appear inside tool traffic) is already captured.
+ */
+export function cleanAgentOutput(output: string): string {
+  if (!output) return output;
+  return output
+    .split('\n')
+    .filter(line => {
+      const trimmed = line.trimStart();
+      return !trimmed.startsWith('[tool_call]') && !trimmed.startsWith('[tool_result]');
+    })
+    .join('\n')
+    // Collapse runs of 3+ blank lines into 2
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 /**
