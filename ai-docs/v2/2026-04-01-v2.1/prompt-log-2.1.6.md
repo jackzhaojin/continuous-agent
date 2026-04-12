@@ -413,7 +413,174 @@
 
 ---
 
-**2.1.6 Summary**: Discovery spanned Apr 5 (diagnosis gap found, verifier blocking on playwright artifacts, goal-2.1.6 drafted) through Apr 6 (headful playwright CLI testing revealed pieces-only delivery, no supabase data, retrospective written with sprint-demo mandate) through Apr 11 (single-pass implementation of defect-subtask pipeline + journey-first worker discipline, prompt packet tuning for supabase/playwright consistency, postal checkout re-run on kimi with all 2.1.6 changes live, defect validation sensitivity calibrated after over-indexing on minor issues).
+## Session 11: Overnight Monitoring Run (Apr 11, 2026)
+
+### Prompt 41: Restart PM2 + monitor with 2.1 changes live (11:00 PM)
+
+> OK we're now on 2.2 but really tsting 2.1, let's keep going, we did some merging but they should be non impacting, let's start pm2 and keep monitoring (use claude's montirong capability after restarting)
+
+-> Response: Restarted PM2 with all 2.1.6 changes live post-merge. Kicked off monitoring.
+-> Action: `pm2 start`, launched monitoring agent.
+
+---
+
+### Prompt 42: Deep monitoring - ledgers, output, playwright usage (11:09 PM)
+
+> Monitor this with the claude montirong tool, look through ledgers, output, if we're using playwright cli mcp or e2e, all that
+
+-> Response: Deep-dove into ledgers and worker output to verify playwright CLI/MCP usage and e2e execution.
+-> Action: Tailed ledgers, inspected worker output files, checked for playwright invocations.
+
+---
+
+### Prompt 43: Continue monitoring (11:11 PM)
+
+> continuing to monitor please with claude's montir agent
+
+-> Response: Sustained monitoring through overnight run.
+-> Action: Continued ledger + PM2 log tailing.
+
+---
+
+## Session 12: Sprint Demo - Postal Checkout Headful Walkthrough (Apr 12, 2026)
+
+### Prompt 44: Stop PM2 (10:17 AM)
+
+> let's stop pm2
+
+-> Response: Stopped executive loop.
+-> Action: `pm2 stop executive-loop`.
+
+---
+
+### Prompt 45: Demo what we built using playwright headful (10:18 AM)
+
+> can you start what we built in 6 hours and stuff and do a demo for me using playwright mcp cli headful?
+
+-> Response: Started postal checkout app and began headful playwright demo.
+-> Action: `npm run dev`, playwright session launched.
+
+---
+
+### Prompt 46: Switch to playwright CLI headful (10:24 AM)
+
+> holy crap thsi is so slow, can you use playwirght mcp cli so it's faster?
+> use playwright cli actually headful
+> try again - look up playwright cli headful
+
+-> Response: Switched from MCP to playwright CLI with `--headed` flag for faster interaction.
+-> Action: Restarted with playwright CLI headful mode.
+
+---
+
+### Prompt 47: Fill out forms end to end (10:25 AM)
+
+> fill thinsg out, end to end pleaes, let's go
+
+-> Response: Began filling out postal checkout forms end-to-end in headful browser.
+-> Action: Playwright CLI driving form inputs through checkout flow.
+
+---
+
+### Prompt 48: Country/state dropdown not filling (10:27 AM, 10:28 AM)
+
+> why didn't you fill out country and state?
+> [Image] why can't you fill out
+> country and state
+
+-> Response: Country and state dropdowns not responding to programmatic input - UI component issue.
+-> Action: Attempted multiple approaches to fill dropdowns.
+
+---
+
+### Prompt 49: Restart headed test with full fill (10:30 AM)
+
+> restart the --headed test except please fill it out again
+
+-> Response: Fresh headed session, re-attempted full form fill.
+-> Action: Restarted playwright CLI `--headed`, drove through forms again.
+
+---
+
+### Prompt 50: Accept dropdown defect, keep going (10:33 AM)
+
+> it'sa known defect i guess country and state UI doesn't save, let's note the defect but dont' fix, keep going
+> it'sa known defect i guess country and state UI doesn't reflect let's note the defect but dont' fix, keep going
+
+-> Response: Noted country/state dropdown as known defect, continued demo past it.
+-> Action: Documented defect, proceeded to next screens.
+
+---
+
+### Prompt 51: Billing validation blocker (10:47 AM)
+
+> this is so not helpful, i can't click passed this [Image] i trie a bunch of billing methods, anything i can do to find out what the validation error is?
+> [Image]
+
+-> Response: Billing step blocked by validation error with no clear UI message. Investigated form validation.
+-> Action: Inspected form state and validation rules.
+
+---
+
+### Prompt 52: Force form values, fix validation later (10:49 AM)
+
+> just set the values in the form using plawyright js or whatevern and continue, we'll fix validation later
+
+-> Response: Used playwright to programmatically set billing form values and bypass UI validation.
+-> Action: Playwright JS injection to set form fields directly.
+
+---
+
+### Prompt 53: Backend error investigation (10:50 AM, 10:51 AM)
+
+> sounds like a backend error, mm..
+> when did the backend errors started to happen?
+
+-> Response: Traced billing failure to backend - supabase API returning errors on insert. Investigated timeline.
+-> Action: Checked network requests, supabase logs.
+
+---
+
+### Prompt 54: List all UI pages (10:52 AM)
+
+> the UI looks good, can you give me a list of the UI pages?
+
+-> Response: Enumerated all postal checkout UI pages/routes.
+-> Action: Listed pages from Next.js routing structure.
+
+---
+
+## Session 13: V2.1.6 Retrospective (Apr 12, 2026)
+
+### Prompt 55: Write retro-v2.1.6 with visual findings (10:55 AM)
+
+> OK let's do another retrospective '/Users/jackjin/dev/continuous-agent/ai-docs/v2/2026-04-01-v2.1/retro-b2b-postal-checkout.md' except name it retro-b2b-postal-checkout-v2.1.6.md and uhmm... Unless document everything you're seeing. Visually, drop-down doesn't work. validation ui needs work so folks
+
+-> Response: Created v2.1.6-specific retrospective with visual defects documented (dropdown, validation UI).
+-> Action: Created `retro-b2b-postal-checkout-v2.1.6.md`.
+
+---
+
+### Prompt 56: Deep ledger review for retro (10:56 AM)
+
+> Oh while running the retrospective, can you please look through all the ledgers or most of the ledgers and understand exactly what happened, what went well from execution perspective? We did kinda run a forty seven step execution. Just make sure that, you know, you kinda really capture the outcome
+
+-> Response: Deep-dove ledgers for full 47-step execution history - captured what went well, what failed, execution patterns.
+-> Action: Read ledgers/, worker output, updated retrospective with execution analysis.
+
+---
+
+### Prompt 57: Discard stale ai-sandbox file (11:02 AM)
+
+> In [Image] what is this in ai sandbox? i can't discard it
+> we can delet
+
+-> Response: Identified and deleted stale file in ai-sandbox.
+-> Action: Removed file.
+
+---
+
+**2.1.6 Summary**: Discovery spanned Apr 5 (diagnosis gap found, verifier blocking on playwright artifacts, goal-2.1.6 drafted) through Apr 6 (headful playwright CLI testing revealed pieces-only delivery, no supabase data, retrospective written with sprint-demo mandate) through Apr 11 (single-pass implementation of defect-subtask pipeline + journey-first worker discipline, prompt packet tuning for supabase/playwright consistency, postal checkout re-run on kimi with all 2.1.6 changes live, defect validation sensitivity calibrated after over-indexing on minor issues) through Apr 12 (sprint demo revealed dropdown defect and billing validation backend error - UI looks good but holistic flow still blocked on supabase writes, v2.1.6 retrospective written with full ledger analysis of 47-step execution).
 
 Key commits: `76c2106` (goal draft), `f99943b` (retro), `1de5f15` (defect-subtask pipeline + journey-first), plus prompt tuning and defect calibration commits.
 
