@@ -26,6 +26,7 @@ tests=(
   "tests/e2e/harnesses/mock-eds-orchestrator.e2e.ts"
   "tests/e2e/harnesses/mock-study-orchestrator.e2e.ts"
   "tests/adhoc/validate-kimi-k2.5-harness.adhoc.ts"
+  "tests/e2e/harnesses/vendor-auth-check.e2e.ts"
 )
 
 total_pass=0

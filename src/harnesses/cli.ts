@@ -28,6 +28,7 @@
 
 import * as path from 'node:path';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as dotenv from 'dotenv';
 
 // ── Load env tiers ───────────────────────────────────────────────
@@ -269,10 +270,25 @@ async function main(): Promise<number> {
 
   const auth = provider.validateAuth();
   if (!auth.valid) {
-    console.error(
-      `[harness] vendor '${vendor}' auth invalid: ${auth.error ?? 'unknown error'}`,
-    );
-    return 1;
+    // Codex CLI login stores auth in ~/.codex/auth.json, not env vars.
+    // The provider's validateAuth() only checks env vars, so fall back
+    // to checking the CLI auth file before rejecting.
+    let cliAuthValid = false;
+    if (vendor === 'codex') {
+      try {
+        const authPath = path.join(os.homedir(), '.codex', 'auth.json');
+        if (fs.existsSync(authPath)) {
+          const cliAuth = JSON.parse(fs.readFileSync(authPath, 'utf8'));
+          cliAuthValid = !!(cliAuth.OPENAI_API_KEY || cliAuth.tokens);
+        }
+      } catch { /* fall through */ }
+    }
+    if (!cliAuthValid) {
+      console.error(
+        `[harness] vendor '${vendor}' auth invalid: ${auth.error ?? 'unknown error'}`,
+      );
+      return 1;
+    }
   }
 
   const detected = await harness.detectMode(targetDir, promptFile);
