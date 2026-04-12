@@ -8,149 +8,230 @@
 
 ---
 
-## Context
+## What Went Well
 
-This is the second attempt at the B2B Postal Checkout goal, now running on v2.1.6 which introduced:
-- **Defect subtask pipeline** — Phase 5b integration validator that can file subtasks
-- **Integration gates** — `[GATE]` steps every ~3 build steps
-- **Prerequisite detection** — seed data step auto-inserted before UI work
-- **`definition_of_done_journey`** in PROMPT.md frontmatter
-- **Structured handoff protocol** — workers produce `what_i_built`, `what_connects`, `what_i_verified`
+### 1. Zero human interventions
 
-The first run (v2.1.4, retro'd in `retro-b2b-postal-checkout.md`) completed 32 steps in ~11 hours with 52 commits but shipped an undemoable product. This run aimed to prove the new pipeline catches integration failures.
+The v2.1.4 run needed 2 hotfixes (step ID bug, verifier bug). This run completed 55 steps entirely autonomously. The framework held up over ~15 hours without crashing, stalling, or needing a human touch.
 
----
+### 2. Prerequisite detection worked
 
-## Timeline
+Steps 1-2 were auto-inserted as schema setup + seed data, correctly identified from the goal's Supabase/database keywords. This was the #1 recommendation from the first retro. Seed data committed at `2971fdcb`.
 
-| Phase | Time (UTC) | Duration | What happened |
-|-------|-----------|----------|---------------|
-| Goal start + breakdown | 18:15 | — | 70-step plan generated |
-| Step 0-1 (research + init) | 18:15–18:28 | 13min | Research completed, init started |
-| **Recursive defect chain** | **18:28–22:18** | **3h 50min** | Validator filed defects about missing handoffs, spawning recursive defect-on-defect chain (30 attempts) |
-| 5 re-breakdowns | 18:15–20:25 | 2h 10min | System re-broke the goal 5 times (70→71→47→30→47 steps) trying to escape the defect loop |
-| Defect chain resolves | 21:58–22:18 | 20min | 8 defect subtasks completed in reverse order (deepest first) |
-| **Schema + seed data** | **22:40–22:51** | **11min** | Steps 1-2: Supabase schema + seed data — clean, no retries |
-| Gate 1 checkpoint | 22:51–22:55 | 4min | First gate passed |
-| **Core build phase** | **22:55–06:06** | **7h 11min** | Steps 4-34: layout, forms, APIs, all 6 wizard pages |
-| **Extended build** | **06:06–08:45** | **2h 39min** | Steps 35-44: CRUD endpoints, search, draft/resume, responsive, a11y, E2E tests |
-| Final polish | 08:45–09:05 | 20min | Steps 45-46: bug fixes, cleanup, documentation |
-| **GOAL_COMPLETED** | **09:05** | — | All 55 steps marked complete |
+### 3. Integration gates fired reliably
 
-**Total wall clock:** ~14h 50min
-**Productive build time (excluding defect chain):** ~10h 25min
-**Defect chain waste:** ~3h 50min (26% of total time)
+11 gates inserted at regular cadence throughout the build. Every gate completed. Gate workers actually ran `npx playwright test` (not just aspirational test files). `journey.spec.ts` grew from 7 → 67 tests across 11 gates — the append-only journey file working as designed.
 
----
+### 4. Gates caught real regressions
 
-## By the Numbers
+- **Gate 6:** Found missing `current_step` column in shipments table
+- **Gate 9:** Detected 17/45 test failures (pricing→payment navigation broken)
+- **Gate 11:** Fixed 24 broken selectors after the accessibility step changed form structure, added 11 new tests
 
-| Metric | v2.1.6 (this run) | v2.1.4 (first run) | Delta |
-|--------|-------------------|---------------------|-------|
-| Total steps | 55 (47 build + 8 defect) | 32 | +72% |
-| Step attempts | 84 | 55 | +53% |
-| Steps completed | 60 (includes defect chain) | 32 | +88% |
-| Wasted attempts (defect chain) | 30 | 23 (retries) | +30% |
-| Git commits | 60 | 52 | +15% |
-| Components built | 83 | 40+ | +108% |
-| API routes | 12 | ~5 | +140% |
-| E2E test cases | 213 | 217 | ~same |
-| Lines of code | ~41,600 | ~20,000 (est) | +108% |
-| Integration gates | 11 | 0 | NEW |
-| Wall clock time | ~15h | ~11h | +36% |
-| Human interventions | 0 | 2 | -100% |
-| Re-breakdowns | 5 | 1 | +400% |
+### 5. Depth-first subtask resolution works mechanically
 
----
+When the defect chain resolved, the system correctly walked bottom-up: step-1.1.2.1.1.1.1.1 → 1.1.2.1.1.1.1 → ... → 1.1. The `selectNextExecutableStep` depth-first algorithm is correct.
 
-## Execution Analysis: Executive + Worker Coordination
+### 6. Worker self-correction
 
-### What the Executive Did Well
+Step 21 hit a 300s timeout running tests with `--project=chromium` that didn't match the playwright config. The Kimi worker read the config and self-corrected without needing a retry. Workers also produced proper conventional commits throughout.
 
-1. **Zero human interventions.** Unlike the v2.1.4 run (2 hotfixes needed), the v2.1.6 run completed entirely autonomously. The framework held up.
+### 7. Build quality and ambition
 
-2. **Prerequisite detection worked.** Steps 1-2 were auto-inserted as schema setup + seed data, correctly identified from the goal's Supabase/database keywords. This was the #1 recommendation from the first retro.
+83 components, 12 API routes, 9 pages, responsive layout, WCAG 2.1 AA accessibility, loading states, error boundaries, 5 B2B payment methods. Visually the app looks professional. Velocity: 4.5 steps/hour during the clean build phase.
 
-3. **Integration gates fired reliably.** 11 gates inserted at regular cadence throughout the build. Every gate completed. The gate workers ran `npx playwright test` regression suites and extended `journey.spec.ts`.
+### 8. Discord notifications provided async visibility
 
-4. **Depth-first subtask resolution.** When the defect chain finally resolved, the system correctly walked the tree bottom-up: step-1.1.2.1.1.1.1.1 completed first, then 1.1.2.1.1.1, then 1.1.2.1.1, etc. The depth-first `selectNextExecutableStep` worked exactly as designed.
+The identity system's Discord webhook integration worked throughout the ~15 hour run (38 notifications logged), posting step completions and gate results. This gave async visibility into progress without needing to watch logs — you could check Discord on your phone and see the run advancing overnight.
 
-5. **Step velocity was excellent post-stabilization.** Once the defect chain resolved (22:40), the system completed 47 productive steps in ~10.5 hours = **4.5 steps/hour** (1 step every ~13 minutes). Comparable to the v2.1.4 clean run (4.6 steps/hour).
+### 9. Notion reporting operational
 
-### What the Executive Did Poorly
+80 Notion-related log entries — milestones were being reported to the Notion dashboard throughout the run. Combined with Discord, this gave two independent async visibility channels.
 
-1. **Recursive defect chain — the biggest failure.** The Phase 5b validator filed a defect "Step-1 handoff missing" because the Kimi worker didn't produce a structured handoff. That defect step also failed to produce a handoff, so the validator filed a defect about the defect. This recursed to depth `step-1.1.2.1.1.1.1.1` over 30 attempts and 3h 50min before resolving.
+### 10. Ledger and contract tracking comprehensive
 
-   **Root cause:** The validator treated "missing handoff" as a product defect, but it's actually a harness telemetry gap. The worker DID produce output (schema was set up, files were created), but Kimi's output format doesn't include the structured handoff YAML that the state-handler parser expects. The validator couldn't see the work, so it assumed nothing was done.
+- 150 work-ledger events tracked the full execution
+- 127 contract events in CONTRACTS.jsonl with proper start/complete pairs
+- 559-line PROGRESS_LOG.md with human-readable timeline
+- 38 worker logs (60-109KB each) with turn-by-turn execution data
+- Zero idle or unhealthy sleeps — the executive was productive the entire run
 
-   **Fix applied mid-run:** The integration-validator prompt was updated to bias toward PASS when handoffs are missing, and to never file defects titled "no structured handoff" or "no foundation exists." This stopped the bleeding, but the 3h 50min was already burned.
+### 11. PROMPT.md input quality was high
 
-2. **5 re-breakdowns.** The defect chain caused the goal to hit failure thresholds that triggered re-breakdowns. Each re-breakdown generated a fresh step list (70→71→47→30→47), wasting research and init steps that had to re-run each time.
+The goal PROMPT.md had thorough `definition_of_done_journey`, explicit `data_requirements` (dedicated `postal_v2` schema, seed data requirements, idempotent seed script), `integration_gate_cadence: 3`, and clear vendor justification. The input was not the problem — the execution pipeline couldn't enforce what the input specified.
 
-3. **Phase 5b validator was 100% PASS (38/38).** Every single validator call returned PASS. Zero defects filed from the validator after the recursive chain fix. This means the validator added LLM cost to every step completion but caught nothing. The reasoning-only mode is insufficient — it can only review structured handoffs, and Kimi produces none.
+### 12. Comparison vs v2.1.4
 
-### Worker (Kimi K2.5) Performance
-
-1. **Build quality was high.** 83 components, 12 API routes, responsive design, accessibility features, loading states, error boundaries. Visually the app looks professional and polished.
-
-2. **Workers DID test.** Unlike the first run where testing was mostly aspirational, this run's gate workers actually ran `npx playwright test` and dealt with real failures. Gate 6 found a missing `current_step` column. Gate 11 fixed 24 broken selectors after the accessibility step changed form structure.
-
-3. **Structured handoffs not produced.** Kimi workers started producing YAML handoffs around step 25, but the handoff parser in `state-handler.ts` doesn't extract them from Kimi's CLI output format. The parser was built for Claude Agent SDK output. This is why the validator was blind.
-
-4. **Workers self-corrected.** Step 21 hit a 300s timeout running tests with a `--project=chromium` flag that didn't match the playwright config. The worker read the config and self-corrected without retry.
-
-5. **Gate workers found real issues but didn't always fix them.** Gate 9 found 17/45 test failures (pricing→payment navigation broken). The gate worker documented the issue but did NOT fix it. The regression persisted through completion — ~26/67 journey tests still failing at the end.
+| Area | v2.1.4 | v2.1.6 | Verdict |
+|------|--------|--------|---------|
+| Human interventions | 2 | 0 | **Major improvement** |
+| Seed data | Missing entirely | Committed | **Improved** |
+| Integration gates | 0 | 11 with real test execution | **Major improvement** |
+| Regression detection | None | Gates 6, 9, 11 caught regressions | **Working** |
+| Test execution | Aspirational | Workers ran `npx playwright test` | **Improved** |
+| Output volume | 32 steps, 40+ components | 47 steps, 83 components | **Much more ambitious** |
 
 ---
 
-## Product Demo: What Works and What Doesn't
+## What Did NOT Work — Demoable Product
 
-### UI Pages Built (9 total)
+**Bottom line: two runs, ~26 hours combined, ~100 steps, ~100 commits, 83 components — and you still can't fill out the form and complete a shipment.**
 
-| # | Route | Status |
-|---|-------|--------|
-| - | `/` (Home) | Works — landing page with CTA |
-| 1 | `/shipments/new` (Details) | Works — full form with presets, dual address, package config, special handling |
-| 2 | `/shipments/[id]/rates` | Works — 15 carrier rates displayed with comparison UI |
-| 2b | `/shipments/[id]/pricing` | Duplicate of rates (different workers built both) |
-| 3 | `/shipments/[id]/payment` | Partially works — 5 payment methods (PO, BOL, Third-Party, Net Terms, Corporate), billing form |
-| 4 | `/shipments/[id]/pickup` | Broken — "Failed to load pickup availability" (API 500) |
-| 5 | `/shipments/[id]/review` | Loads but data incomplete |
-| 6 | `/shipments/[id]/confirm` | Loads with mock data |
-| 6b | `/shipments/[id]/confirmation` | Duplicate of confirm |
+### Demo walkthrough findings (playwright-cli --headed)
 
-### What Works (UI-only, no backend)
+- **Step 1 (Details):** Form fills out, but Country/State dropdowns never show selected value (always "Select country"). Form submits anyway because React state has the value — the UI just doesn't display it.
+- **Step 2 (Rates):** 15 rates display, but API calls (`/api/quote`) return 500. The page falls back to mock data. Looks like it works; doesn't.
+- **Step 3 (Payment):** 5 payment methods render. PO form fills but validation fails — the PO form uses standalone `useState` not connected to react-hook-form, so filled values don't reach the submit handler.
+- **Step 4 (Pickup):** "Failed to load pickup availability" — API 500. Page is stuck.
+- **Step 5 (Review):** Loads but data is incomplete.
+- **Step 6 (Confirm):** Loads with hardcoded mock data.
 
-- **Visual quality is excellent.** Professional B2B shipping UI with proper iconography, responsive layout, accessibility (skip links, ARIA, keyboard nav).
-- **Step 1 form is fully interactive.** Presets auto-fill dimensions, package type selector with DIM weight calculation, hazmat conditional form, multi-piece support, address autocomplete UI.
-- **Rates page displays 15 mock rates** from multiple carriers with sorting, filtering, price breakdowns, delivery estimates, CO2 emissions.
-- **Payment page has 5 B2B payment methods** — Purchase Order, Bill of Lading, Third-Party, Net Terms, Corporate Account. Each has its own detailed form.
-- **6-step progress bar** with completed/active/pending states, keyboard navigation.
-- **Error boundaries** — custom error page with "Something Went Wrong" UI, retry/go-back/go-home options.
+### Root causes
 
-### Known UI Defects
-
-1. **SelectValue component always shows placeholder.** The custom `Select` component's `SelectValue` (line 206 of `components/ui/select.tsx`) returns `<>{placeholder}</>` unconditionally — it never reads the `value` from context. Country and State/Province dropdowns click correctly (onChange fires, form state updates) but the display always shows "Select country" / "Select state". This affects every combobox in the app.
-
-2. **Duplicate page routes.** Workers built both `/rates` and `/pricing`, and both `/confirm` and `/confirmation`. Different workers in different steps didn't coordinate on route naming.
-
-3. **Payment form validation is opaque.** The payment page shows "Payment Error: Please correct the validation errors" without indicating which specific fields failed. The PO form uses separate `useState` state (`purchaseOrderData`) not connected to react-hook-form, so `playwright-cli fill` sets DOM values but not React state.
-
-### Backend / Data Flow Issues
-
-1. **API health check reports `database: disconnected`.** The `/api/health` endpoint returns `{"status":"unhealthy","checks":{"database":{"status":"disconnected"}}}`. Supabase credentials exist in `.env.local` but the connection fails.
-
-2. **All API routes return 500** when called from the UI. `/api/quote`, `/api/shipments/:id`, `/api/pickup-availability` all fail. The `GET /api/shipments` endpoint works (returns empty array), and `POST /api/shipments` validates input but the nested object schema (`origin`/`destination`/`package`) doesn't match what the form sends (flat field names).
-
-3. **Backend errors start at Step 2 (Rates).** Step 1 is purely client-side. The moment the app navigates to rates and calls `/api/quote`, the 500s begin. The rates page falls back to mock data so it looks like it works, but it's not hitting the real API.
-
-4. **Seed data may exist in Supabase** (Step 2 completed successfully with commit `2971fdcb`), but the API routes can't reach it due to the disconnected database status.
+1. **`/api/health` returns `database: disconnected`** — Supabase credentials exist, schema was set up, seed data was committed, but the API routes can't reach the database at runtime.
+2. **API request schema mismatch** — POST `/api/shipments` expects nested objects (`origin.line1`, `destination.city`) but the form sends flat fields (`originLine1`, `destinationCity`).
+3. **SelectValue component bug** — `components/ui/select.tsx` line 206: `SelectValue` returns `<>{placeholder}</>` unconditionally. Never reads `value` from context. Every combobox in the app is affected.
+4. **Duplicate routes** — Workers built both `/rates` and `/pricing`, both `/confirm` and `/confirmation`. No coordination between steps.
 
 ---
 
-## The Gate System: Did It Catch Anything?
+## MUST FIX: Harness / Executive Code
 
-### Gate Results Summary
+These are bugs in the continuous-agent infrastructure that must be fixed in code before the next run.
+
+### H1. Kimi handoff parser is broken (CRITICAL)
+
+**File:** `src/deterministic/state-handler.ts` → `parseStructuredHandoffFromLog()`
+
+**Bug:** The parser uses a regex (`/```ya?ml\s*\n([\s\S]*?)\n```/gi`) to find YAML blocks in worker logs. This works for Claude Agent SDK logs (plain text). Kimi CLI logs wrap output in JSON `[MSG]` lines — the YAML fences are inside escaped JSON strings and the regex can't match.
+
+**Evidence:** Worker log `contract-1775980744690` (step-44) contains a full structured handoff (`what_i_built: "Added 11 new E2E test blocks..."`) but every executive handoff file says "_Worker did not produce a structured handoff block._"
+
+**Impact:** Phase 5b validator sees "NO STRUCTURED HANDOFF" for every step → rubber-stamps PASS. Prompt builder can't inject prior step context. The entire handoff chain is broken for Kimi vendor.
+
+**Fix:** JSON-parse `[MSG]` lines first, extract `content[].text` field, then search for YAML fences in the extracted text. Vendor-specific log format handling.
+
+### H2. Defect subtask pipeline never fired for real product defects (CRITICAL)
+
+**Bug:** All 8 defect subtasks were filed against step-1 for "missing handoff" — a false positive caused by H1. Zero defects were filed during the actual build phase (steps 2-46). The intended pattern (step 17 has defect → 17.1 runs before 18) was never exercised.
+
+**Evidence:** STEPS.json shows all defect subtasks are children of `step-1`:
+```
+step-1 → step-1.1 → step-1.1.1
+                   → step-1.1.2 → step-1.1.2.1 → ... (8 levels deep)
+```
+Zero subtasks parented to any step after step-1.
+
+**Why it didn't fire:** The validator (the only entity that can file defects) rubber-stamped everything PASS because of H1. Gate workers found regressions (Gate 9: 17 test failures) but gates don't have authority to file defect subtasks.
+
+**Fix:** Two changes needed:
+1. Fix H1 so the validator can actually see handoff evidence
+2. Give gate workers authority to file defect subtasks when `npx playwright test` shows more failures than the previous gate recorded
+
+### H3. Gates detect regressions but don't enforce them
+
+**Bug:** Gate 9 found 17/45 test failures (pricing→payment navigation broken). The system continued building 8 more steps. The regression was never fixed. At completion, ~26/67 journey tests were still failing.
+
+**Impact:** Gates are expensive (each is a full worker spawn + test run) but toothless. They document failures without blocking progress.
+
+**Fix:** Gate step completion should be gated on "test failure count did not increase since last gate." If it increased, the gate worker must either fix the regressions or file a defect subtask. Don't proceed to the next build step with a known regression growing.
+
+### H4. Recursive defect chain needs a depth limit
+
+**Bug:** The validator filed defects about defects about defects, recursing to depth `step-1.1.2.1.1.1.1.1` (8 levels) over 30 attempts and 3h 50min.
+
+**Fix applied mid-run:** Validator prompt updated to never file defects about "missing handoff." But this is a prompt-level band-aid. Add a hard depth limit in `insertDefectSubtask()` — max 2-3 levels. If a defect subtask itself fails, escalate to `needs-you.md` instead of recursing.
+
+### H5. 5 re-breakdowns wasted ~2 hours
+
+**Bug:** The defect chain caused failure thresholds that triggered re-breakdowns. Each generated a fresh step list (70→71→47→30→47), re-running research and init steps.
+
+**Fix:** Re-breakdown should preserve completed steps. If steps 0-2 are complete and step 3 fails, re-breakdown should only regenerate steps 3+, not start over from scratch.
+
+---
+
+### H6. Worker log truncates AI output to 500 chars (LOW PRIORITY)
+
+**File:** `src/agentic/execution/worker-spawner.ts` line 764
+
+**Bug:** `logger.log(`[MSG] type=${msg.type} ${JSON.stringify(msg.raw).slice(0, 500)}`);` — the raw message JSON is truncated to 500 characters. AI reasoning (which can be 5-10KB), tool call arguments (200 chars), and tool results (500 chars via kimi-cli-provider.ts) are all cut off.
+
+**Impact:** When debugging a step failure, you can't see what the AI actually said or what tool output it received. The worker logs look comprehensive (60-109KB, 92+ MSG lines per log) but each MSG line is a stub.
+
+**Fix:** Remove the `.slice(0, 500)` from the log line. Optionally write full raw JSON to a separate `.jsonl` file if log size is a concern. The `msg.text` field (the normalized summary) can stay as the primary log line, but `msg.raw` should be fully preserved somewhere for debugging.
+
+---
+
+## MUST FIX: Goal Input / Skills / Prompts
+
+These are changes to how goals are defined and how workers are prompted — not infrastructure bugs.
+
+### I0. The prompt packet needs richer prior-step context (input quality)
+
+The PROMPT.md itself was excellent (`definition_of_done_journey`, `data_requirements`, `integration_gate_cadence`). But the full input packet each worker receives has gaps:
+
+**What each worker gets today:**
+1. Step title + description from STEPS.json ✓
+2. Previous step handoff file — but every one says "_Worker did not produce a structured handoff block_" (H1) ✗
+3. `definition_of_done_journey` injected verbatim ✓
+4. Worker-base and web-testing skills ✓
+5. CLAUDE.md with monorepo rules ✓
+6. `data_requirements` referenced but not prominently placed — workers may not read it ⚠️
+
+**What's missing:**
+- **No API contract/schema context.** Each worker rebuilds its mental model of what endpoints exist, what shapes they return, what the DB schema looks like. The prompt should inject a compact API surface summary (routes + request/response types) extracted from the codebase.
+- **No "current state of journey tests" context.** The worker doesn't know how many journey tests pass or fail. Injecting `npx playwright test --list` output or the last gate's test count would let the worker know what to protect.
+- **Prior step handoff is useless.** Because of H1, every step sees "_no structured handoff_" — even though the prior worker DID produce one. The worker has to `git log` and `ls` to figure out what was built. This wastes 5-10 turns per step.
+- **No explicit API health check instruction.** The prompt says "verify data persists across screens" but doesn't say "first run `curl localhost:3000/api/health` — if database is disconnected, stop and file a defect." Workers happily build UI on a dead backend.
+- **`data_requirements` should be in the constraints section**, not just in PROMPT.md frontmatter. Workers see constraints prominently; they may skim the journey definition.
+
+**Fix — enrich `prompt-builder.ts`:**
+1. Extract and inject a compact API surface from `app/api/**/route.ts` (route, methods, key types)
+2. Inject last gate's test pass/fail count
+3. Inject `curl localhost:3000/api/health` result if the dev server is running
+4. Move `data_requirements` into the Constraints section, not just the journey definition
+5. Fix H1 so the prior step handoff actually has content
+
+### I1. Backend and frontend need separate test loops
+
+**Problem:** The pipeline treats the whole app as one thing. Backend APIs returning 500 is invisible to UI tests that fall back to mock data. The form → API → DB chain crosses multiple workers and nobody tests the full chain.
+
+**Fix — new `backend-testing` skill:**
+- After every API route is built, run `curl` smoke tests against the running dev server
+- Verify `GET /api/health` returns `status: healthy` at every gate
+- Test actual HTTP request → response → database round trips, no browser needed
+- If `/api/health` returns unhealthy, file a defect immediately — don't build 30 more UI components on a disconnected database
+
+**Fix — frontend testing should mock the backend:**
+- UI E2E tests should use `page.route()` to intercept API calls with known responses
+- Decouples frontend verification from backend state
+- Current `web-testing` skill conflates both — split into `backend-testing` and `frontend-testing`
+
+### I2. Build order should be backend-first for fullstack goals
+
+**Current order:** research → schema → seed → init → UI → UI → UI → API (APIs built at steps 36-38, after all UI)
+
+**Better order:** research → schema → seed → API endpoints → **API smoke test gate** → UI with mocked APIs → **integration gate with real APIs**
+
+The seed data step ran early (step 2) but API endpoints weren't built until step 36. By then, 30+ UI components were built against mock data that doesn't match the real API response shapes.
+
+### I3. `definition_of_done_journey` needs to include API verification
+
+**Current:** `"Fill shipment form → submit → rates page loads quote → select → payment → confirm → reference number displayed"`
+
+**Missing:** No mention of backend verification. Add: `"API health check returns healthy. POST /api/shipments creates a record. GET /api/shipments/:id returns it. Full form submit persists to Supabase."`
+
+### I4. Workers reinvent UI components instead of using libraries
+
+The `Select` component was built from scratch (326 lines) instead of using shadcn/radix. The `SelectValue` subcomponent has a bug (always shows placeholder). This is the "beautiful pieces, broken whole" pattern at the component level.
+
+**Fix — add to `worker-base` or `web-testing` skill:** "Use shadcn/ui or radix primitives for form controls. Do not build custom Select, Combobox, DatePicker, etc. from scratch. Custom components are the #1 source of integration bugs."
+
+---
+
+## Detailed Findings
+
+### Gate Results
 
 | Gate | Checkpoint | Tests | Findings |
 |------|-----------|-------|----------|
@@ -166,102 +247,80 @@ The first run (v2.1.4, retro'd in `retro-b2b-postal-checkout.md`) completed 32 s
 | 10 | Draft/resume | 52 journey tests | Draft/resume flows added |
 | 11 | A11y + loading | 67 journey tests | **Fixed 24 broken selectors** from a11y step. Added 11 new tests. |
 
-**journey.spec.ts grew from 7 → 67 tests** across 11 gates. This is the append-only journey file working as designed.
+### UI Pages Built (9 total)
 
-### Gate Effectiveness
+| # | Route | Status |
+|---|-------|--------|
+| - | `/` (Home) | Works — landing page with CTA |
+| 1 | `/shipments/new` (Details) | Works — full form with presets, dual address, package config, special handling |
+| 2 | `/shipments/[id]/rates` | Displays 15 mock rates — API calls return 500, falls back to mocks |
+| 2b | `/shipments/[id]/pricing` | Duplicate of rates (different workers built both) |
+| 3 | `/shipments/[id]/payment` | 5 B2B payment methods, billing — validation broken (PO form not connected to react-hook-form) |
+| 4 | `/shipments/[id]/pickup` | Broken — "Failed to load pickup availability" (API 500) |
+| 5 | `/shipments/[id]/review` | Loads but data incomplete |
+| 6 | `/shipments/[id]/confirm` | Loads with hardcoded mock data |
+| 6b | `/shipments/[id]/confirmation` | Duplicate of confirm |
 
-- **Regression detection: YES.** Gates 6, 9, and 11 all found real regressions.
-- **Regression enforcement: NO.** Gate 9 found 17 test failures but the system continued building. There's no mechanism to block progress when gate tests fail. The gate worker documents failures but doesn't file defect subtasks for them — only the Phase 5b validator can do that, and it rubber-stamped everything PASS.
-- **The pricing→payment navigation regression was never fixed.** It was detected at Gate 9 (~06:15) and persisted through GOAL_COMPLETED (~09:05). At completion, ~26/67 journey tests were still failing.
+### Handoff Pipeline State
 
-### Phase 5b Validator: Total Rubber Stamp
+- **Executive handoff files:** 47 exist in `workspace/completed/b2b-postal-checkout-2026-04-12/` — ALL say "Worker did not produce a structured handoff block" (parser bug H1)
+- **Worker-written handoffs:** ~15 of 47 workers also wrote their own files to the project's `ai-docs/` directory — steps 0, 1, 1.1.2, 2, 6, 42, 48, 50-53. Most workers didn't.
+- **STEPS.json handoff field:** Empty for every step (never populated due to H1)
+- **Phase 5b validator:** 38 calls, 38 PASS, 0 FAIL — total rubber stamp
 
-- **38 PASS, 0 FAIL.** Every single validator call returned PASS.
-- **Reason:** The validator is reasoning-only — it reviews structured handoffs, not actual app state. Kimi workers don't produce structured handoffs in a format the state-handler parser can extract. So the validator saw "NO STRUCTURED HANDOFF" for every step and, per the anti-recursion rules, defaulted to PASS.
-- **Cost:** 38 LLM calls with zero diagnostic value. The validator added latency and token cost to every step without catching a single issue.
+### Worker (Kimi K2.5) Observations
 
----
-
-## Architecture Lessons: Backend Needs Its Own Testing Layer
-
-### The Core Insight
-
-The v2.1.6 pipeline assumes a single "build and verify" loop where each worker builds a component and a gate verifies it renders. This works for pure frontend. It breaks for fullstack apps because:
-
-1. **Backend and frontend have different failure modes.** A backend API that returns 500 is invisible to a UI component test. The component renders fine with mock data. The failure only surfaces when the UI tries to call the real API.
-
-2. **Backend testing doesn't require a browser.** API endpoints should be tested with `curl` or a test runner hitting HTTP endpoints, not with Playwright walking a UI. The gate system's reliance on browser-based E2E means backend regressions are only caught when a UI test happens to hit a broken endpoint.
-
-3. **The form → API → DB → response chain crosses multiple workers.** Worker A builds the form. Worker B builds the API route. Worker C sets up the schema. If any link breaks, the chain fails silently — the UI worker sees mock data, the API worker sees valid schema, the DB worker sees valid credentials. Nobody tests the full chain.
-
-### What Needs to Change
-
-1. **Backend services need their own skill and validation loop.** A `backend-testing` skill that:
-   - Runs API smoke tests after every API route is built (`curl` / `httpie` / simple test runner)
-   - Verifies database connectivity and seed data existence
-   - Tests the actual request → response → database round trip, not just "does the endpoint compile"
-   - Runs independently of the frontend — no browser needed
-
-2. **Frontend testing should mock the backend.** UI tests should use `page.route()` to intercept API calls with known responses. This decouples frontend verification from backend state. If the frontend works against mocks and the backend passes its own API tests, integration is a small remaining gap.
-
-3. **The gate system needs enforcement.** Currently gates detect regressions but can't block progress. Options:
-   - Gate worker files defect subtasks when tests fail (not just the Phase 5b validator)
-   - Parent step blocked until all gate tests pass
-   - At minimum: the number of failing tests should not increase between gates
-
-4. **Database health should be a continuous prerequisite.** Before any step that touches an API, verify `GET /api/health` returns `{"status":"healthy"}`. If it doesn't, file a defect immediately — don't build 30 more UI components on top of a disconnected database.
+- Build quality high — 83 components, responsive, accessible, proper error boundaries
+- Workers ran real tests — `npx playwright test` at gates, `playwright-cli` for visual verification
+- Self-corrected on config mismatches (step 21 timeout → read config → fixed)
+- Proper conventional commits throughout (60 commits)
+- Structured handoffs produced in YAML but not parseable by executive (H1)
 
 ---
 
-## What Improved vs v2.1.4
+## Timeline
 
-| Area | v2.1.4 | v2.1.6 | Verdict |
-|------|--------|--------|---------|
-| Human interventions | 2 (step ID bug, verifier bug) | 0 | **Major improvement** |
-| Seed data | Missing entirely | Step 2 completed (seed script committed) | **Improved** (though connection issues remain) |
-| Integration gates | None | 11 gates, journey.spec.ts grew to 67 tests | **Major improvement** |
-| Regression detection | Nothing | Gates 6, 9, 11 caught real regressions | **Working** |
-| Regression enforcement | N/A | Zero enforcement — detected but not blocked | **Gap** |
-| Defect subtask pipeline | N/A | Working but caused recursive chain | **Mixed** — mechanism works, validator is broken for Kimi |
-| Test execution | Mostly aspirational | Gate workers actually ran `npx playwright test` | **Improved** |
-| Backend testing | None | None | **Still missing** |
-| Validator | N/A | 38 PASS / 0 FAIL — rubber stamp | **Not working** for Kimi vendor |
-| Output volume | 32 steps, 40+ components | 47 steps, 83 components, 12 APIs | **Much more ambitious** |
-| Demoable end product? | No | **No** — same root problem | **Not improved** |
+| Phase | Time (UTC) | Duration | What happened |
+|-------|-----------|----------|---------------|
+| Goal start + breakdown | 18:15 | — | 70-step plan generated |
+| Step 0-1 (research + init) | 18:15–18:28 | 13min | Research completed, init started |
+| **Recursive defect chain** | **18:28–22:18** | **3h 50min** | Validator filed defects about missing handoffs, spawning 8-level recursive chain (30 attempts, 5 re-breakdowns) |
+| **Schema + seed data** | **22:40–22:51** | **11min** | Steps 1-2: Supabase schema + seed data — clean |
+| **Core build phase** | **22:55–06:06** | **7h 11min** | Steps 4-34: layout, forms, APIs, all 6 wizard pages. 11 gates interspersed. |
+| **Extended build** | **06:06–08:45** | **2h 39min** | Steps 35-44: CRUD endpoints, search, draft/resume, responsive, a11y, E2E tests |
+| Final polish | 08:45–09:05 | 20min | Steps 45-46: bug fixes, cleanup, documentation |
+| **GOAL_COMPLETED** | **09:05** | — | All 55 steps marked complete |
+
+**Productive build time:** ~10h 25min | **Defect chain waste:** ~3h 50min (26%)
 
 ---
 
-## Recommendations
+## By the Numbers
 
-### Immediate (next goal)
-
-1. **Fix the validator for Kimi workers.** Either parse Kimi's YAML handoff format in `state-handler.ts`, or make the validator spawn a browser worker instead of reasoning-only mode. A 100% PASS rate means the validator doesn't exist.
-
-2. **Gate workers must file defects when regression tests fail.** Don't wait for Phase 5b. If `npx playwright test` shows more failures than the previous gate, the gate worker should call `insertDefectSubtask()` directly.
-
-3. **Add backend smoke tests to gate steps.** Every gate should also run: `curl -s localhost:3000/api/health | jq .status` and verify "healthy". If unhealthy, that's a defect.
-
-### Medium-term (next sprint)
-
-4. **Separate backend and frontend testing skills.** A `backend-testing` skill for API-level validation (no browser). A `frontend-testing` skill for UI-level validation (browser, but with mocked APIs). The current `web-testing` skill conflates both.
-
-5. **Backend-first build order for fullstack goals.** Current order: research → schema → seed → init → UI → UI → UI → API. Better order: research → schema → seed → API endpoints → **API smoke test gate** → UI → UI → UI with API mocks → **integration gate**.
-
-6. **Fix the SelectValue bug pattern.** This is a class of bugs where the custom UI component renders correctly in isolation but doesn't integrate with the form library. The worker built a `Select` component from scratch instead of using shadcn/radix, and the `SelectValue` subcomponent just returns the placeholder. This is exactly the "beautiful pieces, broken whole" failure: the Select looks perfect, works for onClick, but never shows the selected value.
-
-### Strategic
-
-7. **The defect chain proves the pipeline works — but needs guardrails.** The depth-first subtask resolution, the recursive chain detection, the anti-pattern rules in the validator prompt — all of this machinery worked correctly. The problem was the trigger condition: "missing handoff" is not a product defect. Add a hard rule: the validator can only file defects about observable product failures (404, 500, broken navigation, missing data), never about harness telemetry (missing handoffs, missing journey_blocks_added, missing what_connects).
-
-8. **The "demoable" bar hasn't moved.** Two runs, ~26 hours combined, ~100 steps, ~100 commits, 83 components — and you still can't fill out the form and complete a shipment. The system builds impressive breadth (every component, every page, every edge case) but not depth (does the happy path work end-to-end?). The single highest-leverage change: make the **first integration gate** (checkpoint 1) test the full happy path with `curl` against the API, not just "does the page load." If that gate fails, nothing else should build.
+| Metric | v2.1.6 (this run) | v2.1.4 (first run) |
+|--------|-------------------|---------------------|
+| Total steps | 55 (47 build + 8 defect) | 32 |
+| Step attempts | 84 | 55 |
+| Git commits | 60 | 52 |
+| Components built | 83 | 40+ |
+| API routes | 12 | ~5 |
+| E2E test cases | 213 | 217 |
+| Lines of code | ~41,600 | ~20,000 (est) |
+| Integration gates | 11 | 0 |
+| Human interventions | 0 | 2 |
+| Phase 5b validator calls | 38 PASS / 0 FAIL | N/A |
+| Defect subtasks filed | 8 (all false positives on step-1) | 0 |
+| Defects filed for real product bugs | **0** | 0 |
+| Demoable end-to-end? | **No** | No |
 
 ---
 
 ## Raw Data
 
-- **Work ledger events:** 150 events for this goal in `ledgers/work-ledger.jsonl` (grep `goal-b2b-postal-checkout` + `2026-04-1[12]`)
-- **Executive logs:** `ledgers/executive-2026-04-11.log` (defect chain phase), `ledgers/executive-2026-04-12.log` (productive build phase)
+- **Work ledger:** 150 events — `grep "goal-b2b-postal-checkout" ledgers/work-ledger.jsonl | grep "2026-04-1[12]"`
+- **Executive logs:** `ledgers/executive-2026-04-11.log` (defect chain), `ledgers/executive-2026-04-12.log` (build phase)
 - **STEPS.json:** `workspace/completed/b2b-postal-checkout-2026-04-12/STEPS.json` (55 steps)
-- **Output:** `/Users/jackjin/dev/ai-sandbox/projects/nextjs/2026-04-11/1775939155064/`
+- **Handoff files:** `workspace/completed/b2b-postal-checkout-2026-04-12/step-*-handoff.md` (47 files, all say "no structured handoff" due to H1)
+- **Project output:** `/Users/jackjin/dev/ai-sandbox/projects/nextjs/2026-04-11/1775939155064/`
 - **Previous retro:** `retro-b2b-postal-checkout.md` (v2.1.4 first run)
-- **Plan that created v2.1.6:** `/Users/jackjin/.claude/plans/iterative-roaming-haven.md`
+- **Plan:** `/Users/jackjin/.claude/plans/iterative-roaming-haven.md`
