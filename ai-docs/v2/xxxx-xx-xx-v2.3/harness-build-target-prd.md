@@ -57,6 +57,22 @@ Create an isolated branch + worktree off the `ai-sandbox-v2` repository.
 - Local state (`.env`, caches, `node_modules`, build artifacts) stays in the worktree and is gitignored
 - Switching projects = switching worktrees, not branches in a shared checkout
 
+**Directory structure (decided):**
+```
+~/dev/ai-sandbox-v2/                ← actual repo checkout (main branch, minimal files)
+~/dev/ai-sandbox-v2-worktrees/      ← all worktrees live here, one per project
+  ├── player-mcp/                   ← branch: proj/player-mcp
+  ├── supabase-migration/           ← branch: proj/supabase-migration
+  ├── portfolio-refresh/            ← branch: proj/portfolio-refresh
+  └── ...
+```
+
+- **Branch naming:** `proj/<slug>` (e.g. `proj/player-mcp`)
+- **Worktree path:** `~/dev/ai-sandbox-v2-worktrees/<slug>/`
+- **Creation command:** `git -C ~/dev/ai-sandbox-v2 worktree add ~/dev/ai-sandbox-v2-worktrees/<slug> -b proj/<slug>`
+- Worktrees share the git object database with the main repo — lightweight, no duplicated history
+- The main repo checkout stays clean (just LICENSE, `.gitignore`, README) and is never the build target itself
+
 **When to use:**
 - New projects (the default for any build that doesn't specify otherwise)
 - Exploratory / incubating work
@@ -178,21 +194,17 @@ complexity: medium
 created: "2026-04-12"
 
 # Build target (this PRD)
-build_target: worktree             # worktree | existing | monorepo
+build_target: worktree             # worktree | existing | monorepo (default: worktree)
 target_dir:                        # required for 'existing', ignored otherwise
-target_branch:                     # optional override
+target_branch:                     # optional — auto-generated for worktree, current branch for monorepo/existing
 
 # Execution
 execution_pattern: harness         # plan-then-execute | harness | plan-mode | etc.
 harness: generic                   # which harness (when execution_pattern=harness)
 
-# Vendor & model config
-worker_vendor: claude              # claude | codex | kimi
-worker_model:                      # model override for the primary worker
-planner_vendor:                    # vendor for planning/breakdown (defaults to worker_vendor)
-planner_model:                     # model for planning/breakdown
-validator_vendor:                  # vendor for validation (defaults to worker_vendor)
-validator_model:                   # model for validation
+# Worker vendor & model
+worker_vendor: claude              # claude | codex | kimi (default: claude)
+worker_model:                      # model override (default: vendor's default model)
 
 # Existing fields
 tags: []
@@ -204,9 +216,71 @@ branch:                            # set for self-enhancement tasks
 
 **Defaults:** If a field is omitted, the system uses its default. Defaults are documented in one place (likely `src/deterministic/prompt-md-parser.ts` or a shared `defaults.ts`). Harness CLI flags become overrides for testing, not the primary config path.
 
+**Executive is not configurable.** Planning, breakdown, diagnosis, validation — all executive-tier work is always Claude. This is not an input packet field. Only the worker execution is vendor/model-selectable.
+
 **Phased delivery:**
 - v2.3: Add `build_target` + `target_dir` + `target_branch` to PROMPT.md parser. Wire into worker-spawner and harness-executor.
 - Post-v2.3: Migrate vendor/model config from CLI flags + env vars into PROMPT.md. Unify harness and executive input parsing fully.
+
+### Frontmatter field → code path reference
+
+Every frontmatter field must map to deterministic code that reads it. If a field doesn't trigger code, it shouldn't be in the frontmatter. This table is the authoritative reference for what each field does and where.
+
+#### Core fields (required)
+
+| Field | Values | Default | Parsed in | Used by | What it triggers |
+|---|---|---|---|---|---|
+| `title` | string | `"Untitled"` | `prompt-md-parser.ts` | `goal-scanner.ts:275` | `[SELF-ENHANCE]`/`[SKILL-BUILD]` prefix → routes worker to agent codebase instead of output repo |
+| `slug` | string (URL-safe) | `"untitled"` | `prompt-md-parser.ts` | `goal-scanner.ts:320` | Directory name, cross-references, worktree branch name (`proj/<slug>`) |
+| `priority` | `P0`\|`P1`\|`P2`\|`P3`\|`P4` | `P4` | `prompt-md-parser.ts` | `goal-scanner.ts:41,171` | Work selection order; auto-promotion from `ondeck/` to `in-progress/P{n}/` |
+| `status` | `pending`\|`in_progress`\|`blocked`\|`complete` | `pending` | `prompt-md-parser.ts` | `goal-scanner.ts:280` | Controls whether goal is eligible for execution; `blocked` keeps it in-place |
+
+#### Build target fields (v2.3 — this PRD)
+
+| Field | Values | Default | Parsed in | Used by | What it triggers |
+|---|---|---|---|---|---|
+| `build_target` | `worktree`\|`existing`\|`monorepo` | `worktree` | `prompt-md-parser.ts` | `worker-spawner.ts`, `harness-executor.ts` | Determines output directory creation strategy (worktree add / validate existing / monorepo subfolder) |
+| `target_dir` | absolute path | _(none)_ | `prompt-md-parser.ts` | `worker-spawner.ts`, `harness-executor.ts` | Required for `existing`. Worker uses this as project root, skips scaffold. |
+| `target_branch` | string | auto-generated | `prompt-md-parser.ts` | `worker-spawner.ts` | For `worktree`: overrides auto `proj/<slug>`. For `existing`/`monorepo`: creates a branch if set, otherwise uses current. |
+
+#### Execution fields
+
+| Field | Values | Default | Parsed in | Used by | What it triggers |
+|---|---|---|---|---|---|
+| `execution_pattern` | `plan-then-execute`\|`harness`\|`loop-until-progress`\|`plan-mode`\|`deterministic-pipeline` | `plan-then-execute` | `prompt-md-parser.ts` | `execution-pattern-resolver.ts`, `executive-loop.ts:~413` | `harness` → delegates to `HarnessOrchestrator` via `harness-executor.ts`. Others → worker-spawner with different tool/prompt strategies. |
+| `harness` | `generic`\|`eds`\|`study` | _(none)_ | `goal-scanner.ts:338` | `harness-executor.ts:70` | Which registered harness to run (only when `execution_pattern: harness`) |
+| `harness_target` | absolute path | _(none)_ | `goal-scanner.ts:339` | `harness-executor.ts` | Override harness target directory (CLI testing). Superseded by `target_dir` in v2.3. |
+| `harness_mode` | `bootstrap`\|`adopt`\|`extend`\|`extend-deep`\|`resume` | auto-detected | `goal-scanner.ts:341` | `harness-executor.ts:102` | Override harness `detectMode()`. Usually auto-detected from on-disk state. |
+| `model_overrides` | `Record<string, string>` | _(none)_ | `goal-scanner.ts:346` | harness `model-defaults.ts` | Per-agent model overrides within a harness pipeline (e.g. `{ "spec": "opus", "build": "sonnet" }`) |
+| `worker_vendor` | `claude`\|`codex`\|`kimi`\|`kimi-cli`\|`kimi-wire` | `claude` | `goal-scanner.ts:334` | `worker-spawner.ts`, `vendor-registry.ts` | Selects `AgentWorkerProvider` implementation. Falls back: frontmatter → `WORKER_VENDOR` env → `claude`. |
+| `worker_model` | string | vendor default | `prompt-md-parser.ts` | `worker-spawner.ts` | Model override passed to the vendor's provider. Each vendor has its own default. |
+| `max_turns` | integer | `200` | `goal-scanner.ts:332` | `worker-spawner.ts` | Max agent turns per step. Set `500` for Playwright/complex. |
+
+#### Optional metadata fields
+
+| Field | Values | Default | Parsed in | Used by | What it triggers |
+|---|---|---|---|---|---|
+| `complexity` | `low`\|`medium`\|`high` | _(none)_ | `prompt-md-parser.ts` | `goal-breakdown.ts` | Affects auto-breakdown heuristic (threshold: `BREAKDOWN_THRESHOLD_TURNS`, default 100) |
+| `created` | ISO 8601 date | _(none)_ | `prompt-md-parser.ts` | _(informational)_ | No code reads this — purely for human tracking |
+| `tags` | string[] | `[]` | `prompt-md-parser.ts` | `goal-scanner.ts` | Categorization. No execution logic currently — available for future filtering/routing. |
+| `source_project` | slug string | _(none)_ | `goal-scanner.ts:315` | `worker-spawner.ts:654` | Copies an existing completed project as starting point via `project-registry.yml` |
+
+#### System-managed fields (do not set manually)
+
+| Field | Values | Default | Set by | What it triggers |
+|---|---|---|---|---|
+| `output_path` | absolute path | _(none)_ | `worker-spawner.ts:822` | Persists project directory across retries. Once set, all retries resume in the same directory. |
+| `branch` | string | _(none)_ | `worker-spawner.ts` | Git branch for `[SELF-ENHANCE]`/`[SKILL-BUILD]` goals. Worker updates PROMPT.md with this. |
+
+#### UI/Web goal fields (optional — only for goals with a user-facing UI)
+
+These are functional and wired to real code, but only relevant for UI goals with data backends. Omit them for CLI tools, backend services, or non-UI work.
+
+| Field | Values | Default | Parsed in | Used by | What it triggers |
+|---|---|---|---|---|---|
+| `definition_of_done_journey` | string (literal user flow) | _(none)_ | `goal-scanner.ts:350` | `integration-validator-runner.ts:67`, `prompt-builder.ts:282` | Phase 5b integration validator asserts against this. Injected verbatim into every worker prompt so each step knows the flow it contributes to. |
+| `data_requirements` | string (persistence layer spec) | _(none)_ | `goal-scanner.ts:353` | `goal-breakdown.ts:327,336` | Breakdown Pass A prepends a locked `[PREREQUISITE]` step (schema + seed + API smoke). Also injected into validator context. |
+| `integration_gate_cadence` | integer | auto (clamped 3–8) | `goal-scanner.ts:356` | `goal-breakdown.ts:391` | Overrides automatic `[GATE]` checkpoint spacing in Breakdown Pass B. Lower = more frequent journey gates. |
 
 ---
 
@@ -260,10 +334,27 @@ branch:                            # set for self-enhancement tasks
 
 ---
 
+## Decisions Made
+
+1. **Worktree directory structure:** Option A — dedicated parent directory. Main repo at `~/dev/ai-sandbox-v2/`, all worktrees at `~/dev/ai-sandbox-v2-worktrees/<slug>/`. Branch convention: `proj/<slug>`.
+
+2. **`.gitignore` template:** Maintain a baseline template in `continuous-agent/workspace-instructions/gitignore-template`. The agent copies this into new worktrees. The `ai-sandbox-v2` repo's own `.gitignore` covers the init commit, but the template in `continuous-agent/` is the authoritative source for updates.
+
+3. **Branch strategy by target type:**
+   - **worktree:** If `target_branch` is not provided, auto-generate as `proj/<slug>` where slug is derived from the goal (e.g. `proj/2026-04-12-nextjs-dashboard`). Always a new branch off init commit.
+   - **monorepo:** Commit on the current branch. No branch creation.
+   - **existing:** Commit on the current branch of the target repo. No branch creation. If the user wants a branch, they specify `target_branch` explicitly.
+
+4. **Migration from `ai-sandbox/`:** No migration. `ai-sandbox/` stays as-is — it's work from a previous era. New work goes to `ai-sandbox-v2`. If individual projects are worth continuing, they can be manually migrated.
+
+5. **Model configuration scope:**
+   - **Executive agent:** Always Claude. No vendor/model override — hardcoded, not configurable.
+   - **Workers:** Configurable via PROMPT.md frontmatter. Two fields:
+     - `worker_vendor` — which vendor to use (`claude`, `codex`, `kimi`). Defaults to `claude`.
+     - `worker_model` — which model from that vendor. Defaults to the vendor's default model.
+   - **No per-role splits** (planner/validator/worker) in v2.3. The executive handles planning and validation itself (always Claude). Workers get one vendor + one model.
+   - Vendor-specific model defaults and instruction tuning must work correctly for each supported model (carried from v2.0 requirement). The vendor adapter (`vendor-adapter.ts`) and model defaults per harness (`model-defaults.ts`) must be validated per vendor.
+
 ## Open Questions
 
-1. Should `ai-sandbox-v2` baseline `.gitignore` be maintained as a template in `continuous-agent/` (e.g. `workspace-instructions/gitignore-template`) so agents can reference it?
-2. For `existing` target: should the agent create a branch automatically, or should `target_branch` be required to prevent accidental commits to main?
-3. Worktree naming convention: `ai-sandbox-v2-<slug>` in a sibling directory, or a dedicated parent like `~/dev/worktrees/<slug>`?
-4. During migration, should existing in-progress goals in `ai-sandbox/` be left alone or migrated to worktrees?
-5. Should the unified PROMPT.md support per-phase model overrides (e.g. use Opus for planning, Sonnet for build) or is per-role (worker/planner/validator) sufficient?
+1. For harness multi-agent pipelines (e.g. generic has WHY/WHAT/HOW/WHEN + RESEARCH + BUILD + VALIDATE agents), should each agent within the harness be individually configurable, or does the whole harness use the single `worker_vendor`/`worker_model`? Currently `model-defaults.ts` per harness assigns models per agent role — that's a harness-internal decision, not an input packet field. Is that the right boundary?
