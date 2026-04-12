@@ -92,7 +92,11 @@ export async function runHarnessAgent(args: RunHarnessAgentArgs): Promise<Harnes
       if (msg.type === 'assistant' && msg.text) {
         result.output += msg.text;
       } else if (msg.type === 'result') {
-        if (typeof msg.text === 'string' && msg.text.length > 0) {
+        if (typeof msg.text === 'string' && msg.text.length > 0 && result.output.length === 0) {
+          // Only use result text if we didn't accumulate any assistant text.
+          // Kimi/Codex result messages contain a summary line (e.g. "Kimi CLI
+          // exited with code 0") which would overwrite the real output and
+          // destroy the handoff JSON block needed by extractHandoffJson().
           result.output = msg.text;
         }
         result.success = msg.resultSuccess === true;
