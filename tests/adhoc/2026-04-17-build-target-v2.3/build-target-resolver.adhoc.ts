@@ -3,7 +3,7 @@
  *
  * Covers the deterministic decision logic + the I/O paths for `existing` and
  * the worktree fallback. Worktree happy-path (`git worktree add`) is exercised
- * by setting AI_SANDBOX_V2_PATH to a freshly-init'd temp git repo.
+ * by setting AI_DEMOS_PATH to a freshly-init'd temp git repo.
  *
  * Run: `npx tsx tests/adhoc/2026-04-17-build-target-v2.3/build-target-resolver.adhoc.ts`
  */
@@ -173,10 +173,10 @@ async function main(): Promise<void> {
     assert.equal(r.created, false);
   });
 
-  // ─── worktree mode: fallback when ai-sandbox-v2 missing ─
-  await test('worktree: missing ai-sandbox-v2 falls back to monorepo with warning', () => {
-    const prevSandbox = process.env.AI_SANDBOX_V2_PATH;
-    process.env.AI_SANDBOX_V2_PATH = '/nonexistent/ai-sandbox-v2-for-testing';
+  // ─── worktree mode: fallback when ai-demos missing ─
+  await test('worktree: missing ai-demos falls back to monorepo with warning', () => {
+    const prevSandbox = process.env.AI_DEMOS_PATH;
+    process.env.AI_DEMOS_PATH = '/nonexistent/ai-demos-for-testing';
     try {
       const r = resolveBuildTarget({
         slug: 'foo',
@@ -186,33 +186,33 @@ async function main(): Promise<void> {
       assert.equal(r.build_target, 'monorepo');
       assert.equal(r.outputPath, '/legacy/fallback/foo');
       assert.ok(r.warnings.length >= 1, 'expected at least one warning');
-      assert.match(r.warnings[0]!, /ai-sandbox-v2 not found/);
+      assert.match(r.warnings[0]!, /ai-demos not found/);
     } finally {
-      if (prevSandbox === undefined) delete process.env.AI_SANDBOX_V2_PATH;
-      else process.env.AI_SANDBOX_V2_PATH = prevSandbox;
+      if (prevSandbox === undefined) delete process.env.AI_DEMOS_PATH;
+      else process.env.AI_DEMOS_PATH = prevSandbox;
     }
   });
 
   // ─── worktree mode: happy path against a temp git repo ─
-  await test('worktree: creates worktree off temp ai-sandbox-v2 repo', async () => {
-    const prevSandbox = process.env.AI_SANDBOX_V2_PATH;
-    const prevWorktrees = process.env.AI_SANDBOX_V2_WORKTREES_PATH;
+  await test('worktree: creates worktree off temp ai-demos repo', async () => {
+    const prevSandbox = process.env.AI_DEMOS_PATH;
+    const prevWorktrees = process.env.AI_DEMOS_WORKTREES_PATH;
     const prevAgent = process.env.AGENT_PATH;
 
     const tmpRoot = await mkdtemp(path.join(os.tmpdir(), 'btr-wt-'));
-    const sandboxRepo = path.join(tmpRoot, 'ai-sandbox-v2');
-    const worktreesParent = path.join(tmpRoot, 'ai-sandbox-v2-worktrees');
+    const sandboxRepo = path.join(tmpRoot, 'ai-demos');
+    const worktreesParent = path.join(tmpRoot, 'ai-demos-worktrees');
     const fakeAgent = path.join(tmpRoot, 'continuous-agent');
 
     try {
-      // Init the fake ai-sandbox-v2 repo with a single commit.
+      // Init the fake ai-demos repo with a single commit.
       await mkdir(sandboxRepo);
       execSync('git init -q', { cwd: sandboxRepo });
       execSync('git config user.email test@example.com', { cwd: sandboxRepo });
       execSync('git config user.name Test', { cwd: sandboxRepo });
       execSync('git config commit.gpgsign false', { cwd: sandboxRepo });
       execSync('git config tag.gpgsign false', { cwd: sandboxRepo });
-      await writeFile(path.join(sandboxRepo, 'README.md'), '# ai-sandbox-v2\n');
+      await writeFile(path.join(sandboxRepo, 'README.md'), '# ai-demos\n');
       execSync('git add -A', { cwd: sandboxRepo });
       execSync('git commit -q -m init', { cwd: sandboxRepo });
 
@@ -223,8 +223,8 @@ async function main(): Promise<void> {
         '# from-template\nnode_modules/\n',
       );
 
-      process.env.AI_SANDBOX_V2_PATH = sandboxRepo;
-      process.env.AI_SANDBOX_V2_WORKTREES_PATH = worktreesParent;
+      process.env.AI_DEMOS_PATH = sandboxRepo;
+      process.env.AI_DEMOS_WORKTREES_PATH = worktreesParent;
       process.env.AGENT_PATH = fakeAgent;
 
       const r = resolveBuildTarget({
@@ -253,10 +253,10 @@ async function main(): Promise<void> {
       assert.equal(r2.outputPath, r.outputPath);
       assert.equal(r2.created, false);
     } finally {
-      if (prevSandbox === undefined) delete process.env.AI_SANDBOX_V2_PATH;
-      else process.env.AI_SANDBOX_V2_PATH = prevSandbox;
-      if (prevWorktrees === undefined) delete process.env.AI_SANDBOX_V2_WORKTREES_PATH;
-      else process.env.AI_SANDBOX_V2_WORKTREES_PATH = prevWorktrees;
+      if (prevSandbox === undefined) delete process.env.AI_DEMOS_PATH;
+      else process.env.AI_DEMOS_PATH = prevSandbox;
+      if (prevWorktrees === undefined) delete process.env.AI_DEMOS_WORKTREES_PATH;
+      else process.env.AI_DEMOS_WORKTREES_PATH = prevWorktrees;
       if (prevAgent === undefined) delete process.env.AGENT_PATH;
       else process.env.AGENT_PATH = prevAgent;
       await rm(tmpRoot, { recursive: true, force: true });
@@ -265,11 +265,11 @@ async function main(): Promise<void> {
 
   // ─── slug sanitization ───────────────────────────────
   await test('worktree: sanitizes slug for branch and path', async () => {
-    const prevSandbox = process.env.AI_SANDBOX_V2_PATH;
-    const prevWorktrees = process.env.AI_SANDBOX_V2_WORKTREES_PATH;
+    const prevSandbox = process.env.AI_DEMOS_PATH;
+    const prevWorktrees = process.env.AI_DEMOS_WORKTREES_PATH;
 
     const tmpRoot = await mkdtemp(path.join(os.tmpdir(), 'btr-slug-'));
-    const sandboxRepo = path.join(tmpRoot, 'ai-sandbox-v2');
+    const sandboxRepo = path.join(tmpRoot, 'ai-demos');
     const worktreesParent = path.join(tmpRoot, 'wt');
 
     try {
@@ -283,8 +283,8 @@ async function main(): Promise<void> {
       execSync('git add -A', { cwd: sandboxRepo });
       execSync('git commit -q -m init', { cwd: sandboxRepo });
 
-      process.env.AI_SANDBOX_V2_PATH = sandboxRepo;
-      process.env.AI_SANDBOX_V2_WORKTREES_PATH = worktreesParent;
+      process.env.AI_DEMOS_PATH = sandboxRepo;
+      process.env.AI_DEMOS_WORKTREES_PATH = worktreesParent;
 
       const r = resolveBuildTarget({
         slug: 'weird/slug with spaces & symbols!',
@@ -301,10 +301,10 @@ async function main(): Promise<void> {
       assert.match(segment, /^[a-zA-Z0-9._-]+$/);
       assert.match(r.branch ?? '', /^proj\/[a-zA-Z0-9._-]+$/);
     } finally {
-      if (prevSandbox === undefined) delete process.env.AI_SANDBOX_V2_PATH;
-      else process.env.AI_SANDBOX_V2_PATH = prevSandbox;
-      if (prevWorktrees === undefined) delete process.env.AI_SANDBOX_V2_WORKTREES_PATH;
-      else process.env.AI_SANDBOX_V2_WORKTREES_PATH = prevWorktrees;
+      if (prevSandbox === undefined) delete process.env.AI_DEMOS_PATH;
+      else process.env.AI_DEMOS_PATH = prevSandbox;
+      if (prevWorktrees === undefined) delete process.env.AI_DEMOS_WORKTREES_PATH;
+      else process.env.AI_DEMOS_WORKTREES_PATH = prevWorktrees;
       await rm(tmpRoot, { recursive: true, force: true });
     }
   });

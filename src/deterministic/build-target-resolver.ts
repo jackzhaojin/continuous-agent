@@ -5,7 +5,7 @@
  * of the v2.3 PRD (`ai-docs/v2/xxxx-xx-xx-v2.3/harness-build-target-prd.md`).
  *
  * Three modes:
- *   - worktree: git worktree off `ai-sandbox-v2`, branch `proj/<slug>`
+ *   - worktree: git worktree off `ai-demos`, branch `proj/<slug>`
  *   - existing: validate `target_dir`, no scaffold
  *   - monorepo: legacy `ai-sandbox/` subfolder behavior (caller computes path)
  *
@@ -45,28 +45,28 @@ export function getDefaultBuildTarget(): BuildTarget {
 }
 
 /**
- * Path to the ai-sandbox-v2 repo (the worktree source).
+ * Path to the ai-demos repo (the worktree source).
  *
- * Per PRD: "Jack manually creates `ai-sandbox-v2` repo with Apache 2.0 license,
+ * Per PRD: "Jack manually creates `ai-demos` repo with Apache 2.0 license,
  * baseline `.gitignore`, README". The agent never auto-creates it.
  *
- * Override with env var `AI_SANDBOX_V2_PATH`. Default `~/dev/ai-sandbox-v2`.
+ * Override with env var `AI_DEMOS_PATH`. Default `~/dev/ai-demos`.
  */
-export function getSandboxV2Path(): string {
-  return process.env.AI_SANDBOX_V2_PATH || path.join(os.homedir(), 'dev', 'ai-sandbox-v2');
+export function getAiDemosPath(): string {
+  return process.env.AI_DEMOS_PATH || path.join(os.homedir(), 'dev', 'ai-demos');
 }
 
 /**
- * Parent directory for all worktrees off ai-sandbox-v2.
+ * Parent directory for all worktrees off ai-demos.
  * Per PRD decision 1 (Option A — dedicated parent directory).
  *
- * Override with env var `AI_SANDBOX_V2_WORKTREES_PATH`. Default
- * `~/dev/ai-sandbox-v2-worktrees`.
+ * Override with env var `AI_DEMOS_WORKTREES_PATH`. Default
+ * `~/dev/ai-demos-worktrees`.
  */
-export function getSandboxV2WorktreesPath(): string {
+export function getAiDemosWorktreesPath(): string {
   return (
-    process.env.AI_SANDBOX_V2_WORKTREES_PATH ||
-    path.join(os.homedir(), 'dev', 'ai-sandbox-v2-worktrees')
+    process.env.AI_DEMOS_WORKTREES_PATH ||
+    path.join(os.homedir(), 'dev', 'ai-demos-worktrees')
   );
 }
 
@@ -129,7 +129,7 @@ export interface BuildTargetResolution {
   created: boolean;
   /**
    * Best-effort warnings from the resolution that the caller should log
-   * (e.g. ai-sandbox-v2 missing in worktree mode).
+   * (e.g. ai-demos missing in worktree mode).
    */
   warnings: string[];
 }
@@ -171,7 +171,7 @@ export function decideBuildTarget(input: {
  *
  * Throws on configuration errors that the caller can't recover from
  * (e.g. existing target_dir missing). Worktree creation falls back to
- * monorepo mode with a warning if `ai-sandbox-v2` doesn't exist yet — that
+ * monorepo mode with a warning if `ai-demos` doesn't exist yet — that
  * keeps the executive loop running while Jack completes P1-1.
  */
 export function resolveBuildTarget(input: BuildTargetInput): BuildTargetResolution {
@@ -224,13 +224,13 @@ export function resolveBuildTarget(input: BuildTargetInput): BuildTargetResoluti
     }
 
     case 'worktree': {
-      const sandboxPath = getSandboxV2Path();
-      const worktreesParent = getSandboxV2WorktreesPath();
+      const sandboxPath = getAiDemosPath();
+      const worktreesParent = getAiDemosWorktreesPath();
 
-      // Fallback when ai-sandbox-v2 isn't ready yet (PRD P1-1 is human work).
+      // Fallback when ai-demos isn't ready yet (PRD P1-1 is human work).
       if (!existsSync(sandboxPath)) {
         warnings.push(
-          `[build-target-resolver] ai-sandbox-v2 not found at ${sandboxPath}; ` +
+          `[build-target-resolver] ai-demos not found at ${sandboxPath}; ` +
             `falling back to monorepo mode for slug=${slug}. ` +
             `Create the repo (PRD P1-1) to enable worktree mode.`,
         );

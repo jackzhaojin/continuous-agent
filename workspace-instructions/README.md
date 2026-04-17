@@ -62,7 +62,7 @@ These select where worker/harness output lands. See the PRD at
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `build_target` | enum | `monorepo` (during v2.3 transition; flips to `worktree` per P1-8) | `worktree` = git worktree off `ai-sandbox-v2`. `existing` = work directly in an external project at `target_dir`. `monorepo` = legacy `ai-sandbox/` subfolder. |
+| `build_target` | enum | `monorepo` (during v2.3 transition; flips to `worktree` per P1-8) | `worktree` = git worktree off `ai-demos`. `existing` = work directly in an external project at `target_dir`. `monorepo` = legacy `ai-sandbox/` subfolder. |
 | `target_dir` | string | _(none)_ | **Required when `build_target=existing`.** Absolute path to an existing project directory. The worker uses it as-is — no `.gitignore` injection, no scaffold. |
 | `target_branch` | string | _(see below)_ | Branch override. `worktree`: defaults to `proj/<slug>` (this overrides). `existing`/`monorepo`: if set, the worker checks out (or creates) this branch; otherwise commits on the current branch. |
 
@@ -72,14 +72,14 @@ the default to `worktree`.)
 
 **Env overrides:**
 - `BUILD_TARGET_DEFAULT` — change the system-wide default (`worktree`/`existing`/`monorepo`)
-- `AI_SANDBOX_V2_PATH` — location of the worktree source repo (default `~/dev/ai-sandbox-v2`)
-- `AI_SANDBOX_V2_WORKTREES_PATH` — parent dir for worktrees (default `~/dev/ai-sandbox-v2-worktrees`)
+- `AI_DEMOS_PATH` — location of the worktree source repo (default `~/dev/ai-demos`)
+- `AI_DEMOS_WORKTREES_PATH` — parent dir for worktrees (default `~/dev/ai-demos-worktrees`)
 
 **Worktree behavior:**
 - Branch: `proj/<slug>` (or `target_branch`).
-- Path: `~/dev/ai-sandbox-v2-worktrees/<slug>/`.
-- The resolver runs `git -C <ai-sandbox-v2> worktree add -b <branch> <path>` — idempotent (re-using an existing worktree dir is fine).
-- If `ai-sandbox-v2` doesn't exist yet (PRD P1-1 is human work), the resolver falls back to `monorepo` and logs a warning. Goals keep running.
+- Path: `~/dev/ai-demos-worktrees/<slug>/`.
+- The resolver runs `git -C <ai-demos> worktree add -b <branch> <path>` — idempotent (re-using an existing worktree dir is fine).
+- If `ai-demos` doesn't exist yet (PRD P1-1 is human work), the resolver falls back to `monorepo` and logs a warning. Goals keep running.
 - The `.gitignore` template at `workspace-instructions/gitignore-template` is copied into each new worktree.
 
 **Existing behavior:**

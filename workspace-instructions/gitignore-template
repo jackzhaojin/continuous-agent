@@ -1,7 +1,7 @@
-# Baseline .gitignore template for ai-sandbox-v2 worktrees (v2.3 PRD).
+# Baseline .gitignore template for ai-demos worktrees (v2.3 PRD).
 #
 # Copied verbatim into each new `git worktree add` checkout by
-# `src/deterministic/build-target-resolver.ts`. The ai-sandbox-v2 repo
+# `src/deterministic/build-target-resolver.ts`. The ai-demos repo
 # itself ships a near-identical .gitignore on the init commit; this file
 # is the authoritative source for updates so they propagate to all new
 # worktrees without touching the existing repo's history.

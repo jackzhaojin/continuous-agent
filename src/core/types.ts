@@ -15,7 +15,7 @@ export type ExecutionPattern =
 /**
  * Build target (v2.3) — where worker/harness output lands.
  *
- * - `worktree` — git worktree off the `ai-sandbox-v2` repo (per-project isolation).
+ * - `worktree` — git worktree off the `ai-demos` repo (per-project isolation).
  * - `existing` — work directly inside an external project at `target_dir`.
  * - `monorepo` — legacy: subfolder inside the `ai-sandbox/` monorepo.
  *
