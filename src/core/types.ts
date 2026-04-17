@@ -13,6 +13,11 @@ export type ExecutionPattern =
   | 'harness';
 
 /**
+ * Where build output should be written for a goal.
+ */
+export type BuildTarget = 'worktree' | 'existing' | 'monorepo';
+
+/**
  * Individual health check result
  */
 export interface HealthCheck {
@@ -196,6 +201,11 @@ export interface WorkItem {
   harness_target?: string;        // Absolute or repo-relative target dir for harness run
   harness_mode?: 'bootstrap' | 'adopt' | 'extend' | 'extend-deep' | 'resume';
   model_overrides?: Record<string, string>;  // Per-agent model overrides for harness
+
+  // v2.3: Build target routing (shared by executive + harness execution)
+  build_target?: BuildTarget;
+  target_dir?: string;
+  target_branch?: string;
 
   // v2.1.7: Integration/data contract fields from PROMPT.md frontmatter
   //

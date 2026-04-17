@@ -5,8 +5,8 @@
  * Responsibilities:
  *   1. Resolve the harness from the registry by workItem.harness.
  *   2. Resolve the vendor provider (per-goal override → global default).
- *   3. Resolve the harness target directory (workItem.harness_target or
- *      ai-sandbox/harnesses/<name>/<slug>/ default).
+ *   3. Resolve the harness target directory from build-target frontmatter
+ *      (legacy workItem.harness_target still supported as highest-priority override).
  *   4. Pre-seed STEPS.json with the harness's static phase list on first run
  *      (no-op on resume — respects existing step rows).
  *   5. Run the harness generator, re-emit agent_message events to the worker
@@ -22,7 +22,6 @@
 
 import * as path from 'node:path';
 import * as fs from 'node:fs';
-import * as os from 'node:os';
 
 import type { WorkItem, WorkerResult, WorkStep } from '../../core/types.js';
 import { log } from '../../core/logging.js';
@@ -35,9 +34,15 @@ import type {
 } from '../../harnesses/core/types.js';
 import { seedStepsFromPhases, makeStepSink } from '../../harnesses/core/status-mirror.js';
 import { getAgentWorkerProviderForVendor } from '../../core/vendor/vendor-registry.js';
+import {
+  BUILD_TARGET_PATHS,
+  ensureWorktreeTarget,
+  resolveBuildTargetType,
+  resolveExistingTargetDir,
+  resolveHarnessDefaultTarget,
+} from './build-target-resolver.js';
 
-const AGENT_OUTPUTS_BASE =
-  process.env.AGENT_OUTPUTS_PATH || path.join(os.homedir(), 'dev', 'ai-sandbox');
+const AGENT_OUTPUTS_BASE = BUILD_TARGET_PATHS.monorepoBase;
 
 function resolveHarnessTarget(workItem: WorkItem): string {
   if (workItem.harness_target) {
@@ -46,7 +51,17 @@ function resolveHarnessTarget(workItem: WorkItem): string {
       : path.resolve(AGENT_OUTPUTS_BASE, workItem.harness_target);
   }
   const slug = (workItem.source_path && path.basename(workItem.source_path)) || workItem.id;
-  return path.join(AGENT_OUTPUTS_BASE, 'harnesses', workItem.harness ?? 'generic', slug);
+  const buildTarget = resolveBuildTargetType(workItem);
+  if (buildTarget === 'existing') {
+    if (!workItem.target_dir) {
+      throw new Error('build_target=existing requires target_dir for harness execution');
+    }
+    return resolveExistingTargetDir(workItem.target_dir);
+  }
+  if (buildTarget === 'worktree') {
+    return ensureWorktreeTarget(workItem, slug);
+  }
+  return resolveHarnessDefaultTarget(workItem.harness ?? 'generic', slug);
 }
 
 export async function executeHarness(

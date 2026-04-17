@@ -20,11 +20,17 @@ import {
   resolveWorkerModelForVendor,
   type AgentWorkerMessage,
 } from '../../core/vendor/index.js';
+import {
+  BUILD_TARGET_PATHS,
+  ensureWorktreeTarget,
+  resolveBuildTargetType,
+  resolveExistingTargetDir,
+} from './build-target-resolver.js';
 import yaml from 'js-yaml';
 import { BUILD_INFO } from '../../core/executive-loop.js';
 
 // Agent outputs directory - where workers create their projects
-const AGENT_OUTPUTS_BASE = process.env.AGENT_OUTPUTS_PATH || path.join(os.homedir(), 'dev', 'ai-sandbox');
+const AGENT_OUTPUTS_BASE = BUILD_TARGET_PATHS.monorepoBase;
 
 // Worker timeout: wall-clock limit to prevent indefinite hangs (default 45 min)
 const WORKER_TIMEOUT_MS = parseInt(process.env.WORKER_TIMEOUT_MS || '2700000', 10);
@@ -640,15 +646,41 @@ export async function spawnWorker(
     logger.log(`RESUME: Using existing project path: ${projectPath}`);
     console.log(`[Worker] RESUME: Using existing project path: ${projectPath}`);
   } else {
-    console.log(`[Worker] NEW: Generating new project path`);
-    // Generate project path and set up directory with .gitignore FIRST
-    const generated = generateProjectPath(contract);
-    projectPath = generated.path;
-    category = generated.category;
-    setupProjectDirectory(projectPath, category);
+    const buildTarget = workItem ? resolveBuildTargetType(workItem) : 'worktree';
+    logger.log(`Build target: ${buildTarget}`);
+
+    if (buildTarget === 'existing') {
+      if (!workItem?.target_dir) {
+        throw new Error('build_target=existing requires target_dir in PROMPT.md frontmatter');
+      }
+      projectPath = resolveExistingTargetDir(workItem.target_dir);
+      category = detectCategory(contract.prompt);
+      logger.log(`EXISTING: Using target_dir ${projectPath}`);
+    } else if (buildTarget === 'worktree') {
+      projectPath = ensureWorktreeTarget(
+        workItem ?? {
+          id: contract.id,
+          title: contract.prompt,
+          description: '',
+          priority: 'P2',
+          status: 'pending',
+        },
+        contract.id.replace('contract-', ''),
+      );
+      category = detectCategory(contract.prompt);
+      setupProjectDirectory(projectPath, category);
+      logger.log(`WORKTREE: Using ${projectPath}`);
+    } else {
+      console.log(`[Worker] NEW: Generating new project path`);
+      // Generate project path and set up directory with .gitignore FIRST
+      const generated = generateProjectPath(contract);
+      projectPath = generated.path;
+      category = generated.category;
+      setupProjectDirectory(projectPath, category);
+    }
 
     // V1.2: Copy-in from source project if specified
-    if (workItem?.source_project) {
+    if (workItem?.source_project && buildTarget !== 'existing') {
       const sourceEntry = findProjectBySlug(workItem.source_project);
       if (sourceEntry) {
         logger.log(`COPY-IN: Copying from source project "${sourceEntry.slug}" at ${sourceEntry.output_path}`);
@@ -675,7 +707,10 @@ export async function spawnWorker(
   // Self-enhance/skill-build use the absolute path since cwd is the agent repo.
   const relativeProjectPath = (isSelfEnhance || isSkillBuild)
     ? projectPath
-    : path.relative(AGENT_OUTPUTS_BASE, projectPath);
+    : (() => {
+      const rel = path.relative(AGENT_OUTPUTS_BASE, projectPath);
+      return rel.startsWith('..') ? projectPath : rel;
+    })();
 
   // Build prompt - use specialized prompts for self-enhance and skill-build tasks
   let prompt: string;

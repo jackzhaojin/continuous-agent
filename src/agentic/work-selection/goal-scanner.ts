@@ -7,7 +7,7 @@ import { readdir, rename, mkdir, appendFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 import { parsePromptMd, type PromptMdFile } from '../../deterministic/prompt-md-parser.js';
-import type { WorkItem, WorkStep, ExecutionPattern } from '../../core/types.js';
+import type { WorkItem, WorkStep, ExecutionPattern, BuildTarget } from '../../core/types.js';
 import type { SelectableWork } from './work-selector.js';
 import { readStepsJson, stepsJsonToWorkSteps, migrateFromPromptMd, selectNextExecutableStep } from '../../deterministic/steps-json-handler.js';
 
@@ -314,6 +314,12 @@ async function bundleToWorkItemAsync(bundle: GoalBundle): Promise<WorkItem> {
   // Read source_project from frontmatter (for multi-project access)
   const source_project = frontmatter.source_project as string | undefined;
 
+  const buildTargetRaw = frontmatter.build_target;
+  const buildTarget: BuildTarget | undefined =
+    buildTargetRaw === 'worktree' || buildTargetRaw === 'existing' || buildTargetRaw === 'monorepo'
+      ? buildTargetRaw
+      : undefined;
+
   return {
     id: `goal-${bundle.slug}`,
     priority: bundle.priority || 'P4',
@@ -346,6 +352,9 @@ async function bundleToWorkItemAsync(bundle: GoalBundle): Promise<WorkItem> {
       frontmatter.model_overrides && typeof frontmatter.model_overrides === 'object'
         ? (frontmatter.model_overrides as Record<string, string>)
         : undefined,
+    build_target: buildTarget,
+    target_dir: typeof frontmatter.target_dir === 'string' ? frontmatter.target_dir : undefined,
+    target_branch: typeof frontmatter.target_branch === 'string' ? frontmatter.target_branch : undefined,
     // v2.1.7: integration/data contract fields
     definition_of_done_journey: typeof frontmatter.definition_of_done_journey === 'string'
       ? frontmatter.definition_of_done_journey

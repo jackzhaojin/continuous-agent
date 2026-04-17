@@ -22,6 +22,10 @@ export interface PromptMdFrontmatter {
   harness_target?: string;          // absolute or repo-relative target dir
   harness_mode?: string;            // bootstrap|adopt|extend|extend-deep|resume
   model_overrides?: Record<string, string>;
+  // V2.3: build target routing fields
+  build_target?: 'worktree' | 'existing' | 'monorepo';
+  target_dir?: string;
+  target_branch?: string;
   [key: string]: unknown;
 }
 
@@ -64,11 +68,18 @@ export function parsePromptMdContent(content: string): PromptMdFile {
   let frontmatter: PromptMdFrontmatter;
   try {
     const parsed = yaml.load(frontmatterRaw) as Record<string, unknown>;
+    const rawBuildTarget = typeof parsed.build_target === 'string' ? parsed.build_target : undefined;
+    const derivedBuildTarget =
+      rawBuildTarget === 'worktree' || rawBuildTarget === 'existing' || rawBuildTarget === 'monorepo'
+        ? rawBuildTarget
+        : (typeof parsed.target_dir === 'string' && parsed.target_dir.trim().length > 0 ? 'existing' : 'worktree');
+
     frontmatter = {
       title: String(parsed.title || 'Untitled'),
       slug: String(parsed.slug || 'untitled'),
       status: String(parsed.status || 'pending'),
       ...parsed,
+      build_target: derivedBuildTarget,
     };
   } catch {
     frontmatter = {

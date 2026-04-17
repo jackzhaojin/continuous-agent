@@ -46,12 +46,19 @@ for (const candidate of envCandidates) {
 
 import { getHarness, listHarnesses } from './core/harness-registry.js';
 import { getAgentWorkerProviderForVendor } from '../core/vendor/vendor-registry.js';
+import { parsePromptMd } from '../deterministic/prompt-md-parser.js';
 import type { AgentWorkerVendor } from '../core/vendor/types.js';
 import type {
   HarnessEvent,
   HarnessModeType,
   HarnessRunConfig,
 } from './core/types.js';
+import {
+  ensureWorktreeTarget,
+  resolveBuildTargetType,
+  resolveExistingTargetDir,
+  resolveHarnessDefaultTarget,
+} from '../agentic/execution/build-target-resolver.js';
 
 interface ParsedArgs {
   name?: string;
@@ -120,13 +127,37 @@ function readModelEnvOverrides(): Record<string, string> {
   return out;
 }
 
-function deriveTargetFromPrompt(promptFile: string): string {
-  const dir = path.dirname(path.resolve(promptFile));
-  // If prompt lives in ai-docs/SPEC/, go up two levels.
-  if (dir.endsWith(path.join('ai-docs', 'SPEC'))) {
-    return path.dirname(path.dirname(dir));
+async function resolveTargetDir(
+  promptFile: string,
+  harnessName: string,
+  overrideTarget?: string,
+): Promise<string> {
+  if (overrideTarget) return path.resolve(overrideTarget);
+
+  const prompt = await parsePromptMd(promptFile);
+  const frontmatter = prompt.frontmatter;
+  const workItem = {
+    id: `goal-${frontmatter.slug || path.basename(path.dirname(promptFile))}`,
+    title: frontmatter.title,
+    description: '',
+    priority: 'P3' as const,
+    status: 'pending' as const,
+    build_target: frontmatter.build_target,
+    target_dir: typeof frontmatter.target_dir === 'string' ? frontmatter.target_dir : undefined,
+    target_branch: typeof frontmatter.target_branch === 'string' ? frontmatter.target_branch : undefined,
+  };
+
+  const buildTarget = resolveBuildTargetType(workItem);
+  if (buildTarget === 'existing') {
+    if (!workItem.target_dir) {
+      throw new Error('build_target=existing requires target_dir in PROMPT.md');
+    }
+    return resolveExistingTargetDir(workItem.target_dir);
   }
-  return dir;
+  if (buildTarget === 'worktree') {
+    return ensureWorktreeTarget(workItem, frontmatter.slug || 'harness-run');
+  }
+  return resolveHarnessDefaultTarget(harnessName, frontmatter.slug || 'harness-run');
 }
 
 function resolveVendor(flag: string | undefined): AgentWorkerVendor {
@@ -261,7 +292,7 @@ async function main(): Promise<number> {
     return 2;
   }
 
-  const targetDir = path.resolve(args.target ?? deriveTargetFromPrompt(promptFile));
+  const targetDir = await resolveTargetDir(promptFile, args.name, args.target);
   const vendor = resolveVendor(args.vendor);
   const modeOverride = coerceMode(args.mode);
 

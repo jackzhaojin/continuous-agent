@@ -49,6 +49,9 @@ Every goal's `PROMPT.md` starts with YAML frontmatter between `---` delimiters. 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `execution_pattern` | enum | `plan-then-execute` | How the worker approaches the task. |
+| `build_target` | enum | `worktree` | Where build output lands: `worktree`, `existing`, or legacy `monorepo`. |
+| `target_dir` | string | _(none)_ | Required when `build_target: existing`; local directory to build in. |
+| `target_branch` | string | _(auto)_ | Optional branch hint for worktree creation (`proj/<slug>` if omitted). |
 | `max_turns` | integer | `200` | Max agent turns per step. Set `500` for Playwright/complex tasks. |
 | `worker_vendor` | enum | `claude` | Which LLM vendor executes the work. |
 | `output_path` | string | _(auto-set)_ | Directory where worker writes output. Set by worker on first execution. |
@@ -139,6 +142,16 @@ The `BREAKDOWN_THRESHOLD_TURNS` env var controls the auto-breakdown cutoff (defa
 | `kimi-wire` | Kimi wire SDK | `kimi login` |
 
 **Per-goal override:** Set `worker_vendor` in frontmatter. Otherwise falls back to `WORKER_VENDOR` env, then `claude`.
+
+#### `build_target`
+
+| Value | Behavior |
+|-------|----------|
+| `worktree` | **Default.** Creates/uses a git worktree in `~/dev/ai-sandbox-v2-worktrees/<slug>/` from `~/dev/ai-sandbox-v2`. |
+| `existing` | Uses `target_dir` directly (must already exist). No scaffold/copy-in. |
+| `monorepo` | Legacy layout under `~/dev/ai-sandbox/projects/...` (backward-compat). |
+
+**Resolution precedence:** PROMPT.md `build_target` > inferred `existing` when `target_dir` is present > default `worktree`.
 
 ## Special Workspace Files
 

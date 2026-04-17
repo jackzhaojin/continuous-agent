@@ -7,6 +7,9 @@ complexity: medium                 # low | medium | high (informational, affects
 created: "2026-01-01"             # ISO 8601 date
 tags: [tag1, tag2]                # Categorization labels
 execution_pattern:                 # plan-then-execute (default) | loop-until-progress | plan-mode | deterministic-pipeline
+build_target: worktree             # worktree (default) | existing | monorepo
+target_dir:                        # Required when build_target=existing. Absolute local path.
+target_branch:                     # Optional branch hint. For worktree defaults to proj/<slug>.
 max_turns:                         # Default 200. Set 500 for Playwright/complex. Any positive integer.
 worker_vendor:                     # claude (default) | codex | kimi | kimi-cli | kimi-wire
 output_path:                       # Auto-set by worker on first execution. Leave blank.
