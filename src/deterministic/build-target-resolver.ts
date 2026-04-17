@@ -242,7 +242,7 @@ export function resolveBuildTarget(input: BuildTargetInput): BuildTargetResoluti
 
       // Idempotent worktree add. Two cases handled:
       //   (a) worktree already exists at worktreePath → re-use it
-      //   (b) doesn't exist → `git worktree add -b <branch> <path>` from main repo
+      //   (b) doesn't exist → `git worktree add -b <branch> <path> <start-point>`
       // We don't try to detect partial state; if the dir exists we trust it.
       if (existsSync(worktreePath)) {
         return {
@@ -270,9 +270,30 @@ export function resolveBuildTarget(input: BuildTargetInput): BuildTargetResoluti
           }
         })();
 
+        // Per PRD: new worktrees fork from the `base` branch (not HEAD/`main`).
+        // Rationale: `base` is frozen at the init commit (LICENSE + .gitignore)
+        // so worktrees stay clean of other projects' code. Finished projects
+        // merge `proj/<slug>` → `main`, but `base` never moves.
+        //
+        // Fall back to HEAD if `base` doesn't exist — supports repos that
+        // haven't adopted the base/main split (e.g. fresh test repos).
+        const baseExists = (() => {
+          try {
+            execSync(`git -C "${sandboxPath}" rev-parse --verify "base"`, {
+              stdio: 'pipe',
+            });
+            return true;
+          } catch {
+            return false;
+          }
+        })();
+        const startPoint = baseExists ? 'base' : '';
+
         const cmd = branchExists
           ? `git -C "${sandboxPath}" worktree add "${worktreePath}" "${branch}"`
-          : `git -C "${sandboxPath}" worktree add -b "${branch}" "${worktreePath}"`;
+          : startPoint
+            ? `git -C "${sandboxPath}" worktree add -b "${branch}" "${worktreePath}" "${startPoint}"`
+            : `git -C "${sandboxPath}" worktree add -b "${branch}" "${worktreePath}"`;
 
         execSync(cmd, { stdio: 'pipe' });
       } catch (err) {

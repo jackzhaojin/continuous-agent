@@ -263,6 +263,63 @@ async function main(): Promise<void> {
     }
   });
 
+  // ─── worktree forks from `base` branch, not main/HEAD ─
+  await test('worktree: forks from `base` branch when it exists (PRD decision 1)', async () => {
+    const prevSandbox = process.env.AI_DEMOS_PATH;
+    const prevWorktrees = process.env.AI_DEMOS_WORKTREES_PATH;
+
+    const tmpRoot = await mkdtemp(path.join(os.tmpdir(), 'btr-base-'));
+    const sandboxRepo = path.join(tmpRoot, 'ai-demos');
+    const worktreesParent = path.join(tmpRoot, 'wt');
+
+    try {
+      await mkdir(sandboxRepo);
+      execSync('git init -q -b main', { cwd: sandboxRepo });
+      execSync('git config user.email t@e.com', { cwd: sandboxRepo });
+      execSync('git config user.name t', { cwd: sandboxRepo });
+      execSync('git config commit.gpgsign false', { cwd: sandboxRepo });
+
+      // Init commit (will be the shared ancestor).
+      await writeFile(path.join(sandboxRepo, 'LICENSE'), 'Apache 2.0\n');
+      execSync('git add -A', { cwd: sandboxRepo });
+      execSync('git commit -q -m init', { cwd: sandboxRepo });
+      const initSha = execSync('git rev-parse HEAD', { cwd: sandboxRepo }).toString().trim();
+
+      // Fork `base` off the init commit — frozen.
+      execSync('git branch base', { cwd: sandboxRepo });
+
+      // Advance `main` with a demo-project commit that should NOT appear in new worktrees.
+      await writeFile(path.join(sandboxRepo, 'finished-demo.md'), 'a previous project merged to main\n');
+      execSync('git add -A', { cwd: sandboxRepo });
+      execSync('git commit -q -m "finished demo"', { cwd: sandboxRepo });
+      const mainSha = execSync('git rev-parse main', { cwd: sandboxRepo }).toString().trim();
+
+      assert.notEqual(initSha, mainSha, 'main must have advanced past base');
+
+      process.env.AI_DEMOS_PATH = sandboxRepo;
+      process.env.AI_DEMOS_WORKTREES_PATH = worktreesParent;
+
+      const r = resolveBuildTarget({
+        slug: 'new-project',
+        build_target: 'worktree',
+        resolveMonorepoPath: () => '/x',
+      });
+
+      assert.equal(r.created, true);
+      const worktreeHead = execSync('git rev-parse HEAD', { cwd: r.outputPath }).toString().trim();
+      assert.equal(worktreeHead, initSha, 'worktree HEAD must equal base/init commit, not main');
+      // finished-demo.md from main must not be present.
+      assert.ok(!existsSync(path.join(r.outputPath, 'finished-demo.md')),
+        'worktree must not contain files from main');
+    } finally {
+      if (prevSandbox === undefined) delete process.env.AI_DEMOS_PATH;
+      else process.env.AI_DEMOS_PATH = prevSandbox;
+      if (prevWorktrees === undefined) delete process.env.AI_DEMOS_WORKTREES_PATH;
+      else process.env.AI_DEMOS_WORKTREES_PATH = prevWorktrees;
+      await rm(tmpRoot, { recursive: true, force: true });
+    }
+  });
+
   // ─── slug sanitization ───────────────────────────────
   await test('worktree: sanitizes slug for branch and path', async () => {
     const prevSandbox = process.env.AI_DEMOS_PATH;
