@@ -65,6 +65,7 @@ function legacyHarnessMonorepoPath(workItem: WorkItem): string {
  */
 function resolveHarnessTarget(workItem: WorkItem): {
   targetDir: string;
+  resolvedBuildTarget: 'worktree' | 'existing' | 'monorepo';
   warnings: string[];
 } {
   const slug =
@@ -77,7 +78,11 @@ function resolveHarnessTarget(workItem: WorkItem): {
     existingOutputPath: workItem.output_path,
     resolveMonorepoPath: () => legacyHarnessMonorepoPath(workItem),
   });
-  return { targetDir: resolution.outputPath, warnings: resolution.warnings };
+  return {
+    targetDir: resolution.outputPath,
+    resolvedBuildTarget: resolution.build_target,
+    warnings: resolution.warnings,
+  };
 }
 
 export async function executeHarness(
@@ -98,12 +103,14 @@ export async function executeHarness(
     return failFast(`unknown harness '${harnessName}': ${(err as Error).message}`, startedAt);
   }
 
-  const { targetDir, warnings } = resolveHarnessTarget(workItem);
+  const { targetDir, resolvedBuildTarget, warnings } = resolveHarnessTarget(workItem);
   for (const w of warnings) log(w);
   // Existing-target safeguard: refuse to mkdir into a path the user expects
   // to already exist. The resolver throws if target_dir is missing for
-  // build_target='existing', so reaching here means it's present.
-  if (workItem.build_target !== 'existing') {
+  // build_target='existing', so reaching here means it's present. Use the
+  // resolved mode (not raw workItem.build_target) so a goal with target_dir
+  // but no explicit build_target — inferred as 'existing' — is also guarded.
+  if (resolvedBuildTarget !== 'existing') {
     fs.mkdirSync(targetDir, { recursive: true });
   }
 

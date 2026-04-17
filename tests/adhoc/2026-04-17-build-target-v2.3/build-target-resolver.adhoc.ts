@@ -139,6 +139,27 @@ async function main(): Promise<void> {
     }
   });
 
+  await test('existing: inferred from target_dir alone (no explicit build_target)', async () => {
+    // Regression guard for the harness-executor fix: the resolver MUST return
+    // build_target='existing' when only target_dir is set, so harness-executor's
+    // existing-mode mkdir-skip guard fires correctly via resolvedBuildTarget.
+    const tmp = await mkdtemp(path.join(os.tmpdir(), 'btr-existing-inf-'));
+    try {
+      const r = resolveBuildTarget({
+        slug: 'foo',
+        // build_target intentionally omitted
+        target_dir: tmp,
+        resolveMonorepoPath: () => '/unused',
+      });
+      assert.equal(r.build_target, 'existing',
+        'target_dir without build_target must resolve to existing');
+      assert.equal(r.outputPath, tmp);
+      assert.equal(r.created, false);
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
+
   // ─── resolveBuildTarget — monorepo fallback ─────────
   await test('monorepo: defers path to caller factory', () => {
     const r = resolveBuildTarget({
@@ -311,6 +332,226 @@ async function main(): Promise<void> {
       // finished-demo.md from main must not be present.
       assert.ok(!existsSync(path.join(r.outputPath, 'finished-demo.md')),
         'worktree must not contain files from main');
+    } finally {
+      if (prevSandbox === undefined) delete process.env.AI_DEMOS_PATH;
+      else process.env.AI_DEMOS_PATH = prevSandbox;
+      if (prevWorktrees === undefined) delete process.env.AI_DEMOS_WORKTREES_PATH;
+      else process.env.AI_DEMOS_WORKTREES_PATH = prevWorktrees;
+      await rm(tmpRoot, { recursive: true, force: true });
+    }
+  });
+
+  // ─── explicit target_branch still forks from base ────
+  await test('worktree: explicit target_branch still forks from `base`', async () => {
+    const prevSandbox = process.env.AI_DEMOS_PATH;
+    const prevWorktrees = process.env.AI_DEMOS_WORKTREES_PATH;
+
+    const tmpRoot = await mkdtemp(path.join(os.tmpdir(), 'btr-tb-'));
+    const sandboxRepo = path.join(tmpRoot, 'ai-demos');
+    const worktreesParent = path.join(tmpRoot, 'wt');
+
+    try {
+      await mkdir(sandboxRepo);
+      execSync('git init -q -b main', { cwd: sandboxRepo });
+      execSync('git config user.email t@e.com', { cwd: sandboxRepo });
+      execSync('git config user.name t', { cwd: sandboxRepo });
+      execSync('git config commit.gpgsign false', { cwd: sandboxRepo });
+      await writeFile(path.join(sandboxRepo, 'LICENSE'), 'a\n');
+      execSync('git add -A', { cwd: sandboxRepo });
+      execSync('git commit -q -m init', { cwd: sandboxRepo });
+      const initSha = execSync('git rev-parse HEAD', { cwd: sandboxRepo }).toString().trim();
+      execSync('git branch base', { cwd: sandboxRepo });
+      // Advance main with other work
+      await writeFile(path.join(sandboxRepo, 'other.md'), 'other\n');
+      execSync('git add -A', { cwd: sandboxRepo });
+      execSync('git commit -q -m other', { cwd: sandboxRepo });
+
+      process.env.AI_DEMOS_PATH = sandboxRepo;
+      process.env.AI_DEMOS_WORKTREES_PATH = worktreesParent;
+
+      const r = resolveBuildTarget({
+        slug: 'custom-branch-project',
+        build_target: 'worktree',
+        target_branch: 'feat/something-custom',
+        resolveMonorepoPath: () => '/x',
+      });
+
+      assert.equal(r.branch, 'feat/something-custom');
+      const head = execSync(`git rev-parse HEAD`, { cwd: r.outputPath }).toString().trim();
+      assert.equal(head, initSha, 'custom-named branch must still fork from base');
+    } finally {
+      if (prevSandbox === undefined) delete process.env.AI_DEMOS_PATH;
+      else process.env.AI_DEMOS_PATH = prevSandbox;
+      if (prevWorktrees === undefined) delete process.env.AI_DEMOS_WORKTREES_PATH;
+      else process.env.AI_DEMOS_WORKTREES_PATH = prevWorktrees;
+      await rm(tmpRoot, { recursive: true, force: true });
+    }
+  });
+
+  // ─── auto-prune: dir gone WITHOUT manual prune, resolver recovers ─
+  await test('worktree: auto-prunes stale registration when dir was rm\'d without `worktree remove`', async () => {
+    const prevSandbox = process.env.AI_DEMOS_PATH;
+    const prevWorktrees = process.env.AI_DEMOS_WORKTREES_PATH;
+
+    const tmpRoot = await mkdtemp(path.join(os.tmpdir(), 'btr-autoprune-'));
+    const sandboxRepo = path.join(tmpRoot, 'ai-demos');
+    const worktreesParent = path.join(tmpRoot, 'wt');
+
+    try {
+      await mkdir(sandboxRepo);
+      execSync('git init -q -b main', { cwd: sandboxRepo });
+      execSync('git config user.email t@e.com', { cwd: sandboxRepo });
+      execSync('git config user.name t', { cwd: sandboxRepo });
+      execSync('git config commit.gpgsign false', { cwd: sandboxRepo });
+      await writeFile(path.join(sandboxRepo, 'LICENSE'), 'a\n');
+      execSync('git add -A', { cwd: sandboxRepo });
+      execSync('git commit -q -m init', { cwd: sandboxRepo });
+      execSync('git branch base', { cwd: sandboxRepo });
+
+      process.env.AI_DEMOS_PATH = sandboxRepo;
+      process.env.AI_DEMOS_WORKTREES_PATH = worktreesParent;
+
+      const r1 = resolveBuildTarget({
+        slug: 'auto-prune',
+        build_target: 'worktree',
+        resolveMonorepoPath: () => '/x',
+      });
+      assert.equal(r1.created, true);
+
+      // Nuke the worktree dir WITHOUT `git worktree remove` / `prune`.
+      // Leaves a dangling registration in `.git/worktrees/auto-prune/`.
+      await rm(r1.outputPath, { recursive: true, force: true });
+
+      // Resolver must auto-prune and recreate without human intervention.
+      const r2 = resolveBuildTarget({
+        slug: 'auto-prune',
+        build_target: 'worktree',
+        resolveMonorepoPath: () => {
+          throw new Error('resolver should not fall back — auto-prune must save the day');
+        },
+      });
+      assert.equal(r2.outputPath, r1.outputPath);
+      assert.ok(existsSync(r2.outputPath), 'worktree dir must be recreated post-prune');
+    } finally {
+      if (prevSandbox === undefined) delete process.env.AI_DEMOS_PATH;
+      else process.env.AI_DEMOS_PATH = prevSandbox;
+      if (prevWorktrees === undefined) delete process.env.AI_DEMOS_WORKTREES_PATH;
+      else process.env.AI_DEMOS_WORKTREES_PATH = prevWorktrees;
+      await rm(tmpRoot, { recursive: true, force: true });
+    }
+  });
+
+  // ─── shell-safe branch names (hardening) ─────────────
+  await test('worktree: branch name with shell-special chars does not shell-inject', async () => {
+    // Hardening guard: we switched from execSync template strings to
+    // execFileSync with argv arrays. A name with `"`, `;`, `$`, backticks
+    // must not be interpreted by a shell. Git will reject the name itself
+    // as invalid (so the resolver logs a warning and falls back to
+    // monorepo) but there must be NO side effects from shell parsing.
+    const prevSandbox = process.env.AI_DEMOS_PATH;
+    const prevWorktrees = process.env.AI_DEMOS_WORKTREES_PATH;
+
+    const tmpRoot = await mkdtemp(path.join(os.tmpdir(), 'btr-shell-'));
+    const sandboxRepo = path.join(tmpRoot, 'ai-demos');
+    const worktreesParent = path.join(tmpRoot, 'wt');
+    // The canary file git could have been tricked into writing if shell
+    // interpretation leaked through. Its existence = test fail.
+    const canary = path.join(tmpRoot, 'canary-pwned.txt');
+
+    try {
+      await mkdir(sandboxRepo);
+      execSync('git init -q -b main', { cwd: sandboxRepo });
+      execSync('git config user.email t@e.com', { cwd: sandboxRepo });
+      execSync('git config user.name t', { cwd: sandboxRepo });
+      execSync('git config commit.gpgsign false', { cwd: sandboxRepo });
+      await writeFile(path.join(sandboxRepo, 'L'), 'a\n');
+      execSync('git add -A', { cwd: sandboxRepo });
+      execSync('git commit -q -m init', { cwd: sandboxRepo });
+      execSync('git branch base', { cwd: sandboxRepo });
+
+      process.env.AI_DEMOS_PATH = sandboxRepo;
+      process.env.AI_DEMOS_WORKTREES_PATH = worktreesParent;
+
+      // Classic shell-injection payload: if the branch name ever hits a
+      // shell, the `touch canary-pwned.txt` would fire.
+      const evilBranch = `bad"; touch ${canary} ; echo "`;
+
+      // The resolver must not crash the process and must not execute the
+      // injected command. Git will reject the branch name as invalid,
+      // causing the resolver's internal catch to fall back to monorepo.
+      const r = resolveBuildTarget({
+        slug: 'shell-test',
+        build_target: 'worktree',
+        target_branch: evilBranch,
+        resolveMonorepoPath: () => path.join(tmpRoot, 'mono-fallback'),
+      });
+
+      // Either the worktree was created with git's own invalid-branch
+      // handling, OR the resolver fell back to monorepo. Both are
+      // acceptable. What is NOT acceptable is the canary being touched.
+      assert.ok(!existsSync(canary),
+        `SHELL INJECTION DETECTED: ${canary} was created by a shell`);
+      assert.ok(r.build_target === 'worktree' || r.build_target === 'monorepo',
+        'resolver must return a valid mode, not crash');
+    } finally {
+      if (prevSandbox === undefined) delete process.env.AI_DEMOS_PATH;
+      else process.env.AI_DEMOS_PATH = prevSandbox;
+      if (prevWorktrees === undefined) delete process.env.AI_DEMOS_WORKTREES_PATH;
+      else process.env.AI_DEMOS_WORKTREES_PATH = prevWorktrees;
+      await rm(tmpRoot, { recursive: true, force: true });
+    }
+  });
+
+  // ─── dangling branch (worktree dir manually removed) ─
+  await test('worktree: dangling branch (no dir) re-uses branch via `git worktree add <path> <branch>`', async () => {
+    const prevSandbox = process.env.AI_DEMOS_PATH;
+    const prevWorktrees = process.env.AI_DEMOS_WORKTREES_PATH;
+
+    const tmpRoot = await mkdtemp(path.join(os.tmpdir(), 'btr-dangle-'));
+    const sandboxRepo = path.join(tmpRoot, 'ai-demos');
+    const worktreesParent = path.join(tmpRoot, 'wt');
+
+    try {
+      await mkdir(sandboxRepo);
+      execSync('git init -q -b main', { cwd: sandboxRepo });
+      execSync('git config user.email t@e.com', { cwd: sandboxRepo });
+      execSync('git config user.name t', { cwd: sandboxRepo });
+      execSync('git config commit.gpgsign false', { cwd: sandboxRepo });
+      await writeFile(path.join(sandboxRepo, 'LICENSE'), 'a\n');
+      execSync('git add -A', { cwd: sandboxRepo });
+      execSync('git commit -q -m init', { cwd: sandboxRepo });
+      execSync('git branch base', { cwd: sandboxRepo });
+
+      process.env.AI_DEMOS_PATH = sandboxRepo;
+      process.env.AI_DEMOS_WORKTREES_PATH = worktreesParent;
+
+      // First pass creates the worktree + branch.
+      const r1 = resolveBuildTarget({
+        slug: 'resume-project',
+        build_target: 'worktree',
+        resolveMonorepoPath: () => '/x',
+      });
+      assert.equal(r1.created, true);
+      const worktreePath = r1.outputPath;
+
+      // Simulate a user/retry nuking the worktree dir WITHOUT `git worktree remove`.
+      // This leaves a dangling registration in .git/worktrees/<name>.
+      await rm(worktreePath, { recursive: true, force: true });
+      // Prune the dangling registration — matches what a disciplined recovery would do.
+      execSync(`git -C "${sandboxRepo}" worktree prune`, { stdio: 'pipe' });
+
+      // Branch still exists. Re-resolve: should succeed, re-using the branch (no -b).
+      const r2 = resolveBuildTarget({
+        slug: 'resume-project',
+        build_target: 'worktree',
+        resolveMonorepoPath: () => {
+          throw new Error('resolver should not fall back on dangling recovery');
+        },
+      });
+      assert.equal(r2.build_target, 'worktree');
+      assert.equal(r2.outputPath, worktreePath);
+      assert.equal(r2.created, true);
+      assert.ok(existsSync(r2.outputPath), 'worktree dir must be recreated');
     } finally {
       if (prevSandbox === undefined) delete process.env.AI_DEMOS_PATH;
       else process.env.AI_DEMOS_PATH = prevSandbox;

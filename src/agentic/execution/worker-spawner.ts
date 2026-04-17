@@ -7,7 +7,7 @@
  */
 
 import { mkdirSync, existsSync, copyFileSync, cpSync, createWriteStream, readFileSync, writeFileSync } from 'fs';
-import { execSync } from 'child_process';
+import { execSync, execFileSync } from 'child_process';
 import os from 'os';
 import path from 'path';
 import type { WorkerContract, WorkerResult, WorkItem, ExecutionPattern } from '../../core/types.js';
@@ -701,22 +701,25 @@ export async function spawnWorker(
       resolution.branch &&
       (resolution.build_target === 'existing' || resolution.build_target === 'monorepo')
     ) {
+      // Use execFileSync with argv arrays (no shell) so user-supplied
+      // target_branch from PROMPT.md can't shell-inject through quoting.
+      const gitIn = (args: string[]): void => {
+        execFileSync('git', ['-C', projectPath, ...args], { stdio: 'pipe' });
+      };
+      const gitProbe = (args: string[]): boolean => {
+        try {
+          gitIn(args);
+          return true;
+        } catch {
+          return false;
+        }
+      };
       try {
-        execSync(`git -C "${projectPath}" rev-parse --git-dir`, { stdio: 'pipe' });
-        const exists = (() => {
-          try {
-            execSync(`git -C "${projectPath}" rev-parse --verify "${resolution.branch}"`, {
-              stdio: 'pipe',
-            });
-            return true;
-          } catch {
-            return false;
-          }
-        })();
-        const cmd = exists
-          ? `git -C "${projectPath}" checkout "${resolution.branch}"`
-          : `git -C "${projectPath}" checkout -b "${resolution.branch}"`;
-        execSync(cmd, { stdio: 'pipe' });
+        gitIn(['rev-parse', '--git-dir']);
+        const exists = gitProbe(['rev-parse', '--verify', resolution.branch]);
+        gitIn(exists
+          ? ['checkout', resolution.branch]
+          : ['checkout', '-b', resolution.branch]);
         logger.log(`BUILD_TARGET: checked out branch ${resolution.branch}`);
       } catch (err) {
         logger.log(

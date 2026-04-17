@@ -20,11 +20,37 @@
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync, statSync } from 'node:fs';
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import * as path from 'node:path';
 import * as os from 'node:os';
 
 import type { BuildTarget } from '../core/types.js';
+
+/**
+ * Run a git subcommand with an argv array (no shell). Prevents shell
+ * interpretation of user-controlled values like `target_branch` from
+ * PROMPT.md frontmatter. Returns the combined stdout/stderr string or
+ * throws if git exits non-zero.
+ */
+function git(cwd: string, args: string[]): string {
+  return execFileSync('git', ['-C', cwd, ...args], {
+    stdio: 'pipe',
+    encoding: 'utf-8',
+  });
+}
+
+/**
+ * Boolean variant: returns true if git exits 0, false otherwise. Swallows
+ * errors — use only for probes like `rev-parse --verify`.
+ */
+function gitOk(cwd: string, args: string[]): boolean {
+  try {
+    git(cwd, args);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Default build target during the v2.3 transition.
@@ -256,19 +282,21 @@ export function resolveBuildTarget(input: BuildTargetInput): BuildTargetResoluti
 
       try {
         mkdirSync(worktreesParent, { recursive: true });
-        // If the branch already exists (e.g. from a prior worktree that was removed
-        // without `git worktree remove`), `-b <branch>` will fail. Fall back to
-        // checking out the existing branch with no `-b` flag.
-        const branchExists = (() => {
-          try {
-            execSync(`git -C "${sandboxPath}" rev-parse --verify "${branch}"`, {
-              stdio: 'pipe',
-            });
-            return true;
-          } catch {
-            return false;
-          }
-        })();
+
+        // Auto-prune stale worktree registrations. If a prior run's worktree
+        // directory was manually removed (e.g. `rm -rf`) without `git worktree
+        // remove`, git still thinks the worktree exists and `git worktree add`
+        // would fail with "already registered". Prune is idempotent and only
+        // removes entries whose directories are gone — safe to call blindly.
+        try {
+          git(sandboxPath, ['worktree', 'prune']);
+        } catch {
+          // Non-fatal — the add below will surface any real issue.
+        }
+
+        // If the branch already exists (e.g. from a prior worktree), `-b <branch>`
+        // will fail. Fall back to checking out the existing branch with no `-b`.
+        const branchExists = gitOk(sandboxPath, ['rev-parse', '--verify', branch]);
 
         // Per PRD: new worktrees fork from the `base` branch (not HEAD/`main`).
         // Rationale: `base` is frozen at the init commit (LICENSE + .gitignore)
@@ -277,25 +305,16 @@ export function resolveBuildTarget(input: BuildTargetInput): BuildTargetResoluti
         //
         // Fall back to HEAD if `base` doesn't exist — supports repos that
         // haven't adopted the base/main split (e.g. fresh test repos).
-        const baseExists = (() => {
-          try {
-            execSync(`git -C "${sandboxPath}" rev-parse --verify "base"`, {
-              stdio: 'pipe',
-            });
-            return true;
-          } catch {
-            return false;
-          }
-        })();
+        const baseExists = gitOk(sandboxPath, ['rev-parse', '--verify', 'base']);
         const startPoint = baseExists ? 'base' : '';
 
-        const cmd = branchExists
-          ? `git -C "${sandboxPath}" worktree add "${worktreePath}" "${branch}"`
+        const addArgs = branchExists
+          ? ['worktree', 'add', worktreePath, branch]
           : startPoint
-            ? `git -C "${sandboxPath}" worktree add -b "${branch}" "${worktreePath}" "${startPoint}"`
-            : `git -C "${sandboxPath}" worktree add -b "${branch}" "${worktreePath}"`;
+            ? ['worktree', 'add', '-b', branch, worktreePath, startPoint]
+            : ['worktree', 'add', '-b', branch, worktreePath];
 
-        execSync(cmd, { stdio: 'pipe' });
+        git(sandboxPath, addArgs);
       } catch (err) {
         warnings.push(
           `[build-target-resolver] git worktree add failed for slug=${slug}: ` +
