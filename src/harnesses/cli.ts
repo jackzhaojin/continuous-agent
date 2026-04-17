@@ -9,7 +9,10 @@
  * Flags:
  *   --name <harness>        (required) generic | eds | study
  *   --prompt <path>         (required) absolute or relative path to PROMPT.md
- *   --target <dir>          target working directory (default: derived)
+ *   --target <dir>          target working directory OVERRIDE — supersedes
+ *                           PROMPT.md frontmatter (build_target, target_dir).
+ *                           Default: resolved from PROMPT.md, or derived from
+ *                           the prompt's directory.
  *   --vendor <name>         claude | codex | kimi | kimi-cli | kimi-wire
  *                           (default: $WORKER_VENDOR or 'claude')
  *   --mode <mode>           auto|bootstrap|adopt|extend|extend-deep|resume
@@ -52,6 +55,8 @@ import type {
   HarnessModeType,
   HarnessRunConfig,
 } from './core/types.js';
+import { parsePromptMd } from '../deterministic/prompt-md-parser.js';
+import { resolveBuildTarget } from '../deterministic/build-target-resolver.js';
 
 interface ParsedArgs {
   name?: string;
@@ -94,7 +99,8 @@ function printUsage(): void {
       `Flags:\n` +
       `  --name <harness>     Required. One of: ${registered}\n` +
       `  --prompt <path>      Required. Path to PROMPT.md\n` +
-      `  --target <dir>       Target working dir (default: derived from prompt)\n` +
+      `  --target <dir>       Target working dir OVERRIDE (supersedes PROMPT.md;\n` +
+      `                        default: resolved from PROMPT.md frontmatter or derived from prompt)\n` +
       `  --vendor <name>      claude | codex | kimi | kimi-cli | kimi-wire\n` +
       `  --mode <mode>        auto | bootstrap | adopt | extend | extend-deep | resume\n` +
       `  --max-turns <n>      Max turns per agent call\n` +
@@ -261,7 +267,44 @@ async function main(): Promise<number> {
     return 2;
   }
 
-  const targetDir = path.resolve(args.target ?? deriveTargetFromPrompt(promptFile));
+  // v2.3: PROMPT.md is the primary source of truth for build target.
+  // CLI --target is an override (still honored for testing/back-compat).
+  // Resolution precedence (highest first):
+  //   1. --target flag → absolute override, skips resolver
+  //   2. PROMPT.md frontmatter (build_target, target_dir, target_branch)
+  //   3. deriveTargetFromPrompt() → legacy fallback (PROMPT.md's own dir)
+  let targetDir: string;
+  if (args.target) {
+    targetDir = path.resolve(args.target);
+  } else {
+    let resolved: string | undefined;
+    try {
+      const promptMd = await parsePromptMd(promptFile);
+      const fm = promptMd.frontmatter;
+      const hasBuildTargetFields =
+        typeof fm.build_target === 'string' ||
+        typeof fm.target_dir === 'string';
+      if (hasBuildTargetFields) {
+        const resolution = resolveBuildTarget({
+          slug: String(fm.slug || path.basename(path.dirname(promptFile))),
+          build_target: fm.build_target,
+          target_dir: fm.target_dir,
+          target_branch: fm.target_branch,
+          existingOutputPath: typeof fm.output_path === 'string' ? fm.output_path : undefined,
+          // CLI fallback for monorepo mode = the legacy deriveTargetFromPrompt
+          // behavior. Standalone CLI runs don't have a goal-bundle slug
+          // hierarchy, so the prompt's directory is the natural default.
+          resolveMonorepoPath: () => deriveTargetFromPrompt(promptFile),
+        });
+        for (const w of resolution.warnings) process.stderr.write(`${w}\n`);
+        resolved = resolution.outputPath;
+      }
+    } catch (err) {
+      // Parsing failures are non-fatal in standalone mode — fall back to legacy derivation.
+      process.stderr.write(`[harness] PROMPT.md parse failed (${(err as Error).message}); using derived target\n`);
+    }
+    targetDir = resolved ?? path.resolve(deriveTargetFromPrompt(promptFile));
+  }
   const vendor = resolveVendor(args.vendor);
   const modeOverride = coerceMode(args.mode);
 

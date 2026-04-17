@@ -7,7 +7,8 @@ import { readdir, rename, mkdir, appendFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 import { parsePromptMd, type PromptMdFile } from '../../deterministic/prompt-md-parser.js';
-import type { WorkItem, WorkStep, ExecutionPattern } from '../../core/types.js';
+import type { WorkItem, WorkStep, ExecutionPattern, BuildTarget } from '../../core/types.js';
+import { coerceBuildTarget } from '../../deterministic/build-target-resolver.js';
 import type { SelectableWork } from './work-selector.js';
 import { readStepsJson, stepsJsonToWorkSteps, migrateFromPromptMd, selectNextExecutableStep } from '../../deterministic/steps-json-handler.js';
 
@@ -355,6 +356,14 @@ async function bundleToWorkItemAsync(bundle: GoalBundle): Promise<WorkItem> {
       : undefined,
     integration_gate_cadence: frontmatter.integration_gate_cadence
       ? Number(frontmatter.integration_gate_cadence)
+      : undefined,
+    // v2.3: unified build target fields (PRD harness-build-target-prd.md)
+    build_target: coerceBuildTarget(frontmatter.build_target) as BuildTarget | undefined,
+    target_dir: typeof frontmatter.target_dir === 'string' && frontmatter.target_dir.length > 0
+      ? frontmatter.target_dir
+      : undefined,
+    target_branch: typeof frontmatter.target_branch === 'string' && frontmatter.target_branch.length > 0
+      ? frontmatter.target_branch
       : undefined,
   };
 }

@@ -35,11 +35,19 @@ import type {
 } from '../../harnesses/core/types.js';
 import { seedStepsFromPhases, makeStepSink } from '../../harnesses/core/status-mirror.js';
 import { getAgentWorkerProviderForVendor } from '../../core/vendor/vendor-registry.js';
+import { resolveBuildTarget } from '../../deterministic/build-target-resolver.js';
 
 const AGENT_OUTPUTS_BASE =
   process.env.AGENT_OUTPUTS_PATH || path.join(os.homedir(), 'dev', 'ai-sandbox');
 
-function resolveHarnessTarget(workItem: WorkItem): string {
+/**
+ * Compute the legacy monorepo path the harness used pre-v2.3:
+ * `ai-sandbox/harnesses/<name>/<slug>/`.
+ *
+ * Used as the fallback when build_target='monorepo' (or default during
+ * v2.3 transition). Honors the legacy `harness_target` override.
+ */
+function legacyHarnessMonorepoPath(workItem: WorkItem): string {
   if (workItem.harness_target) {
     return path.isAbsolute(workItem.harness_target)
       ? workItem.harness_target
@@ -47,6 +55,29 @@ function resolveHarnessTarget(workItem: WorkItem): string {
   }
   const slug = (workItem.source_path && path.basename(workItem.source_path)) || workItem.id;
   return path.join(AGENT_OUTPUTS_BASE, 'harnesses', workItem.harness ?? 'generic', slug);
+}
+
+/**
+ * v2.3: Unified build-target resolution for harness runs. Reads the same
+ * PROMPT.md frontmatter fields the worker-spawner reads (build_target,
+ * target_dir, target_branch). Falls back to the legacy monorepo path when
+ * build_target is unset / 'monorepo'.
+ */
+function resolveHarnessTarget(workItem: WorkItem): {
+  targetDir: string;
+  warnings: string[];
+} {
+  const slug =
+    (workItem.source_path && path.basename(workItem.source_path)) || workItem.id;
+  const resolution = resolveBuildTarget({
+    slug,
+    build_target: workItem.build_target,
+    target_dir: workItem.target_dir,
+    target_branch: workItem.target_branch,
+    existingOutputPath: workItem.output_path,
+    resolveMonorepoPath: () => legacyHarnessMonorepoPath(workItem),
+  });
+  return { targetDir: resolution.outputPath, warnings: resolution.warnings };
 }
 
 export async function executeHarness(
@@ -67,8 +98,14 @@ export async function executeHarness(
     return failFast(`unknown harness '${harnessName}': ${(err as Error).message}`, startedAt);
   }
 
-  const targetDir = resolveHarnessTarget(workItem);
-  fs.mkdirSync(targetDir, { recursive: true });
+  const { targetDir, warnings } = resolveHarnessTarget(workItem);
+  for (const w of warnings) log(w);
+  // Existing-target safeguard: refuse to mkdir into a path the user expects
+  // to already exist. The resolver throws if target_dir is missing for
+  // build_target='existing', so reaching here means it's present.
+  if (workItem.build_target !== 'existing') {
+    fs.mkdirSync(targetDir, { recursive: true });
+  }
 
   // Locate PROMPT.md for the harness. Prefer the goal bundle's PROMPT.md
   // (source_path) — that's what the user authored.

@@ -15,6 +15,7 @@ import { buildIntelligentPrompt } from '../intelligence/prompt-builder.js';
 import { selectStrategy } from '../intelligence/strategy-selector.js';
 import { findProjectBySlug } from '../../deterministic/project-registry.js';
 import { getAvailableAppCredentialNames, checkWorkerEnvForLeaks } from '../../deterministic/credential-tiers.js';
+import { resolveBuildTarget } from '../../deterministic/build-target-resolver.js';
 import {
   getAgentWorkerProviderForVendor,
   resolveWorkerModelForVendor,
@@ -634,32 +635,93 @@ export async function spawnWorker(
     category = 'skill-build';
     logger.log(`SKILL-BUILD: Working in agent codebase: ${projectPath}`);
     console.log(`[Worker] SKILL-BUILD: Working in agent codebase: ${projectPath}`);
-  } else if (retryContext?.existingProjectPath) {
-    projectPath = retryContext.existingProjectPath;
-    category = detectCategory(contract.prompt);
-    logger.log(`RESUME: Using existing project path: ${projectPath}`);
-    console.log(`[Worker] RESUME: Using existing project path: ${projectPath}`);
   } else {
-    console.log(`[Worker] NEW: Generating new project path`);
-    // Generate project path and set up directory with .gitignore FIRST
-    const generated = generateProjectPath(contract);
-    projectPath = generated.path;
-    category = generated.category;
-    setupProjectDirectory(projectPath, category);
+    // v2.3: Route through the unified build-target resolver. The resolver
+    // honors retry context (existingProjectPath) by short-circuiting and
+    // returning the persisted path, so the legacy retry branch is folded in.
+    const slug = workItem?.id?.replace(/^goal-/, '') || contract.id.replace('contract-', '');
+    category = detectCategory(contract.prompt);
+    const resolution = resolveBuildTarget({
+      slug,
+      build_target: workItem?.build_target,
+      target_dir: workItem?.target_dir,
+      target_branch: workItem?.target_branch,
+      existingOutputPath: retryContext?.existingProjectPath || workItem?.output_path,
+      // Monorepo path stays exactly where v2.2 put it (preserves backwards compat).
+      resolveMonorepoPath: () => generateProjectPath(contract).path,
+    });
+    for (const w of resolution.warnings) {
+      logger.log(w);
+      console.warn(w);
+    }
+    projectPath = resolution.outputPath;
+    logger.log(
+      `BUILD_TARGET: mode=${resolution.build_target} path=${projectPath} ` +
+        `branch=${resolution.branch ?? '(current)'} created=${resolution.created}`,
+    );
+    console.log(
+      `[Worker] BUILD_TARGET: mode=${resolution.build_target} path=${projectPath}`,
+    );
 
-    // V1.2: Copy-in from source project if specified
-    if (workItem?.source_project) {
-      const sourceEntry = findProjectBySlug(workItem.source_project);
-      if (sourceEntry) {
-        logger.log(`COPY-IN: Copying from source project "${sourceEntry.slug}" at ${sourceEntry.output_path}`);
-        const copied = copySourceProject(sourceEntry.output_path, projectPath);
-        if (copied) {
-          logger.log(`COPY-IN: Source project copied successfully`);
+    // 'existing' target: respect the project as-is. Skip all scaffold (no
+    // .gitignore injection, no .env copy, no auto-commit). The project owns
+    // its own state. Source-project copy-in also doesn't apply.
+    if (resolution.build_target !== 'existing') {
+      // Worktree mode is ours — safe to scaffold. Monorepo is the legacy
+      // path. Both share the same setup steps.
+      setupProjectDirectory(projectPath, category);
+
+      // V1.2: Copy-in from source project if specified
+      if (workItem?.source_project) {
+        const sourceEntry = findProjectBySlug(workItem.source_project);
+        if (sourceEntry) {
+          logger.log(`COPY-IN: Copying from source project "${sourceEntry.slug}" at ${sourceEntry.output_path}`);
+          const copied = copySourceProject(sourceEntry.output_path, projectPath);
+          if (copied) {
+            logger.log(`COPY-IN: Source project copied successfully`);
+          } else {
+            logger.log(`COPY-IN: Warning - source project copy failed, starting fresh`);
+          }
         } else {
-          logger.log(`COPY-IN: Warning - source project copy failed, starting fresh`);
+          logger.log(`COPY-IN: Source project "${workItem.source_project}" not found in registry`);
         }
-      } else {
-        logger.log(`COPY-IN: Source project "${workItem.source_project}" not found in registry`);
+      }
+    } else if (workItem?.source_project) {
+      logger.log(
+        `COPY-IN: skipped — build_target='existing' uses target_dir as-is`,
+      );
+    }
+
+    // Optional branch checkout for existing/monorepo modes when the
+    // frontmatter explicitly requests one. Worktree mode already created
+    // its branch via `git worktree add -b`. Best-effort: if checkout
+    // fails, we log and continue — the worker can still commit on the
+    // current branch.
+    if (
+      resolution.branch &&
+      (resolution.build_target === 'existing' || resolution.build_target === 'monorepo')
+    ) {
+      try {
+        execSync(`git -C "${projectPath}" rev-parse --git-dir`, { stdio: 'pipe' });
+        const exists = (() => {
+          try {
+            execSync(`git -C "${projectPath}" rev-parse --verify "${resolution.branch}"`, {
+              stdio: 'pipe',
+            });
+            return true;
+          } catch {
+            return false;
+          }
+        })();
+        const cmd = exists
+          ? `git -C "${projectPath}" checkout "${resolution.branch}"`
+          : `git -C "${projectPath}" checkout -b "${resolution.branch}"`;
+        execSync(cmd, { stdio: 'pipe' });
+        logger.log(`BUILD_TARGET: checked out branch ${resolution.branch}`);
+      } catch (err) {
+        logger.log(
+          `BUILD_TARGET: branch checkout failed for ${resolution.branch}: ${(err as Error).message}`,
+        );
       }
     }
   }
@@ -670,12 +732,16 @@ export async function spawnWorker(
     setupAgentOutputsRoot();
   }
 
-  // Compute relative project path (relative to ai-sandbox root).
-  // Regular workers use this in their prompts since cwd is ai-sandbox/.
-  // Self-enhance/skill-build use the absolute path since cwd is the agent repo.
+  // Compute the project path label that workers see in their prompts.
+  // - self-enhance / skill-build: absolute path (cwd is the agent repo)
+  // - monorepo (legacy): relative to ai-sandbox/ (cwd is ai-sandbox/)
+  // - worktree / existing (v2.3): absolute, since these live outside ai-sandbox/
+  const projectIsInsideOutputs = projectPath.startsWith(AGENT_OUTPUTS_BASE + path.sep);
   const relativeProjectPath = (isSelfEnhance || isSkillBuild)
     ? projectPath
-    : path.relative(AGENT_OUTPUTS_BASE, projectPath);
+    : projectIsInsideOutputs
+      ? path.relative(AGENT_OUTPUTS_BASE, projectPath)
+      : projectPath;
 
   // Build prompt - use specialized prompts for self-enhance and skill-build tasks
   let prompt: string;

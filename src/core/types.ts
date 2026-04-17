@@ -13,6 +13,19 @@ export type ExecutionPattern =
   | 'harness';
 
 /**
+ * Build target (v2.3) — where worker/harness output lands.
+ *
+ * - `worktree` — git worktree off the `ai-sandbox-v2` repo (per-project isolation).
+ * - `existing` — work directly inside an external project at `target_dir`.
+ * - `monorepo` — legacy: subfolder inside the `ai-sandbox/` monorepo.
+ *
+ * The effective default during the v2.3 transition is `monorepo`. The PRD's
+ * end-state default is `worktree` (P1-8: flipped only after worktree path is
+ * validated end-to-end against real goals).
+ */
+export type BuildTarget = 'worktree' | 'existing' | 'monorepo';
+
+/**
  * Individual health check result
  */
 export interface HealthCheck {
@@ -196,6 +209,21 @@ export interface WorkItem {
   harness_target?: string;        // Absolute or repo-relative target dir for harness run
   harness_mode?: 'bootstrap' | 'adopt' | 'extend' | 'extend-deep' | 'resume';
   model_overrides?: Record<string, string>;  // Per-agent model overrides for harness
+
+  // v2.3: Unified build target (PRD: ai-docs/v2/xxxx-xx-xx-v2.3/harness-build-target-prd.md)
+  // Selects where worker/harness output lands. See BuildTarget for semantics.
+  build_target?: BuildTarget;
+  // Required when build_target='existing'. Absolute path to an existing project directory.
+  // For 'worktree', leave unset — system computes the worktree path from slug.
+  // For 'monorepo', leave unset — system uses the legacy ai-sandbox/<...>/<slug> path.
+  target_dir?: string;
+  // Optional branch override.
+  // - worktree: defaults to `proj/<slug>`. Override for non-default branch names.
+  // - existing: if set, the worker/harness checks out this branch in the external repo.
+  //             Otherwise it commits on the current branch of the external repo.
+  // - monorepo: if set, the worker creates and commits on this branch.
+  //             Otherwise commits on the current branch.
+  target_branch?: string;
 
   // v2.1.7: Integration/data contract fields from PROMPT.md frontmatter
   //
