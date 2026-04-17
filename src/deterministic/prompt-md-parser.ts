@@ -22,6 +22,11 @@ export interface PromptMdFrontmatter {
   harness_target?: string;          // absolute or repo-relative target dir
   harness_mode?: string;            // bootstrap|adopt|extend|extend-deep|resume
   model_overrides?: Record<string, string>;
+  // v2.3: Unified build target fields
+  // See src/core/types.ts BuildTarget and ai-docs/v2/xxxx-xx-xx-v2.3/harness-build-target-prd.md
+  build_target?: string;            // 'worktree' | 'existing' | 'monorepo'
+  target_dir?: string;              // required when build_target='existing'
+  target_branch?: string;           // optional branch override per build_target
   [key: string]: unknown;
 }
 

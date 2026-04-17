@@ -1,0 +1,136 @@
+# Baseline .gitignore template for ai-sandbox-v2 worktrees (v2.3 PRD).
+#
+# Copied verbatim into each new `git worktree add` checkout by
+# `src/deterministic/build-target-resolver.ts`. The ai-sandbox-v2 repo
+# itself ships a near-identical .gitignore on the init commit; this file
+# is the authoritative source for updates so they propagate to all new
+# worktrees without touching the existing repo's history.
+#
+# Per PRD decision 2:
+#   "Maintain a baseline template in
+#    `continuous-agent/workspace-instructions/gitignore-template`. The
+#    agent copies this into new worktrees."
+
+# ============================================
+# Dependencies
+# ============================================
+node_modules/
+vendor/
+bower_components/
+
+# Python virtual environments
+.venv/
+venv/
+env/
+ENV/
+.Python
+
+# ============================================
+# Build Outputs
+# ============================================
+build/
+dist/
+out/
+*.egg-info/
+*.egg
+.eggs/
+
+# ============================================
+# Python
+# ============================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+pip-log.txt
+pip-delete-this-directory.txt
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+.mypy_cache/
+.ruff_cache/
+
+# ============================================
+# Environment & Secrets
+# ============================================
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+.env.app
+.env.worker
+*.pem
+*.key
+
+# ============================================
+# Logs
+# ============================================
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ============================================
+# Claude Code scaffolding (synced per spawn, not project source)
+# ============================================
+.claude/
+CLAUDE.md.tmp
+
+# ============================================
+# IDE & Editors
+# ============================================
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+*.sublime-workspace
+*.sublime-project
+
+# ============================================
+# OS files
+# ============================================
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ============================================
+# Testing & Coverage
+# ============================================
+coverage/
+.nyc_output/
+*.lcov
+
+# ============================================
+# Framework caches
+# ============================================
+.next/
+.nuxt/
+.cache/
+.turbo/
+.parcel-cache/
+
+# ============================================
+# Playwright (Claude harness MCP scratchpad)
+# ============================================
+.playwright-mcp/
+playwright-report/
+test-results/
+
+# ============================================
+# Jupyter
+# ============================================
+.ipynb_checkpoints/
+
+# ============================================
+# Temporary & misc
+# ============================================
+*.tmp
+*.temp
+*.bak
+*.pid

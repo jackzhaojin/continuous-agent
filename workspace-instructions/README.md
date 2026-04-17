@@ -55,6 +55,41 @@ Every goal's `PROMPT.md` starts with YAML frontmatter between `---` delimiters. 
 | `branch` | string | _(none)_ | Git branch for self-enhancement/skill-build goals. |
 | `source_project` | string | _(none)_ | Slug of an existing project to copy as starting point. |
 
+### Build Target Fields (v2.3) — unified output destination
+
+These select where worker/harness output lands. See the PRD at
+`ai-docs/v2/xxxx-xx-xx-v2.3/harness-build-target-prd.md` for the full design.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `build_target` | enum | `monorepo` (during v2.3 transition; flips to `worktree` per P1-8) | `worktree` = git worktree off `ai-sandbox-v2`. `existing` = work directly in an external project at `target_dir`. `monorepo` = legacy `ai-sandbox/` subfolder. |
+| `target_dir` | string | _(none)_ | **Required when `build_target=existing`.** Absolute path to an existing project directory. The worker uses it as-is — no `.gitignore` injection, no scaffold. |
+| `target_branch` | string | _(see below)_ | Branch override. `worktree`: defaults to `proj/<slug>` (this overrides). `existing`/`monorepo`: if set, the worker checks out (or creates) this branch; otherwise commits on the current branch. |
+
+**Decision framework:** if `build_target` is set, use it; else if `target_dir`
+is set, use `existing`; else default. (Currently `monorepo` until P1-8 flips
+the default to `worktree`.)
+
+**Env overrides:**
+- `BUILD_TARGET_DEFAULT` — change the system-wide default (`worktree`/`existing`/`monorepo`)
+- `AI_SANDBOX_V2_PATH` — location of the worktree source repo (default `~/dev/ai-sandbox-v2`)
+- `AI_SANDBOX_V2_WORKTREES_PATH` — parent dir for worktrees (default `~/dev/ai-sandbox-v2-worktrees`)
+
+**Worktree behavior:**
+- Branch: `proj/<slug>` (or `target_branch`).
+- Path: `~/dev/ai-sandbox-v2-worktrees/<slug>/`.
+- The resolver runs `git -C <ai-sandbox-v2> worktree add -b <branch> <path>` — idempotent (re-using an existing worktree dir is fine).
+- If `ai-sandbox-v2` doesn't exist yet (PRD P1-1 is human work), the resolver falls back to `monorepo` and logs a warning. Goals keep running.
+- The `.gitignore` template at `workspace-instructions/gitignore-template` is copied into each new worktree.
+
+**Existing behavior:**
+- `target_dir` must be an absolute path to an existing directory. The resolver throws otherwise.
+- No scaffold (no `.gitignore`, no `.env` copy, no auto-commit). Respects the project's own conventions.
+- `source_project` (copy-in) is intentionally skipped — the project already exists.
+
+**Monorepo behavior:**
+- Identical to v2.2: worker → `ai-sandbox/projects/<category>/<date>/<slug>/`; harness → `ai-sandbox/harnesses/<name>/<slug>/`.
+
 ### User-Journey Fields (v2.1.7) — required for UI goals
 
 These came out of the B2B postal-checkout retro (`ai-docs/v2/2026-04-01-v2.1/retro-b2b-postal-checkout.md`). Without them the executive refuses to start UI goals (and should — the postal run shipped 32 steps of undemoable product because none of these were declared).
