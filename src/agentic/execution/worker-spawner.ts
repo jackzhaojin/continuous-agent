@@ -16,6 +16,7 @@ import { selectStrategy } from '../intelligence/strategy-selector.js';
 import { findProjectBySlug } from '../../deterministic/project-registry.js';
 import { getAvailableAppCredentialNames, checkWorkerEnvForLeaks } from '../../deterministic/credential-tiers.js';
 import { resolveBuildTarget, getLegacyMonorepoWorktreePath } from '../../deterministic/build-target-resolver.js';
+import type { BuildTarget } from '../../core/types.js';
 import {
   getAgentWorkerProviderForVendor,
   resolveWorkerModelForVendor,
@@ -27,12 +28,9 @@ import { BUILD_INFO } from '../../core/executive-loop.js';
 // Agent outputs directory — anchor for monorepo-mode project paths and the
 // centralized `.env` / `.claude/` / `CLAUDE.md` setup. Post-rebaseline this
 // points at the `monorepo/legacy-v2.2` worktree so monorepo-mode goals land
-// inside legacy and worktree-mode workers don't accidentally pollute the
-// clean `main` checkout. Override with `AGENT_OUTPUTS_PATH` env var.
-//
-// TODO (follow-up): For build_target='worktree', workers should arguably
-// cwd into their own worktree instead of the legacy monorepo. That refactor
-// is out of scope for this PRD-alignment pass.
+// inside legacy. Worktree-mode workers (v2.3 default) get a parallel setup
+// inside their own worktree via `setupWorktreeProject()` and cwd directly
+// into the worktree — they do NOT use AGENT_OUTPUTS_BASE as their cwd.
 const AGENT_OUTPUTS_BASE = process.env.AGENT_OUTPUTS_PATH || getLegacyMonorepoWorktreePath();
 
 // Worker timeout: wall-clock limit to prevent indefinite hangs (default 45 min)
@@ -343,6 +341,78 @@ ${replaceLines.length > 0 ? `\n### Do NOT use local alternatives when a cloud se
 }
 
 /**
+ * Set up a v2.3 worktree project: copy .env / .env.app / .claude/ into the
+ * worktree root and write a worktree-specific CLAUDE.md. The worker's cwd
+ * will be the worktree itself (not AGENT_OUTPUTS_BASE), so all the files
+ * the worker needs must live alongside it.
+ *
+ * This is parallel to setupAgentOutputsRoot() which targets the legacy
+ * monorepo. Both can run in the same loop iteration without conflict.
+ */
+function setupWorktreeProject(worktreePath: string, slug: string): void {
+  if (!existsSync(worktreePath)) return;
+
+  // Copy worker .env (synced from .env.worker or .env)
+  const envSources = [path.join(AGENT_BASE, '.env.worker'), path.join(AGENT_BASE, '.env')];
+  const envSource = envSources.find((c) => existsSync(c));
+  if (envSource) {
+    copyFileSync(envSource, path.join(worktreePath, '.env'));
+  }
+
+  // Copy .env.app (Tier 3 transfer file) if it exists
+  const appEnvSource = path.join(AGENT_BASE, '.env.app');
+  if (existsSync(appEnvSource)) {
+    copyFileSync(appEnvSource, path.join(worktreePath, '.env.app'));
+  }
+
+  // Copy .claude/ (skills + agents) into the worktree
+  if (existsSync(CLAUDE_FILES_DIR)) {
+    try {
+      cpSync(CLAUDE_FILES_DIR, path.join(worktreePath, '.claude'), { recursive: true });
+    } catch (error) {
+      console.log(`[Worker] Warning: Failed to sync .claude/ into worktree: ${error}`);
+    }
+  }
+
+  // Write a worktree-specific CLAUDE.md (do NOT reuse the monorepo template —
+  // it would tell the worker it's in a monorepo, which it isn't).
+  const appEnvDest = path.join(worktreePath, '.env.app');
+  const appCredNames = existsSync(appEnvDest) ? getAvailableAppCredentialNames(appEnvDest) : [];
+  const appCredsSection = appCredNames.length > 0
+    ? `\n## Available App Credentials (Tier 3)\n\nAvailable in \`.env.app\` at this worktree root:\n${appCredNames.map(n => `- \`${n}\``).join('\n')}\n\nThese are stripped of the \`APP_\` prefix. Inject into your project format (\`.env.local\`, dotenv, docker-compose, etc.) as needed.\n`
+    : '';
+
+  const content = `# Worktree Project Workspace
+
+You are working in a per-project git worktree at \`${worktreePath}\` on branch \`proj/${slug}\`, forked from the immutable \`base\` branch of the parent ai-sandbox repo. This is the v2.3 default build target.
+
+## Layout
+
+- \`.env\` — Worker env (do not modify)
+- \`.env.app\` — App credentials (Tier 3, \`APP_\` prefix stripped; read-only)
+- \`.claude/\` — Shared skills and agents (do not modify; use via Skill/Task tools)
+- \`LICENSE\`, \`.gitignore\` — Inherited from \`base\` (do not modify)
+- All other files: yours to create / modify
+
+## Rules
+
+1. **Stay in this worktree.** Do not \`cd\` to \`~/dev/ai-sandbox/\` or to any other worktree. Your assigned project path IS this directory.
+2. **Do NOT run \`git init\`.** This worktree shares the parent ai-sandbox repo's git database. \`git add\` / \`git commit\` from here commits to the \`proj/${slug}\` branch.
+3. **Branch is \`proj/${slug}\`** off the immutable \`base\` branch. Don't switch branches; commit your work directly here.
+4. **Do NOT create a nested \`.claude/\`** — the one at this worktree root is shared by Skill/Task tools.
+5. **Projects CAN have their own CLAUDE.md** — it inherits from this root file and adds project-specific context.
+${appCredsSection}`;
+
+  const claudeMdPath = path.join(worktreePath, 'CLAUDE.md');
+  if (existsSync(claudeMdPath)) {
+    const existing = readFileSync(claudeMdPath, 'utf-8');
+    if (existing === content) return;
+  }
+  writeFileSync(claudeMdPath, content, 'utf-8');
+  console.log(`[Worker] Wrote worktree CLAUDE.md at ${claudeMdPath}`);
+}
+
+/**
  * Retry context for intelligent prompts
  */
 export interface WorkerRetryContext {
@@ -630,6 +700,10 @@ export async function spawnWorker(
   // EXCEPTION: Self-enhancement tasks always use AGENT_BASE
   let projectPath: string;
   let category: string;
+  // Hoisted from the resolver block below so the cwd computation at the
+  // bottom of spawnWorker can branch on the build target.
+  let buildTargetMode: BuildTarget | undefined;
+  let resolvedSlug: string | undefined;
 
   if (isSelfEnhance) {
     // Self-enhancement: work in the agent codebase itself
@@ -648,6 +722,7 @@ export async function spawnWorker(
     // honors retry context (existingProjectPath) by short-circuiting and
     // returning the persisted path, so the legacy retry branch is folded in.
     const slug = workItem?.id?.replace(/^goal-/, '') || contract.id.replace('contract-', '');
+    resolvedSlug = slug;
     category = detectCategory(contract.prompt);
     const resolution = resolveBuildTarget({
       slug,
@@ -658,6 +733,7 @@ export async function spawnWorker(
       // Monorepo path stays exactly where v2.2 put it (preserves backwards compat).
       resolveMonorepoPath: () => generateProjectPath(contract).path,
     });
+    buildTargetMode = resolution.build_target;
     for (const w of resolution.warnings) {
       logger.log(w);
       console.warn(w);
@@ -678,6 +754,14 @@ export async function spawnWorker(
       // Worktree mode is ours — safe to scaffold. Monorepo is the legacy
       // path. Both share the same setup steps.
       setupProjectDirectory(projectPath, category);
+
+      // v2.3: For worktree mode, mirror the centralized .env / .env.app /
+      // .claude / CLAUDE.md into the worktree so the worker can cwd directly
+      // into it instead of the legacy monorepo. Monorepo mode keeps using
+      // the centralized AGENT_OUTPUTS_BASE setup unchanged.
+      if (resolution.build_target === 'worktree') {
+        setupWorktreeProject(projectPath, slug);
+      }
 
       // V1.2: Copy-in from source project if specified
       if (workItem?.source_project) {
@@ -755,14 +839,17 @@ export async function spawnWorker(
 
   // Compute the project path label that workers see in their prompts.
   // - self-enhance / skill-build: absolute path (cwd is the agent repo)
-  // - monorepo (legacy): relative to ai-sandbox/ (cwd is ai-sandbox/)
-  // - worktree / existing (v2.3): absolute, since these live outside ai-sandbox/
+  // - worktree / existing (v2.3): absolute path; cwd already IS this dir, so
+  //   `cd $PROJECT_PATH` is a no-op but keeps prompts uniform across modes
+  // - monorepo (legacy): relative to AGENT_OUTPUTS_BASE (cwd is the legacy root)
   const projectIsInsideOutputs = projectPath.startsWith(AGENT_OUTPUTS_BASE + path.sep);
   const relativeProjectPath = (isSelfEnhance || isSkillBuild)
     ? projectPath
-    : projectIsInsideOutputs
-      ? path.relative(AGENT_OUTPUTS_BASE, projectPath)
-      : projectPath;
+    : (buildTargetMode === 'worktree' || buildTargetMode === 'existing')
+      ? projectPath
+      : projectIsInsideOutputs
+        ? path.relative(AGENT_OUTPUTS_BASE, projectPath)
+        : projectPath;
 
   // Build prompt - use specialized prompts for self-enhance and skill-build tasks
   let prompt: string;
@@ -809,8 +896,14 @@ export async function spawnWorker(
     // loop-until-progress — handled at executive-loop level (Phase 4 re-execution loop)
   }
 
-  // Resolve vendor provider before logging so we can include vendor info
-  const workerCwd = (isSelfEnhance || isSkillBuild) ? projectPath : AGENT_OUTPUTS_BASE;
+  // Resolve vendor provider before logging so we can include vendor info.
+  // v2.3: worktree/existing modes cwd directly into the project dir; monorepo
+  // (legacy) keeps using the centralized AGENT_OUTPUTS_BASE root.
+  const workerCwd = (isSelfEnhance || isSkillBuild)
+    ? projectPath
+    : (buildTargetMode === 'worktree' || buildTargetMode === 'existing')
+      ? projectPath
+      : AGENT_OUTPUTS_BASE;
   const provider = getAgentWorkerProviderForVendor(workItem?.worker_vendor);
 
   // Log worker start with full context

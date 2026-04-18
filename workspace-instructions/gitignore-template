@@ -116,6 +116,14 @@ coverage/
 .parcel-cache/
 
 # ============================================
+# Next.js auto-generated files
+# ============================================
+# Next.js refreshes next-env.d.ts on every `next build` / `next dev` run,
+# producing 1-line diffs that trip the agent's git_status_clean verifier.
+# Workers don't need to track this file — Next.js regenerates it on demand.
+next-env.d.ts
+
+# ============================================
 # Playwright (Claude harness MCP scratchpad)
 # ============================================
 .playwright-mcp/

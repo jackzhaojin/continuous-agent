@@ -2,8 +2,8 @@
 name: worker-base
 description: >
   Core worker instructions for all autonomous agent workers. Includes constitution limits,
-  monorepo rules, navigation protocol, technology preferences, and execution guidelines.
-  Loaded for EVERY worker task regardless of type or vendor.
+  workspace rules (worktree default, monorepo legacy), navigation protocol, technology
+  preferences, and execution guidelines. Loaded for EVERY worker task regardless of type or vendor.
 user-invocable: false
 metadata:
   category: skill
@@ -26,9 +26,13 @@ You are operating under the Continuous Executive Agent constitution. These limit
 
 If you hit a constitutional limit, document it and proceed with alternative work.
 
-## Project Context (Monorepo)
+## Project Context
 
-You are working inside a **monorepo** at `ai-sandbox/`. Multiple projects coexist here, each in its own subdirectory. Your current working directory is the monorepo root.
+Your assigned project workspace is `{{PROJECT_PATH}}`. The shape of that workspace depends on the goal's `build_target`:
+
+- **`worktree` (v2.3 default)** — Your project IS a per-project git worktree at `{{PROJECT_PATH}}` on branch `proj/<slug>`, forked from the immutable `base` branch of the parent ai-sandbox repo. Your CWD is already this worktree. Shared `.env`, `.env.app`, `.claude/`, and a worktree-specific `CLAUDE.md` live at this worktree's root.
+- **`monorepo` (legacy)** — Your CWD is the legacy ai-sandbox monorepo root, and `{{PROJECT_PATH}}` is a subdirectory inside it (`projects/{category}/{date}/{id}/`). Multiple projects coexist in this workspace. Shared `.env`, `.env.app`, `.claude/`, and the monorepo `CLAUDE.md` live at the workspace root, NOT in your subdirectory.
+- **`existing`** — `{{PROJECT_PATH}}` is an external project owned by the user. Respect its existing conventions; do not inject `.env` / `.gitignore` / scaffolding.
 
 **Your Project Directory:** `{{PROJECT_PATH}}`
 
@@ -37,22 +41,22 @@ You are working inside a **monorepo** at `ai-sandbox/`. Multiple projects coexis
 Before doing ANY work, navigate to your project directory and assess existing state:
 
 ```bash
-cd {{PROJECT_PATH}}
-git log --oneline -10 2>/dev/null  # See what's already been built
+cd {{PROJECT_PATH}}                 # No-op for worktree mode (already there); navigates for monorepo
+git log --oneline -10 2>/dev/null   # See what's already been built
 git diff --stat 2>/dev/null         # Check for uncommitted work
 ls -la                              # Understand project structure
 ```
 
 **A previous worker may have already made progress on this task** (e.g., due to a timeout or restart). Review what exists before writing any code. If the project already has files, commits, or partial implementations that align with your task, **continue from where it left off** — do not start over. Only redo work if what exists is broken beyond repair.
 
-### Monorepo Rules
+### Workspace Rules
 
 - **ALL files you create or modify MUST be inside `{{PROJECT_PATH}}`**
-- Do NOT modify the root CLAUDE.md, .env (worker env), or .claude/ directory
+- Do NOT modify the workspace root `CLAUDE.md`, `.env` (worker env), `.env.app`, or `.claude/` directory — these are shared
 - Do NOT modify any other project's directory
-- **Do NOT create `.claude/` inside your project.** Skills and agents are shared at the root `.claude/` only — use via Skill/Task tools, do NOT copy them
-- **Projects CAN have their own CLAUDE.md** — CLAUDE.md inherits hierarchically, so your project-level CLAUDE.md adds to (not replaces) the root one
-- Do NOT run `git init` — you are inside a monorepo. Commit to the monorepo's git from your project directory
+- **Do NOT create a nested `.claude/` inside your project.** Skills and agents are shared at the workspace root — use them via the Skill/Task tools instead of copying
+- **Projects CAN have their own CLAUDE.md** — CLAUDE.md inherits hierarchically, so a project-level CLAUDE.md adds to (not replaces) the root one
+- Do NOT run `git init` — your workspace already shares the parent ai-sandbox repo's git database. Commit your work directly from `{{PROJECT_PATH}}`; in worktree mode that goes to your `proj/<slug>` branch, in monorepo mode it goes to `monorepo/legacy-v2.2`
 
 ## Technology Preferences
 
