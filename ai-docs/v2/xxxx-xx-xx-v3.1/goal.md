@@ -1,6 +1,8 @@
-# V2.5 Goal: Cloud Observability Unification (With Local Monitor Parity)
+# V3.1 Goal: Cloud Observability Unification (With Local Monitor Parity)
 
 **Status:** Planned
+
+> **Renumbered from v2.5 → v3.1 on 2026-04-18.** Follow-on to the v3.0 cloud migration; moved in lockstep.
 
 ## Theme
 
