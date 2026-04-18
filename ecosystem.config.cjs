@@ -20,7 +20,11 @@ module.exports = {
         // NOTE: Using 'development' to ensure npm installs devDependencies
         // 'production' was causing workers to fail npm install for TypeScript
         NODE_ENV: 'development',
-        AGENT_OUTPUTS_PATH: '/Users/jackjin/dev/ai-sandbox',
+        // AGENT_OUTPUTS_PATH intentionally NOT set here — the v2.3 default
+        // (getLegacyMonorepoWorktreePath()) routes the centralized
+        // CLAUDE.md/.env/.env.app/.claude/ setup into the legacy worktree
+        // instead of polluting ai-sandbox main. Override only if you have a
+        // very specific need to redirect monorepo-mode output elsewhere.
         IDLE_SLEEP_SECONDS: '30',       // Sleep when no work (polling interval)
         UNHEALTHY_SLEEP_SECONDS: '60',  // Sleep when system unhealthy
         MAX_TURNS_PER_STEP: '200',      // Default max turns per worker (higher for complex tasks)
@@ -29,7 +33,7 @@ module.exports = {
       },
       env_development: {
         NODE_ENV: 'development',
-        AGENT_OUTPUTS_PATH: '/Users/jackjin/dev/ai-sandbox',
+        // AGENT_OUTPUTS_PATH intentionally NOT set — see env block above.
         IDLE_SLEEP_SECONDS: '60',       // Longer polling in dev
         UNHEALTHY_SLEEP_SECONDS: '60',
         MAX_TURNS_PER_STEP: '200',      // Default max turns per worker
