@@ -67,7 +67,7 @@ import { createBrowserClient } from '@supabase/ssr'
 export function createClient() {
   return createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
   )
 }
 
@@ -78,9 +78,9 @@ import { createServerClient } from '@supabase/ssr'
 ### Environment Variables
 
 ```
-NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321  (or hosted URL)
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key  (server-side only)
+NEXT_PUBLIC_SUPABASE_URL=https://<ref>.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...  (safe in browser with RLS)
+SUPABASE_SECRET_KEY=sb_secret_...                         (server-side only, bypasses RLS)
 ```
 
 ### Data Access Pattern

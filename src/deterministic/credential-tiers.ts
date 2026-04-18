@@ -58,8 +58,8 @@ export const TIER2_WORKER_KEYS = new Set([
   'CHAT_VENDOR',
   'CHAT_MODEL',
   'SUPABASE_URL',
-  'SUPABASE_ANON_KEY',
-  'SUPABASE_SERVICE_ROLE_KEY',
+  'SUPABASE_PUBLISHABLE_KEY',
+  'SUPABASE_SECRET_KEY',
 ]);
 
 // ── Tier 3 APP_ prefix convention ────────────────────────────────
