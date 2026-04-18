@@ -178,6 +178,8 @@ async function buildBreakdownPrompt(item: WorkItem, bundleContext: string, compl
     TURN_RANGE: turnRange,
     GOAL_TITLE: item.title,
     BUNDLE_CONTEXT: bundleContext || item.description || '(no description)',
+  }, {
+    usageContext: 'phase-3b/goal-breakdown',
   });
 }
 
