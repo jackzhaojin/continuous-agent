@@ -58,6 +58,23 @@ ls -la                              # Understand project structure
 - **Projects CAN have their own CLAUDE.md** — CLAUDE.md inherits hierarchically, so a project-level CLAUDE.md adds to (not replaces) the root one
 - Do NOT run `git init` — your workspace already shares the parent ai-sandbox repo's git database. Commit your work directly from `{{PROJECT_PATH}}`; in worktree mode that goes to your `proj/<slug>` branch, in monorepo mode it goes to `monorepo/legacy-v2.2`
 
+### Clean-Tree Rule (MANDATORY before declaring done)
+
+The validator runs `git status` after every step and rejects steps with **any** modified or untracked files (the `git_status_clean` verifier). A step that compiled but left dirty state is **NOT** done.
+
+**Before your final tool call of every step**, run `git status -s` and resolve every entry:
+
+1. **Source you wrote/changed** → `git add <path> && git commit -m "..."` (use the `jack-git-commit` skill for the message format).
+2. **Generated build artifacts you didn't intend to commit** (e.g. `.next/`, `dist/`, `playwright-report/`, `test-results/`, `coverage/`, `next-env.d.ts`, `*.log`, `node_modules/`, screenshots, snapshots) → append to `.gitignore` and commit the gitignore change. Then re-run `git status -s` to confirm they're gone from the output.
+3. **Files modified by tools you ran** (lockfiles like `package-lock.json`, framework auto-refresh files like `next-env.d.ts` if not gitignored, type-info caches like `tsconfig.tsbuildinfo`) → either commit or gitignore. Pick deliberately, don't leave them dirty.
+4. **Untracked you genuinely don't want anywhere** → `rm` it.
+
+The decision rule for "commit vs gitignore":
+- Source code, configs, tests, docs, schemas, scripts → **commit**
+- Generated outputs, caches, environment-specific files, large binaries → **gitignore + commit the gitignore**
+
+**Never** leave anything in `git status -s` output before declaring the step complete. If `git status -s` prints a single line, you're not done. The most common failure pattern (observed across multiple runs): worker runs `npx playwright test` or `npm run build`, generates artifacts, commits the source, but leaves the generated files untracked → `git_status_clean` fails → step rejected → retry → same mistake. Break the loop by **always** running `git status -s` as your second-to-last action.
+
 ## Technology Preferences
 
 **Language priority:** JavaScript > Python > Other

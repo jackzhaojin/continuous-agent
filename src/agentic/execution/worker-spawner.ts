@@ -831,9 +831,14 @@ export async function spawnWorker(
     }
   }
 
-  // Set up centralized CLAUDE.md, .claude/, and .env at ai-sandbox root
-  // Skip for self-enhance/skill-build — they work in the agent repo which already has .claude/
-  if (!isSelfEnhance && !isSkillBuild) {
+  // Set up centralized CLAUDE.md, .claude/, and .env at AGENT_OUTPUTS_BASE
+  // (the legacy monorepo worktree). v2.3: only run this for monorepo-mode
+  // goals — worktree-mode goals get their own self-contained setup via
+  // setupWorktreeProject() and don't read from the legacy root, so touching
+  // it on every spawn just produces noisy diffs in the legacy worktree.
+  // Self-enhance/skill-build also skip — they work in the agent repo which
+  // already has .claude/.
+  if (!isSelfEnhance && !isSkillBuild && buildTargetMode === 'monorepo') {
     setupAgentOutputsRoot();
   }
 
