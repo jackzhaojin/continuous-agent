@@ -51,6 +51,8 @@ async function buildDiagnosticPrompt(
     LAST_ERROR: lastError,
     VALIDATION_REPORTS: validationSection,
     WORKER_LOGS: logsSection,
+  }, {
+    usageContext: 'phase-7/failure-diagnosis',
   });
 }
 

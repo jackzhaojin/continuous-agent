@@ -141,6 +141,65 @@ async function checkReferenceIntegrity(): Promise<HealthCheck> {
   }
 }
 
+interface ExecutiveSkillCheck {
+  skill: string;
+  usedBy: string;
+}
+
+const EXECUTIVE_SKILLS: ExecutiveSkillCheck[] = [
+  { skill: 'email-triage', usedBy: 'Phase 0.5 inbox triage (identity/inbox-checker.ts)' },
+  { skill: 'goal-breakdown', usedBy: 'Phase 3b auto-breakdown (agentic/work-selection/goal-breakdown.ts)' },
+  { skill: 'failure-diagnosis', usedBy: 'Phase 7 diagnosis (agentic/diagnosis/agentic-diagnosis.ts)' },
+];
+
+/**
+ * Check that executive skills required by agentic loop phases are present and readable.
+ *
+ * These skills are loaded dynamically at runtime via loadSkillPrompt().
+ * If files are missing or empty, agentic phases silently degrade/fallback.
+ */
+async function checkExecutiveSkills(): Promise<HealthCheck> {
+  const agentRoot = process.env.AGENT_PATH || process.cwd();
+  const skillsRoot = path.join(agentRoot, '.claude', 'skills');
+  const missing: string[] = [];
+  const unreadable: string[] = [];
+
+  for (const entry of EXECUTIVE_SKILLS) {
+    const skillPath = path.join(skillsRoot, entry.skill, 'SKILL.md');
+
+    if (!existsSync(skillPath)) {
+      missing.push(`${entry.skill} (${entry.usedBy})`);
+      continue;
+    }
+
+    try {
+      const content = await readFile(skillPath, 'utf-8');
+      if (!content.trim()) {
+        unreadable.push(`${entry.skill} (empty file)`);
+      }
+    } catch {
+      unreadable.push(`${entry.skill} (read failed)`);
+    }
+  }
+
+  if (missing.length > 0 || unreadable.length > 0) {
+    const parts: string[] = [];
+    if (missing.length > 0) parts.push(`missing: ${missing.join(', ')}`);
+    if (unreadable.length > 0) parts.push(`unreadable: ${unreadable.join(', ')}`);
+    return {
+      name: 'executive-skills',
+      status: 'fail',
+      message: `Executive skill validation failed (${parts.join('; ')})`,
+    };
+  }
+
+  return {
+    name: 'executive-skills',
+    status: 'pass',
+    message: `Validated ${EXECUTIVE_SKILLS.length} runtime executive skills in ${skillsRoot}`,
+  };
+}
+
 /**
  * Housekeep completed bundles that are still in in-progress/.
  * Scans in-progress/P{0-4}/ for bundles with status: complete in PROMPT.md
@@ -203,6 +262,7 @@ export async function checkHealth(): Promise<HealthStatus> {
   checks.push(await checkDiskSpace());
   checks.push(checkNodeVersion());
   checks.push(await checkReferenceIntegrity());
+  checks.push(await checkExecutiveSkills());
 
   // Housekeep completed bundles still sitting in in-progress/
   try {

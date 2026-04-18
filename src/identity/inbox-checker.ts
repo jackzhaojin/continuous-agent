@@ -140,6 +140,8 @@ async function triageEmails(emails: FetchedEmail[], agentEmail: string): Promise
   const prompt = await loadSkillPrompt('email-triage', {
     AGENT_EMAIL: agentEmail,
     EMAIL_SUMMARIES: emailSummaries,
+  }, {
+    usageContext: 'phase-0.5/inbox-triage',
   });
 
   const result = await chatProvider.complete({
