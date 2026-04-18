@@ -27,7 +27,10 @@ tags: [tag1, tag2]
 output_path:             # Set by worker on first execution
 branch:                  # Set for self-enhancement tasks
 source_project:          # Slug of source project to copy from
-execution_pattern:       # v2.0: plan-then-execute, plan-mode, etc.
+execution_pattern:       # v2.0: plan-then-execute, plan-mode, harness, etc.
+build_target:            # v2.3: worktree (default) | existing | monorepo
+target_dir:              # Required for build_target: existing
+target_branch:           # Optional branch override for worktree/existing
 ---
 ```
 

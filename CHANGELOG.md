@@ -6,25 +6,28 @@ Builds are tracked in the sibling `ai-sandbox/` repo. New v2.3 work happens on p
 
 ## [Unreleased] - develop
 
-### Changed
-- **`ai-sandbox` rebaselined in place** (2026-04-17) — replaced the planned standalone `ai-demos` repo with an in-place rebaseline of the existing `ai-sandbox` repo. Three branches now share the rebaselined ancestry: `base` (frozen Apache 2.0 + `.gitignore` init, backdated to 2026-03-28), `main` (= `base`, plus a README), and `monorepo/legacy-v2.2` (the original 156 commits with original SHAs and timestamps preserved). The `pre-rebaseline-backup` tag pins the pre-surgery tip as a safety net.
-- **Tiered-namespace worktree convention** — `<namespace>/<slug>` branches map to `~/dev/ai-sandbox-worktrees/<namespace>/<slug>/` so `git worktree list` and the filesystem stay in lockstep. The legacy archive is materialized at `~/dev/ai-sandbox-worktrees/monorepo/legacy-v2.2/`.
-- **`build_target: monorepo` redirected** — monorepo-mode goals now write into the legacy worktree (`<legacy-worktree>/projects/<cat>/<date>/<slug>/` for workers, `<legacy-worktree>/harnesses/<name>/<slug>/` for harnesses) instead of the rebaselined `ai-sandbox/` root. The legacy worktree is pinned to `monorepo/legacy-v2.2` — `target_branch` is ignored (and logged) for monorepo-mode goals.
-- **Default `build_target` flipped to `worktree`** — PRD P1-8 honored. `getDefaultBuildTarget()` returns `'worktree'`. Goals without `build_target` now get a fresh `proj/<slug>` worktree off `base`. Override via `BUILD_TARGET_DEFAULT` env if a deployment needs the legacy default.
-- **Env vars renamed** — `AI_DEMOS_PATH` → `AI_SANDBOX_PATH`, `AI_DEMOS_WORKTREES_PATH` → `AI_SANDBOX_WORKTREES_PATH`. New `AI_SANDBOX_LEGACY_MONOREPO_PATH` overrides the legacy worktree path (default: `<AI_SANDBOX_WORKTREES_PATH>/monorepo/legacy-v2.2/`).
-- **`AGENT_OUTPUTS_BASE` redirected** — defaults to `getLegacyMonorepoWorktreePath()` so the centralized `.env`/`.claude`/`CLAUDE.md` setup lands in the legacy worktree (not the clean `main` checkout).
+Next up: v2.4 capability hardening + retro carry-forward (executive→harness integration with a real LLM, build-target manual e2e carried from v2.3 P1-6/P1-7, v2.2 capability matrix, H/I items from v2.1.6 retro). See [`ai-docs/v2/xxxx-xx-xx-v2.4/goal.md`](ai-docs/v2/xxxx-xx-xx-v2.4/goal.md). Cloud migration (v3.0) and observability (v3.1) deferred — see `ai-docs/v2/xxxx-xx-xx-v3.0/` and `xxxx-xx-xx-v3.1/`.
+
+## [2.3.0] - 2026-04-18
 
 ### Added
+- **Unified Build Targets** — Three-mode output model selected per-goal via PROMPT.md frontmatter: `worktree` (default, tiered-namespace path under `~/dev/ai-sandbox-worktrees/<namespace>/<slug>/` off `ai-sandbox` `base`), `existing` (work directly in an external repo/directory via `target_dir`), `monorepo` (legacy flat layout anchored at the `monorepo/legacy-v2.2` worktree). Resolver centralized in `src/deterministic/build-target-resolver.ts`; PROMPT.md fields parsed by `prompt-md-parser.ts` (`build_target`, `target_dir`, `target_branch`); `BuildTarget` type in `core/types.ts`.
 - **`getLegacyMonorepoWorktreePath()`** in `build-target-resolver.ts` — single helper for the legacy archive base.
-- **Tiered-path tests** in `build-target-resolver.adhoc.ts` (asserts `proj/foo` → `<parent>/proj/foo/`, `experiment/spike/bar` → `<parent>/experiment/spike/bar/`) plus a default-flip assertion.
-- **`monorepo-legacy-routing.adhoc.ts`** — verifies `getLegacyMonorepoWorktreePath()` lands inside the worktrees parent, NOT the rebaselined `main` checkout.
-- **`real-ai-sandbox-integration.adhoc.ts`** — renamed from `real-ai-demos-integration.adhoc.ts`; tests against the actual rebaselined `ai-sandbox` repo with the tiered-namespace path expectation.
+- **Regression tests** — `build-target-resolver.adhoc.ts` (tiered-path + default-flip), `monorepo-legacy-routing.adhoc.ts` (legacy routing stays inside worktrees parent), `real-ai-sandbox-integration.adhoc.ts` (against the real rebaselined `ai-sandbox`).
 
-### Pages / docs
-- PRD `harness-build-target-prd.md` updated to reflect the in-place rebaseline; Phase 1 P1-1 / P1-8 marked DONE.
-- GitHub Pages workflow re-point handled in a separate change (out of scope for this CHANGELOG entry).
-- v2.3 `goal.md` updated with the rebaselined repo decision; P1-1 through P1-5 + P1-8 marked DONE; P1-6 / P1-7 (manual e2e) remain.
-- `workspace-instructions/README.md`, `_TEMPLATE/PROMPT.md`, `.claude/rules/architecture.md`, root `CLAUDE.md`, and `claude-files-to-output/templates/ai-sandbox-claude-md.md` all updated to describe the new model.
+### Changed
+- **`ai-sandbox` rebaselined in place** (2026-04-17) — replaced the planned standalone `ai-demos` repo with an in-place rebaseline. Three branches now share the rebaselined ancestry: `base` (frozen Apache 2.0 + `.gitignore` init, backdated 2026-03-28), `main` (= `base` plus a README), `monorepo/legacy-v2.2` (original 156 commits with original SHAs and timestamps). Safety-net tag `pre-rebaseline-backup` pins the pre-surgery tip.
+- **Tiered-namespace worktree convention** — `<namespace>/<slug>` branches map to `~/dev/ai-sandbox-worktrees/<namespace>/<slug>/` so `git worktree list` and the filesystem stay in lockstep.
+- **Default `build_target` flipped to `worktree`** — `getDefaultBuildTarget()` returns `'worktree'`. Override via `BUILD_TARGET_DEFAULT` env if a deployment needs the legacy default.
+- **Harness target resolution via PROMPT.md** — `harness-executor.resolveHarnessTarget()` uses the shared resolver; CLI `--target` is now an optional override.
+- **Env vars renamed** — `AI_DEMOS_PATH` → `AI_SANDBOX_PATH`, `AI_DEMOS_WORKTREES_PATH` → `AI_SANDBOX_WORKTREES_PATH`. New `AI_SANDBOX_LEGACY_MONOREPO_PATH` overrides the legacy worktree path. `AGENT_OUTPUTS_BASE` redirected to `getLegacyMonorepoWorktreePath()` so the centralized `.env`/`.claude`/`CLAUDE.md` setup lands in the legacy worktree.
+
+### Scope split
+v2.3 was originally scoped as "Unified Build Targets + Hardening Release." Phase 1 (build targets) shipped as v2.3.0; Phase 2 (hardening) and Phase 3 (retro carry-forward) moved to v2.4. Manual e2e for `worktree` and `existing` targets (P1-6 / P1-7) carries into v2.4.
+
+### Deferred
+- v3.0 — Cloud DB migration for ledgers and agent state (was v2.4)
+- v3.1 — Cloud observability unification (was v2.5)
 
 ## [2.2.0] - 2026-04-11
 

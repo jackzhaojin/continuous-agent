@@ -17,7 +17,7 @@ paths:
 **Special routing:**
 - `[SELF-ENHANCE]` goals -> agent codebase (`AGENT_BASE`), adds Task tool for self-enhancer subagent
 - `[SKILL-BUILD]` goals -> agent codebase, delegates to skill-builder subagent
-- All other goals -> `ai-sandbox/` with isolated project directories
+- All other goals -> build-target resolver (`src/deterministic/build-target-resolver.ts`): `worktree` (default, per-goal worktree off `ai-sandbox` `base`), `existing` (`target_dir`), or `monorepo` (legacy flat layout)
 
 **Execution patterns:**
 - `plan-then-execute`: Standard worker (default)

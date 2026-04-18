@@ -37,6 +37,18 @@ New project work: a `proj/<slug>` branch in its own worktree at `~/dev/ai-sandbo
 
 **GitHub Pages CI:** `.github/workflows/deploy-pages.yml` (lives on `monorepo/legacy-v2.2`) auto-deploys all Vite projects from the legacy flat layout. Live at [jackzhaojin.github.io/ai-sandbox](https://jackzhaojin.github.io/ai-sandbox/). Per-worktree deploys for new `proj/<slug>` work are not yet wired (future work).
 
+## Build Targets (v2.3)
+
+Per-goal output routing via PROMPT.md frontmatter (`build_target`, `target_dir`, `target_branch`). Resolver: `src/deterministic/build-target-resolver.ts`.
+
+| Target | Path | Use |
+|---|---|---|
+| `worktree` (default) | `~/dev/ai-sandbox-worktrees/<namespace>/<slug>/` off `base` (tiered-namespace) | New projects, parallel builds |
+| `existing` | `target_dir` (external repo) | Migrations, improving existing projects |
+| `monorepo` | Anchored at the `monorepo/legacy-v2.2` worktree | Legacy flat layout, scratch experiments |
+
+Default flipped from `monorepo` to `worktree` via `getDefaultBuildTarget()`; override with `BUILD_TARGET_DEFAULT` env. Harness target resolution goes through the same resolver (`harness-executor.resolveHarnessTarget()`); CLI `--target` is an optional override.
+
 ## Vendor Abstraction Layer (v2.1)
 
 `src/core/vendor/` — Multi-vendor LLM support. Two interfaces:

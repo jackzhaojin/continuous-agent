@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) **and** other agents
 
 ## Project Overview
 
-A continuously-running autonomous agent that finds and executes work without waiting for human prompts. It runs 24/7 via PM2, picks goals from a prioritized queue, spawns workers via a multi-vendor abstraction (Claude Agent SDK, OpenAI Codex SDK, Kimi CLI/Wire), validates results, and moves to the next task. Human interaction is async via `workspace/needs-you.md`.
+A continuously-running autonomous agent that finds and executes work without waiting for human prompts. It runs 24/7 via PM2, picks goals from a prioritized queue, spawns workers via a multi-vendor abstraction (Claude Agent SDK, OpenAI Codex SDK, Kimi CLI/Wire), validates results, and moves to the next task. Output lands in a per-goal build target (v2.3: `worktree` default, `existing`, or `monorepo` legacy). Human interaction is async via `workspace/needs-you.md`.
 
 ## Build & Run
 
@@ -57,7 +57,7 @@ Claude Code auto-loads these via `.claude/rules/`. **Other agents (Codex, Kimi, 
 
 | Rule File | Covers |
 |-----------|--------|
-| [`.claude/rules/architecture.md`](.claude/rules/architecture.md) | Three-layer split (agentic/deterministic/core), two-repo design, vendor abstraction, execution patterns |
+| [`.claude/rules/architecture.md`](.claude/rules/architecture.md) | Three-layer split (agentic/deterministic/core), two-repo design, v2.3 build targets, vendor abstraction, execution patterns |
 | [`.claude/rules/skills-and-prompts.md`](.claude/rules/skills-and-prompts.md) | Two-CWD skill model, executive vs worker skills, prompt composition pipeline, vendor-specific behavior |
 | [`.claude/rules/executive-loop.md`](.claude/rules/executive-loop.md) | 8-phase loop details, sleep logic, env loading order |
 | [`.claude/rules/harnesses.md`](.claude/rules/harnesses.md) | v2.2 harness mode — HarnessOrchestrator interface, vendor-agnostic chokepoint, per-harness deltas, registration flow |

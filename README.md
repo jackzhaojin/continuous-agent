@@ -19,7 +19,7 @@ In addition to the 24x7 executive loop, this repo ships **harnesses** -- dedicat
 - **Standalone** via the unified CLI: `npm run harness -- --name generic --prompt path/to/PROMPT.md`
 - **Integrated** by dropping a goal bundle with `execution_pattern: harness` into `workspace/ondeck/`, letting the executive loop drive it through the normal goal/contract/steps lifecycle.
 
-All three harnesses are native TypeScript and invoke LLMs through a single vendor-agnostic chokepoint (`runHarnessAgent()`), so generic + EDS work with Claude, Codex, or Kimi. Study is Claude-only because its coordinator relies on the Claude SDK's native Task/Skill tools; `__spawn__` emulation for other vendors is deferred to v2.3.
+All three harnesses are native TypeScript and invoke LLMs through a single vendor-agnostic chokepoint (`runHarnessAgent()`), so generic + EDS work with Claude, Codex, or Kimi. Study is Claude-only because its coordinator relies on the Claude SDK's native Task/Skill tools; `__spawn__` emulation for other vendors remains deferred.
 
 A mock-provider test suite exercises the full orchestrator for all three harnesses end-to-end without API calls:
 
@@ -199,9 +199,13 @@ Credentials are physically separated into three files to prevent accidental leak
 
 Executive-tier keys never reach workers. The spawner validates this on every execution.
 
+### Build Targets (v2.3)
+
+`build_target:` in PROMPT.md picks where output lands: `worktree` (default — fresh `proj/<slug>` worktree off `ai-sandbox` `base`, tiered-namespace), `existing` (external repo via `target_dir`), or `monorepo` (legacy flat layout). Resolver: `src/deterministic/build-target-resolver.ts`. See [v2.3 goal](ai-docs/v2/2026-04-18-v2.3/goal.md).
+
 ### Self-Enhancement
 
-Goals prefixed with `[SELF-ENHANCE]` allow the agent to modify its own infrastructure code. Changes are made on a branch for human review before merging. Similarly, `[SKILL-BUILD]` goals create reusable Claude Code skills.
+`[SELF-ENHANCE]` goals let the agent modify its own infrastructure code on a branch for human review. `[SKILL-BUILD]` goals create reusable Claude Code skills.
 
 ### Multi-Vendor Workers (v2.1)
 
