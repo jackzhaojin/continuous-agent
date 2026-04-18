@@ -5,15 +5,18 @@
  * of the v2.3 PRD (`ai-docs/v2/xxxx-xx-xx-v2.3/harness-build-target-prd.md`).
  *
  * Three modes:
- *   - worktree: git worktree off `ai-demos`, branch `proj/<slug>`
+ *   - worktree: git worktree off `ai-sandbox` `base` branch; default branch
+ *     name `proj/<slug>`. Worktree path mirrors the branch namespace
+ *     (`<namespace>/<slug>` → `~/dev/ai-sandbox-worktrees/<namespace>/<slug>/`).
  *   - existing: validate `target_dir`, no scaffold
- *   - monorepo: legacy `ai-sandbox/` subfolder behavior (caller computes path)
+ *   - monorepo: anchor at the `monorepo/legacy-v2.2` worktree (the
+ *     pre-rebaseline flat layout). Caller's `resolveMonorepoPath` factory
+ *     decides the project sub-path under that anchor.
  *
  * Selection rules (matches PRD "Decision Framework"):
  *   1. If `build_target` is set on the input → use it
  *   2. Else if `target_dir` is set → existing
- *   3. Else → DEFAULT_BUILD_TARGET (currently 'monorepo' during v2.3 transition;
- *      flips to 'worktree' once worktree path is validated end-to-end — PRD P1-8)
+ *   3. Else → DEFAULT_BUILD_TARGET (worktree, per PRD P1-8 flip on 2026-04-17)
  *
  * The caller passes a `monorepoPath` factory so this module stays free of
  * worker-spawner / harness-executor concerns.
@@ -53,13 +56,13 @@ function gitOk(cwd: string, args: string[]): boolean {
 }
 
 /**
- * Default build target during the v2.3 transition.
+ * Default build target.
  *
- * Per PRD migration plan step 2: "Add `build_target` field to
- * `prompt-md-parser.ts` (default: `monorepo` during transition)" and step 6:
- * "Flip default from `monorepo` to `worktree` once validated".
+ * Per PRD P1-8: flipped from 'monorepo' to 'worktree' on 2026-04-17 once the
+ * in-place rebaseline of `ai-sandbox` was validated. The fallback at the end
+ * of the function is the source of truth for the system default.
  *
- * Set via env var `BUILD_TARGET_DEFAULT` for staged rollout. Read lazily on
+ * Set via env var `BUILD_TARGET_DEFAULT` for staged overrides. Read lazily on
  * each call so tests/runtime overrides take effect without module reload.
  */
 export function getDefaultBuildTarget(): BuildTarget {
@@ -67,32 +70,54 @@ export function getDefaultBuildTarget(): BuildTarget {
   if (fromEnv === 'worktree' || fromEnv === 'existing' || fromEnv === 'monorepo') {
     return fromEnv;
   }
-  return 'monorepo';
+  return 'worktree';
 }
 
 /**
- * Path to the ai-demos repo (the worktree source).
+ * Path to the `ai-sandbox` repo (the worktree source).
  *
- * Per PRD: "Jack manually creates `ai-demos` repo with Apache 2.0 license,
- * baseline `.gitignore`, README". The agent never auto-creates it.
+ * The repo was rebaselined in place on 2026-04-17: `base` branch holds the
+ * clean init commit (Apache 2.0 + `.gitignore`), `main` is the empty
+ * showcase, and `monorepo/legacy-v2.2` preserves the pre-rebaseline flat
+ * layout. New worktrees fork from `base`.
  *
- * Override with env var `AI_DEMOS_PATH`. Default `~/dev/ai-demos`.
+ * Override with env var `AI_SANDBOX_PATH`. Default `~/dev/ai-sandbox`.
  */
-export function getAiDemosPath(): string {
-  return process.env.AI_DEMOS_PATH || path.join(os.homedir(), 'dev', 'ai-demos');
+export function getAiSandboxPath(): string {
+  return process.env.AI_SANDBOX_PATH || path.join(os.homedir(), 'dev', 'ai-sandbox');
 }
 
 /**
- * Parent directory for all worktrees off ai-demos.
- * Per PRD decision 1 (Option A — dedicated parent directory).
+ * Parent directory for all worktrees off `ai-sandbox`.
+ * Per PRD decision 1 (Option A — dedicated parent directory) plus the
+ * tiered-namespace convention: `<namespace>/<slug>` branches map to
+ * `<parent>/<namespace>/<slug>/`.
  *
- * Override with env var `AI_DEMOS_WORKTREES_PATH`. Default
- * `~/dev/ai-demos-worktrees`.
+ * Override with env var `AI_SANDBOX_WORKTREES_PATH`. Default
+ * `~/dev/ai-sandbox-worktrees`.
  */
-export function getAiDemosWorktreesPath(): string {
+export function getAiSandboxWorktreesPath(): string {
   return (
-    process.env.AI_DEMOS_WORKTREES_PATH ||
-    path.join(os.homedir(), 'dev', 'ai-demos-worktrees')
+    process.env.AI_SANDBOX_WORKTREES_PATH ||
+    path.join(os.homedir(), 'dev', 'ai-sandbox-worktrees')
+  );
+}
+
+/**
+ * Path to the legacy-v2.2 monorepo worktree.
+ *
+ * Per PRD Option 3 (Monorepo Folder, Legacy): the pre-rebaseline flat layout
+ * is preserved on the `monorepo/legacy-v2.2` branch and materialized as a
+ * worktree at this path. `build_target: monorepo` writes into here — callers'
+ * `resolveMonorepoPath` factories should anchor sub-paths against this base.
+ *
+ * Override with env var `AI_SANDBOX_LEGACY_MONOREPO_PATH`.
+ * Default: `<AI_SANDBOX_WORKTREES_PATH>/monorepo/legacy-v2.2/`.
+ */
+export function getLegacyMonorepoWorktreePath(): string {
+  return (
+    process.env.AI_SANDBOX_LEGACY_MONOREPO_PATH ||
+    path.join(getAiSandboxWorktreesPath(), 'monorepo', 'legacy-v2.2')
   );
 }
 
@@ -155,7 +180,7 @@ export interface BuildTargetResolution {
   created: boolean;
   /**
    * Best-effort warnings from the resolution that the caller should log
-   * (e.g. ai-demos missing in worktree mode).
+   * (e.g. ai-sandbox missing in worktree mode).
    */
   warnings: string[];
 }
@@ -197,7 +222,7 @@ export function decideBuildTarget(input: {
  *
  * Throws on configuration errors that the caller can't recover from
  * (e.g. existing target_dir missing). Worktree creation falls back to
- * monorepo mode with a warning if `ai-demos` doesn't exist yet — that
+ * monorepo mode with a warning if `ai-sandbox` doesn't exist yet — that
  * keeps the executive loop running while Jack completes P1-1.
  */
 export function resolveBuildTarget(input: BuildTargetInput): BuildTargetResolution {
@@ -250,21 +275,26 @@ export function resolveBuildTarget(input: BuildTargetInput): BuildTargetResoluti
     }
 
     case 'worktree': {
-      const sandboxPath = getAiDemosPath();
-      const worktreesParent = getAiDemosWorktreesPath();
+      const sandboxPath = getAiSandboxPath();
+      const worktreesParent = getAiSandboxWorktreesPath();
 
-      // Fallback when ai-demos isn't ready yet (PRD P1-1 is human work).
+      // Defensive fallback: ai-sandbox should always exist post-rebaseline,
+      // but if a user runs in an environment without it, degrade gracefully
+      // to monorepo mode rather than crashing the executive loop.
       if (!existsSync(sandboxPath)) {
         warnings.push(
-          `[build-target-resolver] ai-demos not found at ${sandboxPath}; ` +
+          `[build-target-resolver] ai-sandbox not found at ${sandboxPath}; ` +
             `falling back to monorepo mode for slug=${slug}. ` +
-            `Create the repo (PRD P1-1) to enable worktree mode.`,
+            `Clone the repo or set AI_SANDBOX_PATH to enable worktree mode.`,
         );
         return resolveMonorepoFallback(input, warnings);
       }
 
       const branch = input.target_branch || `proj/${slug}`;
-      const worktreePath = path.join(worktreesParent, slug);
+      // Tiered-namespace convention: branch `<namespace>/<slug>` maps to
+      // `<worktreesParent>/<namespace>/<slug>/`. A bare branch (no slash)
+      // lands directly under the parent.
+      const worktreePath = path.join(worktreesParent, ...branch.split('/'));
 
       // Idempotent worktree add. Two cases handled:
       //   (a) worktree already exists at worktreePath → re-use it
@@ -281,7 +311,9 @@ export function resolveBuildTarget(input: BuildTargetInput): BuildTargetResoluti
       }
 
       try {
-        mkdirSync(worktreesParent, { recursive: true });
+        // Ensure the full chain of namespace dirs exists (e.g., for
+        // `experiment/spike/foo` we need `<parent>/experiment/spike/`).
+        mkdirSync(path.dirname(worktreePath), { recursive: true });
 
         // Auto-prune stale worktree registrations. If a prior run's worktree
         // directory was manually removed (e.g. `rm -rf`) without `git worktree

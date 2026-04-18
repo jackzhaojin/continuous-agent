@@ -15,7 +15,7 @@ import { buildIntelligentPrompt } from '../intelligence/prompt-builder.js';
 import { selectStrategy } from '../intelligence/strategy-selector.js';
 import { findProjectBySlug } from '../../deterministic/project-registry.js';
 import { getAvailableAppCredentialNames, checkWorkerEnvForLeaks } from '../../deterministic/credential-tiers.js';
-import { resolveBuildTarget } from '../../deterministic/build-target-resolver.js';
+import { resolveBuildTarget, getLegacyMonorepoWorktreePath } from '../../deterministic/build-target-resolver.js';
 import {
   getAgentWorkerProviderForVendor,
   resolveWorkerModelForVendor,
@@ -24,8 +24,16 @@ import {
 import yaml from 'js-yaml';
 import { BUILD_INFO } from '../../core/executive-loop.js';
 
-// Agent outputs directory - where workers create their projects
-const AGENT_OUTPUTS_BASE = process.env.AGENT_OUTPUTS_PATH || path.join(os.homedir(), 'dev', 'ai-sandbox');
+// Agent outputs directory — anchor for monorepo-mode project paths and the
+// centralized `.env` / `.claude/` / `CLAUDE.md` setup. Post-rebaseline this
+// points at the `monorepo/legacy-v2.2` worktree so monorepo-mode goals land
+// inside legacy and worktree-mode workers don't accidentally pollute the
+// clean `main` checkout. Override with `AGENT_OUTPUTS_PATH` env var.
+//
+// TODO (follow-up): For build_target='worktree', workers should arguably
+// cwd into their own worktree instead of the legacy monorepo. That refactor
+// is out of scope for this PRD-alignment pass.
+const AGENT_OUTPUTS_BASE = process.env.AGENT_OUTPUTS_PATH || getLegacyMonorepoWorktreePath();
 
 // Worker timeout: wall-clock limit to prevent indefinite hangs (default 45 min)
 const WORKER_TIMEOUT_MS = parseInt(process.env.WORKER_TIMEOUT_MS || '2700000', 10);
@@ -692,14 +700,24 @@ export async function spawnWorker(
       );
     }
 
-    // Optional branch checkout for existing/monorepo modes when the
-    // frontmatter explicitly requests one. Worktree mode already created
-    // its branch via `git worktree add -b`. Best-effort: if checkout
-    // fails, we log and continue — the worker can still commit on the
-    // current branch.
+    // Optional branch checkout for existing mode when the frontmatter
+    // explicitly requests one. Worktree mode already created its branch via
+    // `git worktree add -b`. Monorepo mode is intentionally excluded: the
+    // legacy worktree is pinned to `monorepo/legacy-v2.2` and switching
+    // branches there would corrupt the archive. If a monorepo goal sets
+    // `target_branch`, we log and ignore.
     if (
       resolution.branch &&
-      (resolution.build_target === 'existing' || resolution.build_target === 'monorepo')
+      resolution.build_target === 'monorepo'
+    ) {
+      logger.log(
+        `BUILD_TARGET: ignoring target_branch=${resolution.branch} for monorepo ` +
+          `mode — the legacy worktree is pinned to monorepo/legacy-v2.2`,
+      );
+    }
+    if (
+      resolution.branch &&
+      resolution.build_target === 'existing'
     ) {
       // Use execFileSync with argv arrays (no shell) so user-supplied
       // target_branch from PROMPT.md can't shell-inject through quoting.

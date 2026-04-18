@@ -24,7 +24,7 @@ pm2 start ecosystem.config.cjs     # Production (requires build first)
 1. **Constitution** (`workspace/constitution.md`) — NEVER auto-modify
 2. **Ledgers** — Append-only JSONL, never truncate or modify existing entries
 3. **Verifiers** — Must check `result.output_path`, NOT `process.cwd()`
-4. **Worker skills** — Add to `claude-files-to-output/skills/` (synced to ai-sandbox per spawn)
+4. **Worker skills** — Add to `claude-files-to-output/skills/` (synced to the worker's output worktree per spawn)
 5. **PM2** — Rebuild only (`npm run build`); never `pm2 restart` without explicit ask
 6. **Develop worktree** — NEVER run `npm run build` in `continuous-agent-develop`. The SIGUSR2 hits main's registered dist/, not develop's. Use `npm run typecheck` in secondary worktrees.
 7. **Never commit or push** unless explicitly instructed

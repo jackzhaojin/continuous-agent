@@ -15,9 +15,9 @@ source_project:                    # Slug of existing project to copy as startin
 
 # --- v2.3 Unified Build Target ---
 # See ai-docs/v2/xxxx-xx-xx-v2.3/harness-build-target-prd.md
-build_target:                      # worktree | existing | monorepo (default during v2.3 transition: monorepo)
+build_target:                      # worktree (default) | existing | monorepo
 target_dir:                        # REQUIRED when build_target=existing. Absolute path to an existing project.
-target_branch:                     # Optional. worktree: defaults to proj/<slug>. existing/monorepo: explicit branch to check out.
+target_branch:                     # Optional. worktree: overrides default proj/<slug> (worktree path mirrors namespace). existing: explicit branch to check out. monorepo: ignored (legacy worktree pinned to monorepo/legacy-v2.2).
 
 # --- User-Journey fields (REQUIRED for UI goals, see README.md) ---
 definition_of_done_journey: >

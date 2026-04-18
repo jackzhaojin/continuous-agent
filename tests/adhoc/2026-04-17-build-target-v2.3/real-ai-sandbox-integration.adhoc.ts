@@ -1,16 +1,18 @@
 /**
  * Real-repo integration adhoc test for v2.3 Phase 1.
  *
- * Exercises `resolveBuildTarget()` against the user's actual `~/dev/ai-demos`
- * clone (the PRD P1-1 artifact). Creates a throwaway worktree, verifies the
- * PRD contract end-to-end, then cleans up with `git worktree remove` and
- * deletes the `proj/<slug>` branch.
+ * Exercises `resolveBuildTarget()` against the user's actual `~/dev/ai-sandbox`
+ * clone (the rebaselined repo with `base`/`main`/`monorepo/legacy-v2.2`).
+ * Creates a throwaway worktree at the tiered-namespace path
+ * `~/dev/ai-sandbox-worktrees/proj/<slug>/`, verifies the PRD contract
+ * end-to-end, then cleans up with `git worktree remove` and deletes the
+ * `proj/<slug>` branch.
  *
- * Skips (does not fail) if `~/dev/ai-demos` is not a git repo — lets CI and
+ * Skips (does not fail) if `~/dev/ai-sandbox` is not a git repo — lets CI and
  * other environments run the rest of the adhoc suite without this integration
  * check.
  *
- * Run: `npx tsx tests/adhoc/2026-04-17-build-target-v2.3/real-ai-demos-integration.adhoc.ts`
+ * Run: `npx tsx tests/adhoc/2026-04-17-build-target-v2.3/real-ai-sandbox-integration.adhoc.ts`
  */
 
 import assert from 'node:assert/strict';
@@ -21,21 +23,22 @@ import path from 'node:path';
 
 import { resolveBuildTarget } from '../../../src/deterministic/build-target-resolver.js';
 
-const AI_DEMOS = process.env.AI_DEMOS_PATH || path.join(os.homedir(), 'dev', 'ai-demos');
-const AI_DEMOS_WORKTREES =
-  process.env.AI_DEMOS_WORKTREES_PATH || path.join(os.homedir(), 'dev', 'ai-demos-worktrees');
+const AI_SANDBOX = process.env.AI_SANDBOX_PATH || path.join(os.homedir(), 'dev', 'ai-sandbox');
+const AI_SANDBOX_WORKTREES =
+  process.env.AI_SANDBOX_WORKTREES_PATH || path.join(os.homedir(), 'dev', 'ai-sandbox-worktrees');
 
 // Unique slug per run so parallel invocations don't collide.
 const SLUG = `adhoc-v2.3-${Date.now()}`;
 const BRANCH = `proj/${SLUG}`;
-const WORKTREE_PATH = path.join(AI_DEMOS_WORKTREES, SLUG);
+// Tiered-namespace convention: `proj/<slug>` branch → `<parent>/proj/<slug>/`.
+const WORKTREE_PATH = path.join(AI_SANDBOX_WORKTREES, ...BRANCH.split('/'));
 
 function repoIsUsable(): boolean {
-  if (!existsSync(AI_DEMOS)) return false;
+  if (!existsSync(AI_SANDBOX)) return false;
   try {
-    const s = statSync(AI_DEMOS);
+    const s = statSync(AI_SANDBOX);
     if (!s.isDirectory()) return false;
-    execSync(`git -C "${AI_DEMOS}" rev-parse --git-dir`, { stdio: 'pipe' });
+    execSync(`git -C "${AI_SANDBOX}" rev-parse --git-dir`, { stdio: 'pipe' });
     return true;
   } catch {
     return false;
@@ -44,7 +47,7 @@ function repoIsUsable(): boolean {
 
 function hasBaseBranch(): boolean {
   try {
-    execSync(`git -C "${AI_DEMOS}" rev-parse --verify base`, { stdio: 'pipe' });
+    execSync(`git -C "${AI_SANDBOX}" rev-parse --verify base`, { stdio: 'pipe' });
     return true;
   } catch {
     return false;
@@ -54,28 +57,28 @@ function hasBaseBranch(): boolean {
 function cleanup(): void {
   // Remove worktree (best-effort).
   try {
-    execSync(`git -C "${AI_DEMOS}" worktree remove --force "${WORKTREE_PATH}"`, { stdio: 'pipe' });
+    execSync(`git -C "${AI_SANDBOX}" worktree remove --force "${WORKTREE_PATH}"`, { stdio: 'pipe' });
   } catch {
     // fall through
   }
   // Delete the branch (best-effort).
   try {
-    execSync(`git -C "${AI_DEMOS}" branch -D "${BRANCH}"`, { stdio: 'pipe' });
+    execSync(`git -C "${AI_SANDBOX}" branch -D "${BRANCH}"`, { stdio: 'pipe' });
   } catch {
     // fall through
   }
 }
 
 async function main(): Promise<void> {
-  process.stdout.write('real-ai-demos integration adhoc\n');
+  process.stdout.write('real-ai-sandbox integration adhoc\n');
 
   if (!repoIsUsable()) {
-    process.stdout.write(`  ⤳ SKIP: ${AI_DEMOS} is not a usable git repo\n`);
+    process.stdout.write(`  ⤳ SKIP: ${AI_SANDBOX} is not a usable git repo\n`);
     return;
   }
 
   const hasBase = hasBaseBranch();
-  process.stdout.write(`  info: ai-demos=${AI_DEMOS}  base-branch=${hasBase}\n`);
+  process.stdout.write(`  info: ai-sandbox=${AI_SANDBOX}  base-branch=${hasBase}\n`);
 
   // Preflight cleanup in case a prior run left state.
   cleanup();
@@ -88,7 +91,7 @@ async function main(): Promise<void> {
       slug: SLUG,
       build_target: 'worktree',
       resolveMonorepoPath: () => {
-        throw new Error('monorepo fallback should not trigger against real ai-demos');
+        throw new Error('monorepo fallback should not trigger against real ai-sandbox');
       },
     });
 
@@ -107,7 +110,7 @@ async function main(): Promise<void> {
 
     // ─── Contract: branch points to a real commit ───────
     try {
-      const branchSha = execSync(`git -C "${AI_DEMOS}" rev-parse "${BRANCH}"`, {
+      const branchSha = execSync(`git -C "${AI_SANDBOX}" rev-parse "${BRANCH}"`, {
         stdio: 'pipe',
       }).toString().trim();
       assert.match(branchSha, /^[0-9a-f]{40}$/);
@@ -123,7 +126,7 @@ async function main(): Promise<void> {
         stdio: 'pipe',
       }).toString().trim();
       if (hasBase) {
-        const baseSha = execSync(`git -C "${AI_DEMOS}" rev-parse base`, {
+        const baseSha = execSync(`git -C "${AI_SANDBOX}" rev-parse base`, {
           stdio: 'pipe',
         }).toString().trim();
         assert.equal(
@@ -147,7 +150,7 @@ async function main(): Promise<void> {
       const contents = readFileSync(gi, 'utf-8');
       // The template has distinctive marker text; any match proves it was copied.
       assert.ok(
-        /Baseline \.gitignore template for ai-demos/.test(contents) ||
+        /Baseline \.gitignore template for ai-(?:demos|sandbox) worktrees/.test(contents) ||
           /node_modules\//.test(contents),
         '.gitignore must look like the baseline template',
       );
@@ -176,7 +179,7 @@ async function main(): Promise<void> {
 
     // ─── Contract: worktree registered with parent repo ─
     try {
-      const wtList = execSync(`git -C "${AI_DEMOS}" worktree list --porcelain`, {
+      const wtList = execSync(`git -C "${AI_SANDBOX}" worktree list --porcelain`, {
         stdio: 'pipe',
       }).toString();
       assert.ok(
@@ -186,6 +189,19 @@ async function main(): Promise<void> {
       process.stdout.write('  ✓ worktree registered in parent repo\n');
     } catch (err) {
       process.stdout.write(`  ✗ worktree registry\n    ${(err as Error).message}\n`);
+      failed++;
+    }
+
+    // ─── Contract: tiered-namespace path layout ─────────
+    try {
+      // The worktree path must include the namespace as a folder, not a flat slug.
+      assert.ok(
+        WORKTREE_PATH.includes(`${path.sep}proj${path.sep}`),
+        `worktree path must include /proj/ namespace folder; got ${WORKTREE_PATH}`,
+      );
+      process.stdout.write('  ✓ worktree path uses tiered namespace layout\n');
+    } catch (err) {
+      process.stdout.write(`  ✗ tiered namespace layout\n    ${(err as Error).message}\n`);
       failed++;
     }
   } finally {

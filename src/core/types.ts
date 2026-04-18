@@ -15,13 +15,16 @@ export type ExecutionPattern =
 /**
  * Build target (v2.3) — where worker/harness output lands.
  *
- * - `worktree` — git worktree off the `ai-demos` repo (per-project isolation).
+ * - `worktree` — git worktree off the `ai-sandbox` `base` branch (per-project
+ *   isolation). Branch defaults to `proj/<slug>`. Worktree path mirrors the
+ *   branch namespace: `proj/foo` → `~/dev/ai-sandbox-worktrees/proj/foo/`.
  * - `existing` — work directly inside an external project at `target_dir`.
- * - `monorepo` — legacy: subfolder inside the `ai-sandbox/` monorepo.
+ * - `monorepo` — write into the legacy flat layout, now preserved on the
+ *   `monorepo/legacy-v2.2` branch and materialized as a worktree at
+ *   `~/dev/ai-sandbox-worktrees/monorepo/legacy-v2.2/`.
  *
- * The effective default during the v2.3 transition is `monorepo`. The PRD's
- * end-state default is `worktree` (P1-8: flipped only after worktree path is
- * validated end-to-end against real goals).
+ * Default is `worktree` (PRD P1-8 flip on 2026-04-17). Override per-goal in
+ * PROMPT.md frontmatter or system-wide via `BUILD_TARGET_DEFAULT` env.
  */
 export type BuildTarget = 'worktree' | 'existing' | 'monorepo';
 

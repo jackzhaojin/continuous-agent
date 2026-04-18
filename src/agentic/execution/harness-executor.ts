@@ -35,17 +35,26 @@ import type {
 } from '../../harnesses/core/types.js';
 import { seedStepsFromPhases, makeStepSink } from '../../harnesses/core/status-mirror.js';
 import { getAgentWorkerProviderForVendor } from '../../core/vendor/vendor-registry.js';
-import { resolveBuildTarget } from '../../deterministic/build-target-resolver.js';
+import {
+  resolveBuildTarget,
+  getLegacyMonorepoWorktreePath,
+} from '../../deterministic/build-target-resolver.js';
 
+// Anchor for monorepo-mode harness output paths and the only safe place to
+// resolve a relative `harness_target` against. Post-rebaseline this points at
+// the `monorepo/legacy-v2.2` worktree (NOT the clean `main` checkout). Override
+// with `AGENT_OUTPUTS_PATH` env var.
 const AGENT_OUTPUTS_BASE =
-  process.env.AGENT_OUTPUTS_PATH || path.join(os.homedir(), 'dev', 'ai-sandbox');
+  process.env.AGENT_OUTPUTS_PATH || getLegacyMonorepoWorktreePath();
 
 /**
- * Compute the legacy monorepo path the harness used pre-v2.3:
- * `ai-sandbox/harnesses/<name>/<slug>/`.
+ * Compute the legacy monorepo path the harness used pre-v2.3, now anchored
+ * inside the `monorepo/legacy-v2.2` worktree:
+ * `<legacy-worktree>/harnesses/<name>/<slug>/`.
  *
- * Used as the fallback when build_target='monorepo' (or default during
- * v2.3 transition). Honors the legacy `harness_target` override.
+ * Used as the fallback when build_target='monorepo'. Honors the legacy
+ * `harness_target` override (relative paths resolve against the legacy
+ * worktree).
  */
 function legacyHarnessMonorepoPath(workItem: WorkItem): string {
   if (workItem.harness_target) {

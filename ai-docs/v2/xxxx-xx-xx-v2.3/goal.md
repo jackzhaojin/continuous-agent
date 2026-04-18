@@ -38,26 +38,26 @@ Merge the harness and executive agent output paths into a single build-target mo
 
 | Target | Description | When to use |
 |---|---|---|
-| **worktree** (default) | Git worktree off `ai-demos` repo | New projects, incubating work, parallel builds |
+| **worktree** (default) | Git worktree off `ai-sandbox` `base` branch (tiered-namespace path: branch namespace becomes folder hierarchy) | New projects, incubating work, parallel builds |
 | **existing** | Work directly in an external repo/directory | Improving existing projects, migrations |
-| **monorepo** (legacy) | Subfolder in current `ai-sandbox/` | Backward compat, scratch experiments |
+| **monorepo** (legacy) | Anchored at the `monorepo/legacy-v2.2` worktree (preserves the pre-rebaseline flat layout) | Backward compat, scratch experiments, piling onto the legacy archive |
 
 ### Phase 1 Goals
 
-1. **P1-1:** Jack creates `ai-demos` repo (Apache 2.0, baseline `.gitignore`, init commit)
-2. **P1-2:** Add `build_target`, `target_dir`, `target_branch` to PROMPT.md frontmatter parser (`prompt-md-parser.ts`)
-3. **P1-3:** Implement worktree creation in worker-spawner — `git worktree add` off `ai-demos` init commit
-4. **P1-4:** Implement `existing` target — validate `target_dir`, skip project scaffold, respect existing conventions
-5. **P1-5:** Wire harness `targetDir` resolution through PROMPT.md instead of CLI `--target`
-6. **P1-6:** Run one harness goal and one executive goal using worktree target end-to-end
-7. **P1-7:** Run one executive goal using `existing` target against a real external project
-8. **P1-8:** Flip default from `monorepo` to `worktree`
+1. ~~**P1-1:** Jack creates `ai-demos` repo (Apache 2.0, baseline `.gitignore`, init commit)~~ **DONE 2026-04-17.** Repo decision changed: instead of standing up a separate `ai-demos` repo, the existing `ai-sandbox` was rebaselined in place — `base` (clean init), `main` (showcase), `monorepo/legacy-v2.2` (preserved flat layout). Original SHAs and timestamps intact.
+2. ~~**P1-2:** Add `build_target`, `target_dir`, `target_branch` to PROMPT.md frontmatter parser (`prompt-md-parser.ts`)~~ **DONE.** Field parsed; `BuildTarget` type in `core/types.ts`.
+3. ~~**P1-3:** Implement worktree creation in worker-spawner — `git worktree add` off `ai-sandbox` `base` branch~~ **DONE.** Centralized in `src/deterministic/build-target-resolver.ts`. Tiered-namespace convention applied: branch `<namespace>/<slug>` → `~/dev/ai-sandbox-worktrees/<namespace>/<slug>/`.
+4. ~~**P1-4:** Implement `existing` target — validate `target_dir`, skip project scaffold, respect existing conventions~~ **DONE.**
+5. ~~**P1-5:** Wire harness `targetDir` resolution through PROMPT.md instead of CLI `--target`~~ **DONE.** `harness-executor.resolveHarnessTarget()` uses the resolver; CLI `--target` is now an optional override.
+6. **P1-6:** Run one harness goal and one executive goal using worktree target end-to-end (manual e2e — pending)
+7. **P1-7:** Run one executive goal using `existing` target against a real external project (manual e2e — pending)
+8. ~~**P1-8:** Flip default from `monorepo` to `worktree`~~ **DONE 2026-04-17.** `getDefaultBuildTarget()` returns `'worktree'`.
 
 ### Phase 1 Success Criteria
 
-- Both harness and executive agent can create and write to a worktree off `ai-demos`
+- Both harness and executive agent can create and write to a worktree off `ai-sandbox` `base` (per-worktree path mirrors branch namespace)
 - An executive goal can work directly in an existing external project via `target_dir`
-- Legacy `ai-sandbox/` monorepo path still works for goals without `build_target`
+- Legacy flat-layout path still works for goals with `build_target: monorepo` — anchored at the `monorepo/legacy-v2.2` worktree
 - `output_path` persistence and retry context work correctly for all three targets
 
 ---
@@ -184,7 +184,7 @@ See [`harness-build-target-prd.md`](harness-build-target-prd.md) "Unified Input 
 - Re-architecting harnesses from scratch
 - Full unified input packet (post-v2.3, see above)
 - Automating worktree-to-standalone-repo promotion
-- Auto-creating the `ai-demos` repo (Jack does this manually)
+- Auto-creating or rebaselining the `ai-sandbox` repo (Jack did this manually on 2026-04-17)
 
 ## Deliverables
 

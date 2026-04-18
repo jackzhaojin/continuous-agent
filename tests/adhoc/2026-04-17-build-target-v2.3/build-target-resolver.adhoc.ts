@@ -3,7 +3,11 @@
  *
  * Covers the deterministic decision logic + the I/O paths for `existing` and
  * the worktree fallback. Worktree happy-path (`git worktree add`) is exercised
- * by setting AI_DEMOS_PATH to a freshly-init'd temp git repo.
+ * by setting AI_SANDBOX_PATH to a freshly-init'd temp git repo.
+ *
+ * Tiered-namespace convention: a branch named `<namespace>/<slug>` (e.g.
+ * `proj/foo`) maps to `<worktreesParent>/<namespace>/<slug>/`. Tests below
+ * assert this mapping holds.
  *
  * Run: `npx tsx tests/adhoc/2026-04-17-build-target-v2.3/build-target-resolver.adhoc.ts`
  */
@@ -80,6 +84,19 @@ async function main(): Promise<void> {
 
   await test('no build_target and no target_dir → default', () => {
     assert.equal(decideBuildTarget({}), getDefaultBuildTarget());
+  });
+
+  await test('default build target is `worktree` post-PRD-P1-8 flip', () => {
+    // Saved & restored to insulate other tests' env mutations.
+    const prev = process.env.BUILD_TARGET_DEFAULT;
+    delete process.env.BUILD_TARGET_DEFAULT;
+    try {
+      assert.equal(getDefaultBuildTarget(), 'worktree');
+      assert.equal(decideBuildTarget({}), 'worktree');
+    } finally {
+      if (prev === undefined) delete process.env.BUILD_TARGET_DEFAULT;
+      else process.env.BUILD_TARGET_DEFAULT = prev;
+    }
   });
 
   await test('BUILD_TARGET_DEFAULT env override flips default', () => {
@@ -194,10 +211,10 @@ async function main(): Promise<void> {
     assert.equal(r.created, false);
   });
 
-  // ─── worktree mode: fallback when ai-demos missing ─
-  await test('worktree: missing ai-demos falls back to monorepo with warning', () => {
-    const prevSandbox = process.env.AI_DEMOS_PATH;
-    process.env.AI_DEMOS_PATH = '/nonexistent/ai-demos-for-testing';
+  // ─── worktree mode: fallback when ai-sandbox missing ─
+  await test('worktree: missing ai-sandbox falls back to monorepo with warning', () => {
+    const prevSandbox = process.env.AI_SANDBOX_PATH;
+    process.env.AI_SANDBOX_PATH = '/nonexistent/ai-sandbox-for-testing';
     try {
       const r = resolveBuildTarget({
         slug: 'foo',
@@ -207,22 +224,22 @@ async function main(): Promise<void> {
       assert.equal(r.build_target, 'monorepo');
       assert.equal(r.outputPath, '/legacy/fallback/foo');
       assert.ok(r.warnings.length >= 1, 'expected at least one warning');
-      assert.match(r.warnings[0]!, /ai-demos not found/);
+      assert.match(r.warnings[0]!, /ai-sandbox not found/);
     } finally {
-      if (prevSandbox === undefined) delete process.env.AI_DEMOS_PATH;
-      else process.env.AI_DEMOS_PATH = prevSandbox;
+      if (prevSandbox === undefined) delete process.env.AI_SANDBOX_PATH;
+      else process.env.AI_SANDBOX_PATH = prevSandbox;
     }
   });
 
   // ─── worktree mode: happy path against a temp git repo ─
-  await test('worktree: creates worktree off temp ai-demos repo', async () => {
-    const prevSandbox = process.env.AI_DEMOS_PATH;
-    const prevWorktrees = process.env.AI_DEMOS_WORKTREES_PATH;
+  await test('worktree: creates worktree off temp ai-sandbox repo', async () => {
+    const prevSandbox = process.env.AI_SANDBOX_PATH;
+    const prevWorktrees = process.env.AI_SANDBOX_WORKTREES_PATH;
     const prevAgent = process.env.AGENT_PATH;
 
     const tmpRoot = await mkdtemp(path.join(os.tmpdir(), 'btr-wt-'));
-    const sandboxRepo = path.join(tmpRoot, 'ai-demos');
-    const worktreesParent = path.join(tmpRoot, 'ai-demos-worktrees');
+    const sandboxRepo = path.join(tmpRoot, 'ai-sandbox');
+    const worktreesParent = path.join(tmpRoot, 'ai-sandbox-worktrees');
     const fakeAgent = path.join(tmpRoot, 'continuous-agent');
 
     try {
@@ -233,7 +250,7 @@ async function main(): Promise<void> {
       execSync('git config user.name Test', { cwd: sandboxRepo });
       execSync('git config commit.gpgsign false', { cwd: sandboxRepo });
       execSync('git config tag.gpgsign false', { cwd: sandboxRepo });
-      await writeFile(path.join(sandboxRepo, 'README.md'), '# ai-demos\n');
+      await writeFile(path.join(sandboxRepo, 'README.md'), '# ai-sandbox\n');
       execSync('git add -A', { cwd: sandboxRepo });
       execSync('git commit -q -m init', { cwd: sandboxRepo });
 
@@ -244,8 +261,8 @@ async function main(): Promise<void> {
         '# from-template\nnode_modules/\n',
       );
 
-      process.env.AI_DEMOS_PATH = sandboxRepo;
-      process.env.AI_DEMOS_WORKTREES_PATH = worktreesParent;
+      process.env.AI_SANDBOX_PATH = sandboxRepo;
+      process.env.AI_SANDBOX_WORKTREES_PATH = worktreesParent;
       process.env.AGENT_PATH = fakeAgent;
 
       const r = resolveBuildTarget({
@@ -255,7 +272,9 @@ async function main(): Promise<void> {
       });
 
       assert.equal(r.build_target, 'worktree');
-      assert.equal(r.outputPath, path.join(worktreesParent, 'demo-project'));
+      // Tiered-namespace convention: branch `proj/demo-project` →
+      // `<parent>/proj/demo-project/`, NOT `<parent>/demo-project/`.
+      assert.equal(r.outputPath, path.join(worktreesParent, 'proj', 'demo-project'));
       assert.equal(r.branch, 'proj/demo-project');
       assert.equal(r.created, true);
       assert.ok(existsSync(r.outputPath), 'worktree dir should exist');
@@ -274,10 +293,10 @@ async function main(): Promise<void> {
       assert.equal(r2.outputPath, r.outputPath);
       assert.equal(r2.created, false);
     } finally {
-      if (prevSandbox === undefined) delete process.env.AI_DEMOS_PATH;
-      else process.env.AI_DEMOS_PATH = prevSandbox;
-      if (prevWorktrees === undefined) delete process.env.AI_DEMOS_WORKTREES_PATH;
-      else process.env.AI_DEMOS_WORKTREES_PATH = prevWorktrees;
+      if (prevSandbox === undefined) delete process.env.AI_SANDBOX_PATH;
+      else process.env.AI_SANDBOX_PATH = prevSandbox;
+      if (prevWorktrees === undefined) delete process.env.AI_SANDBOX_WORKTREES_PATH;
+      else process.env.AI_SANDBOX_WORKTREES_PATH = prevWorktrees;
       if (prevAgent === undefined) delete process.env.AGENT_PATH;
       else process.env.AGENT_PATH = prevAgent;
       await rm(tmpRoot, { recursive: true, force: true });
@@ -286,11 +305,11 @@ async function main(): Promise<void> {
 
   // ─── worktree forks from `base` branch, not main/HEAD ─
   await test('worktree: forks from `base` branch when it exists (PRD decision 1)', async () => {
-    const prevSandbox = process.env.AI_DEMOS_PATH;
-    const prevWorktrees = process.env.AI_DEMOS_WORKTREES_PATH;
+    const prevSandbox = process.env.AI_SANDBOX_PATH;
+    const prevWorktrees = process.env.AI_SANDBOX_WORKTREES_PATH;
 
     const tmpRoot = await mkdtemp(path.join(os.tmpdir(), 'btr-base-'));
-    const sandboxRepo = path.join(tmpRoot, 'ai-demos');
+    const sandboxRepo = path.join(tmpRoot, 'ai-sandbox');
     const worktreesParent = path.join(tmpRoot, 'wt');
 
     try {
@@ -317,8 +336,8 @@ async function main(): Promise<void> {
 
       assert.notEqual(initSha, mainSha, 'main must have advanced past base');
 
-      process.env.AI_DEMOS_PATH = sandboxRepo;
-      process.env.AI_DEMOS_WORKTREES_PATH = worktreesParent;
+      process.env.AI_SANDBOX_PATH = sandboxRepo;
+      process.env.AI_SANDBOX_WORKTREES_PATH = worktreesParent;
 
       const r = resolveBuildTarget({
         slug: 'new-project',
@@ -333,21 +352,21 @@ async function main(): Promise<void> {
       assert.ok(!existsSync(path.join(r.outputPath, 'finished-demo.md')),
         'worktree must not contain files from main');
     } finally {
-      if (prevSandbox === undefined) delete process.env.AI_DEMOS_PATH;
-      else process.env.AI_DEMOS_PATH = prevSandbox;
-      if (prevWorktrees === undefined) delete process.env.AI_DEMOS_WORKTREES_PATH;
-      else process.env.AI_DEMOS_WORKTREES_PATH = prevWorktrees;
+      if (prevSandbox === undefined) delete process.env.AI_SANDBOX_PATH;
+      else process.env.AI_SANDBOX_PATH = prevSandbox;
+      if (prevWorktrees === undefined) delete process.env.AI_SANDBOX_WORKTREES_PATH;
+      else process.env.AI_SANDBOX_WORKTREES_PATH = prevWorktrees;
       await rm(tmpRoot, { recursive: true, force: true });
     }
   });
 
   // ─── explicit target_branch still forks from base ────
   await test('worktree: explicit target_branch still forks from `base`', async () => {
-    const prevSandbox = process.env.AI_DEMOS_PATH;
-    const prevWorktrees = process.env.AI_DEMOS_WORKTREES_PATH;
+    const prevSandbox = process.env.AI_SANDBOX_PATH;
+    const prevWorktrees = process.env.AI_SANDBOX_WORKTREES_PATH;
 
     const tmpRoot = await mkdtemp(path.join(os.tmpdir(), 'btr-tb-'));
-    const sandboxRepo = path.join(tmpRoot, 'ai-demos');
+    const sandboxRepo = path.join(tmpRoot, 'ai-sandbox');
     const worktreesParent = path.join(tmpRoot, 'wt');
 
     try {
@@ -366,8 +385,8 @@ async function main(): Promise<void> {
       execSync('git add -A', { cwd: sandboxRepo });
       execSync('git commit -q -m other', { cwd: sandboxRepo });
 
-      process.env.AI_DEMOS_PATH = sandboxRepo;
-      process.env.AI_DEMOS_WORKTREES_PATH = worktreesParent;
+      process.env.AI_SANDBOX_PATH = sandboxRepo;
+      process.env.AI_SANDBOX_WORKTREES_PATH = worktreesParent;
 
       const r = resolveBuildTarget({
         slug: 'custom-branch-project',
@@ -380,21 +399,21 @@ async function main(): Promise<void> {
       const head = execSync(`git rev-parse HEAD`, { cwd: r.outputPath }).toString().trim();
       assert.equal(head, initSha, 'custom-named branch must still fork from base');
     } finally {
-      if (prevSandbox === undefined) delete process.env.AI_DEMOS_PATH;
-      else process.env.AI_DEMOS_PATH = prevSandbox;
-      if (prevWorktrees === undefined) delete process.env.AI_DEMOS_WORKTREES_PATH;
-      else process.env.AI_DEMOS_WORKTREES_PATH = prevWorktrees;
+      if (prevSandbox === undefined) delete process.env.AI_SANDBOX_PATH;
+      else process.env.AI_SANDBOX_PATH = prevSandbox;
+      if (prevWorktrees === undefined) delete process.env.AI_SANDBOX_WORKTREES_PATH;
+      else process.env.AI_SANDBOX_WORKTREES_PATH = prevWorktrees;
       await rm(tmpRoot, { recursive: true, force: true });
     }
   });
 
   // ─── auto-prune: dir gone WITHOUT manual prune, resolver recovers ─
   await test('worktree: auto-prunes stale registration when dir was rm\'d without `worktree remove`', async () => {
-    const prevSandbox = process.env.AI_DEMOS_PATH;
-    const prevWorktrees = process.env.AI_DEMOS_WORKTREES_PATH;
+    const prevSandbox = process.env.AI_SANDBOX_PATH;
+    const prevWorktrees = process.env.AI_SANDBOX_WORKTREES_PATH;
 
     const tmpRoot = await mkdtemp(path.join(os.tmpdir(), 'btr-autoprune-'));
-    const sandboxRepo = path.join(tmpRoot, 'ai-demos');
+    const sandboxRepo = path.join(tmpRoot, 'ai-sandbox');
     const worktreesParent = path.join(tmpRoot, 'wt');
 
     try {
@@ -408,8 +427,8 @@ async function main(): Promise<void> {
       execSync('git commit -q -m init', { cwd: sandboxRepo });
       execSync('git branch base', { cwd: sandboxRepo });
 
-      process.env.AI_DEMOS_PATH = sandboxRepo;
-      process.env.AI_DEMOS_WORKTREES_PATH = worktreesParent;
+      process.env.AI_SANDBOX_PATH = sandboxRepo;
+      process.env.AI_SANDBOX_WORKTREES_PATH = worktreesParent;
 
       const r1 = resolveBuildTarget({
         slug: 'auto-prune',
@@ -433,10 +452,10 @@ async function main(): Promise<void> {
       assert.equal(r2.outputPath, r1.outputPath);
       assert.ok(existsSync(r2.outputPath), 'worktree dir must be recreated post-prune');
     } finally {
-      if (prevSandbox === undefined) delete process.env.AI_DEMOS_PATH;
-      else process.env.AI_DEMOS_PATH = prevSandbox;
-      if (prevWorktrees === undefined) delete process.env.AI_DEMOS_WORKTREES_PATH;
-      else process.env.AI_DEMOS_WORKTREES_PATH = prevWorktrees;
+      if (prevSandbox === undefined) delete process.env.AI_SANDBOX_PATH;
+      else process.env.AI_SANDBOX_PATH = prevSandbox;
+      if (prevWorktrees === undefined) delete process.env.AI_SANDBOX_WORKTREES_PATH;
+      else process.env.AI_SANDBOX_WORKTREES_PATH = prevWorktrees;
       await rm(tmpRoot, { recursive: true, force: true });
     }
   });
@@ -448,11 +467,11 @@ async function main(): Promise<void> {
     // must not be interpreted by a shell. Git will reject the name itself
     // as invalid (so the resolver logs a warning and falls back to
     // monorepo) but there must be NO side effects from shell parsing.
-    const prevSandbox = process.env.AI_DEMOS_PATH;
-    const prevWorktrees = process.env.AI_DEMOS_WORKTREES_PATH;
+    const prevSandbox = process.env.AI_SANDBOX_PATH;
+    const prevWorktrees = process.env.AI_SANDBOX_WORKTREES_PATH;
 
     const tmpRoot = await mkdtemp(path.join(os.tmpdir(), 'btr-shell-'));
-    const sandboxRepo = path.join(tmpRoot, 'ai-demos');
+    const sandboxRepo = path.join(tmpRoot, 'ai-sandbox');
     const worktreesParent = path.join(tmpRoot, 'wt');
     // The canary file git could have been tricked into writing if shell
     // interpretation leaked through. Its existence = test fail.
@@ -469,8 +488,8 @@ async function main(): Promise<void> {
       execSync('git commit -q -m init', { cwd: sandboxRepo });
       execSync('git branch base', { cwd: sandboxRepo });
 
-      process.env.AI_DEMOS_PATH = sandboxRepo;
-      process.env.AI_DEMOS_WORKTREES_PATH = worktreesParent;
+      process.env.AI_SANDBOX_PATH = sandboxRepo;
+      process.env.AI_SANDBOX_WORKTREES_PATH = worktreesParent;
 
       // Classic shell-injection payload: if the branch name ever hits a
       // shell, the `touch canary-pwned.txt` would fire.
@@ -494,21 +513,21 @@ async function main(): Promise<void> {
       assert.ok(r.build_target === 'worktree' || r.build_target === 'monorepo',
         'resolver must return a valid mode, not crash');
     } finally {
-      if (prevSandbox === undefined) delete process.env.AI_DEMOS_PATH;
-      else process.env.AI_DEMOS_PATH = prevSandbox;
-      if (prevWorktrees === undefined) delete process.env.AI_DEMOS_WORKTREES_PATH;
-      else process.env.AI_DEMOS_WORKTREES_PATH = prevWorktrees;
+      if (prevSandbox === undefined) delete process.env.AI_SANDBOX_PATH;
+      else process.env.AI_SANDBOX_PATH = prevSandbox;
+      if (prevWorktrees === undefined) delete process.env.AI_SANDBOX_WORKTREES_PATH;
+      else process.env.AI_SANDBOX_WORKTREES_PATH = prevWorktrees;
       await rm(tmpRoot, { recursive: true, force: true });
     }
   });
 
   // ─── dangling branch (worktree dir manually removed) ─
   await test('worktree: dangling branch (no dir) re-uses branch via `git worktree add <path> <branch>`', async () => {
-    const prevSandbox = process.env.AI_DEMOS_PATH;
-    const prevWorktrees = process.env.AI_DEMOS_WORKTREES_PATH;
+    const prevSandbox = process.env.AI_SANDBOX_PATH;
+    const prevWorktrees = process.env.AI_SANDBOX_WORKTREES_PATH;
 
     const tmpRoot = await mkdtemp(path.join(os.tmpdir(), 'btr-dangle-'));
-    const sandboxRepo = path.join(tmpRoot, 'ai-demos');
+    const sandboxRepo = path.join(tmpRoot, 'ai-sandbox');
     const worktreesParent = path.join(tmpRoot, 'wt');
 
     try {
@@ -522,8 +541,8 @@ async function main(): Promise<void> {
       execSync('git commit -q -m init', { cwd: sandboxRepo });
       execSync('git branch base', { cwd: sandboxRepo });
 
-      process.env.AI_DEMOS_PATH = sandboxRepo;
-      process.env.AI_DEMOS_WORKTREES_PATH = worktreesParent;
+      process.env.AI_SANDBOX_PATH = sandboxRepo;
+      process.env.AI_SANDBOX_WORKTREES_PATH = worktreesParent;
 
       // First pass creates the worktree + branch.
       const r1 = resolveBuildTarget({
@@ -553,21 +572,84 @@ async function main(): Promise<void> {
       assert.equal(r2.created, true);
       assert.ok(existsSync(r2.outputPath), 'worktree dir must be recreated');
     } finally {
-      if (prevSandbox === undefined) delete process.env.AI_DEMOS_PATH;
-      else process.env.AI_DEMOS_PATH = prevSandbox;
-      if (prevWorktrees === undefined) delete process.env.AI_DEMOS_WORKTREES_PATH;
-      else process.env.AI_DEMOS_WORKTREES_PATH = prevWorktrees;
+      if (prevSandbox === undefined) delete process.env.AI_SANDBOX_PATH;
+      else process.env.AI_SANDBOX_PATH = prevSandbox;
+      if (prevWorktrees === undefined) delete process.env.AI_SANDBOX_WORKTREES_PATH;
+      else process.env.AI_SANDBOX_WORKTREES_PATH = prevWorktrees;
+      await rm(tmpRoot, { recursive: true, force: true });
+    }
+  });
+
+  // ─── tiered-namespace worktree paths (PRD decision 1) ─
+  await test('worktree: tiered branch namespace becomes folder hierarchy', async () => {
+    const prevSandbox = process.env.AI_SANDBOX_PATH;
+    const prevWorktrees = process.env.AI_SANDBOX_WORKTREES_PATH;
+
+    const tmpRoot = await mkdtemp(path.join(os.tmpdir(), 'btr-tiered-'));
+    const sandboxRepo = path.join(tmpRoot, 'ai-sandbox');
+    const worktreesParent = path.join(tmpRoot, 'wt');
+
+    try {
+      await mkdir(sandboxRepo);
+      execSync('git init -q -b main', { cwd: sandboxRepo });
+      execSync('git config user.email t@e.com', { cwd: sandboxRepo });
+      execSync('git config user.name t', { cwd: sandboxRepo });
+      execSync('git config commit.gpgsign false', { cwd: sandboxRepo });
+      await writeFile(path.join(sandboxRepo, 'LICENSE'), 'a\n');
+      execSync('git add -A', { cwd: sandboxRepo });
+      execSync('git commit -q -m init', { cwd: sandboxRepo });
+      execSync('git branch base', { cwd: sandboxRepo });
+
+      process.env.AI_SANDBOX_PATH = sandboxRepo;
+      process.env.AI_SANDBOX_WORKTREES_PATH = worktreesParent;
+
+      // Default branch (proj/<slug>) → <parent>/proj/<slug>/
+      const r1 = resolveBuildTarget({
+        slug: 'foo',
+        build_target: 'worktree',
+        resolveMonorepoPath: () => '/x',
+      });
+      assert.equal(r1.outputPath, path.join(worktreesParent, 'proj', 'foo'));
+      assert.equal(r1.branch, 'proj/foo');
+
+      // Multi-segment custom branch → folder hierarchy
+      const r2 = resolveBuildTarget({
+        slug: 'bar',
+        build_target: 'worktree',
+        target_branch: 'experiment/spike/bar',
+        resolveMonorepoPath: () => '/x',
+      });
+      assert.equal(
+        r2.outputPath,
+        path.join(worktreesParent, 'experiment', 'spike', 'bar'),
+      );
+      assert.equal(r2.branch, 'experiment/spike/bar');
+
+      // Bare branch (no slash) → flat under parent
+      const r3 = resolveBuildTarget({
+        slug: 'baz',
+        build_target: 'worktree',
+        target_branch: 'flat-branch',
+        resolveMonorepoPath: () => '/x',
+      });
+      assert.equal(r3.outputPath, path.join(worktreesParent, 'flat-branch'));
+      assert.equal(r3.branch, 'flat-branch');
+    } finally {
+      if (prevSandbox === undefined) delete process.env.AI_SANDBOX_PATH;
+      else process.env.AI_SANDBOX_PATH = prevSandbox;
+      if (prevWorktrees === undefined) delete process.env.AI_SANDBOX_WORKTREES_PATH;
+      else process.env.AI_SANDBOX_WORKTREES_PATH = prevWorktrees;
       await rm(tmpRoot, { recursive: true, force: true });
     }
   });
 
   // ─── slug sanitization ───────────────────────────────
   await test('worktree: sanitizes slug for branch and path', async () => {
-    const prevSandbox = process.env.AI_DEMOS_PATH;
-    const prevWorktrees = process.env.AI_DEMOS_WORKTREES_PATH;
+    const prevSandbox = process.env.AI_SANDBOX_PATH;
+    const prevWorktrees = process.env.AI_SANDBOX_WORKTREES_PATH;
 
     const tmpRoot = await mkdtemp(path.join(os.tmpdir(), 'btr-slug-'));
-    const sandboxRepo = path.join(tmpRoot, 'ai-demos');
+    const sandboxRepo = path.join(tmpRoot, 'ai-sandbox');
     const worktreesParent = path.join(tmpRoot, 'wt');
 
     try {
@@ -581,8 +663,8 @@ async function main(): Promise<void> {
       execSync('git add -A', { cwd: sandboxRepo });
       execSync('git commit -q -m init', { cwd: sandboxRepo });
 
-      process.env.AI_DEMOS_PATH = sandboxRepo;
-      process.env.AI_DEMOS_WORKTREES_PATH = worktreesParent;
+      process.env.AI_SANDBOX_PATH = sandboxRepo;
+      process.env.AI_SANDBOX_WORKTREES_PATH = worktreesParent;
 
       const r = resolveBuildTarget({
         slug: 'weird/slug with spaces & symbols!',
@@ -599,10 +681,10 @@ async function main(): Promise<void> {
       assert.match(segment, /^[a-zA-Z0-9._-]+$/);
       assert.match(r.branch ?? '', /^proj\/[a-zA-Z0-9._-]+$/);
     } finally {
-      if (prevSandbox === undefined) delete process.env.AI_DEMOS_PATH;
-      else process.env.AI_DEMOS_PATH = prevSandbox;
-      if (prevWorktrees === undefined) delete process.env.AI_DEMOS_WORKTREES_PATH;
-      else process.env.AI_DEMOS_WORKTREES_PATH = prevWorktrees;
+      if (prevSandbox === undefined) delete process.env.AI_SANDBOX_PATH;
+      else process.env.AI_SANDBOX_PATH = prevSandbox;
+      if (prevWorktrees === undefined) delete process.env.AI_SANDBOX_WORKTREES_PATH;
+      else process.env.AI_SANDBOX_WORKTREES_PATH = prevWorktrees;
       await rm(tmpRoot, { recursive: true, force: true });
     }
   });

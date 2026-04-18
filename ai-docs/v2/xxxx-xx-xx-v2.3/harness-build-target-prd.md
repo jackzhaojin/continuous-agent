@@ -12,7 +12,7 @@ Jack Jin
 
 Today the harness system and the 24x7 executive agent write output to different places (`harness-v2-test/` vs `ai-sandbox/`) with different isolation models. This PRD defines a unified build-target selection layer so both execution paths — harness multi-agent pipelines and executive-loop worker spawns — share the same three options for where work lands:
 
-1. **Git Worktree** (new default) — isolated branch + worktree off a new `ai-demos` repo
+1. **Git Worktree** (new default) — isolated branch + worktree off a new `ai-sandbox` repo
 2. **Existing Project** — work directly in an external repo/directory the user already owns
 3. **Monorepo Folder** (legacy) — subfolder inside the current `ai-sandbox/` flat structure
 
@@ -48,10 +48,10 @@ Both harnesses and the executive agent read a single PROMPT.md input packet that
 
 ### Option 1: Git Worktree (Default)
 
-Create an isolated branch + worktree off the `ai-demos` repository.
+Create an isolated branch + worktree off the `ai-sandbox` repository.
 
 **How it works:**
-- `ai-demos` is a manually-created repo with two long-lived branches:
+- `ai-sandbox` is a manually-created repo with two long-lived branches:
   - **`base`** — minimal init commit (Apache 2.0 license, baseline `.gitignore`). All worktrees branch from here.
   - **`main`** — where finished demos get merged in. This is the public-facing branch with completed work.
 - Each new project gets `git worktree add` off the `base` branch, on a new `proj/<slug>` branch
@@ -61,18 +61,23 @@ Create an isolated branch + worktree off the `ai-demos` repository.
 
 **Directory structure (decided):**
 ```
-~/dev/ai-demos/                     ← actual repo checkout (main branch — merged demos)
-~/dev/ai-demos-worktrees/           ← all worktrees live here, one per project
-  ├── player-mcp/                   ← branch: proj/player-mcp (forked from base)
-  ├── supabase-migration/           ← branch: proj/supabase-migration (forked from base)
-  ├── portfolio-refresh/            ← branch: proj/portfolio-refresh (forked from base)
-  └── ...
+~/dev/ai-sandbox/                       ← actual repo checkout (main branch — merged demos)
+~/dev/ai-sandbox-worktrees/             ← all worktrees live here; branch namespace mirrors folder structure
+  ├── proj/                             ← worktrees for `proj/*` branches (new project work)
+  │   ├── player-mcp/                   ← branch: proj/player-mcp (forked from base)
+  │   ├── supabase-migration/           ← branch: proj/supabase-migration (forked from base)
+  │   └── portfolio-refresh/            ← branch: proj/portfolio-refresh (forked from base)
+  ├── monorepo/                         ← worktrees for `monorepo/*` branches (legacy / archive)
+  │   └── legacy-v2.2/                  ← branch: monorepo/legacy-v2.2 (preserves pre-rebaseline history)
+  └── ...                               ← future namespaces (e.g. `release/`, `experiment/`) follow the same rule
 ```
 
-- **Branch naming:** `proj/<slug>` (e.g. `proj/player-mcp`)
+**Tiered-namespace convention:** Worktree paths mirror branch names exactly. A branch named `<namespace>/<slug>` (with a slash) lives at `~/dev/ai-sandbox-worktrees/<namespace>/<slug>/`. A branch with multiple slashes (e.g. `experiment/spike/foo`) nests further. This keeps `git worktree list` output and the filesystem layout in lockstep — no slug munging, no dropped prefixes.
+
+- **Branch naming:** `proj/<slug>` (e.g. `proj/player-mcp`) for new project work; other namespaces (`monorepo/`, `release/`, etc.) follow the same `<namespace>/<slug>` shape
 - **Worktree base point:** `base` branch (not `main` — keeps worktrees clean of other projects' code)
-- **Worktree path:** `~/dev/ai-demos-worktrees/<slug>/`
-- **Creation command:** `git -C ~/dev/ai-demos worktree add ~/dev/ai-demos-worktrees/<slug> -b proj/<slug> base`
+- **Worktree path:** `~/dev/ai-sandbox-worktrees/<branch-name>/` (literal branch name — slashes become folder separators)
+- **Creation command:** `git -C ~/dev/ai-sandbox worktree add ~/dev/ai-sandbox-worktrees/proj/<slug> -b proj/<slug> base`
 - **Promotion:** When a project is ready, merge `proj/<slug>` → `main`. The `base` branch never moves.
 - Worktrees share the git object database with the main repo — lightweight, no duplicated history
 - The main repo checkout on `main` accumulates finished demos; `base` stays minimal forever
@@ -89,10 +94,10 @@ build_target: worktree          # or omit — worktree is the default
 ```
 
 **Implications for existing code:**
-- `worker-spawner.ts` project directory setup changes from `ai-sandbox/<slug>/` to `git worktree add` in the `ai-demos` repo
+- `worker-spawner.ts` project directory setup changes from the legacy flat `<sandbox>/<slug>/` (now preserved on the `monorepo/legacy-v2.2` branch) to `git worktree add` against the `base` branch in the rebaselined `ai-sandbox` repo
 - `output_path` in PROMPT.md frontmatter points to the worktree directory
 - Retry context preservation still works — `output_path` persists across attempts
-- GitHub Pages CI (`ai-sandbox/.github/workflows/deploy-pages.yml`) does NOT apply to the new repo; deployment is per-project
+- The legacy GitHub Pages CI (`.github/workflows/deploy-pages.yml`) only applied to the legacy flat layout and does NOT apply per-worktree; deployment is per-project from each worktree branch
 
 ---
 
@@ -131,17 +136,18 @@ target_remote: git@github.com:jackzhaojin/my-old-project.git
 
 ### Option 3: Monorepo Folder (Legacy)
 
-Create a subfolder inside the current `ai-sandbox/` repository.
+Create a subfolder inside the legacy flat layout — now preserved on the `monorepo/legacy-v2.2` branch of `ai-sandbox`. Typically materialized as its own worktree (e.g. `~/dev/ai-sandbox-worktrees/legacy-v2.2/`) so it doesn't fight with the worktree-default workflow on `base`/`main`.
 
 **How it works:**
-- Same as today's behavior: `ai-sandbox/<project-slug>/` with a branch
-- Shared `.gitignore`, shared CI, shared GitHub Pages deploy
-- No local isolation between projects
+- Worktree of `monorepo/legacy-v2.2` at `~/dev/ai-sandbox-worktrees/legacy-v2.2/` holds the historical flat layout (`projects/{react,nextjs,node,misc}/<date>/<slug>/`)
+- New monorepo-target goals add subfolders inside that worktree and commit on the `monorepo/legacy-v2.2` branch
+- Shared `.gitignore` (the legacy version, not `base`'s), shared CI, shared GitHub Pages deploy (if re-pointed at this branch)
+- No local isolation between projects on this branch
 
 **When to use:**
-- Quick scratch experiments that don't warrant their own worktree
-- Projects that benefit from the existing `ai-sandbox` GitHub Pages auto-deploy
-- Backward compatibility with existing goals and in-progress work
+- Quick scratch experiments that don't warrant a fresh `proj/<slug>` worktree
+- Backward compatibility with existing goals and in-progress work that referenced the flat layout
+- Continuing iteration on a project that already lives in `monorepo/legacy-v2.2`
 
 **PROMPT.md frontmatter:**
 ```yaml
@@ -149,8 +155,8 @@ build_target: monorepo
 ```
 
 **Implications for existing code:**
-- This is the current `worker-spawner.ts` behavior — no changes needed
-- Existing goals without `build_target` should fall back to `monorepo` during migration, then to `worktree` once `ai-demos` is ready
+- Resolver routes the worker to the `monorepo/legacy-v2.2` worktree path instead of creating a fresh `proj/<slug>` worktree
+- Existing goals without `build_target` should fall back to `monorepo` during transition, then to `worktree` once the new flow is validated
 
 ---
 
@@ -292,12 +298,12 @@ These are functional and wired to real code, but only relevant for UI goals with
 
 ### Phase 1: Add build_target to PROMPT.md (v2.3)
 
-1. Jack manually creates `ai-demos` repo with Apache 2.0 license, baseline `.gitignore`, README
-2. Add `build_target` field to `prompt-md-parser.ts` (default: `monorepo` during transition)
-3. Add worktree creation logic to worker-spawner (or a shared `build-target-resolver.ts`)
-4. Add `existing` target support — validate `target_dir`, skip scaffold
-5. Harness `HarnessRunConfig.targetDir` reads from PROMPT.md `target_dir` / worktree path instead of CLI `--target`
-6. Flip default from `monorepo` to `worktree` once validated
+1. ~~Jack manually creates `ai-sandbox` repo with Apache 2.0 license, baseline `.gitignore`, README~~ **DONE 2026-04-17.** Existing `ai-sandbox` repo rebaselined: `base` branch holds the clean init commit (Apache 2.0 + minimal `.gitignore`, backdated to 2026-03-28), `main` is reset to `base` for showcase use, and the entire previous flat layout is preserved on `monorepo/legacy-v2.2` (original SHAs and timestamps intact).
+2. ~~Add `build_target` field to `prompt-md-parser.ts` (default: `monorepo` during transition)~~ **DONE.** Field parsed in `prompt-md-parser.ts`; `BuildTarget` type lives in `core/types.ts`; `coerceBuildTarget`/`decideBuildTarget` in `build-target-resolver.ts`.
+3. ~~Add worktree creation logic to worker-spawner (or a shared `build-target-resolver.ts`)~~ **DONE.** Logic centralized in `src/deterministic/build-target-resolver.ts`; worker-spawner and harness-executor both call `resolveBuildTarget()`.
+4. ~~Add `existing` target support — validate `target_dir`, skip scaffold~~ **DONE.** Resolver throws on missing/non-dir `target_dir`; worker-spawner skips scaffold and source-project copy when `resolution.build_target === 'existing'`.
+5. ~~Harness `HarnessRunConfig.targetDir` reads from PROMPT.md `target_dir` / worktree path instead of CLI `--target`~~ **DONE.** `harness-executor.resolveHarnessTarget()` reads frontmatter via the resolver; CLI `--target` is now an optional override (PROMPT.md primary).
+6. ~~Flip default from `monorepo` to `worktree` once validated~~ **DONE 2026-04-17.** `getDefaultBuildTarget()` returns `'worktree'`. Override via `BUILD_TARGET_DEFAULT` env if a deployment needs the legacy default.
 
 ### Phase 2: Unified input packet (post-v2.3)
 
@@ -330,7 +336,7 @@ These are functional and wired to real code, but only relevant for UI goals with
 
 ## Non-Goals
 
-- Auto-creating the `ai-demos` repo (Jack does this manually)
+- Auto-creating or rebaselining the `ai-sandbox` repo (Jack did this manually on 2026-04-17)
 - Replacing the two-repo split for agent infra (`continuous-agent/` stays separate)
 - Changing `[SELF-ENHANCE]` / `[SKILL-BUILD]` routing (still targets agent codebase)
 - Fully automating worktree-to-standalone-repo promotion in v2.3
@@ -340,16 +346,16 @@ These are functional and wired to real code, but only relevant for UI goals with
 
 ## Decisions Made
 
-1. **Worktree directory structure:** Option A — dedicated parent directory. Main repo at `~/dev/ai-demos/`, all worktrees at `~/dev/ai-demos-worktrees/<slug>/`. Branch convention: `proj/<slug>`, forked from `base` branch. Finished demos merge to `main`. The `base` branch is frozen at the init commit (LICENSE + `.gitignore`) and never moves.
+1. **Worktree directory structure:** Option A — dedicated parent directory. Main repo at `~/dev/ai-sandbox/`, all worktrees at `~/dev/ai-sandbox-worktrees/<branch-name>/`. **Branch namespace mirrors folder structure** — a branch named `<namespace>/<slug>` (e.g. `proj/player-mcp`, `monorepo/legacy-v2.2`) maps to `~/dev/ai-sandbox-worktrees/<namespace>/<slug>/`. No slug munging, no dropped prefixes — `git worktree list` and the filesystem layout stay in lockstep. Default branch convention for new work: `proj/<slug>`, forked from `base`. Finished demos merge to `main`. The `base` branch is frozen at the init commit (LICENSE + `.gitignore`) and never moves.
 
-2. **`.gitignore` template:** Maintain a baseline template in `continuous-agent/workspace-instructions/gitignore-template`. The agent copies this into new worktrees. The `ai-demos` repo's own `.gitignore` covers the init commit, but the template in `continuous-agent/` is the authoritative source for updates.
+2. **`.gitignore` template:** Maintain a baseline template in `continuous-agent/workspace-instructions/gitignore-template`. The agent copies this into new worktrees. The `ai-sandbox` repo's own `.gitignore` covers the init commit, but the template in `continuous-agent/` is the authoritative source for updates.
 
 3. **Branch strategy by target type:**
    - **worktree:** If `target_branch` is not provided, auto-generate as `proj/<slug>` where slug is derived from the goal (e.g. `proj/2026-04-12-nextjs-dashboard`). Always a new branch off init commit.
    - **monorepo:** Commit on the current branch. No branch creation.
    - **existing:** Commit on the current branch of the target repo. No branch creation. If the user wants a branch, they specify `target_branch` explicitly.
 
-4. **Migration from `ai-sandbox/`:** No migration. `ai-sandbox/` stays as-is — it's work from a previous era. New work goes to `ai-demos`. If individual projects are worth continuing, they can be manually migrated.
+4. **Migration from the flat `ai-sandbox/` layout:** Done in-place on 2026-04-17 by rebaselining the existing `ai-sandbox` repo. The flat layout (`projects/{react,nextjs,node,misc}/<date>/<slug>/`) is preserved on the `monorepo/legacy-v2.2` branch with original SHAs and timestamps intact. `base` and `main` are clean orphan branches; `monorepo/legacy-v2.2` is a parallel ancestry (does NOT descend from `base`). The `pre-rebaseline-backup` tag pins the pre-surgery tip as a safety net. New work goes on `proj/<slug>` worktrees off `base`. If individual legacy projects are worth continuing, they can be manually checked out from `monorepo/legacy-v2.2`.
 
 5. **Model configuration scope:**
    - **Executive agent:** Always Claude. No vendor/model override — hardcoded, not configurable.

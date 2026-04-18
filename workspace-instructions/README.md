@@ -62,24 +62,24 @@ These select where worker/harness output lands. See the PRD at
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `build_target` | enum | `monorepo` (during v2.3 transition; flips to `worktree` per P1-8) | `worktree` = git worktree off `ai-demos`. `existing` = work directly in an external project at `target_dir`. `monorepo` = legacy `ai-sandbox/` subfolder. |
+| `build_target` | enum | `worktree` (PRD P1-8 flip on 2026-04-17) | `worktree` = git worktree off `ai-sandbox` `base` branch. `existing` = work directly in an external project at `target_dir`. `monorepo` = legacy flat layout, anchored at the `monorepo/legacy-v2.2` worktree. |
 | `target_dir` | string | _(none)_ | **Required when `build_target=existing`.** Absolute path to an existing project directory. The worker uses it as-is — no `.gitignore` injection, no scaffold. |
-| `target_branch` | string | _(see below)_ | Branch override. `worktree`: defaults to `proj/<slug>` (this overrides). `existing`/`monorepo`: if set, the worker checks out (or creates) this branch; otherwise commits on the current branch. |
+| `target_branch` | string | _(see below)_ | Branch override. `worktree`: defaults to `proj/<slug>` (this overrides; the worktree path mirrors the branch namespace). `existing`: if set, the worker checks out (or creates) this branch in the target dir; otherwise commits on the current branch. `monorepo`: ignored — the legacy worktree is pinned to `monorepo/legacy-v2.2`. |
 
 **Decision framework:** if `build_target` is set, use it; else if `target_dir`
-is set, use `existing`; else default. (Currently `monorepo` until P1-8 flips
-the default to `worktree`.)
+is set, use `existing`; else default (`worktree`).
 
 **Env overrides:**
 - `BUILD_TARGET_DEFAULT` — change the system-wide default (`worktree`/`existing`/`monorepo`)
-- `AI_DEMOS_PATH` — location of the worktree source repo (default `~/dev/ai-demos`)
-- `AI_DEMOS_WORKTREES_PATH` — parent dir for worktrees (default `~/dev/ai-demos-worktrees`)
+- `AI_SANDBOX_PATH` — location of the rebaselined worktree-source repo (default `~/dev/ai-sandbox`)
+- `AI_SANDBOX_WORKTREES_PATH` — parent dir for worktrees (default `~/dev/ai-sandbox-worktrees`)
+- `AI_SANDBOX_LEGACY_MONOREPO_PATH` — explicit override for the legacy monorepo worktree path (default `<AI_SANDBOX_WORKTREES_PATH>/monorepo/legacy-v2.2`)
 
 **Worktree behavior:**
 - Branch: `proj/<slug>` (or `target_branch`).
-- Path: `~/dev/ai-demos-worktrees/<slug>/`.
-- The resolver runs `git -C <ai-demos> worktree add -b <branch> <path>` — idempotent (re-using an existing worktree dir is fine).
-- If `ai-demos` doesn't exist yet (PRD P1-1 is human work), the resolver falls back to `monorepo` and logs a warning. Goals keep running.
+- Path: `~/dev/ai-sandbox-worktrees/<branch-name>/` — **tiered-namespace convention**: the branch's namespace prefix becomes a folder hierarchy. So `proj/foo` → `~/dev/ai-sandbox-worktrees/proj/foo/`; `experiment/spike/bar` → `~/dev/ai-sandbox-worktrees/experiment/spike/bar/`.
+- The resolver runs `git -C <ai-sandbox> worktree add -b <branch> <path> base` — idempotent (re-using an existing worktree dir is fine). New branches always fork from `base`.
+- If `ai-sandbox` doesn't exist (e.g. on a fresh machine), the resolver falls back to `monorepo` mode with a warning so goals keep running.
 - The `.gitignore` template at `workspace-instructions/gitignore-template` is copied into each new worktree.
 
 **Existing behavior:**
@@ -88,7 +88,10 @@ the default to `worktree`.)
 - `source_project` (copy-in) is intentionally skipped — the project already exists.
 
 **Monorepo behavior:**
-- Identical to v2.2: worker → `ai-sandbox/projects/<category>/<date>/<slug>/`; harness → `ai-sandbox/harnesses/<name>/<slug>/`.
+- Anchors at the `monorepo/legacy-v2.2` worktree (typically at `~/dev/ai-sandbox-worktrees/monorepo/legacy-v2.2/`).
+- Worker output: `<legacy-worktree>/projects/<category>/<date>/<slug>/`. Harness output: `<legacy-worktree>/harnesses/<name>/<slug>/`.
+- The legacy worktree is pinned to the `monorepo/legacy-v2.2` branch — `target_branch` is ignored (and logged) to protect the archive.
+- Use this only for back-compat or to pile additional projects onto the legacy flat layout.
 
 ### User-Journey Fields (v2.1.7) — required for UI goals
 
