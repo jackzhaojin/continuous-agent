@@ -4,11 +4,27 @@ All notable changes to the Continuous Executive Agent.
 
 Builds are tracked in the sibling `ai-sandbox/` repo. New v2.3 work happens on per-project worktrees at `~/dev/ai-sandbox-worktrees/proj/<slug>/` (branch `proj/<slug>` forked from `base`). Pre-rebaseline builds are preserved on the `monorepo/legacy-v2.2` branch under `projects/{react,nextjs,node,misc}/{date}/` and deployed to [jackzhaojin.github.io/ai-sandbox](https://jackzhaojin.github.io/ai-sandbox/).
 
-## [Unreleased] - develop
+## [2.4] - 2026-04-19
 
-Next up: v2.4 capability hardening + retro carry-forward (executive→harness integration with a real LLM, build-target manual e2e carried from v2.3 P1-6/P1-7, v2.2 capability matrix, H/I items from v2.1.6 retro). See [`ai-docs/v2/xxxx-xx-xx-v2.4/goal.md`](ai-docs/v2/xxxx-xx-xx-v2.4/goal.md). Cloud migration (v3.0) and observability (v3.1) deferred — see `ai-docs/v2/xxxx-xx-xx-v3.0/` and `xxxx-xx-xx-v3.1/`.
+Capability hardening + retro carry-forward. v2.4.0 / v2.4.1 / v2.4.2 are grouped here — sub-releases delivered incrementally but shipped together to main. See [`ai-docs/v2/2026-04-18-v2.4/`](ai-docs/v2/2026-04-18-v2.4/).
 
-## [2.3.0] - 2026-04-18
+### Added
+- **Executive↔harness live integration validated** — goal bundle `2026-04-18-harness-eds-hello` ran end-to-end on 2026-04-19 against a real Claude Sonnet 4.5 worker; all 5 phases completed and `blocks/hello-world/{hello-world.js,hello-world.css}` shipped. Closes the v2.2 "meta-worker integration only mock tested" gap.
+- **Retro H-fixes (H1–H6)** — Kimi `[MSG]` handoff parser, deterministic gate regression blocker, defect-recursion depth cap (`MAX_DEFECT_RECURSION_DEPTH`, escalates to `needs-you.md` past depth 2), re-breakdown preserves completed sub-steps, worker-log truncation behind opt-in `WORKER_LOG_TRUNCATE_LEN`.
+- **Prompt/skill hardening (I0–I6, A4–A6)** — `buildCurrentSystemStateSection()` injects API surface + gate count + project markers into worker prompts; new `backend-testing` skill with curl/round-trip patterns; backend-first prerequisite split (`[PREREQUISITE-0]` schema/seed, `[PREREQUISITE-1]` API + curl); journey API verification (`extractApiPathsFromJourney`, `journeyDescribesPersistence`); UI-library guidance (shadcn/Radix/headlessui) moved to `web-testing` SKILL; Kimi doc-adherence and Codex HOW-phase preambles; Playwright policy gates web-testing inclusion via `isBackendOnlyStepTitle`.
+- **Progressive skill disclosure for workers (v2.4.1)** — prompt-builder vendor-branches: Claude keeps full-body injection (SDK `Skill` tool lazy-loads), Kimi/Codex receive a manual Worker Skill Index inside `worker-base/SKILL.md` + on-demand `ReadFile`. New `skill-consultation-verifier.ts` reads per-contract manifest (`ledgers/{date}/worker-{id}.manifest.json`) and FAILs when a required SKILL.md was not consulted. Ledger emits `WORKER_SKILL_LOADED` / `WORKER_SKILL_CONSULTED`.
+- **Adobe EDS skills imported (v2.4.1)** — `eds-content-driven-development/` and `eds-building-blocks/` adapted from `@adobe/skills` (Apache-2.0). Deterministic EDS detection via `fstab.yaml` / `scripts/aem.js` / `blocks/` / `head.html` / `paths.json` auto-adds them to `required_skills`. Resources imported verbatim (`cdd-philosophy.md`, `html-structure.md`, `js-guidelines.md`, `css-guidelines.md`).
+- **Slug date-prefix enforcement** — every agentic flow that drafts a bundle in `workspace/drafts/` or `workspace/ondeck/` must prefix the slug with today's `YYYY-MM-DD-`. Keeps generated projects chronologically findable.
+
+### Fixed
+- **v2.4.2 prerequisite inserter false positives** — `insertPrerequisiteStep` no longer contaminates backend-only / no-DB goals with hardcoded Supabase+UI prereq steps. Triggered by the `task-scheduler-api` run where a PROMPT explicitly saying "No UI, no database" was post-processed into a 21-step plan whose Step 0 instructed the worker to provision Supabase tables.
+
+### Changed
+- Orchestrator `TARGET_DIR` now uses `codeDir` instead of `docsDir`.
+- Build script mirrors harness assets and copies them on build.
+- Markdown table regex in state handler tolerates optional separator rows.
+
+## [2.3] - 2026-04-18
 
 ### Added
 - **Unified Build Targets** — Three-mode output model selected per-goal via PROMPT.md frontmatter: `worktree` (default, tiered-namespace path under `~/dev/ai-sandbox-worktrees/<namespace>/<slug>/` off `ai-sandbox` `base`), `existing` (work directly in an external repo/directory via `target_dir`), `monorepo` (legacy flat layout anchored at the `monorepo/legacy-v2.2` worktree). Resolver centralized in `src/deterministic/build-target-resolver.ts`; PROMPT.md fields parsed by `prompt-md-parser.ts` (`build_target`, `target_dir`, `target_branch`); `BuildTarget` type in `core/types.ts`.
@@ -29,7 +45,7 @@ v2.3 was originally scoped as "Unified Build Targets + Hardening Release." Phase
 - v3.0 — Cloud DB migration for ledgers and agent state (was v2.4)
 - v3.1 — Cloud observability unification (was v2.5)
 
-## [2.2.0] - 2026-04-11
+## [2.2] - 2026-04-11
 
 ### Added
 - **Harness Integration Framework** -- Three multi-agent plan-then-build pipelines (`generic-v2`, `eds-site-builder`, `study`) ported from JavaScript to TypeScript and integrated into the executive loop as first-class agents. Standalone via `npm run harness -- --name <name> --prompt <path>` or in 24x7 mode via `execution_pattern: harness` goal bundles.
@@ -43,17 +59,20 @@ v2.3 was originally scoped as "Unified Build Targets + Hardening Release." Phase
 - V2 prompt composition and vendor adapter extended to harness agents — all harness invocations route through `runHarnessAgent()` for prompt adaptation, tool name mapping, and multi-vendor provider dispatch.
 - OSS-readiness: upstream harness sources at `/jack-dev-server-configs/local/*-harness-*` remain untouched; all v2.2 fixes live in the continuous-agent adapter layer.
 
+### Later validated (v2.4)
+- **Executive→harness integration with a real LLM** — v2.2 shipped with only mock-provider e2e coverage for the executive path. The EDS harness ran end-to-end under the live executive loop on 2026-04-19 (goal `2026-04-18-harness-eds-hello`, Claude Sonnet 4.5 worker, all 5 phases to `GOAL_COMPLETED`), confirming the `harness-executor.ts` ↔ STEPS.json ↔ verifier path works outside the mock harness.
+
 ### Known Issues (deferred to v2.3)
 - **Kimi K2.5 CLI handoff** — intermittently passes wrong file set to next phase. Wire path is reliable; CLI not recommended for production.
 - **Kimi K2.5 HOW translation** — prompt adaptation for non-Claude vendors needs reinforcement for the spec-when (HOW) phase.
 - **Codex multi-vendor parity** — full parity for EDS and study harnesses deferred (generic works across all three vendors).
 
 ### Projects built
-v2.2 was infrastructure-focused; functional output landed during v2.1.4–v2.1.6 sub-releases (see [v2.1 below](#210---2026-04-01)). The v2.2 release validated the harness framework via [generic/EDS/study e2e runs](ai-docs/v2/2026-04-11-v2.2/validation-report-kimi-k2.5.md) across Claude/Codex/Kimi rather than producing new sandbox apps.
+v2.2 was infrastructure-focused; functional output landed during v2.1.4–v2.1.6 sub-releases (see [v2.1 below](#21---2026-04-01)). The v2.2 release validated the harness framework via [generic/EDS/study e2e runs](ai-docs/v2/2026-04-11-v2.2/validation-report-kimi-k2.5.md) across Claude/Codex/Kimi rather than producing new sandbox apps.
 
 ---
 
-## [2.1.0] - 2026-04-01
+## [2.1] - 2026-04-01
 
 ### Added
 - **Vendor Abstraction Layer** -- Multi-vendor LLM support for workers. `src/core/vendor/` provides two interfaces: `AgentWorkerProvider` (full agentic execution) and `ChatCompletionProvider` (simple text-in/text-out). Three vendor backends: Claude Agent SDK (default), OpenAI Codex SDK, and Kimi SDK (wire + CLI modes).
@@ -95,7 +114,7 @@ B2B postal-checkout — flagship test of v2.1.4–v2.1.6 capabilities:
 
 ---
 
-## [2.0.0] - 2026-03-29
+## [2.0] - 2026-03-29
 
 ### Added
 - **Agent Identity System** -- Gmail inbox checking (Phase 0.5) and Discord webhook notifications. The agent can now receive goals via email and push completion/blocked alerts to Discord. Email intent parsing (priority_change, new_goal, approval, clarification). All opt-in, disabled by default with kill switches and independent auth health checks.
@@ -122,7 +141,7 @@ Late v2.0 produced the multi-vendor finance-dashboard benchmark (deployed via v2
 
 ---
 
-## [1.3.0] - 2026-02-04
+## [1.3] - 2026-02-04
 
 ### Added
 - **Three-tier credential system** -- Physical separation of executive (`.env.executive`), worker (`.env.worker`), and application (`.env.app`) credentials. Leak detection validates no cross-tier contamination.
@@ -140,7 +159,7 @@ Late v2.0 produced the multi-vendor finance-dashboard benchmark (deployed via v2
 
 ---
 
-## [1.2.0] - 2026-01-28
+## [1.2] - 2026-01-28
 
 ### Added
 - **Goal bundles** -- Goals are now directories with `PROMPT.md` (YAML frontmatter + markdown body), replacing flat `goals.md`. Legacy fallback preserved.
@@ -169,7 +188,7 @@ Late v2.0 produced the multi-vendor finance-dashboard benchmark (deployed via v2
 
 ---
 
-## [1.1.0] - 2026-01-25
+## [1.1] - 2026-01-25
 
 ### Added
 - **Incremental execution** -- Goals >100 estimated turns auto-break into 2-5 steps. Each step runs independently with shared project state. Re-breakdown on failure (max 2 times).
@@ -189,7 +208,7 @@ Late v2.0 produced the multi-vendor finance-dashboard benchmark (deployed via v2
 
 ---
 
-## [1.0.0] - 2026-01-24
+## [1.0] - 2026-01-24
 
 ### Added
 - **Executive loop** -- 8-phase continuous loop: health check, input processing, work selection, contract creation, execution, validation, state updates, sleep/continue.
