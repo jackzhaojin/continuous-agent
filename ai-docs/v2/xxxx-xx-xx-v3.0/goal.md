@@ -1,140 +1,141 @@
-# V3.0 Goal: Migrate Ledgers & AI State to Cloud Database (Without Losing Local AI Monitoring)
+# V3.0 Goal: Build the AI Harness "Second Brain" Foundation
 
-> **Renumbered from v2.4 → v3.0 on 2026-04-18.** Cloud migration is a major architectural shift unlikely to ship for some time; elevating to a v3.x milestone reflects the scope and timing. Open questions in-file that refer to "v2.4" or "v2.5" predate the renumber.
+**Status:** Planned
+
+> **Positioning update (2026-04-19):** V3.0 is now explicitly the **second-brain release**. V3.1 remains the primary **observability unification** release. Observability work can start in V3.0 only where it is required to support the second-brain data model.
 
 ## Vision
 
-Move mutable operational data into a cloud database (Supabase or Cosmos DB) **without regressing local AI observability**. The cloud DB is the canonical source of truth, while a deterministic local mirror keeps monitor-oriented workflows (e.g., local file watchers and out-of-the-box model monitor skills) functional.
+V3.0 should turn ledgers, capabilities, run history, and retrospective artifacts into a coherent **second brain** for the AI harness.
 
-## Why
+Today we have many useful traces, but they are scattered, loosely structured, and often unreliable as a memory system. In V3.0, we want the system to accumulate operational knowledge in a way that is:
 
-- **No queryability** — Cannot aggregate, filter, or analyze historical data without parsing JSONL files line by line
-- **No durability** — Local files are lost if the machine is wiped or disk fails
-- **No concurrent access** — Multiple processes reading/writing JSONL files risk corruption
-- **No scalability** — As ledgers grow, file I/O becomes a bottleneck
-- **Limited observability** — No dashboards or real-time queries against operational data
+- **Searchable** (by goal, capability, component, incident pattern, date range)
+- **Accurate enough to trust** for future planning and execution
+- **Linkable** across artifacts (goal -> steps -> contracts -> outcomes -> retros)
+- **Useful to agents** (not just humans reading raw files)
 
-## Non-Regression Principle: Keep AI Monitoring First-Class
+## Problem Statement
 
-Cloud migration must not break existing monitor patterns that rely on local files. We should explicitly support both:
+Current state is "early, loose second brain":
 
-- **Cloud canonical writes** for durability + shared observability
-- **Local append-only mirror writes** for local monitor compatibility and quick debugging
+- Capability and execution history exists, but confidence in accuracy is low
+- Historical context is fragmented across JSONL, markdown, and ad hoc logs
+- Retrospective knowledge is valuable but not consistently structured for reuse
+- The harness lacks a stable memory contract for "what this system can do" and "what happened before"
 
-This keeps us from taking a step backwards while we gain cloud capabilities.
+This limits planning quality, repeatability, and autonomous decision-making.
 
-## What Moves to Cloud DB
+## Core Goal for V3.0
 
-### Must Migrate (Mutable State → Cloud Source of Truth)
+Create a **Second Brain Data Contract + Storage Foundation** so all major historical artifacts can be captured, searched, and reused with consistent semantics.
 
-| Data | Current Location | Format | Cloud Table |
-|------|-----------------|--------|-------------|
-| Work ledger | `ledgers/work-ledger.jsonl` | JSONL | `work_ledger` |
-| Executive logs | `ledgers/executive-*.log` | Log files | `executive_logs` |
-| Contract events | `workspace/**/CONTRACTS.jsonl` | JSONL per bundle | `contract_events` |
-| Step tracking | `workspace/**/STEPS.json` | JSON per bundle | `goal_steps` |
-| Evolution log | `learning/evolution-log.jsonl` | JSONL | `evolution_log` |
-| Retrospectives | `learning/retrospectives/*.md` | Markdown | `retrospectives` |
-| Self-improvement state | `workspace/self-improvement-state.json` | JSON | `agent_state` |
-| Project registry | `workspace/project-registry.yml` | YAML | `project_registry` |
+V3.0 is not about polishing dashboards first. It is about making the underlying memory reliable so V3.1 observability can sit on top of trustworthy records.
 
-### Stays Local (Config / Immutable / Human-Authored)
 
-| Data | Location | Reason |
-|------|----------|--------|
-| `constitution.md` | `workspace/` | Immutable, version-controlled |
-| `PROMPT.md` files | `workspace/**/` | Human-authored, git-tracked |
-| `.env.*` files | Root | Credentials, never in DB |
-| `CLAUDE.md` | Root | Config, version-controlled |
-| `capabilities/*.yml` | Root | Skill definitions, version-controlled |
-| `preferences.md` | `workspace/` | Human-edited |
+## Pre-Implementation Decision: "How" the Second Brain Is Hosted
 
-## Approach
+Before build work starts, V3.0 must lock a concrete hosting/access pattern for where this second brain lives and how agents/operators reach it online.
 
-### 1. Database Provider & Schema
-- **Supabase recommended** — already used in app-tier projects, credentials exist in `.env.app`
-- Design tables matching the data above with proper indexes
-- Create SQL migration scripts in `src/deterministic/cloud-db/migrations/`
+This goal intentionally keeps implementation options open, but **does not** allow implementation to start without selecting one:
 
-### 2. Storage Abstraction Layer
-Create a `StorageProvider` interface so the codebase doesn't hardcode a backend:
+- Git + markdown as canonical source, synced to cloud-accessible storage/search
+- Obsidian-compatible vault with cloud sync and API/indexing bridge
+- Custom cloud knowledge base service backed by DB/object storage
+- Hybrid approach (e.g., git as source of truth + GitHub Action publish/index pipeline)
 
-```typescript
-interface StorageProvider {
-  appendLedgerEntry(entry: LedgerEntry): Promise<void>;
-  queryLedger(filter: LedgerFilter): Promise<LedgerEntry[]>;
-  appendContractEvent(goalSlug: string, event: ContractEvent): Promise<void>;
-  getContractEvents(goalSlug: string): Promise<ContractEvent[]>;
-  readSteps(goalSlug: string): Promise<StepsJson | null>;
-  writeSteps(goalSlug: string, steps: StepsJson): Promise<void>;
-  getState(key: string): Promise<unknown>;
-  setState(key: string, value: unknown): Promise<void>;
-  appendEvolutionEntry(entry: EvolutionEntry): Promise<void>;
-  saveRetrospective(date: string, content: string): Promise<void>;
-}
-```
+### Decision Requirements (must be written before implementation starts)
 
-Two implementations:
-- `LocalFileProvider` — wraps current fs-based behavior (fallback)
-- `CloudDbProvider` — Supabase or Cosmos DB implementation
+1. **Online accessibility** — the second brain must be reachable beyond a single local machine.
+2. **Canonical source of truth** — explicit declaration of where authoritative records are written first.
+3. **Sync/index path** — how updates propagate and become searchable.
+4. **Agent read/write contract** — how executive/workers query and append knowledge safely.
+5. **Failure/degraded behavior** — what happens when cloud sync/indexing is unavailable.
 
-Plus a composition strategy:
-- `DualWriteProvider` — writes to Cloud first (canonical) and local mirror second (best effort, health-signaled)
+If this decision is not documented, V3.0 remains in planning and should not move into implementation.
 
-The goal is to preserve compatibility with local monitor tooling while moving operational truth to cloud records.
+## Scope
 
-### 3. Rewire Deterministic Layer
-Replace direct `fs` calls in these files with `StorageProvider` calls:
-- `src/deterministic/state-handler.ts` — ledger appends, goal state reads
-- `src/deterministic/steps-json-handler.ts` — STEPS.json read/write
-- `src/deterministic/contracts-log-writer.ts` — contract event appends
-- `src/deterministic/progress-log-writer.ts` — progress log appends
-- `src/core/logging.ts` — executive log writes
+### In Scope
 
-### 4. Data Migration Script
-Create `scripts/migrate-to-cloud.ts`:
-- Read all existing local JSONL/JSON/YAML files
-- Parse and validate entries
-- Batch-insert into cloud DB tables
-- Verify row counts match source
-- Generate migration report
+1. **Second Brain Canonical Entities**
+   - Define canonical records for:
+     - capabilities (declared + observed)
+     - goals and runs
+     - steps and contract events
+     - outcomes and validations
+     - retros and learned lessons
+   - Require stable IDs and timestamps to connect these entities.
 
-### 5. Feature Flag & Rollout
-- `V2_CLOUD_DB=true` — feature flag (default OFF)
-- `CLOUD_DB_PROVIDER=supabase|cosmos` — backend selection
-- `V2_LOCAL_MIRROR=true` — maintain local append-only mirror writes for monitor compatibility (default ON initially)
-- Connection config in `.env.executive` (Tier 1)
-- Setting `V2_CLOUD_DB=false` reverts to local files with zero breakage
+2. **Ledger Normalization + Accuracy Pass**
+   - Audit current ledgers and logs for drift, missing fields, and semantic mismatch.
+   - Introduce normalization rules so existing and future records follow one contract.
+   - Add explicit quality markers (e.g., confidence/provenance/source) where records are inferred.
 
-### 6. Monitoring Compatibility Gates (Must Pass Before Flip)
+3. **Searchability Foundation**
+   - Provide deterministic query paths for:
+     - "what capabilities have worked before?"
+     - "what similar goals failed and why?"
+     - "what changed between attempts?"
+   - Ensure historical lookup is practical without manual line-by-line parsing.
 
-Before declaring migration complete:
+4. **Retrospective System Rethink**
+   - Redesign retro capture so lessons are first-class, referenceable records (not just narrative docs).
+   - Link must-fix items directly to capability areas and future goals.
 
-1. **Parity gate** — local monitor can detect goal lifecycle and worker progress from mirror files.
-2. **Lag gate** — mirror write lag from canonical cloud write stays under an agreed threshold.
-3. **Failure gate** — cloud outages degrade gracefully with explicit telemetry while local monitoring remains available.
-4. **Reconciliation gate** — deterministic replay/checkpoint process can verify cloud vs local mirror drift.
+5. **Storage Abstraction for Second Brain**
+   - Introduce/extend a storage abstraction that supports canonical second-brain reads/writes.
+   - Preserve local append-only compatibility while enabling more robust backends.
 
-## Key Files Affected
+6. **Local Artifact -> Second Brain Policy**
+   - All critical local artifacts (ledgers, run logs, step files, contracts, retros, capability notes) must follow one of three paths:
+     1) restructured directly into second-brain canonical records,
+     2) read directly from a second-brain-native store, or
+     3) pushed/synced into the second brain through a deterministic pipeline.
+   - No critical operational history should remain as isolated local-only data once V3.0 foundations are complete.
 
-| File | Change |
-|------|--------|
-| `src/deterministic/state-handler.ts` | Use StorageProvider instead of fs |
-| `src/deterministic/steps-json-handler.ts` | Use StorageProvider instead of fs |
-| `src/deterministic/contracts-log-writer.ts` | Use StorageProvider instead of fs |
-| `src/deterministic/progress-log-writer.ts` | Use StorageProvider instead of fs |
-| `src/core/logging.ts` | Use StorageProvider for executive logs |
-| `src/deterministic/cloud-db/client.ts` | **New** — DB client singleton |
-| `src/deterministic/cloud-db/schema.ts` | **New** — table definitions |
-| `src/deterministic/cloud-db/providers.ts` | **New** — StorageProvider implementations |
-| `scripts/migrate-to-cloud.ts` | **New** — data migration script |
+### Out of Scope (Primary)
 
-## Open Questions
+- End-to-end observability UX unification (targeted for V3.1)
+- Dashboard-first work not required by second-brain data integrity
+- Broad analytics polish before memory contract is stable
 
-- **Supabase vs Cosmos DB?** Supabase recommended since credentials already exist. Cosmos DB if Azure integration is preferred.
-- **Real-time subscriptions?** Supabase supports real-time — could enable live dashboard updates. Out of scope for v2.4, worth noting for v2.5.
-- **Retention policy?** Should old ledger entries be archived/purged after N days? Keep all for now, add retention later.
+## Proposed Deliverables
+
+1. **V3.0 Second Brain Spec**
+   - Canonical entity model, field definitions, ID strategy, provenance rules.
+
+2. **Second Brain Hosting Decision Record (required pre-implementation)**
+   - Chosen "how" (platform/storage/sync/indexing), rationale, and fallback behavior.
+
+3. **Ledger Accuracy Audit Report**
+   - Gap analysis of current artifacts and prioritized fixes.
+
+4. **Normalized Write/Read Path Plan**
+   - Mapping of existing writers/readers to the new memory contract.
+
+5. **Retro Knowledge Schema + Migration Plan**
+   - Structured lessons and linking strategy for historical retros.
+
+6. **Initial Search Interface Contract**
+   - Query shapes for agents/executive flow to retrieve relevant prior knowledge.
+
+7. **Local Artifact Migration/Sync Inventory**
+   - File-by-file mapping of local artifacts to: restructure, direct second-brain usage, or push/sync path.
+
+## Success Criteria
+
+V3.0 is successful when:
+
+1. The harness has a documented second-brain hosting decision (the "how") before implementation starts, with online accessibility guaranteed.
+2. The harness has a documented, implemented second-brain contract for historical knowledge.
+3. Capability history and run history are materially more trustworthy than current loose logs.
+4. Agents can retrieve prior outcomes/lessons through structured queries rather than ad hoc file parsing.
+5. Retrospective insights are linkable to future execution decisions.
+6. Critical local historical data is no longer stranded in local-only formats; it is restructured, directly second-brain-backed, or deterministically pushed/synced.
+7. A follow-on release path is defined for actively using this second-brain knowledge in higher-level planning/execution behaviors.
+8. V3.1 observability work can build on this model without redoing foundational data semantics.
 
 ## Priority
 
-High — but only if we preserve (or improve) AI observability during migration. “Cloud-first + local-monitor-compatible mirror” is the intended path.
+**Very high.** The second brain is foundational to better autonomy. Without trustworthy memory, observability and planning improvements will remain shallow.
