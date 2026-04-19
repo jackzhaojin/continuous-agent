@@ -28,6 +28,7 @@ pm2 start ecosystem.config.cjs     # Production (requires build first)
 5. **PM2** — Rebuild only (`npm run build`); never `pm2 restart` without explicit ask
 6. **Develop worktree** — NEVER run `npm run build` in `continuous-agent-develop`. The SIGUSR2 hits main's registered dist/, not develop's. Use `npm run typecheck` in secondary worktrees.
 7. **Never commit or push** unless explicitly instructed
+8. **Goal bundle slugs** — Every agentic flow that drafts a bundle in `workspace/drafts/` or `workspace/ondeck/` must prefix the slug with today's `YYYY-MM-DD-` (e.g. `2026-04-19-hello-react`). Bundle directory name must match. Keeps generated projects chronologically findable as they pile up. See `workspace-instructions/README.md` and `.claude/rules/workspace-and-goals.md`.
 
 ## TypeScript Conventions
 

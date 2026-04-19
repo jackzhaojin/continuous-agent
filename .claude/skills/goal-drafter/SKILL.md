@@ -113,7 +113,7 @@ Summarize all choices in a table and ask for confirmation before writing files:
 ```
 Goal Summary:
   Title:             B2B Postal Checkout Flow
-  Slug:              b2b-postal-checkout
+  Slug:              2026-04-19-b2b-postal-checkout    ← ALWAYS prefix with today's YYYY-MM-DD
   Priority:          P2
   Complexity:        High (6-10 requirements docs)
   Worker:            kimi
@@ -124,6 +124,8 @@ Goal Summary:
 
 Proceed? (y/n)
 ```
+
+**Slug rule (MANDATORY):** Always prefix the slug with today's date in `YYYY-MM-DD-` form before the descriptive part. Use the actual calendar date of drafting (from the system clock, not made-up). `hello-react` → `2026-04-19-hello-react`. This scales across dozens of generated projects — without the date prefix, finding the fifth recipe-book build in a long `workspace/completed/` list is a nightmare. The bundle directory name MUST match the slug, so the directory also carries the date.
 
 ## Output Location
 
@@ -161,7 +163,7 @@ Full field reference: `workspace-instructions/README.md`
 ```yaml
 ---
 title: "[from interview]"
-slug: "[derived from title]"
+slug: "YYYY-MM-DD-[derived-from-title]"   # REQUIRED: today's date prefix (see Step 9 slug rule)
 priority: P2                           # From Step 3
 status: pending                        # Always 'pending' for drafts
 complexity: medium                     # From Step 2
@@ -214,6 +216,8 @@ Real goal bundles at two complexity levels. Read before drafting to calibrate ou
 After generating all files, verify:
 
 - [ ] PROMPT.md frontmatter has all required fields filled
+- [ ] **Slug is prefixed with today's `YYYY-MM-DD-`** and the bundle directory name matches the slug
+- [ ] `created:` matches the date prefix embedded in the slug
 - [ ] `status: pending` (always for drafts)
 - [ ] `output_path` and `branch` are blank
 - [ ] Requirements docs exist for medium/high complexity

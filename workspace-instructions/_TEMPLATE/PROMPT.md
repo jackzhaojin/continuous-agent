@@ -1,10 +1,10 @@
 ---
 title: "[Goal Title]"              # Required. Use [SELF-ENHANCE] or [SKILL-BUILD] prefix for agent-codebase work.
-slug: "goal-slug"                  # Required. URL-safe identifier, used as directory name.
+slug: "YYYY-MM-DD-goal-slug"       # Required. ALWAYS prefix with today's date (e.g. "2026-04-19-hello-react"). Directory name MUST match.
 priority: P3                       # P0 (critical) | P1 (high) | P2 (normal) | P3 (default) | P4 (backlog)
 status: pending                    # pending | in_progress | blocked | complete
 complexity: medium                 # low | medium | high (informational, affects auto-breakdown heuristic)
-created: "2026-01-01"             # ISO 8601 date
+created: "YYYY-MM-DD"              # ISO 8601 date — MUST match the date prefix in the slug
 tags: [tag1, tag2]                # Categorization labels
 execution_pattern:                 # plan-then-execute (default) | loop-until-progress | plan-mode | deterministic-pipeline
 max_turns:                         # Default 200. Set 500 for Playwright/complex. Any positive integer.

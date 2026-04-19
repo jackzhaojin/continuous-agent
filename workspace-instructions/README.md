@@ -15,6 +15,8 @@ workspace/completed/    --> Finished work (permanent record)
 
 Goals move through these directories automatically. Each goal is a **directory** (named after the slug) containing at minimum a `PROMPT.md`.
 
+**Slug convention — always `YYYY-MM-DD-<description>`.** The directory name IS the slug, and the slug must start with the drafting date. Dozens of projects accumulate in `ondeck/`, `in-progress/`, and `completed/` — a plain `recipe-book` slug gets lost in the list; `2026-04-19-recipe-book` sorts chronologically and stays findable. This applies to every agentic flow that drafts bundles (goal-drafter skill, queue ingestion, self-improvement task generator). Deterministic slug derivation (`workspace-writers.ts`) is unchanged for backward-compat, but AI-authored drafts should emit the date-prefixed form directly.
+
 ## Per-Bundle File Structure
 
 ```
@@ -37,7 +39,7 @@ Every goal's `PROMPT.md` starts with YAML frontmatter between `---` delimiters. 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
 | `title` | string | **yes** | `"Untitled"` | Human-readable goal name. Special prefixes: `[SELF-ENHANCE]` routes to agent codebase, `[SKILL-BUILD]` routes to skill builder. |
-| `slug` | string | **yes** | `"untitled"` | URL-safe identifier. Used as directory name and for cross-references. |
+| `slug` | string | **yes** | `"untitled"` | URL-safe identifier. **MUST begin with today's `YYYY-MM-DD-` prefix** (e.g. `2026-04-19-hello-react`). The bundle directory name must match the slug exactly. This prefix is how generated projects stay findable across `workspace/completed/`, the ai-sandbox worktree tree, and Notion — without it, the fifth recipe-book build disappears in the pile. |
 | `priority` | enum | **yes** | `P4` | Execution order. Higher priority = picked first. |
 | `status` | enum | **yes** | `pending` | Current lifecycle state. |
 | `complexity` | enum | no | _(none)_ | Informational hint for breakdown heuristics. |

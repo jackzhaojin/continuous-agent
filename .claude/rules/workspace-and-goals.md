@@ -13,16 +13,16 @@ paths:
 
 ## Goal Bundles
 
-Work items are directories containing `PROMPT.md` with YAML frontmatter:
+Work items are directories containing `PROMPT.md` with YAML frontmatter. **Slug convention: always prefix with today's `YYYY-MM-DD-`** (e.g. `2026-04-19-hello-react`). The bundle directory name must match the slug. This applies to every agentic flow that authors a bundle (goal-drafter skill, self-enhance/skill-build drafters, any slash command that writes to `workspace/drafts/` or `workspace/ondeck/`). Without it, dozens of generated projects collapse into an unsearchable list.
 
 ```yaml
 ---
 title: "Goal Title"
-slug: "goal-slug"
+slug: "2026-04-19-goal-slug"        # MUST start with today's YYYY-MM-DD-
 priority: P3
 status: pending
 complexity: medium
-created: "2026-01-01"
+created: "2026-04-19"               # matches the date prefix in slug
 tags: [tag1, tag2]
 output_path:             # Set by worker on first execution
 branch:                  # Set for self-enhancement tasks
