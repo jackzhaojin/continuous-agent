@@ -88,25 +88,48 @@ The decision rule for "commit vs gitignore":
 - Do not add extra features, languages, or implementations
 - If the task is done, stop - don't "complement" with alternatives
 
-### UI Libraries (MANDATORY for web projects)
+## MANDATORY: Skill Consultation Before Code
 
-For any UI work on a web goal, **use an existing component library** for inputs that carry internal state. Do NOT hand-roll Select, Combobox, DatePicker, Autocomplete, Menu, or any compound input.
+Every skill the worker pool knows about is listed below. **Before you write or modify any code, ReadFile the SKILL.md for every skill that applies to your step.** Claude workers auto-discover via the Skill tool; Kimi and Codex have no auto-discovery, so the ReadFile **is** your discovery. The validator scans your worker log for these reads and fails the step if a skill that should have been consulted was skipped.
 
-**Required, in priority order:**
-1. `shadcn/ui` — first choice. Install components via `npx shadcn@latest add <component>`. Uses Radix primitives under the hood.
-2. `@radix-ui/react-*` — if shadcn isn't installed and cannot be added (template restriction), use Radix primitives directly and style them.
-3. `@headlessui/react` — acceptable fallback for Tailwind projects.
+### Worker Skill Index (all 15 skills, by path)
 
-**Forbidden unless the task explicitly asks for a custom implementation:**
-- Custom `Select` / `Combobox` / `DatePicker` / `Menu` built with raw `useState` and divs. The v2.1.6 postal-checkout run shipped a 326-line custom Select whose `SelectValue` subcomponent never showed the selected country because `useState` was local to the parent but `SelectValue` read from its own never-updated state. This is the #1 integration bug source and is invisible to unit tests.
-- Controlled inputs that `useState` their own value while claiming to be "connected to react-hook-form". Pick one: either the parent form owns the value via `useController`, or the component owns it via `useState`. Do not do both.
+This index is maintained manually — if a skill is added to `claude-files-to-output/skills/`, add one row here. The table is the authoritative list workers should look at.
 
-**How to decide between shadcn and Radix raw:**
-- If `components.json` exists in the project, shadcn is already installed — use `npx shadcn@latest add` to pull the component you need.
-- If no `components.json`, prefer initializing shadcn (`npx shadcn@latest init`) over hand-rolling — it is 5 minutes and saves hours of Select bugs.
-- Exception: if the PROJECT is a design system / UI component library itself, then hand-rolled components are the point of the task and this rule does not apply.
+| Path | What it covers |
+|---|---|
+| `.claude/skills/worker-base/SKILL.md` | Universal constitution, workspace rules, Clean-Tree Rule, structured handoff schema, this index *(you are already reading it)*. |
+| `.claude/skills/backend-testing/SKILL.md` | Curl-based API smoke testing. Pre-flight health checks, round-trip verification, "is this endpoint really live" discipline. |
+| `.claude/skills/calibration-eds/SKILL.md` | Calibration/practice flow for `deliver.eds.site` capability. Only on explicit calibration steps — not for normal EDS feature work. |
+| `.claude/skills/calibration-nextjs/SKILL.md` | Calibration/practice flow for `deliver.nextjs.app.basic`. Only on explicit calibration steps. |
+| `.claude/skills/claude-skill-creator/SKILL.md` | Guide for authoring new SKILL.md files. Only on `[SKILL-BUILD]` goals. |
+| `.claude/skills/eds-building-blocks/SKILL.md` | AEM Edge Delivery block implementation patterns — JS decoration, CSS scoping, core-file modification. Invoked from CDD Step 5. |
+| `.claude/skills/eds-content-driven-development/SKILL.md` | 8-step CDD workflow for any AEM Edge Delivery code change. Start here on EDS projects. |
+| `.claude/skills/integration-validator/SKILL.md` | Integration gate protocol — walks the user journey, files defect reports. Only on `integration_gate` / `[GATE]` steps. |
+| `.claude/skills/jack-git-commit/SKILL.md` | Conventional commit format with traceable footers. Required on every step that produces code deltas. |
+| `.claude/skills/playwright-demo-video/SKILL.md` | Polished demo videos with voiceover + captions. Only when the explicit deliverable is a demo video. |
+| `.claude/skills/prd-writer/SKILL.md` | PRD authoring. Only when the deliverable is a PRD document. |
+| `.claude/skills/project-analysis/SKILL.md` | Codebase analysis and tech-stack documentation. For research/analysis steps on unfamiliar codebases. |
+| `.claude/skills/project-architect/SKILL.md` | System-design / architecture documents. For architecture-deliverable steps after a PRD exists. |
+| `.claude/skills/task-breakdown/SKILL.md` | Task-breakdown documents. Rare — normal multi-step goals use the executive's own breakdown. |
+| `.claude/skills/web-testing/SKILL.md` | Mandatory visual testing via playwright-cli for any web UI, plus UI Library rules (shadcn / Radix / headlessui). |
 
-Document your choice in the structured handoff under `what_i_built`, e.g. `what_i_built: "shadcn/ui Select + Combobox for country/state; form state owned by react-hook-form"`.
+### Which skill applies to which step
+
+Match on the nature of your step, not on title keywords:
+
+| Your step does… | Read these |
+|---|---|
+| UI / page / form / route / component on a web project | `web-testing` + `jack-git-commit` |
+| API route / handler / serverless function / DB migration / schema / seed data | `backend-testing` + `jack-git-commit` |
+| Fullstack step touching both UI and API | `web-testing` + `backend-testing` + `jack-git-commit` |
+| Integration gate step (kind=`integration_gate`, or title prefixed `[GATE]`) | `integration-validator` + `web-testing` + `jack-git-commit` |
+| AEM Edge Delivery block / `scripts.js` / `styles.css` edit (EDS project: `fstab.yaml`, `blocks/`, `scripts/aem.js` present) | `eds-content-driven-development` + `eds-building-blocks` + `web-testing` + `jack-git-commit` |
+| Demo video / screen capture deliverable | `playwright-demo-video` + `jack-git-commit` |
+| New SKILL.md authoring (`[SKILL-BUILD]` goal) | `skill-creator` + `jack-git-commit` |
+| Pure research / analysis step (no code deltas) | Read only what the handoff references; commit is optional |
+
+If a step is ambiguous, prefer over-reading (one extra ReadFile is cheap) to under-reading (one missed skill ships broken work). If you're on an EDS project, always start with `eds-content-driven-development` — it will tell you when to invoke `eds-building-blocks` and what content to test against.
 
 ## Execution Guidelines — Vertical Slice, Not Horizontal Layer
 

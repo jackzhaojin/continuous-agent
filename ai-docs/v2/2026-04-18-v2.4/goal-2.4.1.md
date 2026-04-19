@@ -1,7 +1,24 @@
 # v2.4.1 — Progressive Skill Disclosure for Workers
 
-**Status:** Planned
+**Status:** Implemented 2026-04-18 (awaiting live-run telemetry to confirm token drop + consultation rate)
 **Focus:** Stop pasting full skill bodies into every worker prompt. Replace with a tiny manifest + on-demand `ReadFile` of skills the worker decides it needs. Verify the worker actually consulted the right ones.
+
+## Implementation Note
+
+- **Manual Worker Skill Index** inside `claude-files-to-output/skills/worker-base/SKILL.md` — one row per skill on disk (path + one-line purpose), authored by hand. This is the authoritative list workers consult. The i5 adhoc test enforces parity with on-disk directories and rejects orphan references.
+- **No runtime INDEX generator.** An earlier draft had a `skill-index-generator.ts` render the manifest on every prompt; we simplified — the manual table in worker-base is the single source of truth.
+- **Vendor branch** in `src/agentic/intelligence/prompt-builder.ts`: Claude keeps full-body injection (SDK lazy-loads via the `Skill` tool); Kimi and Codex get worker-base only (which now contains the manual index + the decision table) and `ReadFile` skills on demand.
+- **Skill-consultation verifier** at `src/deterministic/verifiers/skill-consultation-verifier.ts` reads a per-contract manifest (`ledgers/{YYYY-MM-DD}/worker-{id}.manifest.json`) and the worker log, and FAILs if a required SKILL.md path was not accompanied by a vendor-appropriate Read-tool call (`ReadFile` for Kimi, `read_file` for Codex). Claude short-circuits to PASS.
+- **Ledger telemetry**: `WORKER_SKILL_LOADED` emitted from prompt-builder per required skill; `WORKER_SKILL_CONSULTED` emitted from verifier per skill whose Read was detected.
+- **Worker-base cleanup**: UI Libraries section (v2.4 I4) moved to `web-testing/SKILL.md`. Worker-base now carries the Worker Skill Index + decision table + Skill Consultation directive — 215 lines, under the 260-line ceiling enforced by the i5 test.
+- **Adobe EDS skills imported**: `eds-content-driven-development/` and `eds-building-blocks/` adapted from `@adobe/skills` (Apache-2.0). Adaptations: aligned commits to `jack-git-commit`, routed test step through our `web-testing` skill, removed Cursor-specific attribution, trimmed references to Adobe-internal sister skills not in our library. Resources (`cdd-philosophy.md`, `html-structure.md`, `js-guidelines.md`, `css-guidelines.md`) imported verbatim. Deterministic detection via `fstab.yaml` / `scripts/aem.js` / `blocks/` markers adds them to the required-skills list on EDS projects.
+- **Adhoc tests**: `tests/adhoc/i5-skill-index-generation.adhoc.ts` and `tests/adhoc/i6-skill-consultation-verifier.adhoc.ts` both pass. i5 verifies the manual index in worker-base exactly matches the on-disk skill directories (15 total), has no orphan references, and contains no `when_required` custom frontmatter leakage.
+
+### Design note: reverted `when_required` frontmatter AND the runtime INDEX generator
+
+An earlier draft of v2.4.1 (a) added a custom `when_required` prose field to every SKILL.md, and (b) generated a two-column INDEX manifest at prompt-build time via `src/deterministic/skill-index-generator.ts`. Both reverted. Skills stay in standard Claude-compatible format (`name`, `description`, `user-invocable`, `metadata.category`). The "what skills exist" and "when to consult" logic both live in a single authored table inside `worker-base`. Rationale: (1) maintaining 15 copies of decision prose is worse than one table in one skill; (2) skills stay portable across Claude / Kimi / Codex / Anthropic's Agent Skills spec with no vendor-specific fields; (3) manual curation is simpler to read, debug, and PR-review than runtime templating; (4) removing the generator cut one file and ~70 lines of code from the pipeline.
+
+- **Deferred to live run**: token-reduction measurement, consultation-rate telemetry, no-regression on journey gates / commit format (success criteria 1–4).
 
 > **Sub-release of v2.4.** Carries forward the cost/quality concerns surfaced during the Recipe Book run on 2026-04-18: Kimi K 2.5 was paying ~480 lines of skill content per spawn (worker-base 191 + web-testing 150 + jack-git-commit 139) on every one of 19 steps, with no native lazy-load mechanism like Claude SDK's `Skill` tool.
 
@@ -49,139 +66,96 @@ Three consecutive Kimi workers, three consecutive same-vendor proofs that file-r
 
 ### In Scope
 
-1. **Generate a worker-skill INDEX** (`claude-files-to-output/skills/INDEX.md`) auto-built from each skill's frontmatter `name` + `description` + new `when_required` field
-2. **Slim the always-loaded prompt** down to: worker-base (universal) + INDEX (manifest only) + a strong directive
-3. **Add a directive in worker-base** that mandates `ReadFile` of any SKILL.md whose `when_required` matches the current step before writing code
-4. **Add a verifier** (`workspace/verifiers/skill-consultation.ts` or wired into integration-validator-runner) that scans the worker log for `ReadFile` calls against expected `SKILL.md` paths and fails the step if a required skill was skipped
-5. **Update `prompt-builder.ts:377-393`** to inject INDEX.md instead of full skill bodies
-6. **Telemetry**: emit `WORKER_SKILL_LOADED` (when prompt-builder includes skill in INDEX) and `WORKER_SKILL_CONSULTED` (when worker ReadFiles a SKILL.md) ledger events. Closes the gap noted today: today only `EXECUTIVE_SKILL_USED` exists.
-7. **Move web-only content out of worker-base**: the v2.4 I4 "UI Libraries" section belongs in `web-testing` or a new `ui-components` skill, not in the universal worker-base. Same for any future web-specific additions.
-8. **Vendor scope**: Kimi (CLI + Wire) and Codex. Claude path is a no-op — its SDK already lazy-loads via the `Skill` tool, so the prompt-builder injection for Claude can either keep the current behavior or also switch to INDEX.md (TBD by run data).
+1. **Generate a worker-skill INDEX** auto-built from each skill's standard `name` + `description` frontmatter. **No custom frontmatter fields** — skills stay compatible with Anthropic's Agent Skills spec.
+2. **Slim the always-loaded prompt** down to: worker-base (universal, includes a Skill Consultation decision table) + INDEX manifest. For Kimi and Codex only; Claude keeps full-body injection since its SDK lazy-loads via the `Skill` tool.
+3. **Put the "when to consult" decision table in `worker-base`** — one table that maps step kind (UI / backend / gate / EDS / demo / skill-build / research) to the skills a worker should `ReadFile`. Centralized, not per-skill.
+4. **Add a verifier** that scans the worker log for vendor-appropriate Read-tool calls (`ReadFile` for Kimi, `read_file` for Codex) against expected `SKILL.md` paths, and FAILs the step if a required skill was skipped. Claude short-circuits to PASS.
+5. **Thread required-skills through the contract** — prompt-builder computes the list deterministically (web → web-testing, EDS markers on disk → both EDS skills, `[GATE]` → integration-validator, etc.), writes it to a per-contract manifest, and the verifier reads back.
+6. **Telemetry**: emit `WORKER_SKILL_LOADED` (prompt-builder, per required skill) and `WORKER_SKILL_CONSULTED` (verifier, per skill whose Read was detected).
+7. **Move web-only content out of worker-base**: the v2.4 I4 "UI Libraries" section moves to `web-testing`.
+8. **Import Adobe's EDS skills**: `eds-content-driven-development` + `eds-building-blocks` adapted from `@adobe/skills` (Apache-2.0), with commits routed through `jack-git-commit` and testing through `web-testing`.
+9. **Vendor scope**: Kimi (CLI + Wire) and Codex. Claude keeps current behavior.
 
 ### Out of Scope
 
-- Building a Kimi-native skill protocol (that's a separate POC, see "Future")
-- Reorganizing existing skill content other than moving the v2.4 I4 web-only section
-- Changing executive skill loading (`.claude/skills/` for the executive process)
-- Changing the SKILL.md frontmatter format beyond adding `when_required`
+- Building a Kimi-native skill protocol (that's a separate POC — see "Future")
+- Changing the SKILL.md frontmatter format (skills stay standard)
+- Changing executive skill loading (`.claude/skills/` for the executive process is unchanged)
 
 ---
 
-## Approach
+## Approach (as shipped)
 
-### Phase 1 — Add `when_required` to every worker SKILL.md (1 hr)
+### Phase 1 — Standard frontmatter, centralized decision table
 
-Update frontmatter in each skill:
+Every worker SKILL.md keeps the standard Anthropic Agent Skills frontmatter only (`name`, `description`, `user-invocable`, `metadata.category`, `license` where applicable). An earlier draft added a custom `when_required` field per skill; we reverted it — see "Design note" at the top of this file.
 
-```yaml
----
-name: web-testing
-description: Mandatory visual testing protocol for web projects. Required if your step touches UI, routes, forms, or rendered components.
-when_required: |
-  Required when:
-  - The step adds or modifies a page, route, or rendered component
-  - The step adds a form, button, or interactive element
-  - The step is an integration_gate on a web project
-  Skip when:
-  - The step is purely backend/API/schema
-  - The step is non-user-facing config or docs
-user-invocable: false
----
-```
+The "when to consult" logic lives in a single decision table inside `worker-base/SKILL.md`:
 
-Files to update (12 skills): `worker-base`, `web-testing`, `backend-testing`, `jack-git-commit`, `integration-validator`, `playwright-demo-video`, `prd-writer`, `project-analysis`, `project-architect`, `task-breakdown`, `claude-skill-creator`, `calibration-eds`, `calibration-nextjs`.
+| Your step does… | Read these |
+|---|---|
+| UI / page / form / route / component on a web project | `web-testing` + `jack-git-commit` |
+| API route / handler / serverless function / DB migration / schema / seed data | `backend-testing` + `jack-git-commit` |
+| Fullstack step touching both UI and API | `web-testing` + `backend-testing` + `jack-git-commit` |
+| Integration gate step (kind=`integration_gate`, or title prefixed `[GATE]`) | `integration-validator` + `web-testing` + `jack-git-commit` |
+| AEM Edge Delivery block / `scripts.js` / `styles.css` edit (project has `fstab.yaml`, `blocks/`, `scripts/aem.js`) | `eds-content-driven-development` + `eds-building-blocks` + `web-testing` + `jack-git-commit` |
+| Demo video / screen capture deliverable | `playwright-demo-video` + `jack-git-commit` |
+| New SKILL.md authoring (`[SKILL-BUILD]` goal) | `skill-creator` + `jack-git-commit` |
+| Pure research / analysis step (no code deltas) | Read only what the handoff references; commit is optional |
 
-### Phase 2 — Build the INDEX generator (1-2 hr)
+### Phase 2 — Manual Worker Skill Index in worker-base
 
-A small deterministic helper at `src/deterministic/skill-index-generator.ts` that:
+No runtime generator. The authoritative list of skills lives inside `worker-base/SKILL.md` as a manually-maintained Markdown table under `### Worker Skill Index`. One row per skill on disk (path + one-line purpose). When a skill is added, edit the table; when a skill is removed, delete the row. The i5 adhoc test enforces parity with `claude-files-to-output/skills/` so drift is caught at typecheck time.
 
-1. Scans `claude-files-to-output/skills/*/SKILL.md`
-2. Extracts `name`, `description`, `when_required` from each frontmatter
-3. Renders a single Markdown index suitable for prompt injection
-4. Optionally writes to disk (`claude-files-to-output/skills/INDEX.md`) so workers can also `ReadFile` the index itself if needed
-
-Output shape (~30 lines for a typical 12-skill library):
+Example rows (actual content lives in worker-base):
 
 ```markdown
-# Available Worker Skills
-
-Read each skill's full body via `ReadFile .claude/skills/<name>/SKILL.md` ONLY when its when_required matches your current step.
-
-| Skill | Description | When required |
-|---|---|---|
-| worker-base | Constitution + universal rules | always (already loaded above) |
-| web-testing | Visual testing via playwright-cli | UI step on web project |
-| backend-testing | Curl-verify APIs, persistence round-trips | API/schema step |
-| jack-git-commit | Conventional commit format with metadata footers | every commit |
-| integration-validator | Gate-step validation protocol | integration_gate step |
-| ... | ... | ... |
+| Path | What it covers |
+|---|---|
+| `.claude/skills/worker-base/SKILL.md` | Universal constitution, workspace rules … (you are already reading it). |
+| `.claude/skills/backend-testing/SKILL.md` | Curl-based API smoke testing. Pre-flight health checks, round-trip verification … |
+| `.claude/skills/eds-content-driven-development/SKILL.md` | 8-step CDD workflow for any AEM Edge Delivery code change. Start here on EDS projects. |
+| … | … |
 ```
 
-### Phase 3 — Wire the new injection in prompt-builder (1 hr)
+### Phase 3 — Vendor-branched prompt-builder
 
-Replace `prompt-builder.ts:377-393`:
+In `src/agentic/intelligence/prompt-builder.ts`, the single-site skill body injection became:
 
 ```ts
-// OLD
-if (workerBaseSkill) sections.push(renderSkillBody(workerBaseSkill.body, skillVars).trim());
-if (webTestingSkill) sections.push(renderSkillBody(webTestingSkill.body, skillVars).trim());
-if (backendTestingSkill) sections.push(renderSkillBody(backendTestingSkill.body, skillVars).trim());
-
-// NEW
-if (workerBaseSkill) sections.push(renderSkillBody(workerBaseSkill.body, skillVars).trim());
-sections.push(generateSkillIndex(skillResult.skills));
-sections.push(SKILL_DIRECTIVE);  // strong language: "MUST ReadFile any SKILL.md whose when_required matches"
-```
-
-Where `SKILL_DIRECTIVE` is a short, hard-edged paragraph in worker-base style:
-
-```
-## MANDATORY: Skill Consultation Before Code
-
-Before you write or modify any code, you MUST review the "Available Worker Skills" table above. For every skill whose `when_required` matches this step, you MUST call ReadFile on its SKILL.md path and follow its protocol. Skipping a required skill is a defect — the validator scans your log for these reads and will fail the step if a required skill was unread.
-
-If a step is ambiguous, prefer over-reading (one extra skill is cheap) to under-reading (one missed skill ships broken work).
-```
-
-### Phase 4 — Move v2.4 I4 web-only content out of worker-base (30 min)
-
-The "UI Libraries (MANDATORY for web projects)" section currently in `worker-base/SKILL.md:91-110` (added in v2.4 I4) is web-specific. Move it to `web-testing/SKILL.md` (or a new `ui-components/SKILL.md` if it grows). This is a sanity check that the new manifest model actually disciplines what goes into worker-base.
-
-### Phase 5 — Add the consultation verifier (2 hr)
-
-New verifier at `workspace/verifiers/skill-consultation.ts` (or merged into `integration-validator-runner.ts`):
-
-```ts
-// Pseudocode
-function verifySkillConsultation(workerLog, requiredSkills): VerifierResult {
-  for (const skill of requiredSkills) {
-    const skillPath = `.claude/skills/${skill.name}/SKILL.md`;
-    const wasRead = workerLog.includes(`ReadFile`) && workerLog.includes(skillPath);
-    if (!wasRead) {
-      return { pass: false, reason: `Required skill "${skill.name}" was not consulted (no ReadFile of ${skillPath} in worker log)` };
-    }
-  }
-  return { pass: true };
+if (resolvedVendor === 'claude') {
+  // Claude path: full-body injection (unchanged)
+  if (webTestingSkill) sections.push(renderSkillBody(webTestingSkill.body, skillVars).trim());
+  if (backendTestingSkill) sections.push(renderSkillBody(backendTestingSkill.body, skillVars).trim());
 }
+// Kimi / Codex path: nothing extra injected. Worker-base already contains the manual index + decision table.
 ```
 
-Wire it into the validator pipeline so a worker that ignores the manifest fails the step instead of silently passing.
+The MANDATORY directive paragraph + decision table + manual skill index all live in `worker-base/SKILL.md`, so they ship with every prompt regardless of vendor (Claude sees the index as informational + uses the SDK Skill tool; Kimi/Codex follow the ReadFile path).
 
-### Phase 6 — Telemetry events (30 min)
+### Phase 4 — Move v2.4 I4 UI Libraries out of worker-base
 
-In `prompt-builder.ts`, when each skill is added to INDEX, emit:
+The "UI Libraries (MANDATORY for web projects)" section moved from `worker-base/SKILL.md:91-110` to `web-testing/SKILL.md` (bottom). Sanity check on the manifest model — worker-base should only contain universal guidance.
 
-```jsonl
-{"event":"WORKER_SKILL_LOADED","ts":"...","goal_id":"...","contract_id":"...","skill_name":"web-testing","mode":"index"}
-```
+### Phase 5 — Skill-consultation verifier
 
-In the verifier, when a skill's `ReadFile` is detected:
+New `src/deterministic/verifiers/skill-consultation-verifier.ts`. Inputs: `contract_id`. Loads the per-contract manifest (`ledgers/{YYYY-MM-DD}/worker-{id}.manifest.json`) and the worker log (`worker-{id}.log`). For each name in `required_skills`, checks that the log contains a vendor-appropriate Read token (`ReadFile` / `read_file`) alongside the skill's `.claude/skills/<dir>/SKILL.md` path. Any miss → FAIL with the missing list in `evidence.missing`.
 
-```jsonl
-{"event":"WORKER_SKILL_CONSULTED","ts":"...","goal_id":"...","contract_id":"...","skill_name":"web-testing"}
-```
+Registered in `src/deterministic/verifiers/index.ts` and called from `runAllVerifiers` via the new optional `extras.contract_id` param. Contract id threads from `worker-spawner.ts` (now sets `WorkerResult.contract_id`) through `validation-handler.ts`. The verifier is advisory by default, consistent with existing validator policy.
 
-Now `grep WORKER_SKILL_LOADED ledgers/work-ledger.jsonl | wc -l` vs `grep WORKER_SKILL_CONSULTED` gives a real adoption ratio per skill.
+### Phase 6 — Telemetry
+
+`src/deterministic/state-handler.ts` gained three helpers:
+
+- `emitWorkLedgerEvent(event, payload)` — appends `{event, ts, ...payload}` to `ledgers/work-ledger.jsonl`
+- `writeContractSkillManifest(id, {required_skills, vendor})` — writes the per-contract manifest
+- `readContractSkillManifest(id)` — reads it back, locates the worker log path alongside
+
+Prompt-builder emits `WORKER_SKILL_LOADED` per required skill at build time. Verifier emits `WORKER_SKILL_CONSULTED` per skill whose Read was detected. Adoption rate per skill = `grep WORKER_SKILL_CONSULTED | wc -l` over `grep WORKER_SKILL_LOADED | wc -l`.
+
+### Phase 7 — Adobe EDS skill import
+
+`eds-content-driven-development/` and `eds-building-blocks/` imported from `@adobe/skills` plugin `aem/edge-delivery-services/` (Apache-2.0). Resource `.md` files imported verbatim. SKILL.md bodies adapted: commits routed through `jack-git-commit`, testing routed through `web-testing`, Cursor-specific attribution removed, references to Adobe-internal sister skills not in our library softened. New `detectEdsProjectMarkers(projectPath)` in prompt-builder adds both EDS skills to `required_skills` when `fstab.yaml` / `scripts/aem.js` / `blocks/` / `head.html` / `paths.json` is present.
 
 ---
 
@@ -198,29 +172,38 @@ The release is successful when ALL of the following are true after one full Reci
 
 ---
 
-## Files Affected
+## Files Affected (as shipped)
 
 | File | Change |
 |---|---|
-| `src/agentic/intelligence/prompt-builder.ts` | Lines 377-393 replaced with INDEX injection + directive |
-| `src/deterministic/skill-index-generator.ts` | NEW — frontmatter scanner + INDEX renderer |
-| `claude-files-to-output/skills/*/SKILL.md` | Frontmatter updated with `when_required` (12 skills) |
-| `claude-files-to-output/skills/INDEX.md` | NEW — generated; can be regenerated on every spawn or pre-built |
-| `claude-files-to-output/skills/worker-base/SKILL.md` | UI Libraries section moved out; new SKILL_DIRECTIVE added |
+| `src/agentic/intelligence/prompt-builder.ts` | Vendor branch at skill-injection site: Claude keeps full-body, Kimi/Codex get worker-base only (which has the manual index). Added required-skills computation + `detectEdsProjectMarkers` + inlined `skillDirectoryName` helper. Threads `required_skills` onto the contract and emits `WORKER_SKILL_LOADED` |
+| `src/deterministic/skill-index-generator.ts` | (Briefly existed, then DELETED.) The runtime INDEX generator was dropped in favour of the manually-authored Worker Skill Index inside `worker-base`. |
+| `src/deterministic/verifiers/skill-consultation-verifier.ts` | NEW — verifier reads per-contract manifest + worker log, FAILs on missing Read-tool call against required SKILL.md paths. Short-circuits to PASS for Claude |
+| `src/deterministic/verifiers/index.ts` | Registers the new verifier |
+| `src/deterministic/verifiers/core-verifiers.ts` | `runAllVerifiers` gained optional `extras.contract_id` to wire the new verifier |
+| `src/deterministic/state-handler.ts` | New helpers: `emitWorkLedgerEvent`, `writeContractSkillManifest`, `readContractSkillManifest` |
+| `src/deterministic/validation-handler.ts` | Threads `result.contract_id` into `runAllVerifiers` |
+| `src/deterministic/skill-loader.ts` | Unchanged loader logic — skills are plain `SkillDefinition` (no extra fields) |
+| `src/deterministic/library-loader-types.ts` | Unchanged `SkillDefinition` shape — stayed standard after the revert |
+| `src/agentic/execution/worker-spawner.ts` | `WorkerResult.contract_id` populated on both success and failure exits |
+| `src/core/types.ts` | `WorkerResult.contract_id?: string` added |
+| `claude-files-to-output/skills/worker-base/SKILL.md` | UI Libraries section removed; "MANDATORY: Skill Consultation Before Code" directive, manual Worker Skill Index (one row per on-disk skill), and "Which skill applies to which step" decision table added. 215 lines |
 | `claude-files-to-output/skills/web-testing/SKILL.md` | Receives the moved UI Libraries section |
-| `src/agentic/execution/integration-validator-runner.ts` | New skill-consultation check (or new sibling verifier) |
-| `src/deterministic/state-handler.ts` | Emit `WORKER_SKILL_LOADED` and `WORKER_SKILL_CONSULTED` events |
-| `tests/adhoc/i5-skill-index-generation.adhoc.ts` | NEW — verify INDEX renders correctly from frontmatter |
-| `tests/adhoc/i6-skill-consultation-verifier.adhoc.ts` | NEW — verify the verifier detects unread required skills |
+| `claude-files-to-output/skills/eds-content-driven-development/` | NEW — adapted from Adobe's CDD skill (Apache-2.0) + verbatim resources |
+| `claude-files-to-output/skills/eds-building-blocks/` | NEW — adapted from Adobe's building-blocks skill (Apache-2.0) + verbatim resources |
+| `tests/adhoc/i5-skill-index-generation.adhoc.ts` | NEW — verifies the **manual** Worker Skill Index in worker-base lists every on-disk skill directory, has no orphan references, carries no `when_required` frontmatter leakage, and keeps worker-base ≤ 260 lines |
+| `tests/adhoc/i6-skill-consultation-verifier.adhoc.ts` | NEW — 7 cases: Kimi PASS, Kimi missing-skill FAIL, Codex `read_file`, Claude short-circuit, no-manifest skip, missing-log FAIL, path-without-read-token FAIL |
+| `tests/adhoc/v2-prompt-builder.adhoc.ts` | Two assertions tightened to reflect v2.4.1 reality (Kimi preamble marker instead of "no ReadFile token", web-testing body instead of "no playwright-cli text") |
 
 ---
 
-## Open Questions
+## Open Questions (resolved)
 
-1. **Should Claude path also switch to INDEX?** Claude SDK lazy-loads via the `Skill` tool, so the current full-body injection is technically wasteful for Claude too. But Claude has more headroom and the SDK behavior is well-tested. Recommendation: **keep Claude on full-body for v2.4.1, evaluate switching in v2.5 once Kimi telemetry confirms the manifest model is stable.**
-2. **Should INDEX include the playbook-matched skills**, or only the always-eligible ones? Recommendation: **include all worker skills**, since the `when_required` field tells the worker which to actually read. Keep playbook matching as a separate signal.
-3. **How strict should the verifier be?** A worker that reads `web-testing` but not `jack-git-commit` on a commit step — fail outright, or warn? Recommendation: **fail outright on missing required skills, since silent-pass is the failure mode v2.4 H/I items repeatedly hit.**
-4. **Token budget for the directive paragraph** — the SKILL_DIRECTIVE needs to be persuasive enough that Kimi obeys it. If three runs show low consultation rate, escalate the language and add an example.
+1. **Should Claude path also switch to INDEX?** **No (v2.4.1).** Claude SDK lazy-loads via the `Skill` tool; the wastefulness is real but the current path is well-tested. Revisit in v2.5 once Kimi telemetry confirms the manifest model is stable.
+2. **Should skills declare their own "when required" in frontmatter?** **No.** An earlier draft did; we reverted. Skills stay portable across Claude / Kimi / Codex / Anthropic's Agent Skills spec. The single decision table in `worker-base` is the source of truth, easier to update once than 15 times.
+3. **Should INDEX include the playbook-matched skills, or only the always-eligible ones?** Include all. The worker-base decision table tells the worker which to actually read. Playbook matching is a separate signal.
+4. **How strict should the verifier be?** Fails advisory (per `validateWorkDetailed`'s existing "worker success is primary" policy). Verifier emits FAIL evidence into the validation summary; does not block a worker that succeeded. v2.5 may escalate to blocking once the consultation rate is proven stable.
+5. **Token budget for the directive paragraph** — the "MANDATORY: Skill Consultation" directive in worker-base is ~14 lines (directive + 8-row table). Measured impact on first-MSG length will land in `retro-2.4.1.md` after the live run.
 
 ---
 
@@ -234,9 +217,12 @@ The release is successful when ALL of the following are true after one full Reci
 
 ## References
 
+- [`outcome-2.4.1.md`](outcome-2.4.1.md) — what actually shipped + live-run runbook
 - `src/agentic/intelligence/prompt-builder.ts:44` — `WORKER_SKILLS_ROOT` definition
 - `src/agentic/intelligence/prompt-builder.ts:220` — `loadSkillLibrary` call
-- `src/agentic/intelligence/prompt-builder.ts:377-393` — Skill body injection (the lines this goal replaces)
-- `src/agentic/intelligence/vendor-adapter.ts:117-130` — Secondary skill-body injection for non-Claude vendors
+- `src/agentic/intelligence/prompt-builder.ts:385-471` — vendor-branched skill injection + required-skills collection (replaces the v2.4 always-full-body injection at lines 377-393). `skillDirectoryName` is inlined here.
+- `src/deterministic/verifiers/skill-consultation-verifier.ts` — verifier
+- `src/agentic/intelligence/vendor-adapter.ts:12-25` — vendor tool name mappings (authoritative source for which Read token to scan per vendor)
 - `.claude/rules/skills-and-prompts.md` — Two-CWD skill model documentation
 - Recipe Book run evidence: `ledgers/2026-04-19/worker-contract-1776562209827.log`, `worker-contract-1776562720472.log`, `worker-contract-1776563608519.log` — direct proof Kimi reads SKILL.md on demand when referenced in prompt
+- Upstream Adobe skills: [`adobe/skills` plugins/aem/edge-delivery-services](https://github.com/adobe/skills/tree/main/plugins/aem/edge-delivery-services) (Apache-2.0)

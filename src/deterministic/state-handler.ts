@@ -28,6 +28,97 @@ const WORKSPACE_DIR = path.join(process.cwd(), 'workspace');
 const LEDGERS_DIR = path.join(process.cwd(), 'ledgers');
 
 /**
+ * v2.4.1 — Append a single JSON event to ledgers/work-ledger.jsonl.
+ * Fire-and-forget: failures are logged but never throw. Used for skill-consultation
+ * telemetry (`WORKER_SKILL_LOADED` / `WORKER_SKILL_CONSULTED`) so adoption can be
+ * measured via `grep WORKER_SKILL_CONSULTED ledgers/work-ledger.jsonl | wc -l`.
+ */
+export async function emitWorkLedgerEvent(
+  event: string,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  try {
+    const ledgerPath = path.join(LEDGERS_DIR, 'work-ledger.jsonl');
+    const entry = JSON.stringify({
+      event,
+      ts: new Date().toISOString(),
+      ...payload,
+    });
+    await appendFile(ledgerPath, entry + '\n', 'utf-8');
+  } catch (err) {
+    logDeterministic(`[state-handler] emitWorkLedgerEvent(${event}) failed: ${err}`);
+  }
+}
+
+/**
+ * v2.4.1 — Persist the set of skills required for a given worker contract so
+ * the skill-consultation verifier can gate on them after the worker finishes.
+ *
+ * File: `ledgers/{YYYY-MM-DD}/worker-{contractId}.manifest.json`
+ * Shape: { required_skills: string[], vendor: string, contract_id: string, created_at: string }
+ *
+ * The manifest sits next to the worker log so the verifier can locate both by contract id.
+ */
+export async function writeContractSkillManifest(
+  contractId: string,
+  data: { required_skills: string[]; vendor: string },
+): Promise<void> {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const dateDir = path.join(LEDGERS_DIR, today);
+    await mkdir(dateDir, { recursive: true });
+    const manifestPath = path.join(dateDir, `worker-${contractId}.manifest.json`);
+    const body = JSON.stringify(
+      {
+        contract_id: contractId,
+        vendor: data.vendor,
+        required_skills: data.required_skills,
+        created_at: new Date().toISOString(),
+      },
+      null,
+      2,
+    );
+    await writeFile(manifestPath, body, 'utf-8');
+  } catch (err) {
+    logDeterministic(`[state-handler] writeContractSkillManifest(${contractId}) failed: ${err}`);
+  }
+}
+
+/**
+ * v2.4.1 — Read the per-contract skill manifest. Searches date-dated ledger
+ * subdirectories newest-first. Returns null if the manifest is missing.
+ */
+export async function readContractSkillManifest(
+  contractId: string,
+): Promise<{ required_skills: string[]; vendor: string; log_path: string | null } | null> {
+  try {
+    const { readdir } = await import('fs/promises');
+    const entries = await readdir(LEDGERS_DIR, { withFileTypes: true });
+    const dateDirs = entries
+      .filter((e) => e.isDirectory() && /^\d{4}-\d{2}-\d{2}$/.test(e.name))
+      .map((e) => e.name)
+      .sort()
+      .reverse();
+    for (const dir of dateDirs) {
+      const manifestPath = path.join(LEDGERS_DIR, dir, `worker-${contractId}.manifest.json`);
+      if (!existsSync(manifestPath)) continue;
+      const raw = await readFile(manifestPath, 'utf-8');
+      const parsed = JSON.parse(raw) as { required_skills?: string[]; vendor?: string };
+      const logPath = path.join(LEDGERS_DIR, dir, `worker-${contractId}.log`);
+      return {
+        required_skills: Array.isArray(parsed.required_skills) ? parsed.required_skills : [],
+        vendor: typeof parsed.vendor === 'string' ? parsed.vendor : 'claude',
+        log_path: existsSync(logPath) ? logPath : null,
+      };
+    }
+    return null;
+  } catch (err) {
+    logDeterministic(`[state-handler] readContractSkillManifest(${contractId}) failed: ${err}`);
+    return null;
+  }
+}
+
+/**
  * Update PROMPT.md frontmatter for a goal bundle
  * V1.2: Updates the PROMPT.md file directly
  */

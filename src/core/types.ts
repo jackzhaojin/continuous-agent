@@ -277,6 +277,9 @@ export interface WorkerResult {
   duration_ms: number;
   output_path?: string; // Target folder in ai-sandbox where work was done
   exit_code?: number; // Exit code from worker process (1 = failure, 0 = success)
+  // v2.4.1 — contract identifier for downstream verifiers that need to locate
+  // the per-contract manifest and worker log (e.g. skill-consultation verifier).
+  contract_id?: string;
 }
 
 /**

@@ -148,3 +148,23 @@ If `playwright-cli` is not available, fall back to:
 3. Check for runtime errors in server output
 
 **Do NOT skip visual testing.** A component that compiles but renders a blank page is a failure.
+
+## UI Libraries (MANDATORY)
+
+For any UI work on a web goal, **use an existing component library** for inputs that carry internal state. Do NOT hand-roll Select, Combobox, DatePicker, Autocomplete, Menu, or any compound input.
+
+**Required, in priority order:**
+1. `shadcn/ui` — first choice. Install components via `npx shadcn@latest add <component>`. Uses Radix primitives under the hood.
+2. `@radix-ui/react-*` — if shadcn isn't installed and cannot be added (template restriction), use Radix primitives directly and style them.
+3. `@headlessui/react` — acceptable fallback for Tailwind projects.
+
+**Forbidden unless the task explicitly asks for a custom implementation:**
+- Custom `Select` / `Combobox` / `DatePicker` / `Menu` built with raw `useState` and divs. The v2.1.6 postal-checkout run shipped a 326-line custom Select whose `SelectValue` subcomponent never showed the selected country because `useState` was local to the parent but `SelectValue` read from its own never-updated state. This is the #1 integration bug source and is invisible to unit tests.
+- Controlled inputs that `useState` their own value while claiming to be "connected to react-hook-form". Pick one: either the parent form owns the value via `useController`, or the component owns it via `useState`. Do not do both.
+
+**How to decide between shadcn and Radix raw:**
+- If `components.json` exists in the project, shadcn is already installed — use `npx shadcn@latest add` to pull the component you need.
+- If no `components.json`, prefer initializing shadcn (`npx shadcn@latest init`) over hand-rolling — it is 5 minutes and saves hours of Select bugs.
+- Exception: if the PROJECT is a design system / UI component library itself, then hand-rolled components are the point of the task and this rule does not apply.
+
+Document your choice in the structured handoff under `what_i_built`, e.g. `what_i_built: "shadcn/ui Select + Combobox for country/state; form state owned by react-hook-form"`.

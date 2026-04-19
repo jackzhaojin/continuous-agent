@@ -901,13 +901,27 @@ export type GoalType = 'standard' | 'skill-build' | 'self-enhance';
  * - Setup steps: Check git clean, files created, npm install works
  * - Implementation/Testing: Full validation suite
  * - Unknown (no step info): Full validation for backwards compatibility
+ *
+ * v2.4.1 — when `extras.contract_id` is supplied, the skill-consultation
+ * verifier runs alongside the standard set to gate whether Kimi/Codex workers
+ * ReadFile'd every skill declared required by the prompt-builder manifest.
+ * Claude contracts short-circuit this verifier to PASS (SDK auto-discovery).
  */
 export async function runAllVerifiers(
   config: VerifierConfig,
   step?: StepContext,
-  taskType?: GoalType
+  taskType?: GoalType,
+  extras?: { contract_id?: string }
 ): Promise<VerifierResult[]> {
   const results: VerifierResult[] = [];
+
+  // v2.4.1 — skill-consultation verifier runs for every step type (including
+  // skill-build / self-enhance) because consultation discipline is universal.
+  // Placed first so the evidence appears at the top of validation logs.
+  if (extras?.contract_id) {
+    const { verifySkillConsultation } = await import('./skill-consultation-verifier.js');
+    results.push(await verifySkillConsultation({ contract_id: extras.contract_id }));
+  }
 
   // Task-type routing: skill-build and self-enhance have specialised verifier sets
   if (taskType === 'skill-build') {

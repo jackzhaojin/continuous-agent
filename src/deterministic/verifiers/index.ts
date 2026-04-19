@@ -32,3 +32,8 @@ export {
   type IntegrityCheckResult,
   type IntegrityReport,
 } from './reference-integrity.js';
+
+export {
+  verifySkillConsultation,
+  type SkillConsultationConfig,
+} from './skill-consultation-verifier.js';

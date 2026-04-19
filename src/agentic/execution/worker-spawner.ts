@@ -1013,6 +1013,7 @@ export async function spawnWorker(
       errors,
       duration_ms: duration,
       output_path: projectPath,
+      contract_id: contract.id,
     };
   } catch (error) {
     const duration = Date.now() - startTime;
@@ -1033,6 +1034,7 @@ export async function spawnWorker(
       errors: [`Worker execution failed: ${errorMessage}`],
       duration_ms: duration,
       output_path: projectPath,
+      contract_id: contract.id,
     };
   }
 }

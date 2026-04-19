@@ -20,10 +20,23 @@ import { buildProjectMemoryContext } from '../../deterministic/project-memory-st
 import { loadSkillLibrary } from '../../deterministic/skill-loader.js';
 import { loadPlaybookLibrary } from '../../deterministic/playbook-loader.js';
 import { resolveExecutionPattern } from '../../deterministic/execution-pattern-resolver.js';
-import { readLatestStructuredHandoff } from '../../deterministic/state-handler.js';
+import {
+  readLatestStructuredHandoff,
+  emitWorkLedgerEvent,
+  writeContractSkillManifest,
+} from '../../deterministic/state-handler.js';
 import { readStepsJson } from '../../deterministic/steps-json-handler.js';
 import type { SkillDefinition, PlaybookDefinition } from '../../deterministic/library-loader-types.js';
 import { adaptPromptForVendor } from './vendor-adapter.js';
+
+/**
+ * v2.4.1 — Resolve the directory name of a skill (the segment workers use in
+ * `.claude/skills/<dir>/SKILL.md` paths). Inlined here because it's the only
+ * consumer after the runtime INDEX generator was retired.
+ */
+function skillDirectoryName(skill: SkillDefinition): string {
+  return path.basename(path.dirname(skill.source_path));
+}
 import { logAgentic } from '../../core/logging.js';
 import { existsSync, readFileSync } from 'fs';
 import { readdir } from 'fs/promises';
@@ -382,17 +395,88 @@ ${matchedPlaybook.body.trim()}
     sections.push(`## Skill References\n\n${skillSections.join('\n\n---\n\n')}`);
   }
 
-  // 7. Web testing skill (for web projects)
-  if (webTestingSkill) {
-    const renderedWebTesting = renderSkillBody(webTestingSkill.body, skillVars);
-    sections.push(renderedWebTesting.trim());
+  // 7. Skill disclosure — Claude keeps full-body, Kimi/Codex rely on the manually-maintained
+  // Worker Skill Index that lives inside worker-base.
+  //
+  // Rationale (v2.4.1): Claude SDK lazy-loads SKILL.md bodies via the `Skill` tool — injecting
+  // them is wasteful but well-tested, so we keep the current behavior. Kimi and Codex have no
+  // skill auto-discovery; before v2.4.1 we paid the full body of every matched skill on every
+  // spawn. The 2026-04-18 Recipe Book run proved Kimi ReadFiles SKILL.md when merely referenced,
+  // so for those vendors the manual index inside worker-base is enough — no runtime-generated
+  // manifest needed.
+  const isClaude = resolvedVendor === 'claude';
+  if (isClaude) {
+    // Claude path: full-body injection (unchanged behavior)
+    if (webTestingSkill) {
+      const renderedWebTesting = renderSkillBody(webTestingSkill.body, skillVars);
+      sections.push(renderedWebTesting.trim());
+    }
+    if (backendTestingSkill) {
+      const renderedBackend = renderSkillBody(backendTestingSkill.body, skillVars);
+      sections.push(renderedBackend.trim());
+    }
+  }
+  // Kimi / Codex path: no additional injection. Worker-base already contains the manual
+  // "Worker Skill Index" table + "Which skill applies to which step" decision table.
+
+  // 7b. Compute required_skills for the verifier to gate on. Deterministic mapping
+  // based on project type + step kind — the same triggers that previously selected
+  // web-testing / backend-testing for full-body injection. worker-base is always
+  // required but is already loaded as the universal prelude, so we elide it from
+  // the gate list (there is no "did the worker ReadFile worker-base" check).
+  const requiredSkillNames: string[] = [];
+  const webTestingDir = webTestingSkill ? skillDirectoryName(webTestingSkill) : null;
+  const backendTestingDir = backendTestingSkill ? skillDirectoryName(backendTestingSkill) : null;
+  if (webTestingDir) requiredSkillNames.push(webTestingDir);
+  if (backendTestingDir) requiredSkillNames.push(backendTestingDir);
+
+  // jack-git-commit — every step that produces code deltas must commit (Clean-Tree Rule).
+  // Pure research steps skip this, but we can't cheaply detect "research only" here, so
+  // gate optimistically on all steps and accept the advisory false positive on pure research.
+  const gitCommitSkill = skillResult.skills.find((s) => s.name === 'jack-git-commit');
+  if (gitCommitSkill) requiredSkillNames.push(skillDirectoryName(gitCommitSkill));
+
+  // integration-validator — only required on integration-gate steps. Detect via title prefix
+  // `[GATE]` (matches executive's kind='integration_gate' naming convention).
+  const isIntegrationGate = /^\s*\[gate\]/i.test(item.title);
+  if (isIntegrationGate) {
+    const igSkill = skillResult.skills.find((s) => s.name === 'integration-validator');
+    if (igSkill) requiredSkillNames.push(skillDirectoryName(igSkill));
   }
 
-  // 7b. Backend testing skill (v2.4 I1 + A5) — include for backend-only steps
-  // and for fullstack steps where the API work is in scope.
-  if (backendTestingSkill) {
-    const renderedBackend = renderSkillBody(backendTestingSkill.body, skillVars);
-    sections.push(renderedBackend.trim());
+  // claude-skill-creator — only on [SKILL-BUILD] goals.
+  if (item.skillBuild) {
+    const cscSkill = skillResult.skills.find((s) => s.name === 'skill-creator' || s.name === 'claude-skill-creator');
+    if (cscSkill) requiredSkillNames.push(skillDirectoryName(cscSkill));
+  }
+
+  // EDS skills — detect Edge Delivery projects by on-disk markers
+  // (`fstab.yaml`, `scripts/aem.js`, or a top-level `blocks/` dir). When any
+  // marker is present, both EDS skills are required alongside web-testing.
+  const isEdsProject = detectEdsProjectMarkers(projectPath);
+  if (isEdsProject) {
+    const cdd = skillResult.skills.find((s) => s.name === 'eds-content-driven-development');
+    const bb = skillResult.skills.find((s) => s.name === 'eds-building-blocks');
+    if (cdd) requiredSkillNames.push(skillDirectoryName(cdd));
+    if (bb) requiredSkillNames.push(skillDirectoryName(bb));
+  }
+
+  // Telemetry: persist manifest + emit per-skill LOADED events for adoption-rate analysis.
+  // Fire-and-forget — failures are logged but never throw. We intentionally don't await
+  // the ledger writes serially to keep prompt-build latency bounded.
+  if (requiredSkillNames.length > 0) {
+    writeContractSkillManifest(contract.id, { required_skills: requiredSkillNames, vendor: resolvedVendor });
+    for (const name of requiredSkillNames) {
+      emitWorkLedgerEvent('WORKER_SKILL_LOADED', {
+        contract_id: contract.id,
+        goal_id: item.id,
+        skill_name: name,
+        vendor: resolvedVendor,
+      });
+    }
+    // Mutate the contract so downstream (validation-handler, verifier) can see the list
+    // without having to reload the manifest from disk when they already have the contract.
+    contract.required_skills = requiredSkillNames;
   }
 
   // 8. Validation criteria
@@ -628,6 +712,24 @@ export function isBackendOnlyStepTitle(title: string): boolean {
   if (/\bschema\b|\bseed data\b|\bdatabase\b|\bsupabase\b/.test(t) && !/form|page|ui|component|dashboard/.test(t)) return true;
   if (/curl smoke|health endpoint|\bpostgres\b/.test(t)) return true;
   return false;
+}
+
+/**
+ * v2.4.1 — Detect whether the project at `projectPath` is an AEM Edge Delivery
+ * Services project. Markers are the usual suspects: Franklin's `fstab.yaml`,
+ * the platform-provided `scripts/aem.js`, or a top-level `blocks/` directory
+ * (how EDS organises block implementations). Any single marker triggers it.
+ */
+function detectEdsProjectMarkers(projectPath: string): boolean {
+  if (!projectPath || !existsSync(projectPath)) return false;
+  const candidates = [
+    'fstab.yaml',
+    'scripts/aem.js',
+    'blocks',
+    'head.html',
+    'paths.json',
+  ];
+  return candidates.some((rel) => existsSync(path.join(projectPath, rel)));
 }
 
 function detectProjectMarkers(projectPath: string): string[] {

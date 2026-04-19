@@ -107,7 +107,10 @@ async function testClaudeWebProject() {
 
   // Claude: should NOT have tool name mappings (SDK handles this)
   assert(!prompt.includes('Tool Name Mappings'), 'No tool mappings for Claude', prompt);
-  assert(!prompt.includes('ReadFile'), 'No Kimi tool names for Claude', prompt);
+  // v2.4.1: SKILL_DIRECTIVE in worker-base legitimately names Kimi/Codex when explaining
+  // cross-vendor skill discovery. What must not leak into Claude prompts is the Kimi-specific
+  // preamble block (identified by its distinctive first heading).
+  assert(!prompt.includes('Documentation Adherence (read before anything else)'), 'No Kimi preamble block for Claude', prompt);
 
   // No unreplaced template variables
   assert(!prompt.includes('{{PROJECT_PATH}}'), 'No unreplaced {{PROJECT_PATH}}', prompt);
@@ -158,9 +161,12 @@ async function testCodexNonWebProject() {
   // Codex: should have worker-base injected
   assert(prompt.includes('CONSTITUTION LIMITS'), 'Has constitution limits injected', prompt);
 
-  // Non-web: should NOT have web-testing content
+  // Non-web: should NOT have web-testing FULL BODY injected
+  // v2.4.1: the INDEX manifest lists every skill (including web-testing's one-line description
+  // which mentions playwright-cli). What must not appear is the full web-testing BODY — e.g.
+  // the ALL-CAPS section headers and the multi-line bash health-check script.
   assert(!prompt.includes('PRE-FLIGHT CHECK'), 'No pre-flight check for non-web', prompt);
-  assert(!prompt.includes('playwright-cli'), 'No playwright-cli for non-web', prompt);
+  assert(!/You MUST execute these exact shell commands/.test(prompt), 'No web-testing full body for non-web', prompt);
 
   // Codex: should have tool mappings
   assert(prompt.includes('Tool Name Mappings'), 'Has tool name mappings for Codex', prompt);

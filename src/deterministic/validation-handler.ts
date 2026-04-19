@@ -104,10 +104,12 @@ export async function validateWorkDetailed(
 
     // DETERMINISTIC: Run verifiers (mechanical checks)
     // Pass step context and task type for routing
+    // v2.4.1 — thread contract_id so skill-consultation verifier can locate the manifest.
     const verifierResults = await runAllVerifiers(
       { project_path: result.output_path },
       stepContext,
-      goalType
+      goalType,
+      { contract_id: result.contract_id }
     );
 
     const summary = summarizeResults(verifierResults);
