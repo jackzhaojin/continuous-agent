@@ -96,6 +96,10 @@ export interface DefectEvidence {
   filed_at?: string;
   parent_step_id?: string;
   regression_failures?: string[];
+  // v2.4 H4: how many ancestors deep this defect was filed (1 = first-level
+  // defect of an original step). Populated by insertDefectSubtask so the
+  // executive and humans can see recursion depth at a glance.
+  depth_reached?: number;
 }
 
 /**

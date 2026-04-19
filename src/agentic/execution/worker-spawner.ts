@@ -941,12 +941,20 @@ export async function spawnWorker(
     // Without this, a hung worker blocks the entire executive loop indefinitely.
     let turnCount = 0;
 
+    // v2.4 H6: write full JSON.stringify(msg.raw) by default so structured
+    // handoffs (YAML fences can easily exceed 500 chars) survive for the
+    // parser in state-handler.ts. Opt into legacy truncation with
+    // WORKER_LOG_TRUNCATE=1 if a deployment has disk-size concerns.
+    const WORKER_LOG_TRUNCATE_LEN = Number(process.env.WORKER_LOG_TRUNCATE_LEN || 0);
+
     const streamingWork = async () => {
       for await (const message of stream) {
         const msg: AgentWorkerMessage = message;
 
         // Log all messages for traceability
-        logger.log(`[MSG] type=${msg.type} ${JSON.stringify(msg.raw).slice(0, 500)}`);
+        const rawJson = JSON.stringify(msg.raw);
+        const rawForLog = WORKER_LOG_TRUNCATE_LEN > 0 ? rawJson.slice(0, WORKER_LOG_TRUNCATE_LEN) : rawJson;
+        logger.log(`[MSG] type=${msg.type} ${rawForLog}`);
 
         // Handle different message types
         if (msg.type === 'assistant') {

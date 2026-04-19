@@ -13,7 +13,10 @@
     "harness:list": "tsx src/harnesses/cli.ts --list",
     "test:adhoc:v2-loaders": "tsx tests/adhoc/v2-library-loaders.adhoc.ts",
     "test:harness": "tests/adhoc/2026-04-11-harness-v22/run-all.sh",
-    "test:harness:live": "RUN_LIVE_E2E=1 tsx tests/e2e/harnesses/claude-live-generic.e2e.ts"
+    "test:harness:live": "RUN_LIVE_E2E=1 tsx tests/e2e/harnesses/claude-live-generic.e2e.ts",
+    "test:retro-h": "tsx tests/adhoc/h1-kimi-handoff-parser.adhoc.ts && tsx tests/adhoc/h3-gate-blocks-on-regression.adhoc.ts && tsx tests/adhoc/h4-defect-recursion-depth.adhoc.ts && tsx tests/adhoc/h5-rebreakdown-preserves-completed.adhoc.ts && tsx tests/adhoc/h6-worker-log-untruncated.adhoc.ts",
+    "test:retro-i": "tsx tests/adhoc/i0-prompt-builder-enrichment.adhoc.ts && tsx tests/adhoc/i1-backend-testing-skill-present.adhoc.ts && tsx tests/adhoc/i2-backend-first-breakdown.adhoc.ts && tsx tests/adhoc/i3-journey-api-verification.adhoc.ts && tsx tests/adhoc/i4-ui-library-guidance.adhoc.ts && tsx tests/adhoc/a5-playwright-policy.adhoc.ts",
+    "test:v2.4": "npm run test:retro-h && npm run test:retro-i"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.29",

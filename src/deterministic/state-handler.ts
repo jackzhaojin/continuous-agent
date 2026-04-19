@@ -559,15 +559,94 @@ Worker log: \`ledgers/${today}/worker-${contractId}.log\`
  * next_step_should_know: "..."
  * ```
  *
- * We search for the last occurrence of such a block in the log. This is a
- * best-effort regex parse — we only care about the listed fields, we don't
- * support nested YAML.
+ * We search for the last occurrence of such a block. Three strategies:
+ *
+ * 1. Claude SDK path: YAML fences appear unescaped in log text.
+ * 2. v2.4 — Kimi/Codex path: worker-spawner writes `[MSG] type=... <JSON>`
+ *    lines. YAML fences live inside JSON string fields and arrive with
+ *    literal `\n` escapes, so the raw-fence regex never matches. We
+ *    JSON.parse each `[MSG]` envelope, extract assistant text (handling
+ *    both string content and `[{type:"text", text:"..."}]` arrays), and
+ *    re-scan the decoded text for fences.
+ * 3. Fallback: scan the full log again as one big buffer so we also catch
+ *    fences emitted by vendor-native log lines that aren't `[MSG]` wrapped.
+ *
+ * Strategy 1 runs first so Claude runs keep working unchanged.
  */
-function parseStructuredHandoffFromLog(logContent: string): StructuredHandoff | null {
+export function parseStructuredHandoffFromLog(logContent: string): StructuredHandoff | null {
   if (!logContent) return null;
 
+  // Strategy 1 — raw fences in the log (Claude SDK style).
+  const direct = extractHandoffFromText(logContent);
+  if (direct) return direct;
+
+  // Strategy 2 — JSON-decode [MSG] envelopes and look inside.
+  const decoded = decodeMsgEnvelopes(logContent);
+  if (decoded) {
+    const fromDecoded = extractHandoffFromText(decoded);
+    if (fromDecoded) return fromDecoded;
+  }
+
+  return null;
+}
+
+/**
+ * Walk `[MSG] type=<type> <JSON>` envelope lines (written by worker-spawner
+ * for every AgentWorkerMessage) and return the concatenated assistant text.
+ * Handles both Kimi-style `content: string` and Claude/Codex-style
+ * `content: [{type:"text", text:"..."}]` message shapes.
+ */
+function decodeMsgEnvelopes(logContent: string): string | null {
+  const lines = logContent.split(/\r?\n/);
+  const texts: string[] = [];
+  for (const line of lines) {
+    const match = line.match(/^\[MSG\]\s+type=(\S+)\s+(\{.*\})\s*$/);
+    if (!match) continue;
+    const type = match[1];
+    if (type !== 'assistant' && type !== 'tool_call' && type !== 'tool_result') continue;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(match[2]);
+    } catch {
+      continue;
+    }
+    const extracted = extractTextFromRawMessage(parsed);
+    if (extracted) texts.push(extracted);
+  }
+  return texts.length > 0 ? texts.join('\n\n') : null;
+}
+
+function extractTextFromRawMessage(raw: unknown): string | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const obj = raw as Record<string, unknown>;
+
+  const content = obj.content;
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    const parts: string[] = [];
+    for (const block of content) {
+      if (block && typeof block === 'object') {
+        const b = block as Record<string, unknown>;
+        if (typeof b.text === 'string') parts.push(b.text);
+      }
+    }
+    if (parts.length > 0) return parts.join('\n');
+  }
+
+  if (typeof obj.text === 'string') return obj.text;
+
+  const message = obj.message;
+  if (message && typeof message === 'object') {
+    const innerText = extractTextFromRawMessage(message);
+    if (innerText) return innerText;
+  }
+
+  return null;
+}
+
+function extractHandoffFromText(text: string): StructuredHandoff | null {
   const fenceRegex = /```ya?ml\s*\n([\s\S]*?)\n```/gi;
-  const matches = Array.from(logContent.matchAll(fenceRegex));
+  const matches = Array.from(text.matchAll(fenceRegex));
   // Walk from the last block backwards — want the most recent handoff the worker emitted.
   // Skip blocks whose values are the skeleton from the prompt (placeholder literals).
   for (let i = matches.length - 1; i >= 0; i--) {

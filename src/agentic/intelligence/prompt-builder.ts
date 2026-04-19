@@ -21,9 +21,12 @@ import { loadSkillLibrary } from '../../deterministic/skill-loader.js';
 import { loadPlaybookLibrary } from '../../deterministic/playbook-loader.js';
 import { resolveExecutionPattern } from '../../deterministic/execution-pattern-resolver.js';
 import { readLatestStructuredHandoff } from '../../deterministic/state-handler.js';
+import { readStepsJson } from '../../deterministic/steps-json-handler.js';
 import type { SkillDefinition, PlaybookDefinition } from '../../deterministic/library-loader-types.js';
 import { adaptPromptForVendor } from './vendor-adapter.js';
 import { logAgentic } from '../../core/logging.js';
+import { existsSync, readFileSync } from 'fs';
+import { readdir } from 'fs/promises';
 import path from 'path';
 import os from 'os';
 
@@ -231,8 +234,18 @@ export async function buildV2ComposedPrompt(
   const workerBaseSkill = skillResult.skills.find(s => s.name === 'worker-base');
   const itemText = `${item.title} ${item.description || ''}`;
   const isWebProject = WEB_KEYWORDS.test(itemText);
-  const webTestingSkill = isWebProject
+  // v2.4 A5 — ledger-driven Playwright policy. Web-testing is required for
+  // UI-visible steps, recommended for ambiguous steps, and skipped for steps
+  // that are deterministically backend-only (PREREQUISITE-0 schema, PREREQUISITE-1
+  // API smoke, or titles that scream backend/api). This stops workers from
+  // spinning up Playwright for a pure API endpoint step and wasting turns.
+  const isBackendOnlyStep = isBackendOnlyStepTitle(item.title);
+  const isBackendOnlyItem = !isWebProject || isBackendOnlyStep;
+  const webTestingSkill = !isBackendOnlyItem
     ? skillResult.skills.find(s => s.name === 'web-testing')
+    : null;
+  const backendTestingSkill = isBackendOnlyItem || isBackendOnlyStep
+    ? skillResult.skills.find(s => s.name === 'backend-testing')
     : null;
 
   // Template variables for skill body rendering
@@ -326,6 +339,21 @@ If "Known gaps" lists anything that belongs to your step, fix it before building
     }
   }
 
+  // 2d. Current System State (v2.4 I0)
+  // Workers kept reinventing API contracts and building UI against hardcoded mock
+  // data because every step started with zero context about what the system could
+  // actually do. Give every worker a small factual snapshot:
+  //   - which API endpoints exist (method + path)
+  //   - how many journey blocks the last integration gate added
+  //   - which project-level markers are present (package.json, schema, env)
+  // This is deterministic text-from-disk — no server needs to be running.
+  try {
+    const systemState = await buildCurrentSystemStateSection(projectPath, item);
+    if (systemState) sections.push(systemState);
+  } catch (err) {
+    logAgentic(`[V2 Prompt] Could not build current-system-state section: ${err}`);
+  }
+
   // 3. Worker-base skill (constitution, monorepo rules, execution guidelines)
   if (workerBaseSkill) {
     const renderedBase = renderSkillBody(workerBaseSkill.body, skillVars);
@@ -358,6 +386,13 @@ ${matchedPlaybook.body.trim()}
   if (webTestingSkill) {
     const renderedWebTesting = renderSkillBody(webTestingSkill.body, skillVars);
     sections.push(renderedWebTesting.trim());
+  }
+
+  // 7b. Backend testing skill (v2.4 I1 + A5) — include for backend-only steps
+  // and for fullstack steps where the API work is in scope.
+  if (backendTestingSkill) {
+    const renderedBackend = renderSkillBody(backendTestingSkill.body, skillVars);
+    sections.push(renderedBackend.trim());
   }
 
   // 8. Validation criteria
@@ -435,4 +470,179 @@ function inferCapabilities(item: WorkItem): string[] {
   }
 
   return capabilities.length > 0 ? capabilities : ['general.implementation'];
+}
+
+// =====================================================================
+// v2.4 I0 — Current System State snapshot
+// =====================================================================
+
+/**
+ * Build a "Current System State" section injected between the prior-step
+ * handoff and the worker-base skill. Static read-from-disk snapshot; no
+ * server is started. Returns null when there's nothing useful to report
+ * (e.g. `existing` build target where we don't own the project structure).
+ */
+export async function buildCurrentSystemStateSection(
+  projectPath: string,
+  item: WorkItem,
+): Promise<string | null> {
+  const parts: string[] = [];
+
+  // API surface
+  const endpoints = await scanApiEndpoints(projectPath);
+  if (endpoints.length > 0) {
+    const lines = endpoints.slice(0, 40).map(e => `- \`${e.method} ${e.routePath}\` (from \`${e.file}\`)`);
+    const note = endpoints.length > 40 ? `\n(+${endpoints.length - 40} more not shown)` : '';
+    parts.push(`### API Surface (detected endpoints)\n\n${lines.join('\n')}${note}\n\nDo NOT invent new endpoint paths or response shapes. If you need a new endpoint, add it explicitly and document it in your structured handoff under \`what_i_built\`.`);
+  } else {
+    parts.push(`### API Surface\n\nNo API routes detected on disk. If the goal requires a backend, this step may be the one that creates it — build the endpoint and curl-verify it before touching UI.`);
+  }
+
+  // Last gate test count
+  if (item.source_path) {
+    const gate = await findLastGateHandoff(item.source_path);
+    if (gate) {
+      const jb = gate.journey_blocks_added !== undefined
+        ? `${gate.journey_blocks_added} block(s)`
+        : '(journey_blocks_added not reported)';
+      parts.push(`### Last Gate Test Count\n\nMost recent integration gate reported: **${jb}**. If your step advances the journey, your handoff must report \`journey_blocks_added\` ≥ this number. A decrease triggers a regression defect.`);
+    }
+  }
+
+  // Project-level markers (lightweight health signal — no running server)
+  const markers = detectProjectMarkers(projectPath);
+  if (markers.length > 0) {
+    parts.push(`### Project Markers\n\n${markers.map(m => `- ${m}`).join('\n')}`);
+  }
+
+  if (parts.length === 0) return null;
+  return `## Current System State (read-from-disk snapshot)\n\n${parts.join('\n\n')}`;
+}
+
+interface ApiEndpoint {
+  method: string;
+  routePath: string;
+  file: string;
+}
+
+/**
+ * Walk the project for common API route file patterns and extract a minimal
+ * method+path summary. Covers Next.js `app/api/**\/route.ts`, Next.js
+ * `pages/api/**\/*.ts`, and generic Express-style `server/routes/*.ts`.
+ *
+ * Best-effort — regex parse, no AST. If we miss an endpoint the worker
+ * should still declare it in their own handoff.
+ */
+async function scanApiEndpoints(projectPath: string): Promise<ApiEndpoint[]> {
+  if (!projectPath || !existsSync(projectPath)) return [];
+
+  const results: ApiEndpoint[] = [];
+
+  const appApi = path.join(projectPath, 'app', 'api');
+  if (existsSync(appApi)) {
+    for (const file of await walkFiles(appApi, /route\.(ts|js|tsx|jsx)$/)) {
+      const rel = path.relative(projectPath, file);
+      const routePath = '/' + path
+        .relative(path.join(projectPath, 'app'), path.dirname(file))
+        .split(path.sep)
+        .join('/');
+      const methods = extractNextJsRouteMethods(file);
+      for (const method of methods) {
+        results.push({ method, routePath, file: rel });
+      }
+    }
+  }
+
+  const pagesApi = path.join(projectPath, 'pages', 'api');
+  if (existsSync(pagesApi)) {
+    for (const file of await walkFiles(pagesApi, /\.(ts|js)$/)) {
+      const rel = path.relative(projectPath, file);
+      const baseName = path.basename(file).replace(/\.(ts|js)$/, '');
+      const subdir = path.relative(path.join(projectPath, 'pages'), path.dirname(file)).split(path.sep).join('/');
+      const routePath = '/' + (subdir ? `${subdir}/${baseName}` : baseName).replace(/\/index$/, '');
+      results.push({ method: 'ANY', routePath, file: rel });
+    }
+  }
+
+  return results;
+}
+
+async function walkFiles(root: string, pattern: RegExp, acc: string[] = []): Promise<string[]> {
+  try {
+    const entries = await readdir(root, { withFileTypes: true });
+    for (const e of entries) {
+      const full = path.join(root, e.name);
+      if (e.isDirectory()) {
+        if (e.name === 'node_modules' || e.name.startsWith('.')) continue;
+        await walkFiles(full, pattern, acc);
+      } else if (pattern.test(e.name)) {
+        acc.push(full);
+      }
+    }
+  } catch {
+    /* ignore unreadable dirs */
+  }
+  return acc;
+}
+
+function extractNextJsRouteMethods(file: string): string[] {
+  try {
+    // Read synchronously is cheap and keeps this helper easy to test.
+    const body = readFileSync(file, 'utf-8');
+    const methods = new Set<string>();
+    for (const m of body.matchAll(/export\s+(?:async\s+)?function\s+(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)\b/g)) {
+      methods.add(m[1]);
+    }
+    if (methods.size === 0) {
+      return ['ANY'];
+    }
+    return Array.from(methods);
+  } catch {
+    return ['ANY'];
+  }
+}
+
+async function findLastGateHandoff(bundlePath: string): Promise<{ journey_blocks_added?: number } | null> {
+  const stepsFile = await readStepsJson(bundlePath);
+  if (!stepsFile) return null;
+  const gates = stepsFile.steps
+    .filter(s => s.status === 'complete' && (s.kind === 'integration_gate' || /^\[GATE\]/i.test(s.title)))
+    .filter(s => !!s.handoff);
+  if (gates.length === 0) return null;
+  const last = gates[gates.length - 1];
+  return last.handoff || null;
+}
+
+/**
+ * v2.4 A5 — classify a step title as backend-only so the prompt-builder
+ * can skip the (heavy) web-testing skill. The signals are conservative —
+ * we only skip web-testing when we're confident the step has no UI surface.
+ * Ambiguous titles fall through to the default (web-testing included).
+ */
+export function isBackendOnlyStepTitle(title: string): boolean {
+  const t = title.toLowerCase();
+  // PREREQUISITE-0 and PREREQUISITE-1 are always backend
+  if (/\[prerequisite-?0\]|\[prerequisite-?1\]/.test(t)) return true;
+  // Obvious backend-only patterns
+  if (/\bapi endpoint\b|\brest api\b|\bserver-side\b|\bcron job\b|\bmigration\b/.test(t)) return true;
+  if (/\bschema\b|\bseed data\b|\bdatabase\b|\bsupabase\b/.test(t) && !/form|page|ui|component|dashboard/.test(t)) return true;
+  if (/curl smoke|health endpoint|\bpostgres\b/.test(t)) return true;
+  return false;
+}
+
+function detectProjectMarkers(projectPath: string): string[] {
+  if (!projectPath || !existsSync(projectPath)) return [];
+  const markers: string[] = [];
+  const checkFile = (rel: string, label: string) => {
+    if (existsSync(path.join(projectPath, rel))) markers.push(label);
+  };
+  checkFile('package.json', '`package.json` present');
+  checkFile('next.config.js', 'Next.js project');
+  checkFile('next.config.ts', 'Next.js project');
+  checkFile('prisma/schema.prisma', 'Prisma schema present');
+  checkFile('supabase/migrations', 'Supabase migrations present');
+  checkFile('.env', '`.env` present');
+  checkFile('.env.local', '`.env.local` present');
+  checkFile('tests/e2e/journey.spec.ts', 'Journey spec present');
+  return markers;
 }

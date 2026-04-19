@@ -11,12 +11,25 @@
  * Writes are atomic (temp file + rename) to prevent data loss.
  */
 
-import { readFile, writeFile, rename } from 'fs/promises';
+import { readFile, writeFile, rename, appendFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 import type { StepsFile, WorkStep, DefectEvidence, StructuredHandoff } from '../core/types.js';
 import { log } from '../core/logging.js';
 import { appendProgressEntry } from './progress-log-writer.js';
+
+/**
+ * v2.4 H4: hard cap on recursive defect filing. Defects can chain
+ * (validator files a defect → subtask fails → another defect), and the
+ * v2.1.6 run produced 8-level-deep chains consuming hours of effort.
+ * Beyond this depth we escalate to needs-you.md instead of filing another
+ * subtask. Override with `MAX_DEFECT_RECURSION_DEPTH` env.
+ */
+const DEFAULT_MAX_DEFECT_RECURSION_DEPTH = 2;
+function getMaxDefectRecursionDepth(): number {
+  const env = Number(process.env.MAX_DEFECT_RECURSION_DEPTH);
+  return Number.isFinite(env) && env > 0 ? env : DEFAULT_MAX_DEFECT_RECURSION_DEPTH;
+}
 
 const STEPS_FILENAME = 'STEPS.json';
 const LEGACY_FILENAME = 'TASKS.json';
@@ -306,6 +319,18 @@ export async function insertDefectSubtask(
     return null;
   }
 
+  // v2.4 H4: compute defect-recursion depth by walking parent_id ancestors
+  // and counting how many of them are themselves validator-filed defects.
+  // The new subtask's depth = ancestorDefects + 1. Escalate instead of filing
+  // if that would exceed MAX_DEFECT_RECURSION_DEPTH.
+  const maxDepth = getMaxDefectRecursionDepth();
+  const depth = computeDefectDepth(stepsFile.steps, parent) + 1;
+  if (depth > maxDepth) {
+    await escalateToNeedsYou(bundlePath, parent, defect, depth, maxDepth);
+    log(`  ! Defect depth ${depth} > ${maxDepth} on ${parentId} — escalated to needs-you.md, no subtask filed`);
+    return null;
+  }
+
   const existingIds = stepsFile.steps.map(s => s.id || '').filter(Boolean);
   const newId = nextSubtaskId(parentId, existingIds);
 
@@ -341,6 +366,7 @@ export async function insertDefectSubtask(
       filed_at: defect.filed_at || new Date().toISOString(),
       parent_step_id: parentId,
       regression_failures: defect.regression_failures,
+      depth_reached: depth,
     },
   };
 
@@ -352,8 +378,65 @@ export async function insertDefectSubtask(
   const written = await writeStepsJson(bundlePath, stepsFile);
   if (!written) return null;
 
-  log(`  ✓ Filed defect subtask ${newId} under ${parentId}: ${defect.title}`);
+  log(`  ✓ Filed defect subtask ${newId} (depth ${depth}) under ${parentId}: ${defect.title}`);
   return newId;
+}
+
+/**
+ * Count how many ancestors in the parent_id chain are themselves
+ * validator-filed defects. An original (non-defect) step has depth 0, its
+ * first-level defect subtask has depth 1, a defect-of-a-defect has depth 2.
+ */
+function computeDefectDepth(steps: WorkStep[], start: WorkStep): number {
+  let depth = 0;
+  let cursor: WorkStep | undefined = start;
+  const visited = new Set<string>();
+  while (cursor) {
+    if (cursor.origin === 'validator_defect') depth++;
+    const parentId: string | null | undefined = cursor.parent_id || cursor.subtask_of;
+    if (!parentId || visited.has(parentId)) break;
+    visited.add(parentId);
+    cursor = steps.find(s => s.id === parentId);
+  }
+  return depth;
+}
+
+/**
+ * Append a defect-escalation entry to workspace/needs-you.md. The executive
+ * doesn't file a subtask — the human has to unstick the recursion manually.
+ */
+async function escalateToNeedsYou(
+  bundlePath: string,
+  parent: WorkStep,
+  defect: DefectEvidence & { description?: string },
+  depth: number,
+  maxDepth: number
+): Promise<void> {
+  const needsYouPath = path.join(process.cwd(), 'workspace', 'needs-you.md');
+  const goalSlug = path.basename(bundlePath);
+  const now = new Date().toISOString();
+  const entry = [
+    '',
+    `## [DEFECT ESCALATION] ${defect.title}`,
+    '',
+    `- **Bundle:** \`${goalSlug}\``,
+    `- **Parent step:** \`${parent.id}\` — ${parent.title}`,
+    `- **Depth reached:** ${depth} (cap is ${maxDepth})`,
+    `- **Filed at:** ${now}`,
+    '',
+    defect.root_cause ? `**Root cause:** ${defect.root_cause}` : '',
+    defect.evidence ? `**Evidence:** ${defect.evidence}` : '',
+    '',
+    'The executive stopped filing new defect subtasks here because the chain exceeded `MAX_DEFECT_RECURSION_DEPTH`. Review the defect chain under the parent step, decide whether to rework the parent from scratch, unblock the step, or take the work off the agent.',
+    '',
+    '---',
+    '',
+  ].filter(Boolean).join('\n');
+  try {
+    await appendFile(needsYouPath, entry, 'utf-8');
+  } catch (err) {
+    log(`  Warning: failed to append defect escalation to needs-you.md: ${err}`);
+  }
 }
 
 /**

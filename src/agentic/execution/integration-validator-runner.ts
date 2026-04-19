@@ -82,32 +82,85 @@ function loadSkillBody(): string {
 
 /**
  * Build a compact evidence summary to feed the reviewing LLM.
+ *
+ * v2.4 I3: when the journey declares API round-trips (e.g. "POST /api/…",
+ * "persists to database", "reads from /api/…"), annotate each step that
+ * claims journey work but does not mention those paths in its
+ * what_i_verified — that is the "UI built on top of mocked APIs" failure
+ * mode. The annotation flags the gap to the LLM validator.
  */
 function buildEvidenceSummary(item: WorkItem, step: WorkStep, completedHandoffs: Array<{ id: string; title: string; handoff?: StructuredHandoff }>): string {
+  const journeyApis = extractApiPathsFromJourney(item.definition_of_done_journey);
+  const journeyDeclaresPersistence = journeyDescribesPersistence(item.definition_of_done_journey);
+
   const handoffLines = completedHandoffs.map(s => {
     const h = s.handoff;
     if (!h) return `- ${s.id} "${s.title}" — NO STRUCTURED HANDOFF (worker did not produce one)`;
-    return [
+
+    const lines: Array<string | false> = [
       `- ${s.id} "${s.title}":`,
       `  - what_i_built: ${h.what_i_built || '(missing)'}`,
       `  - what_connects: ${h.what_connects || '(missing — isolation red flag)'}`,
       `  - what_i_verified: ${h.what_i_verified || '(missing — not verified)'}`,
       `  - known_gaps: ${h.known_gaps || '(none declared)'}`,
-      h.journey_blocks_added !== undefined ? `  - journey_blocks_added: ${h.journey_blocks_added}` : '',
-    ].filter(Boolean).join('\n');
+      h.journey_blocks_added !== undefined ? `  - journey_blocks_added: ${h.journey_blocks_added}` : false,
+    ];
+
+    // I3 annotation — API round-trip coverage
+    if (journeyApis.length > 0) {
+      const verifiedText = `${h.what_i_verified || ''} ${h.what_i_built || ''}`.toLowerCase();
+      const missing = journeyApis.filter(p => !verifiedText.includes(p.toLowerCase()));
+      if (missing.length > 0) {
+        lines.push(`  - ⚠ API coverage gap (v2.4 I3): journey mentions ${missing.join(', ')} but handoff does not reference any of them in what_i_verified.`);
+      }
+    }
+    if (journeyDeclaresPersistence) {
+      const text = `${h.what_i_verified || ''}`.toLowerCase();
+      if (!/persist|saved|db|database|round.?trip|supabase|postgres|read back|re-read/.test(text)) {
+        lines.push(`  - ⚠ persistence not verified (v2.4 I3): journey requires data to persist but handoff does not mention a round-trip.`);
+      }
+    }
+
+    return lines.filter((x): x is string => typeof x === 'string' && x.length > 0).join('\n');
   }).join('\n');
+
+  const journeyContext = journeyApis.length > 0 || journeyDeclaresPersistence
+    ? `\nJourney API round-trips required: ${journeyApis.length > 0 ? journeyApis.join(', ') : '(no explicit paths, but persistence is implied)'}\n`
+    : '';
 
   return [
     `Goal: ${item.title}`,
     `Project path: ${item.output_path || '(unknown)'}`,
     `Definition of Done — User Journey: ${item.definition_of_done_journey || '(not declared — major red flag for a UI goal)'}`,
     `Data requirements: ${item.data_requirements || '(not declared)'}`,
-    '',
+    journeyContext,
     `Step under validation: ${step.id || `step-${step.step_number}`} — "${step.title}" (kind: ${step.kind || 'build'})`,
     '',
     'Completed steps with structured handoffs:',
     handoffLines || '(none)',
   ].join('\n');
+}
+
+/**
+ * v2.4 I3 helper — extract `/api/...` paths mentioned in the journey string.
+ * Deduplicated, lowercased; returns empty array if nothing matches.
+ */
+export function extractApiPathsFromJourney(journey?: string): string[] {
+  if (!journey) return [];
+  const paths = new Set<string>();
+  for (const m of journey.matchAll(/\/api\/[a-zA-Z0-9_\-/]+/g)) {
+    paths.add(m[0]);
+  }
+  return Array.from(paths);
+}
+
+/**
+ * v2.4 I3 helper — does the journey text imply a persistence round-trip?
+ * Catches phrasing like "persists to X", "saved to DB", "round-trip", etc.
+ */
+export function journeyDescribesPersistence(journey?: string): boolean {
+  if (!journey) return false;
+  return /persist|saved to|stored|database|db\b|supabase|postgres|round.?trip|re-?read/i.test(journey);
 }
 
 /**
@@ -238,6 +291,11 @@ export async function runIntegrationValidator(
     '- Only return `result: "fail"` when the evidence describes a concrete, user-facing failure: a route 404, a form submission that does not persist, regression test failures, an API returning the wrong shape, hardcoded mock data where live data is required.',
     '- Do NOT file a defect titled "no structured handoff", "no foundation exists", "recursive defect chain", or any variant. Those are process complaints, not product defects. A previous version of this validator generated a recursive chain of those — do not repeat it.',
     '- If the only thing wrong is that you cannot tell what was built, return `result: "pass"` and note the gap.',
+    '',
+    'API round-trip enforcement (v2.4 I3):',
+    '- If the Definition of Done User Journey mentions any `/api/…` path or persistence verb (saved, persists, database), you MUST treat API coverage as journey-critical.',
+    '- A gate/user-visible step that claims the journey works but whose `what_i_verified` does not mention the relevant endpoint path AND does not mention the persistence round-trip is a legitimate defect — file it under the current step with acceptance criteria "curl the endpoint with the journey\'s exact payload and re-read the record".',
+    '- This is not the same as "no structured handoff" — this is "handoff exists but does not show the backend was exercised". That distinction matters: the former is process noise, the latter is a concrete gap.',
   ].join('\n');
 
   try {
@@ -274,25 +332,79 @@ export async function runIntegrationValidator(
 
 /**
  * Deterministic pre-checks — fail fast on obvious smells without paying for an LLM.
+ *
+ * v2.4 H3: on integration_gate steps, deterministically file a defect when
+ * journey_blocks_added has regressed since the previous gate. This is the
+ * "gate worker must block on regression" fix from the v2.1.6 retro — the
+ * prior Gate 9 saw 17/45 failures and the loop continued anyway because the
+ * LLM validator's pass-bias suppressed the signal. A hard numeric check
+ * bypasses that heuristic.
  */
 function runCheapChecks(
   item: WorkItem,
   step: WorkStep,
   completedHandoffs: Array<{ id: string; title: string; handoff?: StructuredHandoff }>,
 ): DefectEvidence | null {
-  const isWeb = !!item.definition_of_done_journey;
   const stepIsGate = step.kind === 'integration_gate' || /^\[GATE\]/i.test(step.title);
+  if (!stepIsGate) return null;
 
-  // 1. UI goal with no definition_of_done_journey — report once via defect (advisory)
-  //    We intentionally don't fail here because Phase 4 already requires it.
+  const currentHandoff = (step.handoff as StructuredHandoff | undefined)
+    // If the step hasn't had its handoff written into step.handoff yet, look
+    // for its entry in completedHandoffs (set by the caller for status==='complete').
+    ?? completedHandoffs.find(h => h.id === (step.id || `step-${step.step_number}`))?.handoff;
 
-  // The cheap deterministic checks used to file defects when prior handoffs were
-  // missing or sparse. That created recursive "[DEFECT] no structured handoff"
-  // chains where the validator filed defects about its own evidence schema.
-  // Handoff format is harness telemetry, not product. The LLM pass walks the
-  // actual project (or fails to) and decides on real product evidence.
-  void isWeb;
-  void stepIsGate;
-  void completedHandoffs;
+  const priorGates = completedHandoffs
+    .filter(h => /^\[GATE\]/i.test(h.title))
+    .filter(h => h.id !== (step.id || `step-${step.step_number}`));
+  const lastGate = priorGates[priorGates.length - 1];
+
+  // Case 1 — no prior gate to compare against: if the current gate's handoff
+  // omits journey_blocks_added we can't tell if it's progress, so we return
+  // null and let the LLM pass make the call.
+  if (!lastGate) return null;
+
+  const currentJB = typeof currentHandoff?.journey_blocks_added === 'number'
+    ? currentHandoff.journey_blocks_added
+    : undefined;
+  const priorJB = typeof lastGate.handoff?.journey_blocks_added === 'number'
+    ? lastGate.handoff.journey_blocks_added
+    : undefined;
+
+  // Case 2 — current gate missing journey_blocks_added: caller cannot verify
+  // that journey advanced. That's a gate-enforcement defect per H3.
+  if (priorJB !== undefined && currentJB === undefined) {
+    return {
+      title: `Gate ${step.id} did not report journey_blocks_added`,
+      root_cause: 'Gate worker must declare journey_blocks_added so regression can be detected.',
+      evidence: `Previous gate ${lastGate.id} reported ${priorJB} blocks; current gate handoff has no count.`,
+      acceptance_criteria: [
+        'Run the FULL tests/e2e/journey.spec.ts and record the number of blocks.',
+        `Emit a structured handoff with journey_blocks_added >= ${priorJB}.`,
+      ],
+      parent_step_id: step.id || `step-${step.step_number}`,
+    };
+  }
+
+  // Case 3 — strict regression: current count < prior count means journey
+  // coverage shrank. Block progress per H3.
+  if (priorJB !== undefined && currentJB !== undefined && currentJB < priorJB) {
+    return {
+      title: `Regression at gate ${step.id}: journey_blocks_added ${priorJB} → ${currentJB}`,
+      root_cause: 'A prior passing block of the end-to-end journey no longer runs green.',
+      evidence: [
+        `Previous gate ${lastGate.id} reported ${priorJB} blocks.`,
+        `Current gate ${step.id} reports ${currentJB} blocks.`,
+        `Journey coverage shrank by ${priorJB - currentJB} block(s).`,
+      ].join(' '),
+      acceptance_criteria: [
+        'Identify which journey block(s) regressed and fix the underlying code, not the test.',
+        `Re-run journey.spec.ts and emit journey_blocks_added >= ${priorJB}.`,
+      ],
+      parent_step_id: step.id || `step-${step.step_number}`,
+      regression_failures: [`${priorJB - currentJB} journey block(s) regressed`],
+    };
+  }
+
+  void item;
   return null;
 }

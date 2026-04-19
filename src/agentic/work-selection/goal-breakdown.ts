@@ -323,7 +323,7 @@ function defaultGateCadence(totalSteps: number): number {
  * but no seed data existed, so every UI step that hit the API got 404s and the
  * workers silently filled in hardcoded mocks instead.
  */
-function insertPrerequisiteStep(steps: WorkStep[], item: WorkItem): WorkStep[] {
+export function insertPrerequisiteStep(steps: WorkStep[], item: WorkItem): WorkStep[] {
   const text = `${item.title} ${item.description || ''}`;
   const isWeb = WEB_PROJECT_KEYWORDS.test(text);
   const hasBackend = DATA_BACKEND_KEYWORDS.test(text) || !!item.data_requirements;
@@ -339,40 +339,63 @@ function insertPrerequisiteStep(steps: WorkStep[], item: WorkItem): WorkStep[] {
     ? `\n\n**Data requirements (from PROMPT.md):** ${item.data_requirements}`
     : '';
 
-  const prerequisite: WorkStep = {
+  // v2.4 I2 — split the single [PREREQUISITE] into two hard-locked steps:
+  //   0. Schema + seed data
+  //   1. API endpoints + curl smoke (depends on 0)
+  // Splitting them is the backend-first fix from the v2.1.6 retro. The
+  // previous single step mixed schema work and API work into one worker
+  // session and workers routinely claimed both done while only having
+  // completed the schema — leaving UI steps to build against 500s.
+  const schemaSeed: WorkStep = {
     step_number: 0,
-    title: '[PREREQUISITE] Database schema, seed data, and API smoke test',
+    title: '[PREREQUISITE-0] Database schema + seed data',
     description: [
-      'Hard-locked prerequisite — no UI work may start until this passes.',
+      'Hard-locked prerequisite — no API or UI work may start until this passes.',
       '',
       '1. Create/verify the database schema for this goal.',
       '2. Seed realistic test data (not hardcoded mocks in components) that downstream UI can read.',
-      '3. Smoke-test each API endpoint with curl or the JS client and confirm it returns the expected shape.',
-      '4. Fill out the structured handoff with exact endpoint paths and sample response shapes — every downstream worker will read this instead of inventing mocks.',
+      '3. Fill out the structured handoff with: exact table names + columns, sample row IDs you seeded, connection method (env vars, client file).',
       '',
-      'This step blocks every subsequent UI step. If the schema or seed data is wrong, the rest of the goal will silently build against hardcoded data and ship undemoable.',
+      'This step blocks [PREREQUISITE-1] and every subsequent step. If the schema or seed data is wrong, every downstream worker silently builds against hardcoded data and ships undemoable.',
       dataReqLine,
     ].join('\n'),
     status: 'pending',
     dependencies: [],
+    estimated_turns: 60,
+    origin: 'prerequisite',
+    kind: 'prerequisite',
+    blocks_parent: false,
+  };
+
+  const apiSmoke: WorkStep = {
+    step_number: 1,
+    title: '[PREREQUISITE-1] API endpoints + curl smoke tests',
+    description: [
+      'Hard-locked prerequisite — no UI work may start until this passes.',
+      '',
+      '1. Create every API endpoint this goal requires (one route file per endpoint).',
+      '2. For each endpoint, run `curl` with the exact request shape the UI will send and verify the response body + status code.',
+      '3. Verify the persistence round-trip where applicable — create + read-back via curl — per the `backend-testing` skill.',
+      '4. Fill out the structured handoff with: method + path for each endpoint, the exact curl commands you ran, the returned response shapes, and the HTTP status codes.',
+      '',
+      'Follow the `backend-testing` worker skill. Downstream UI workers will read your handoff to learn the API surface — if your handoff is vague, they will invent mocks.',
+    ].join('\n'),
+    status: 'pending',
+    dependencies: [0],
     estimated_turns: 80,
     origin: 'prerequisite',
     kind: 'prerequisite',
     blocks_parent: false,
   };
 
-  // Prepend and force every existing step to depend on this new step 0
-  const result: WorkStep[] = [prerequisite, ...steps];
-  for (let i = 1; i < result.length; i++) {
+  // Prepend both prerequisites and re-number the remaining steps.
+  const result: WorkStep[] = [schemaSeed, apiSmoke, ...steps];
+  for (let i = 2; i < result.length; i++) {
     result[i].step_number = i;
-    // Point every existing step's first dependency at the new prereq
-    if (i === 1) {
-      result[i].dependencies = [0];
-    } else {
-      result[i].dependencies = [i - 1];
-    }
+    // First UI step depends on the API smoke (step 1); everything after chains.
+    result[i].dependencies = i === 2 ? [1] : [i - 1];
   }
-  console.log(`[Breakdown] Inserted [PREREQUISITE] step for "${item.title}" (web + data backend detected)`);
+  console.log(`[Breakdown] Inserted [PREREQUISITE-0]+[PREREQUISITE-1] for "${item.title}" (web + data backend detected)`);
   return result;
 }
 
@@ -465,8 +488,17 @@ export function applyBreakdownPasses(steps: WorkStep[], item: WorkItem): WorkSte
 }
 
 /**
- * Create sub-steps when a step fails (exit code 1)
- * Used for automatic re-breakdown of complex steps
+ * Create sub-steps when a step fails (exit code 1).
+ *
+ * v2.4 H5: when re-breakdown runs a second time and some of the generated
+ * sub-steps are already complete, we MUST preserve them — regenerating
+ * all three wastes all prior work and was the v2.1.6 failure mode
+ * (70→71→47→30→47 steps across five re-breakdowns). Pass `existingSubSteps`
+ * (typically all steps in STEPS.json with `parent_id === parentStep.id`) and
+ * the function returns only the roles that aren't already complete.
+ *
+ * Returns a list of sub-steps to INSERT (so the caller must preserve any
+ * existing completed sub-steps from STEPS.json and just append these).
  */
 export function reBreakdownStep(
   parentStep: WorkStep,
@@ -474,9 +506,9 @@ export function reBreakdownStep(
     error?: string;
     turnsUsed: number;
     lastActions?: string;
-  }
+  },
+  existingSubSteps: WorkStep[] = []
 ): WorkStep[] {
-  const subSteps: WorkStep[] = [];
   const baseStepNum = parentStep.step_number;
 
   // Check if we've hit the re-breakdown limit
@@ -486,42 +518,68 @@ export function reBreakdownStep(
     return [];
   }
 
-  // Generic sub-step breakdown for any complex step
-  const subStepSuffix = ['a', 'b', 'c', 'd', 'e'];
-  
-  // Always start with research for failed step
-  subSteps.push({
-    step_number: baseStepNum, // Will be 4a, 4b, etc. in display
-    title: `Research and plan: ${parentStep.title}`,
-    description: `Analyze why the original step failed. Research alternative approaches. Create detailed plan.`,
-    status: 'pending',
-    dependencies: parentStep.dependencies,
-    estimated_turns: 60,
-    re_breakdown_count: currentReBreakdownCount + 1,
-  });
+  type SubStepRole = 'research' | 'implement' | 'validate';
+  const roleTemplates: Array<{ role: SubStepRole; build: () => WorkStep }> = [
+    {
+      role: 'research',
+      build: () => ({
+        step_number: baseStepNum,
+        title: `Research and plan: ${parentStep.title}`,
+        description: `Analyze why the original step failed. Research alternative approaches. Create detailed plan.`,
+        status: 'pending',
+        dependencies: parentStep.dependencies,
+        estimated_turns: 60,
+        re_breakdown_count: currentReBreakdownCount + 1,
+      }),
+    },
+    {
+      role: 'implement',
+      build: () => ({
+        step_number: baseStepNum,
+        title: `Implement core: ${parentStep.title}`,
+        description: `Implement the core functionality with minimal scope.`,
+        status: 'pending',
+        dependencies: [baseStepNum],
+        estimated_turns: 80,
+        re_breakdown_count: currentReBreakdownCount + 1,
+      }),
+    },
+    {
+      role: 'validate',
+      build: () => ({
+        step_number: baseStepNum,
+        title: `Complete and validate: ${parentStep.title}`,
+        description: `Complete remaining work and validate the implementation.`,
+        status: 'pending',
+        dependencies: [baseStepNum],
+        estimated_turns: 70,
+        re_breakdown_count: currentReBreakdownCount + 1,
+      }),
+    },
+  ];
 
-  // Split the work into smaller chunks
-  subSteps.push({
-    step_number: baseStepNum,
-    title: `Implement core: ${parentStep.title}`,
-    description: `Implement the core functionality with minimal scope.`,
-    status: 'pending',
-    dependencies: [baseStepNum],
-    estimated_turns: 80,
-    re_breakdown_count: currentReBreakdownCount + 1,
-  });
+  const completedRoles = new Set<SubStepRole>();
+  for (const s of existingSubSteps) {
+    if (s.status !== 'complete') continue;
+    const role = classifySubStepRole(s.title);
+    if (role) completedRoles.add(role);
+  }
 
-  subSteps.push({
-    step_number: baseStepNum,
-    title: `Complete and validate: ${parentStep.title}`,
-    description: `Complete remaining work and validate the implementation.`,
-    status: 'pending',
-    dependencies: [baseStepNum],
-    estimated_turns: 70,
-    re_breakdown_count: currentReBreakdownCount + 1,
-  });
+  return roleTemplates
+    .filter(t => !completedRoles.has(t.role))
+    .map(t => t.build());
+}
 
-  return subSteps;
+/**
+ * Map a sub-step title back to its role so we can tell whether an existing
+ * completed sub-step already covers that role. Case-insensitive prefix match.
+ */
+function classifySubStepRole(title: string): 'research' | 'implement' | 'validate' | null {
+  const t = title.trim().toLowerCase();
+  if (t.startsWith('research and plan')) return 'research';
+  if (t.startsWith('implement core')) return 'implement';
+  if (t.startsWith('complete and validate')) return 'validate';
+  return null;
 }
 
 /**
