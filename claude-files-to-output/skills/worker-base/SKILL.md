@@ -196,6 +196,27 @@ journey_blocks_added: 0
 - Handoff text matching another step's handoff word-for-word → you copied someone else's work.
 - `journey_blocks_added` > 0 but `tests/e2e/journey.spec.ts` has no new `test(...)` blocks → you lied.
 
+### When a step description contradicts the PROMPT body
+
+If the step assigned to you says one thing about persistence, data flow, or scope and the PROMPT body says the opposite (example: step says "create the database schema" but PROMPT says "no database, JSON file only"), STOP. Do not pick one and proceed.
+
+This is a goal-breakdown defect, not a worker decision. Append a short note to `workspace/needs-you.md` describing the contradiction (quote both lines verbatim) and stop the step. The defect will be triaged on the executive's next pass; resuming on a contradictory plan wastes turns and ships wrong implementations.
+
+The Kimi worker on the v2.4 task-scheduler-api run (contract `1776568738973`, 2026-04-18) wired up cloud Supabase for an in-memory goal because the step description said "create database schema" while the PROMPT said "in-memory + JSON file only". Don't be the next one. If your step description looks templated and generic while your PROMPT body is specific, trust the PROMPT body — and escalate.
+
+Concrete checklist before you start implementing:
+
+1. Re-read the PROMPT.md body (not just the frontmatter) — note any explicit "no database", "in-memory", "localStorage only", "no UI", "backend only" statements, or any `data_requirements: "none — ..."` line.
+2. Compare against your step description. If they disagree on persistence layer, data flow, or UI/backend scope, stop.
+3. Append to `workspace/needs-you.md` a short entry of the form:
+   ```
+   ### [CONTRADICTION] <goal-slug> step <N>
+   PROMPT says:  "<exact quote>"
+   Step says:    "<exact quote>"
+   I stopped without picking one.
+   ```
+4. Do not write code for that step. Do not silently pick the PROMPT or the step — both will produce downstream defects.
+
 ### If You Cannot Complete
 
 1. Document exactly what is blocking you.

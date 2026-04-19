@@ -297,11 +297,66 @@ function generateGenericBreakdown(item: WorkItem): WorkStep[] {
   return steps;
 }
 
-// Web project detection regex (shared with prompt-builder, word-bounded to avoid false positives)
-const WEB_PROJECT_KEYWORDS = /next\.?js|react|vue|angular|\bhtml\b|\bcss\b|website|web.?app|frontend|\bui\b|component|page|form|dashboard/i;
+// v2.4.2: require an actual rendering token (react, next, ui, component, ...) to
+// conclude "this is a web/UI goal". The old regex matched `api`/`endpoint`/`page`
+// and produced false positives on backend-only API goals — see ai-docs/v2/2026-04-18-v2.4/goal-2.4.2.md.
+const WEB_RENDERING_KEYWORDS = /\b(?:next\.?js|react|vue|svelte|angular|html|tsx|jsx|ui|frontend|component|dashboard|web.?app|website|form|page)\b/i;
 
-// Data-backend detection — triggers a prerequisite seed step
+// Data-backend detection — triggers a prerequisite seed step. The `api|endpoint`
+// tokens still live here (they're honest signals that data flows through a
+// backend), but `insertPrerequisiteStep` now also requires a rendering keyword.
 const DATA_BACKEND_KEYWORDS = /supabase|postgres|prisma|\bmongo|\bmysql|sqlite|firestore|\bdb\b|database|schema|\bapi\b|endpoint|auth|backend/i;
+
+// v2.4.2: Explicit "no database" signals. If any of these fire on the goal body,
+// the prereq inserter MUST NOT prepend DB setup steps — the goal already declares
+// a non-DB persistence strategy (in-memory, JSON file, localStorage, etc.).
+const NO_DATABASE_KEYWORDS = /\b(?:no\s+database|no\s+db\b|no\s+persistence|without\s+(?:a\s+)?database|without\s+(?:a\s+)?db|in[-\s]?memory|stateless|json\s+file(?:\s+snapshot)?|file[-\s]based\s+(?:state|storage|persistence)|localstorage[-\s]only|no\s+backend\s+db)\b/i;
+
+// v2.4.2: Explicit "no UI" signals. Backend-only / CLI-only / API-only goals don't
+// need UI prereqs even if they declare a database.
+const NO_UI_KEYWORDS = /\b(?:no\s+ui|backend[-\s]only|api[-\s]only|server[-\s]only|cli[-\s]only|headless)\b/i;
+
+function goalBodyText(item: WorkItem): string {
+  return `${item.title} ${item.description || ''}`;
+}
+
+/**
+ * v2.4.2: Does this goal explicitly declare "no database"?
+ * Checks tags, body keywords, and the `data_requirements` frontmatter field.
+ */
+export function declaresNoDatabase(item: WorkItem): boolean {
+  if (item.tags?.some(t => /^no[-_]?(database|db)$/i.test(t))) return true;
+  const dr = (item.data_requirements || '').trim();
+  if (dr && /^none\b|^no\b/i.test(dr)) return true;
+  return NO_DATABASE_KEYWORDS.test(goalBodyText(item));
+}
+
+/**
+ * v2.4.2: Does this goal explicitly declare "no UI"?
+ */
+export function declaresNoUi(item: WorkItem): boolean {
+  if (item.tags?.some(t => /^no[-_]?ui$/i.test(t))) return true;
+  return NO_UI_KEYWORDS.test(goalBodyText(item));
+}
+
+/**
+ * Extract up to three short lines from the goal body that describe persistence.
+ * Used to quote the PROMPT back to the worker so the step description never
+ * contradicts the goal's declared persistence strategy.
+ */
+export function extractPersistenceExcerpt(item: WorkItem): string | null {
+  const persistenceLine = /\b(persistence|state|storage|snapshot|database|in[-\s]?memory|json\s+file|localstorage|no\s+db|no\s+database)\b/i;
+  const raw = item.description || '';
+  const lines = raw
+    .split('\n')
+    .map(l => l.trim())
+    .filter(l => l.length > 0 && l.length <= 400 && persistenceLine.test(l));
+  if (lines.length === 0) {
+    if (item.data_requirements) return item.data_requirements.trim();
+    return null;
+  }
+  return lines.slice(0, 3).join('\n');
+}
 
 /** Default interval of build steps between integration gates (user can override with integration_gate_cadence in PROMPT.md) */
 function defaultGateCadence(totalSteps: number): number {
@@ -324,9 +379,30 @@ function defaultGateCadence(totalSteps: number): number {
  * workers silently filled in hardcoded mocks instead.
  */
 export function insertPrerequisiteStep(steps: WorkStep[], item: WorkItem): WorkStep[] {
-  const text = `${item.title} ${item.description || ''}`;
-  const isWeb = WEB_PROJECT_KEYWORDS.test(text);
-  const hasBackend = DATA_BACKEND_KEYWORDS.test(text) || !!item.data_requirements;
+  const text = goalBodyText(item);
+
+  // v2.4.2 — hard suppressors come FIRST so they short-circuit even when the
+  // goal's body contains ambiguous keywords. See ai-docs/v2/2026-04-18-v2.4/goal-2.4.2.md.
+  if (declaresNoDatabase(item)) {
+    console.log(`[Breakdown] Skipping [PREREQUISITE-*] for "${item.title}" — goal declares no database`);
+    return steps;
+  }
+
+  const isWeb = WEB_RENDERING_KEYWORDS.test(text);
+  const isNoUi = declaresNoUi(item);
+  const hasExplicitDataRequirement = !!item.data_requirements && !/^none\b|^no\b/i.test(item.data_requirements);
+  const hasBackend = DATA_BACKEND_KEYWORDS.test(text) || hasExplicitDataRequirement;
+
+  // Backend-only goal without a declared DB — no prereqs needed. An API-only
+  // server that uses an in-memory store has already been filtered by
+  // `declaresNoDatabase`; anything reaching here that is `no-ui` but has an
+  // explicit `data_requirements` still gets a schema prereq (it just won't get
+  // the API/UI-wiring framing).
+  if (isNoUi && !hasExplicitDataRequirement) {
+    console.log(`[Breakdown] Skipping [PREREQUISITE-*] for "${item.title}" — goal declares no UI and no explicit data requirement`);
+    return steps;
+  }
+
   if (!isWeb || !hasBackend) return steps;
 
   // Don't insert if the first step already looks like a schema/seed/init step
@@ -335,30 +411,10 @@ export function insertPrerequisiteStep(steps: WorkStep[], item: WorkItem): WorkS
     return steps;
   }
 
-  const dataReqLine = item.data_requirements
-    ? `\n\n**Data requirements (from PROMPT.md):** ${item.data_requirements}`
-    : '';
-
-  // v2.4 I2 — split the single [PREREQUISITE] into two hard-locked steps:
-  //   0. Schema + seed data
-  //   1. API endpoints + curl smoke (depends on 0)
-  // Splitting them is the backend-first fix from the v2.1.6 retro. The
-  // previous single step mixed schema work and API work into one worker
-  // session and workers routinely claimed both done while only having
-  // completed the schema — leaving UI steps to build against 500s.
   const schemaSeed: WorkStep = {
     step_number: 0,
     title: '[PREREQUISITE-0] Database schema + seed data',
-    description: [
-      'Hard-locked prerequisite — no API or UI work may start until this passes.',
-      '',
-      '1. Create/verify the database schema for this goal.',
-      '2. Seed realistic test data (not hardcoded mocks in components) that downstream UI can read.',
-      '3. Fill out the structured handoff with: exact table names + columns, sample row IDs you seeded, connection method (env vars, client file).',
-      '',
-      'This step blocks [PREREQUISITE-1] and every subsequent step. If the schema or seed data is wrong, every downstream worker silently builds against hardcoded data and ships undemoable.',
-      dataReqLine,
-    ].join('\n'),
+    description: buildPrereq0Description(item),
     status: 'pending',
     dependencies: [],
     estimated_turns: 60,
@@ -370,16 +426,7 @@ export function insertPrerequisiteStep(steps: WorkStep[], item: WorkItem): WorkS
   const apiSmoke: WorkStep = {
     step_number: 1,
     title: '[PREREQUISITE-1] API endpoints + curl smoke tests',
-    description: [
-      'Hard-locked prerequisite — no UI work may start until this passes.',
-      '',
-      '1. Create every API endpoint this goal requires (one route file per endpoint).',
-      '2. For each endpoint, run `curl` with the exact request shape the UI will send and verify the response body + status code.',
-      '3. Verify the persistence round-trip where applicable — create + read-back via curl — per the `backend-testing` skill.',
-      '4. Fill out the structured handoff with: method + path for each endpoint, the exact curl commands you ran, the returned response shapes, and the HTTP status codes.',
-      '',
-      'Follow the `backend-testing` worker skill. Downstream UI workers will read your handoff to learn the API surface — if your handoff is vague, they will invent mocks.',
-    ].join('\n'),
+    description: buildPrereq1Description(item),
     status: 'pending',
     dependencies: [0],
     estimated_turns: 80,
@@ -400,6 +447,56 @@ export function insertPrerequisiteStep(steps: WorkStep[], item: WorkItem): WorkS
 }
 
 /**
+ * v2.4.2 — Build the description for PREREQUISITE-0 (schema + seed).
+ * Quotes the PROMPT's own persistence excerpt so the worker sees the goal's
+ * declared strategy BEFORE the generic template instructions.
+ */
+function buildPrereq0Description(item: WorkItem): string {
+  const excerpt = extractPersistenceExcerpt(item);
+  const dataReqLine = item.data_requirements
+    ? `\n\n**Data requirements (from PROMPT.md):** ${item.data_requirements}`
+    : '';
+
+  const excerptBlock = excerpt
+    ? `### Persistence layer for this goal (excerpt from PROMPT)\n${excerpt}\n\n`
+    : '';
+
+  return [
+    'Hard-locked prerequisite — no API or UI work may start until this passes.',
+    '',
+    excerptBlock +
+      '1. Create/verify the database schema for this goal.\n' +
+      '2. Seed realistic test data (not hardcoded mocks in components) that downstream UI can read.\n' +
+      '3. Fill out the structured handoff with: exact table names + columns, sample row IDs you seeded, connection method (env vars, client file).',
+    '',
+    'This step blocks [PREREQUISITE-1] and every subsequent step. If the schema or seed data is wrong, every downstream worker silently builds against hardcoded data and ships undemoable.',
+    dataReqLine,
+  ].join('\n');
+}
+
+/**
+ * v2.4.2 — Build the description for PREREQUISITE-1 (API endpoints + curl smoke).
+ */
+function buildPrereq1Description(item: WorkItem): string {
+  const excerpt = extractPersistenceExcerpt(item);
+  const excerptBlock = excerpt
+    ? `### Persistence layer for this goal (excerpt from PROMPT)\n${excerpt}\n\n`
+    : '';
+
+  return [
+    'Hard-locked prerequisite — no UI work may start until this passes.',
+    '',
+    excerptBlock +
+      '1. Create every API endpoint this goal requires (one route file per endpoint).\n' +
+      '2. For each endpoint, run `curl` with the exact request shape the UI will send and verify the response body + status code.\n' +
+      '3. Verify the persistence round-trip where applicable — create + read-back via curl — per the `backend-testing` skill.\n' +
+      '4. Fill out the structured handoff with: method + path for each endpoint, the exact curl commands you ran, the returned response shapes, and the HTTP status codes.',
+    '',
+    'Follow the `backend-testing` worker skill. Downstream UI workers will read your handoff to learn the API surface — if your handoff is vague, they will invent mocks.',
+  ].join('\n');
+}
+
+/**
  * Pass B — Integration gate insertion.
  *
  * After every N build steps, insert a dedicated integration gate step whose
@@ -410,8 +507,11 @@ export function insertPrerequisiteStep(steps: WorkStep[], item: WorkItem): WorkS
  * snapshots — this version demands end-to-end journey verification.
  */
 function insertIntegrationGates(steps: WorkStep[], item: WorkItem): WorkStep[] {
-  const text = `${item.title} ${item.description || ''}`;
-  if (!WEB_PROJECT_KEYWORDS.test(text)) return steps;
+  const text = goalBodyText(item);
+  if (!WEB_RENDERING_KEYWORDS.test(text)) return steps;
+  // v2.4.2: a tags:[no-ui] or body-declared "no UI" goal cannot have an
+  // end-to-end journey gate — there's no journey to walk.
+  if (declaresNoUi(item)) return steps;
 
   const cadence = item.integration_gate_cadence && item.integration_gate_cadence > 0
     ? item.integration_gate_cadence
