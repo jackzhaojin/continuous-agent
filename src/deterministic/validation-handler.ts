@@ -142,7 +142,15 @@ export async function validateWorkDetailed(
     // node_build only blocks on the final step or single-step goals.
     const isIntermediateStep = stepContext && stepContext.step_number < stepContext.total_steps - 1;
     const webProject = isLikelyWebProject(item);
-    const blockingVerifiers = isIntermediateStep
+    // Harness pattern: the harness orchestrator owns commit discipline (it commits a
+    // single "finalize run" at COMPLETE phase). Per-step verifiers see uncommitted
+    // intermediate state (e.g. ai-docs/SPEC/*) and falsely fail git_status_clean.
+    // Treat all standard verifiers as advisory for harness steps — the harness's own
+    // internal validation (per-task validate agent) is the source of truth.
+    const isHarnessStep = item.execution_pattern === 'harness';
+    const blockingVerifiers = isHarnessStep
+      ? []
+      : isIntermediateStep
       ? (webProject ? ['git_status_clean', 'node_build', 'node_install'] : ['git_status_clean', 'node_install'])
       : ['git_status_clean', 'node_build', 'node_install'];
     const hasBlockingFailures = failedVerifiers.some(v => blockingVerifiers.includes(v));
@@ -167,7 +175,10 @@ export async function validateWorkDetailed(
     }
 
     // Worker reported success with no blocking failures but low pass ratio
-    if (result.success && !hasBlockingFailures && passRatio < 0.5) {
+    // Harness pattern: skip the pass-ratio threshold — the harness's internal validate
+    // agent is the source of truth for correctness, and per-step verifiers are checking
+    // wrong things (e.g. research_output_exists during SPEC phase).
+    if (result.success && !hasBlockingFailures && passRatio < 0.5 && !isHarnessStep) {
       logAgentic('  Worker reported SUCCESS but too many verifiers failed — rejecting');
       log(`  Pass ratio: ${(passRatio * 100).toFixed(0)}% (below 50% threshold)`);
       return { isValid: false, failedVerifiers, blockingFailures: [], buildError, buildCheckRan };

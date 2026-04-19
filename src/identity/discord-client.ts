@@ -46,14 +46,14 @@ export function isDiscordDmEnabled(config?: IdentityConfig): boolean {
  * Opens a DM channel first, then sends the message.
  * Returns true if sent, false if disabled/throttled/error.
  */
-export async function sendDiscordDM(message: DiscordMessage, config?: IdentityConfig): Promise<boolean> {
+export async function sendDiscordDM(message: DiscordMessage, config?: IdentityConfig, opts?: { bypassThrottle?: boolean }): Promise<boolean> {
   const c = config || loadIdentityConfig();
 
   if (!isDiscordDmEnabled(c)) {
     return false;
   }
 
-  if (isThrottled(c)) {
+  if (!opts?.bypassThrottle && isThrottled(c)) {
     log(`  Discord DM: Throttled — ${messageTimestamps.length}/${c.discordMaxMessagesPerHour} messages in last hour`);
     return false;
   }
@@ -165,14 +165,14 @@ export function resetThrottle(): void {
  * Messages appear as the agent's display name in the channel.
  * Returns true if sent, false if disabled/throttled/error.
  */
-export async function sendDiscordMessage(message: DiscordMessage, config?: IdentityConfig): Promise<boolean> {
+export async function sendDiscordMessage(message: DiscordMessage, config?: IdentityConfig, opts?: { bypassThrottle?: boolean }): Promise<boolean> {
   const c = config || loadIdentityConfig();
 
   if (!isDiscordEnabled(c)) {
     return false;
   }
 
-  if (isThrottled(c)) {
+  if (!opts?.bypassThrottle && isThrottled(c)) {
     log(`  Discord: Throttled — ${messageTimestamps.length}/${c.discordMaxMessagesPerHour} messages in last hour`);
     return false;
   }
@@ -241,14 +241,16 @@ export async function sendCompletionNotification(
     embeds: [embed],
   };
 
+  // Goal-terminal events bypass the throttle so they're never silently dropped after
+  // a long multi-step goal has burned the per-hour budget on step notifications.
   // Try DM first if configured, fall back to webhook
   if (isDiscordDmEnabled(c)) {
-    const sent = await sendDiscordDM(message, c);
+    const sent = await sendDiscordDM(message, c, { bypassThrottle: true });
     if (sent) return true;
     // Fall back to webhook if DM fails
   }
 
-  return sendDiscordMessage(message, c);
+  return sendDiscordMessage(message, c, { bypassThrottle: true });
 }
 
 /**
@@ -319,14 +321,16 @@ export async function sendBlockedNotification(
     embeds: [embed],
   };
 
+  // Goal-terminal events bypass the throttle so blocked notifications surface even
+  // after a multi-step goal has burned the per-hour budget on step notifications.
   // Try DM first if configured, fall back to webhook
   if (isDiscordDmEnabled(c)) {
-    const sent = await sendDiscordDM(message, c);
+    const sent = await sendDiscordDM(message, c, { bypassThrottle: true });
     if (sent) return true;
     // Fall back to webhook if DM fails
   }
 
-  return sendDiscordMessage(message, c);
+  return sendDiscordMessage(message, c, { bypassThrottle: true });
 }
 
 /**

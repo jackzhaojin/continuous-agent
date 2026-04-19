@@ -5,7 +5,7 @@
   "main": "dist/executive-loop.js",
   "type": "module",
   "scripts": {
-    "build": "tsc && node scripts/generate-build-info.mjs && (pm2 sendSignal SIGUSR2 executive-loop 2>/dev/null || true)",
+    "build": "tsc && node scripts/copy-harness-assets.mjs && node scripts/generate-build-info.mjs && (pm2 sendSignal SIGUSR2 executive-loop 2>/dev/null || true)",
     "start": "node dist/executive-loop.js",
     "dev": "tsx src/executive-loop.ts",
     "typecheck": "tsc --noEmit",

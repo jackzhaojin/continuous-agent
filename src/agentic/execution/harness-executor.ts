@@ -165,6 +165,12 @@ export async function executeHarness(
     ? makeStepSink({ bundlePath: workItem.source_path, contractId })
     : undefined;
 
+  // Cap total task iterations to prevent unbounded validator-subtask recursion.
+  // Without this, an impossible task spawns 2 → 2.1 → 2.1.1 → ... forever.
+  // Override per-environment with HARNESS_MAX_TASKS.
+  const maxTasksEnv = Number(process.env.HARNESS_MAX_TASKS);
+  const maxTasks = Number.isFinite(maxTasksEnv) && maxTasksEnv > 0 ? maxTasksEnv : 8;
+
   const runConfig: HarnessRunConfig = {
     promptFile,
     targetDir,
@@ -174,6 +180,8 @@ export async function executeHarness(
     modelOverrides: workItem.model_overrides ?? {},
     maxTurnsPerAgent: workItem.max_turns,
     stepSink,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ...({ maxTasks } as any),
   };
 
   const transcript: string[] = [];

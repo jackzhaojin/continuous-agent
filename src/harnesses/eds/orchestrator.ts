@@ -544,7 +544,26 @@ async function orchestrate(config: HarnessRunConfig, bus: HarnessEventBus): Prom
         }
       }
     } else {
-      // Subtask creation path — failed validation
+      // Subtask creation path — failed validation.
+      // See generic/orchestrator.ts for full rationale. Cap recursion depth.
+      const MAX_SUBTASK_DEPTH = 3;
+      const taskDepth = (task.id.match(/\./g) || []).length;
+      if (taskDepth >= MAX_SUBTASK_DEPTH) {
+        task.status = 'blocked';
+        state.currentTaskId = null;
+        recomputeCounts(state);
+        await appendProgress(
+          docsDir,
+          `Task ${task.id} FAILED validation. Subtask depth limit (${MAX_SUBTASK_DEPTH}) reached — terminating recursion.`,
+        );
+        await saveState(docsDir, state);
+        const tasksDataD = await loadTasks(docsDir);
+        tasksDataD.tasks = state.tasks;
+        await saveTasks(docsDir, tasksDataD);
+        await writeTasksMarkdown(docsDir, state.tasks);
+        continue;
+      }
+
       const preSync = await syncTasksFromDisk(state, docsDir);
       const validatorCreated = preSync.added.filter(
         (t) => t.parentId === task.id,
