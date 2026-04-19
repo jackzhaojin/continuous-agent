@@ -80,8 +80,8 @@ Five goal bundles queued under `workspace/ondeck/` for live runs:
 
 3. For `2026-04-18-existing-executive-hello`, pre-create the target directory:
    ```bash
-   mkdir -p ~/dev/ai-sandbox-worktrees/experiment/v2.4-existing-scratch
-   cd ~/dev/ai-sandbox-worktrees/experiment/v2.4-existing-scratch
+   mkdir -p ~/dev/ai-sandbox-worktrees/experiment/2026-04-19-v2.4-existing-scratch
+   cd ~/dev/ai-sandbox-worktrees/experiment/2026-04-19-v2.4-existing-scratch
    git init && echo '# scratch' > README.md && git add README.md && git commit -m 'init'
    ```
 
