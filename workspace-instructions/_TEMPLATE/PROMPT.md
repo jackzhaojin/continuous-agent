@@ -35,7 +35,13 @@ data_requirements: >
    `DROP SCHEMA IF EXISTS <goal_slug>_v1 CASCADE; CREATE SCHEMA <goal_slug>_v1;`
    before applying migrations. Tables: shipments, rates, payments. Seed 3 shipments
    with ids 1..3 so the rates page renders against real data. Supabase clients
-   configured with db: { schema: '<goal_slug>_v1' }."]
+   configured with db: { schema: '<goal_slug>_v1' }."
+   For goals that explicitly do NOT need a database, set this to a string starting
+   with the word "none" — e.g. "none — in-memory + JSON file snapshot at
+   data/state.json". Setting this (rather than omitting the field) gives the
+   goal-breakdown's deterministic prereq inserter the signal it needs to skip
+   database-prereq insertion. Also consider adding tags:[no-database] and/or
+   tags:[no-ui] for hard suppression (see v2.4.2).]
 integration_gate_cadence:          # Optional integer override. Default auto (clamped 3–8).
 ---
 

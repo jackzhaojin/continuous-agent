@@ -16,7 +16,8 @@
     "test:harness:live": "RUN_LIVE_E2E=1 tsx tests/e2e/harnesses/claude-live-generic.e2e.ts",
     "test:retro-h": "tsx tests/adhoc/h1-kimi-handoff-parser.adhoc.ts && tsx tests/adhoc/h3-gate-blocks-on-regression.adhoc.ts && tsx tests/adhoc/h4-defect-recursion-depth.adhoc.ts && tsx tests/adhoc/h5-rebreakdown-preserves-completed.adhoc.ts && tsx tests/adhoc/h6-worker-log-untruncated.adhoc.ts",
     "test:retro-i": "tsx tests/adhoc/i0-prompt-builder-enrichment.adhoc.ts && tsx tests/adhoc/i1-backend-testing-skill-present.adhoc.ts && tsx tests/adhoc/i2-backend-first-breakdown.adhoc.ts && tsx tests/adhoc/i3-journey-api-verification.adhoc.ts && tsx tests/adhoc/i4-ui-library-guidance.adhoc.ts && tsx tests/adhoc/a5-playwright-policy.adhoc.ts",
-    "test:v2.4": "npm run test:retro-h && npm run test:retro-i"
+    "test:retro-j": "tsx tests/adhoc/j1-no-db-goal-skips-prereq.adhoc.ts && tsx tests/adhoc/j2-web-with-db-still-gets-prereq.adhoc.ts && tsx tests/adhoc/j3-prereq-description-quotes-prompt.adhoc.ts && tsx tests/adhoc/j4-no-ui-tag-suppresses-prereq.adhoc.ts",
+    "test:v2.4": "npm run test:retro-h && npm run test:retro-i && npm run test:retro-j"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.29",

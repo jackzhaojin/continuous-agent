@@ -232,6 +232,10 @@ export interface WorkItem {
   //             Otherwise commits on the current branch.
   target_branch?: string;
 
+  // v2.4.2: PROMPT.md frontmatter tags (e.g. [no-ui, no-database, backend]).
+  // Breakdown uses these as hard suppression signals for prereq insertion.
+  tags?: string[];
+
   // v2.1.7: Integration/data contract fields from PROMPT.md frontmatter
   //
   // `definition_of_done_journey`: concrete user flow the product must execute end-to-end.

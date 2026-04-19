@@ -354,6 +354,9 @@ async function bundleToWorkItemAsync(bundle: GoalBundle): Promise<WorkItem> {
     data_requirements: typeof frontmatter.data_requirements === 'string'
       ? frontmatter.data_requirements
       : undefined,
+    tags: Array.isArray(frontmatter.tags)
+      ? frontmatter.tags.filter((t): t is string => typeof t === 'string')
+      : undefined,
     integration_gate_cadence: frontmatter.integration_gate_cadence
       ? Number(frontmatter.integration_gate_cadence)
       : undefined,
