@@ -147,9 +147,13 @@ export async function executeHarness(
   }
 
   const provider = getAgentWorkerProviderForVendor(workItem.worker_vendor);
+  // Note: no env-var precheck. validateAuth() only inspects process.env, but
+  // the Claude SDK has user-level OAuth at ~/.claude/ that env-checks miss
+  // (worker-spawner.ts has the same trust-the-SDK behavior). For non-Claude
+  // vendors the SDK call itself surfaces auth errors with the same fidelity.
   const auth = provider.validateAuth();
   if (!auth.valid) {
-    return failFast(`vendor auth invalid: ${auth.error ?? 'unknown'}`, startedAt);
+    log(`[harness-executor] auth precheck soft-warn (proceeding): ${auth.error ?? 'unknown'}`);
   }
 
   const detectedMode = await harness.detectMode(targetDir, promptFile);

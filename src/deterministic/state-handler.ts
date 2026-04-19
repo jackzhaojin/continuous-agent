@@ -901,9 +901,11 @@ export async function writeToNeedsYou(
     const errorMessage = `Failed after ${attempts} attempts.${logReference} Error: ${errorSnippet}`;
     const newEntry = `| ${item.title} | ${errorMessage} | | BLOCKING | ${today} |`;
 
-    // Insert after the "Actions Needed" table header
+    // Insert after the "Actions Needed" table header. Separator row is optional —
+    // some markdown linters strip it on autoformat when the table only has a *None*
+    // placeholder, so tolerate either form.
     const actionsTable =
-      /(\| Action \| Why Agent Can't Do It \| Response \| Blocking \| Since \|\n\|[-|]+\|)/;
+      /(\| Action \| Why Agent Can't Do It \| Response \| Blocking \| Since \|(?:\n\|[-|]+\|)?)/;
     if (actionsTable.test(content)) {
       content = content.replace(actionsTable, `$1\n${newEntry}`);
       // Remove "None" placeholder if present
@@ -944,8 +946,9 @@ export async function escalateWithDiagnosis(
     const enhancedDiagnosis = `${diagnosis}${logReference}`;
     const newEntry = `| ${item.title} | ${enhancedDiagnosis} | | BLOCKING | ${today} |`;
 
+    // Separator row is optional — see writeToNeedsYou for the reasoning.
     const actionsTable =
-      /(\| Action \| Why Agent Can't Do It \| Response \| Blocking \| Since \|\n\|[-|]+\|)/;
+      /(\| Action \| Why Agent Can't Do It \| Response \| Blocking \| Since \|(?:\n\|[-|]+\|)?)/;
     if (actionsTable.test(content)) {
       content = content.replace(actionsTable, `$1\n${newEntry}`);
       content = content.replace(/\| \*None\* \| \| \| \| \|/, '');
