@@ -34,6 +34,7 @@ import type { WorkItem, WorkStep, DefectEvidence, StructuredHandoff } from '../.
 import { readStepsJson, insertDefectSubtask } from '../../deterministic/steps-json-handler.js';
 import { getChatCompletionProvider, resolveChatModel } from '../../core/vendor/index.js';
 import { logAgentic, log } from '../../core/logging.js';
+import { checkJourneySatisfiability } from '../../deterministic/journey-satisfiability.js';
 
 const INTEGRATION_VALIDATOR_SKILL_PATH = path.join(
   process.cwd(),
@@ -55,9 +56,16 @@ export interface ValidatorResult {
 
 /**
  * Return true if a step should trigger integration validation after Phase 5.
+ *
+ * Single-goal mode: when `step` is undefined, we are validating the entire
+ * goal (no breakdown happened). Run the validator iff the goal declares a
+ * `definition_of_done_journey` — there is something concrete to gate on.
  */
 export function shouldRunIntegrationValidator(step: WorkStep | undefined, item: WorkItem): boolean {
-  if (!step) return false;
+  if (!step) {
+    // Whole-goal validation: only meaningful if the goal declared a journey.
+    return !!item.definition_of_done_journey;
+  }
   if (step.kind === 'integration_gate') return true;
   if (step.kind === 'user_visible_build') return true;
   // Auto-detect: treat gate-title-matching steps as gates even if kind is missing
@@ -218,11 +226,47 @@ function parseValidatorJson(text: string): ValidatorResult | null {
  */
 export async function runIntegrationValidator(
   item: WorkItem,
-  step: WorkStep,
+  step: WorkStep | undefined,
   contractId?: string,
+  projectPath?: string,
 ): Promise<ValidatorResult> {
   if (!item.source_path) {
     return { result: 'pass', reason: 'No source_path — cannot validate' };
+  }
+
+  // Single-goal mode: no breakdown happened, no STEPS.json to read, no
+  // per-step handoffs to review. The LLM evidence-review path needs handoffs
+  // to be useful; without them it can only restate the journey description.
+  // Instead, do a deterministic journey-satisfiability check against the
+  // worker's output_path. This is the same check Phase 5 runs as a hard
+  // gate (validation-handler.ts), repeated here so single-goal mode also
+  // gets a Phase 5b log entry confirming the journey is executable.
+  if (!step) {
+    logAgentic(`[Phase 5b] Running whole-goal integration validator for "${item.title}" (single-goal mode)`);
+    const candidatePath = projectPath || item.output_path;
+    if (!candidatePath) {
+      return { result: 'pass', reason: 'No project path available for whole-goal validation — soft pass' };
+    }
+    const journeyCheck = checkJourneySatisfiability(candidatePath, item.definition_of_done_journey);
+    if (!journeyCheck.ok) {
+      return {
+        result: 'fail',
+        reason: journeyCheck.reason || 'Journey gate failed',
+        defect: {
+          title: 'Whole-goal journey gate: project has no way to execute the declared user journey',
+          root_cause:
+            'Worker reported success but produced no Playwright config, no tests/e2e/ directory, and no test:e2e/playwright npm script. The definition_of_done_journey cannot be executed against the current project state.',
+          evidence: journeyCheck.reason,
+          acceptance_criteria: [
+            'Add a Playwright config (or equivalent journey runner) at the project root or under code/Functions/<app>/.',
+            'Add a tests/e2e/ spec that drives the full definition_of_done_journey.',
+            'Add a package.json script (test:e2e or similar) that runs the spec end-to-end.',
+            'Run the script locally and confirm it exits 0 before declaring the goal complete.',
+          ],
+        },
+      };
+    }
+    return { result: 'pass', reason: 'Whole-goal journey check satisfied — project contains executable verification artifacts.' };
   }
 
   logAgentic(`[Phase 5b] Running integration validator for ${step.id || `step-${step.step_number}`} "${step.title}"`);

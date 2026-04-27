@@ -16,7 +16,7 @@ import path from 'path';
 
 // CORE
 import { logAgentic, logDeterministic, log, logHealthStatus, closeLogStream } from './logging.js';
-import type { HealthStatus, LoopState, WorkerResult } from './types.js';
+import type { HealthStatus, LoopState, WorkerResult, WorkStep } from './types.js';
 
 // AGENTIC - AI decision-making
 import { selectWorkWithSteps } from '../agentic/work-selection/work-selector.js';
@@ -539,7 +539,7 @@ async function runIteration(): Promise<IterationResult> {
   logAgentic('PHASE 5: Validate Work');
   // Pass current step for step-aware validation
   const validation = await validateWorkDetailed(workItem, result, currentStep);
-  const isValid = validation.isValid;
+  let isValid = validation.isValid;
 
   if (isStepExecution && currentStep && workItem.source_path) {
     const buildHealth = !validation.buildCheckRan
@@ -572,24 +572,58 @@ async function runIteration(): Promise<IterationResult> {
   // the step to "complete". This is the pathway the postal-checkout retro
   // identified as missing — product-level failures get a repair route that
   // runs depth-first before the next sibling step.
-  if (isValid && result && isStepExecution && currentStep && workItem.source_path) {
-    if (shouldRunIntegrationValidator(currentStep, workItem)) {
+  //
+  // Single-goal mode (no breakdown, no currentStep): if the goal declared a
+  // definition_of_done_journey, run a deterministic whole-goal journey check
+  // here too. Without this, complexity:low goals bypass Phase 5b entirely
+  // and ride on Phase 5's looser pass criteria. The 2026-04-26 azure-star
+  // retro caught exactly this — UI shipped without the load-bearing
+  // Playwright spec and Phase 5 still marked success.
+  if (isValid && result && workItem.source_path) {
+    const validatorStep: WorkStep | undefined = isStepExecution ? currentStep : undefined;
+    if (shouldRunIntegrationValidator(validatorStep, workItem)) {
       setDashboardPhase(5);
       logAgentic('PHASE 5b: Integration Validator');
       try {
-        const validatorResult = await runIntegrationValidator(workItem, currentStep, contractId);
+        const validatorResult = await runIntegrationValidator(
+          workItem,
+          validatorStep,
+          contractId,
+          result.output_path,
+        );
         if (validatorResult.result === 'fail') {
           logAgentic(`[Phase 5b] FAIL — ${validatorResult.reason}`);
           if (validatorResult.defectSubtaskId) {
             logAgentic(`[Phase 5b] Filed defect subtask: ${validatorResult.defectSubtaskId}`);
           }
-          // Keep the current step in_progress — do NOT call updateStepState success
-          // path below. The depth-first work-selector will pick up the new defect
-          // subtask before any sibling step in the next loop iteration.
-          loopState.last_work_at = new Date().toISOString();
-          return 'work_completed';
+          if (validatorStep) {
+            // Step mode: keep the current step in_progress — do NOT call
+            // updateStepState success path below. The depth-first
+            // work-selector will pick up the new defect subtask before any
+            // sibling step in the next loop iteration.
+            loopState.last_work_at = new Date().toISOString();
+            return 'work_completed';
+          }
+          // Whole-goal mode: there's no step to keep in_progress and no
+          // STEPS.json to file a defect subtask in. Reject the goal here
+          // so Phase 6's success path is skipped; the next iteration will
+          // re-pick the same goal and the worker gets another shot.
+          isValid = false;
+          if (validatorResult.defect) {
+            log(`[Phase 5b] Whole-goal defect: ${validatorResult.defect.title}`);
+            if (validatorResult.defect.root_cause) {
+              log(`[Phase 5b]   root_cause: ${validatorResult.defect.root_cause}`);
+            }
+            if (validatorResult.defect.acceptance_criteria) {
+              log('[Phase 5b]   acceptance_criteria:');
+              for (const ac of validatorResult.defect.acceptance_criteria) {
+                log(`    - ${ac}`);
+              }
+            }
+          }
+        } else {
+          logAgentic(`[Phase 5b] PASS — ${validatorResult.reason}`);
         }
-        logAgentic(`[Phase 5b] PASS — ${validatorResult.reason}`);
       } catch (err) {
         log(`[Phase 5b] Integration validator error (soft pass): ${err}`);
       }

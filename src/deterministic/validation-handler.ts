@@ -15,6 +15,7 @@ import {
   DEFAULT_CAPABILITY_MAPPINGS,
 } from '../agentic/learning/capability-updater.js';
 import { WEB_KEYWORDS } from '../agentic/intelligence/prompt-builder.js';
+import { checkJourneySatisfiability } from './journey-satisfiability.js';
 import type { WorkItem, WorkStep, WorkerResult } from '../core/types.js';
 import { logAgentic, logDeterministic, log } from '../core/logging.js';
 
@@ -123,6 +124,38 @@ export async function validateWorkDetailed(
     // Worker success is the PRIMARY signal. Verifiers are advisory.
     const overallStatus = summary.overall;
 
+    // Step-aware flag computed early so the journey gate can use it.
+    // Intermediate steps of a multi-step goal are exempt from the journey
+    // gate — the journey is checked at the end, not after every block.
+    const isIntermediateStep = stepContext && stepContext.step_number < stepContext.total_steps - 1;
+
+    // Journey gate: when the goal declares a definition_of_done_journey,
+    // the project must contain something that can actually execute the
+    // journey. This runs BEFORE the standard pass/partial branches because
+    // the generic verifier suite is too coarse to enforce a journey — a
+    // worker can ship UI without writing the test and still satisfy
+    // node_test (echo) / files_exist (irrelevant files). See the 2026-04-26
+    // azure-star-generator retro.
+    if (item.definition_of_done_journey && !isIntermediateStep) {
+      const journeyCheck = checkJourneySatisfiability(
+        result.output_path,
+        item.definition_of_done_journey,
+      );
+      if (!journeyCheck.ok) {
+        logAgentic('  Journey gate FAIL — definition_of_done_journey declared but project has no way to execute it');
+        log(`  Reason: ${journeyCheck.reason}`);
+        const standardFailedVerifiers = verifierResults
+          .filter((v) => v.result === 'FAIL')
+          .map((v) => v.verifier_id);
+        return {
+          isValid: false,
+          failedVerifiers: [...standardFailedVerifiers, 'journey_satisfiable'],
+          blockingFailures: ['journey_satisfiable'],
+          buildCheckRan: verifierResults.some((v) => v.verifier_id === 'node_build'),
+        };
+      }
+    }
+
     if (overallStatus === 'PASS') {
       logAgentic('  All verifiers passed');
       return { isValid: true, failedVerifiers: [], blockingFailures: [], buildCheckRan: verifierResults.some(v => v.verifier_id === 'node_build') };
@@ -140,7 +173,6 @@ export async function validateWorkDetailed(
     // For intermediate steps in multi-step goals, node_build is advisory (not blocking)
     // — intermediate steps may modify types/schema that break builds transiently.
     // node_build only blocks on the final step or single-step goals.
-    const isIntermediateStep = stepContext && stepContext.step_number < stepContext.total_steps - 1;
     const webProject = isLikelyWebProject(item);
     // Harness pattern: the harness orchestrator owns commit discipline (it commits a
     // single "finalize run" at COMPLETE phase). Per-step verifiers see uncommitted
