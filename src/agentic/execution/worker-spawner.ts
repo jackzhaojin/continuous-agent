@@ -413,6 +413,58 @@ ${appCredsSection}`;
 }
 
 /**
+ * For build_target='existing', sync claude-files-to-output/ (skills + agents)
+ * into <target_dir>/.claude/ so the worker can use the Skill tool and load
+ * worker-base / web-testing / jack-git-commit / etc.
+ *
+ * Without this, workers in 'existing' mode run blind — no constitutional
+ * limits, no commit conventions, no test protocol — and treat PROMPT.md
+ * "DO NOT" rules as soft preferences. The 2026-04-26 azure-star-generator
+ * run hit this: worker bumped runtime deps and edited local.settings-template
+ * because no worker-base skill was loaded to enforce the prompt.
+ *
+ * Idempotent: overwrites the synced files each spawn so they stay fresh.
+ * Adds `/.claude/` to the project's `.gitignore` so the synced tree doesn't
+ * pollute the user's git status.
+ */
+function setupExistingProjectSkills(projectPath: string): void {
+  if (!existsSync(projectPath)) return;
+  if (!existsSync(CLAUDE_FILES_DIR)) return;
+
+  const claudeDir = path.join(projectPath, '.claude');
+  try {
+    cpSync(CLAUDE_FILES_DIR, claudeDir, { recursive: true });
+    console.log(`[Worker] BUILD_TARGET: synced .claude/ (skills + agents) into ${claudeDir}`);
+  } catch (error) {
+    console.log(`[Worker] BUILD_TARGET: WARNING failed to sync .claude/ into ${claudeDir}: ${(error as Error).message}`);
+    return;
+  }
+
+  // Ensure /.claude/ is gitignored so we don't show up in the user's git status
+  const gitignorePath = path.join(projectPath, '.gitignore');
+  let existing = '';
+  if (existsSync(gitignorePath)) {
+    existing = readFileSync(gitignorePath, 'utf-8');
+  }
+  const lines = existing.split('\n').map((l) => l.trim());
+  const alreadyIgnored = lines.some(
+    (l) => l === '.claude' || l === '.claude/' || l === '/.claude' || l === '/.claude/',
+  );
+  if (!alreadyIgnored) {
+    const sep = existing && !existing.endsWith('\n') ? '\n' : '';
+    const block =
+      `${sep}# Synced by continuous-agent for build_target=existing (do not commit)\n` +
+      `/.claude/\n`;
+    try {
+      writeFileSync(gitignorePath, existing + block);
+      console.log(`[Worker] BUILD_TARGET: added '/.claude/' to ${gitignorePath}`);
+    } catch (error) {
+      console.log(`[Worker] BUILD_TARGET: WARNING failed to update .gitignore: ${(error as Error).message}`);
+    }
+  }
+}
+
+/**
  * Retry context for intelligent prompts
  */
 export interface WorkerRetryContext {
@@ -747,9 +799,15 @@ export async function spawnWorker(
       `[Worker] BUILD_TARGET: mode=${resolution.build_target} path=${projectPath}`,
     );
 
-    // 'existing' target: respect the project as-is. Skip all scaffold (no
-    // .gitignore injection, no .env copy, no auto-commit). The project owns
-    // its own state. Source-project copy-in also doesn't apply.
+    // 'existing' target: respect the project as-is. Skip the heavy scaffold
+    // (no .env copy, no auto-commit, no source-project copy-in). The project
+    // owns its own state.
+    //
+    // EXCEPTION: sync .claude/ (skills + agents) into the target so the
+    // worker can use the Skill tool. Without this, 'existing' workers run
+    // unprotected by worker-base / web-testing / etc., and treat PROMPT.md
+    // hard constraints as soft preferences. We also inject `/.claude/` into
+    // the project's .gitignore so the sync stays invisible to the user.
     if (resolution.build_target !== 'existing') {
       // Worktree mode is ours — safe to scaffold. Monorepo is the legacy
       // path. Both share the same setup steps.
@@ -778,10 +836,15 @@ export async function spawnWorker(
           logger.log(`COPY-IN: Source project "${workItem.source_project}" not found in registry`);
         }
       }
-    } else if (workItem?.source_project) {
-      logger.log(
-        `COPY-IN: skipped — build_target='existing' uses target_dir as-is`,
-      );
+    } else {
+      if (workItem?.source_project) {
+        logger.log(
+          `COPY-IN: skipped — build_target='existing' uses target_dir as-is`,
+        );
+      }
+      // Sync .claude/ skills + agents into the target so the Skill tool works
+      // and worker-base / web-testing / jack-git-commit are loadable.
+      setupExistingProjectSkills(projectPath);
     }
 
     // Optional branch checkout for existing mode when the frontmatter
