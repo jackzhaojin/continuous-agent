@@ -236,6 +236,13 @@ export interface WorkItem {
   // Breakdown uses these as hard suppression signals for prereq insertion.
   tags?: string[];
 
+  // PROMPT.md frontmatter `complexity` — author's authoritative size estimate.
+  // When set to 'low', breakdown is skipped regardless of keyword heuristics.
+  // The keyword scanner in `estimateComplexity` over-counts on prompts that
+  // mention DO-NOT items (e.g. "no database" still trips the database
+  // multiplier), so the user-declared field has to win.
+  complexity?: 'low' | 'medium' | 'high';
+
   // v2.1.7: Integration/data contract fields from PROMPT.md frontmatter
   //
   // `definition_of_done_journey`: concrete user flow the product must execute end-to-end.

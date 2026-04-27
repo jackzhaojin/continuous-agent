@@ -357,6 +357,9 @@ async function bundleToWorkItemAsync(bundle: GoalBundle): Promise<WorkItem> {
     tags: Array.isArray(frontmatter.tags)
       ? frontmatter.tags.filter((t): t is string => typeof t === 'string')
       : undefined,
+    complexity: (['low', 'medium', 'high'].includes(frontmatter.complexity as string)
+      ? (frontmatter.complexity as 'low' | 'medium' | 'high')
+      : undefined),
     integration_gate_cadence: frontmatter.integration_gate_cadence
       ? Number(frontmatter.integration_gate_cadence)
       : undefined,

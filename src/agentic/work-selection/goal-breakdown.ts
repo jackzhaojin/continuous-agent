@@ -145,6 +145,15 @@ export function needsBreakdown(item: WorkItem): boolean {
   // Legacy fallback: check in-memory steps
   if (item.steps && item.steps.length > 0) return false;
 
+  // Author-declared `complexity: low` is authoritative. The keyword-based
+  // estimator over-counts on prompts that quote DO-NOT items (e.g. "no
+  // database" still trips the database/api/ui keywords), so a low-complexity
+  // refresh on an existing project would be force-broken-down anyway.
+  if (item.complexity === 'low') {
+    console.log(`[Breakdown] Skipping breakdown for "${item.title}" — frontmatter declares complexity: low`);
+    return false;
+  }
+
   const estimatedTurns = estimateComplexity(item);
   return estimatedTurns > BREAKDOWN_THRESHOLD_TURNS;
 }
@@ -380,6 +389,20 @@ function defaultGateCadence(totalSteps: number): number {
  */
 export function insertPrerequisiteStep(steps: WorkStep[], item: WorkItem): WorkStep[] {
   const text = goalBodyText(item);
+
+  // build_target='existing' means we're editing a project the user already
+  // owns. Its persistence reality (DB or none) is already decided by the
+  // checked-in code; injecting a "design a schema + seed data" prereq before
+  // any UI work almost always pushes the worker to scaffold a database the
+  // project never asked for. The 2026-04-26 azure-star-generator run hit
+  // exactly this — the worker built an Azure Table Storage layer for a
+  // stateless function app. If an existing-project goal genuinely needs a
+  // schema, the author can declare it with explicit `data_requirements:` and
+  // a non-low complexity, and write the prereq into PROMPT.md by hand.
+  if (item.build_target === 'existing') {
+    console.log(`[Breakdown] Skipping [PREREQUISITE-*] for "${item.title}" — build_target='existing' (project owns its persistence reality)`);
+    return steps;
+  }
 
   // v2.4.2 — hard suppressors come FIRST so they short-circuit even when the
   // goal's body contains ambiguous keywords. See ai-docs/v2/2026-04-18-v2.4/goal-2.4.2.md.
