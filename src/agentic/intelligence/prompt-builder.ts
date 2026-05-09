@@ -53,6 +53,11 @@ export interface RetryContext {
 /** Web project detection regex (word-bounded to avoid false positives like "build" matching "ui") */
 export const WEB_KEYWORDS = /next\.?js|react|vue|angular|\bhtml\b|\bcss\b|website|web.?app|frontend|\bui\b|component|page|form|dashboard/i;
 
+// Auto-load `azure-function-deploy` skill when the goal mentions Azure Functions
+// or GitHub Actions for an Azure Functions project. Mirrors the WEB_KEYWORDS
+// pattern. See ai-docs/v2/2026-05-09-v2.4-azure-modification/plan.md.
+export const AZURE_FUNCTIONS_KEYWORDS = /azure[\s-]?function|\bfunc\s+(start|deploy|run|init)\b|functions-action|az\s+functionapp|\.funcignore|host\.json/i;
+
 /** Path to worker skills source directory (synced to ai-sandbox/.claude/skills/ by worker-spawner) */
 const WORKER_SKILLS_ROOT = path.join(process.cwd(), 'claude-files-to-output', 'skills');
 
@@ -247,6 +252,7 @@ export async function buildV2ComposedPrompt(
   const workerBaseSkill = skillResult.skills.find(s => s.name === 'worker-base');
   const itemText = `${item.title} ${item.description || ''}`;
   const isWebProject = WEB_KEYWORDS.test(itemText);
+  const isAzureFunctionsProject = AZURE_FUNCTIONS_KEYWORDS.test(itemText);
   // v2.4 A5 — ledger-driven Playwright policy. Web-testing is required for
   // UI-visible steps, recommended for ambiguous steps, and skipped for steps
   // that are deterministically backend-only (PREREQUISITE-0 schema, PREREQUISITE-1
@@ -260,6 +266,9 @@ export async function buildV2ComposedPrompt(
   const backendTestingSkill = isBackendOnlyItem || isBackendOnlyStep
     ? skillResult.skills.find(s => s.name === 'backend-testing')
     : null;
+  const azureFunctionDeploySkill = isAzureFunctionsProject
+    ? skillResult.skills.find(s => s.name === 'azure-function-deploy')
+    : null;
 
   // Template variables for skill body rendering
   const skillVars: Record<string, string> = {
@@ -269,6 +278,7 @@ export async function buildV2ComposedPrompt(
   logAgentic(`[V2 Prompt] Vendor: ${resolvedVendor}, Pattern: ${patternResolution.pattern} (${patternResolution.source})`);
   if (workerBaseSkill) logAgentic(`[V2 Prompt] Loaded worker-base skill`);
   if (webTestingSkill) logAgentic(`[V2 Prompt] Loaded web-testing skill (web project detected)`);
+  if (azureFunctionDeploySkill) logAgentic(`[V2 Prompt] Loaded azure-function-deploy skill (Azure Functions project detected)`);
   if (matchedPlaybook) logAgentic(`[V2 Prompt] Matched playbook: ${matchedPlaybook.name}`);
   if (referencedSkills.length > 0) {
     logAgentic(`[V2 Prompt] Referenced skills: ${referencedSkills.map(s => s.name).join(', ')}`);
@@ -415,6 +425,10 @@ ${matchedPlaybook.body.trim()}
       const renderedBackend = renderSkillBody(backendTestingSkill.body, skillVars);
       sections.push(renderedBackend.trim());
     }
+    if (azureFunctionDeploySkill) {
+      const renderedAzure = renderSkillBody(azureFunctionDeploySkill.body, skillVars);
+      sections.push(renderedAzure.trim());
+    }
   }
   // Kimi / Codex path: no additional injection. Worker-base already contains the manual
   // "Worker Skill Index" table + "Which skill applies to which step" decision table.
@@ -427,8 +441,10 @@ ${matchedPlaybook.body.trim()}
   const requiredSkillNames: string[] = [];
   const webTestingDir = webTestingSkill ? skillDirectoryName(webTestingSkill) : null;
   const backendTestingDir = backendTestingSkill ? skillDirectoryName(backendTestingSkill) : null;
+  const azureFunctionDeployDir = azureFunctionDeploySkill ? skillDirectoryName(azureFunctionDeploySkill) : null;
   if (webTestingDir) requiredSkillNames.push(webTestingDir);
   if (backendTestingDir) requiredSkillNames.push(backendTestingDir);
+  if (azureFunctionDeployDir) requiredSkillNames.push(azureFunctionDeployDir);
 
   // jack-git-commit — every step that produces code deltas must commit (Clean-Tree Rule).
   // Pure research steps skip this, but we can't cheaply detect "research only" here, so
