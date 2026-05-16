@@ -2,6 +2,40 @@
 
 Verifies the *agentic* path into the second brain — i.e., when an LLM (not deterministic code) decides when and how to query memory. Complements `../graph-poc/` which covers the deterministic SDK path.
 
+## Executive summary
+
+Two POCs validate the V3.0 second-brain pattern (May 2026) using `mem0ai@3.0.3` (sibling POC, SDK-side) and `@anthropic-ai/claude-agent-sdk@0.2.29` + `uvx mem0-mcp-server` (this POC, agentic side). Auth via OAuth (`CLAUDE_CODE_OAUTH_TOKEN`) — no API key needed.
+
+**What's locked in as production-ready:**
+
+- ✅ **Agentic read via MCP** — `query({ options: { mcpServers, allowedTools: [...readOnlyMem0Tools] } })`. The LLM **autonomously made 5–8 distinct refined searches** per planning task (verified empirically), citing real memory IDs back in its answer with no hallucination.
+- ✅ **Read-only enforcement is mechanical** — `allowedTools` whitelist absent of write tools means the LLM cannot even attempt writes. Validated: in the read-only Phase 1, no write tool was ever called.
+- ✅ **MCP write path** — when `add_memory` is whitelisted, the LLM calls it correctly with full scoping and metadata. Returns `{ event_id, status: "PENDING" }` — same async behavior as the SDK.
+- ✅ **Stdio MCP via `uvx mem0-mcp-server`** — accepts `MEM0_API_KEY` + `MEM0_DEFAULT_USER_ID` via inline `env`, scopes against the same account as `api.mem0.ai`.
+- ✅ **SDK side** (sibling POC) — add/search/get/history all work; async write durability via event polling (~3-5s server-side); metadata filters narrow precisely.
+
+**What's broken or surprising:**
+
+- ⚠️ **Hosted HTTP MCP at `mcp.mem0.ai/mcp` rejects static bearer auth** — silently returns empty results from every search. Requires OAuth handshake via `npx mcp-add` (browser flow), which doesn't fit a programmatic executive. Stick with stdio for the executive's in-process MCP.
+- ⚠️ **Agentic writes don't self-rate-limit for async propagation.** Phase 2 caught this: the LLM wrote 3 memories then immediately searched, missed them all (status was still PENDING), and correctly diagnosed the timing issue — but couldn't loop back and retry within one prompt. Easier to keep writes on the SDK path inside the harvester skill where polling is deterministic.
+- ⚠️ **`get_memories` via MCP returns `count: 0`** with scope filters that `search_memories` accepts — same v3 quirk as the SDK. Enumerate via paginated search.
+- ⚠️ **No multi-hop graph traversal.** "Graph mode is built in" means entities are extracted, not that retrieval walks the graph. Memories one hop removed do **not** surface. The reader skill must do iterative search or rely on LLM-side synthesis (the LLM does this naturally via multiple search calls).
+- ⚠️ **MCP wrapper returns `event_id` (snake_case); SDK returns `eventId` (camelCase).** Easy bug when switching between paths.
+
+**Locked production pattern:**
+
+```
+Writes  →  harvester skill calls SDK client.add() + pollEventTerminal(eventId)
+           Persist memory_id in harvester ledger. Single writer.
+
+Reads   →  executive Agent SDK query() with:
+             mcpServers: { mem0: uvx-stdio + MEM0_API_KEY env }
+             allowedTools: read-only mem0 tools
+           LLM decides when to query during planning/diagnosis/work selection.
+```
+
+Full timing, scoping, bridge-test, and quirk data lives in the `## Results` section of each README.
+
 ## Why both POCs
 
 | Path | Driver | When the executive uses it |
@@ -92,11 +126,21 @@ The POC's second phase exercises **writes via MCP** and the 2-hop bridge `Jack �
 
 **Bridge query result:** the 2-hop bridge ("Jack owns project X" + "project X uses DB Y" → "Jack uses DB Y") works — but **only because both bridge halves passed the similarity threshold for the query "What databases does Jack use?"**. mem0 did not walk the entity graph; the LLM did the synthesis after both halves were returned. See `../graph-poc/README.md` Step 7 for the other half of this finding (where a one-hop-removed memory did NOT surface because its keywords didn't match the query).
 
-### Three quirks worth knowing
+### Five quirks worth knowing
 
 1. **Hosted HTTP MCP at `mcp.mem0.ai/mcp` does NOT work with a static bearer header.** First attempt used `type: "http"` with `Authorization: Bearer ${MEM0_API_KEY}` — every search returned empty results, no auth error. The hosted endpoint expects an OAuth handshake triggered by `npx mcp-add` (browser flow), not API-key auth. The local stdio server (`uvx mem0-mcp-server`) accepts the API key directly via env and scopes against the same account as `api.mem0.ai`. **Use stdio for the executive's in-process MCP; the hosted MCP is for interactive clients that can do browser OAuth.**
 2. **`get_memories` returns `count: 0` through the MCP wrapper** — same v3 quirk we found in the SDK POC. The MCP server passes the upstream API behavior through faithfully. Confirms the issue is in mem0's `/v3/memories/` list endpoint, not in either layer of our stack.
-3. **`add_memory` is async — returns `PENDING`, takes ~6–20s to become searchable.** Anything that writes-then-queries in the same turn will miss its own writes. The harvester skill must either wait or use the `event_id` to poll `GET /v1/event/{id}` until `SUCCEEDED` before declaring the write complete.
+3. **`add_memory` is async — returns `{ event_id, status: "PENDING" }`.** Concrete numbers (measured 2026-05-16 in the graph-poc Step 8 latency bench): **server-side processing is ~3–5s** (`min 3.7s · median 4.6s · max 5.1s` via the event endpoint's `latency` field). Client-observed wall-clock varies more (3.7s – 25.7s) due to polling intervals, but the server-side number is authoritative. Anything that writes-then-queries in the same turn will miss its own writes. The harvester (and any agentic write path) must poll `GET /v1/event/{id}/` until `status === "SUCCEEDED"`. Status flow is `PENDING → RUNNING → SUCCEEDED` — **`RUNNING` is intermediate, not terminal.**
+4. **MCP wrapper returns `event_id` (snake_case); SDK returns `eventId` (camelCase).** The MCP server forwards the raw API shape; the TypeScript SDK normalizes responses. Code that handles output from both must accept both keys — easy bug to write `result.event_id` after seeing it in the MCP transcript, then have it return `undefined` when switching to the SDK.
+5. **Auth for the raw `/v1/event/{id}/` endpoint is `Authorization: Token <key>`, not `Bearer`.** Only matters if the executive bypasses the SDK to poll events directly (which the harvester likely will). The MCP server abstracts this; the SDK abstracts this; but raw `fetch()` against the v1 API must use the `Token` scheme.
+
+### What writes-via-MCP look like end-to-end
+
+Phase 2 of this POC showed the LLM successfully calling `mcp__mem0__add_memory` three times with full metadata, then immediately querying — and Claude correctly identified the timing issue when results came back stale. That's the natural failure mode: **agentic writes don't self-rate-limit for async propagation.** If we ever let workers write via MCP (we don't, but if we did), each write would need a follow-up event-poll turn before any dependent query. Easier to keep writes on the SDK path inside the harvester skill where polling is deterministic.
+
+The locked production posture in two sentences:
+- **Reads via MCP** — executive uses `allowedTools: [search/get/get_memories/list_entities]`. LLM decides when/what to query during planning.
+- **Writes via SDK** — harvester skill calls `client.add()` then `pollEventTerminal(eventId)`. Never via MCP, never from worker code.
 
 ### Production pattern (locked)
 

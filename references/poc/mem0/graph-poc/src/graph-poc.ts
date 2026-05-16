@@ -49,6 +49,11 @@ const AGENT_ID = "executive";
 const APP_ID_BRIDGE = "v3-mem0-graph-bridge-test";
 const RUN_ID_BRIDGE = "2026-05-16-graph-bridge";
 
+// Separate scope for the async propagation latency benchmark. Disposable —
+// every run writes new canary memories with unique tags. Easy to clean up
+// (`npm run cleanup` covers all three app_ids).
+const APP_ID_LATENCY = "v3-mem0-latency-bench";
+
 // Set to true to auto-delete this POC's memories at the end of a normal run.
 // Default false so you can inspect the seeded data in the mem0 web UI at
 // app.mem0.ai/dashboard/memories. Explicit teardown is always available via
@@ -178,10 +183,69 @@ function sleep(ms: number) {
 async function cleanup() {
   header("CLEANUP: deleteAll for this POC's scopes");
   // v3: like getAll/search, deleteAll uses snake_case filter keys.
-  for (const appId of [APP_ID, APP_ID_BRIDGE]) {
+  for (const appId of [APP_ID, APP_ID_BRIDGE, APP_ID_LATENCY]) {
     await client.deleteAll({ user_id: USER_ID!, app_id: appId } as never);
     console.log(`Deleted all memories under user_id=${USER_ID} app_id=${appId}`);
   }
+}
+
+// ---------- step 8 helpers: async propagation timing ----------
+
+interface AddResult {
+  eventId?: string;   // v3 SDK normalizes to camelCase on response
+  event_id?: string;  // fallback for snake_case (raw API / MCP wrapper)
+  status?: string;
+  [k: string]: unknown;
+}
+
+interface EventStatusBody {
+  id: string;
+  status: string;              // PENDING | RUNNING | SUCCEEDED | FAILED | CANCELLED
+  started_at?: string;
+  completed_at?: string;
+  latency?: number;            // server-reported ms
+  results?: Array<{ id?: string; data?: { memory?: string }; linked_memory_ids?: string[] }>;
+}
+
+interface PropagationTiming {
+  canaryTag: string;
+  eventId?: string;
+  memoryId?: string;
+  writeMs: number;                // total time client.add() took to return
+  clientObservedEventMs?: number; // wall-clock ms from add() return to event status SUCCEEDED
+  serverReportedMs?: number;      // mem0's own latency field (started_at → completed_at)
+  terminalStatus?: string;        // SUCCEEDED, FAILED, etc.
+  directGetMs?: number;           // time for client.get(memoryId) once SUCCEEDED
+  extractedMemory?: string;
+  linkedMemoryIds?: string[];
+}
+
+/**
+ * Poll /v1/event/{id}/ until status is terminal (SUCCEEDED/FAILED/CANCELLED).
+ * Returns the full body of the terminal response, plus client-observed elapsed.
+ * Note: status goes PENDING → RUNNING → SUCCEEDED. RUNNING is intermediate.
+ */
+async function pollEventTerminal(
+  eventId: string,
+  apiKey: string,
+  maxMs = 60000,
+  intervalMs = 1500,
+): Promise<{ status: string; ms: number; body?: EventStatusBody }> {
+  const start = Date.now();
+  const TERMINAL = new Set(["SUCCEEDED", "FAILED", "CANCELLED"]);
+  while (Date.now() - start < maxMs) {
+    const res = await fetch(`https://api.mem0.ai/v1/event/${eventId}/`, {
+      headers: { Authorization: `Token ${apiKey}` },
+    });
+    if (res.ok) {
+      const body = (await res.json()) as EventStatusBody;
+      if (TERMINAL.has(body.status)) {
+        return { status: body.status, ms: Date.now() - start, body };
+      }
+    }
+    await sleep(intervalMs);
+  }
+  return { status: "TIMEOUT", ms: Date.now() - start };
 }
 
 // ---------- main ----------
@@ -491,6 +555,128 @@ async function main() {
         `to surface as semantic-similarity contributions, not as a separate score component.`,
     );
   }
+
+  // ---- 8. async write propagation: latency + event polling ----
+  // For each canary write: measure
+  //   (a) how long client.add() takes (immediate response, returns PENDING)
+  //   (b) wall-clock ms from add()-return to event SUCCEEDED (client observed)
+  //   (c) server-reported latency (started_at → completed_at, from event body)
+  //   (d) ms for direct client.get(memoryId) once memory_id is known
+  // These four numbers together tell the harvester how to handle async writes.
+  // (We do NOT measure "semantic search finds the memory" because semantic
+  //  similarity against a literal tag token is unreliable — direct get is the
+  //  correct readiness check.)
+
+  header("STEP 8 — async write propagation: latency benchmark + event polling");
+
+  const latencyScope = {
+    userId: USER_ID!,
+    agentId: AGENT_ID,
+    appId: APP_ID_LATENCY,
+    runId: `latency-${Date.now()}`,
+  };
+
+  // Three canary memories with unique base36 tags so we can correlate writes
+  // to their event records during inspection.
+  const runStamp = Date.now().toString(36);
+  const canaries = [
+    { tag: `CANARY-ALPHA-${runStamp}`, content: `Latency benchmark canary ALPHA: CANARY-ALPHA-${runStamp} (timestamp ${new Date().toISOString()}).` },
+    { tag: `CANARY-BETA-${runStamp}`,  content: `Latency benchmark canary BETA: CANARY-BETA-${runStamp} (timestamp ${new Date().toISOString()}).` },
+    { tag: `CANARY-GAMMA-${runStamp}`, content: `Latency benchmark canary GAMMA: CANARY-GAMMA-${runStamp} (timestamp ${new Date().toISOString()}).` },
+  ];
+
+  const timings: PropagationTiming[] = [];
+
+  for (const { tag, content } of canaries) {
+    console.log(`\n+ writing ${tag}`);
+    const writeStart = Date.now();
+    const addResult = (await client.add(
+      [{ role: "user", content }],
+      {
+        ...latencyScope,
+        metadata: {
+          type: "episodic",
+          category: "technical",
+          confidence: 1.0,
+          importance: "low",
+          source: "latency-bench",
+          harvest_run: latencyScope.runId,
+          canary_tag: tag,
+        },
+      } as never,
+    )) as unknown as AddResult | AddResult[];
+    const writeMs = Date.now() - writeStart;
+
+    const first = Array.isArray(addResult) ? addResult[0] : addResult;
+    const eventId = first?.eventId ?? first?.event_id;
+    console.log(`  add() returned in ${writeMs}ms · eventId=${eventId ?? "(none)"} · initial status=${first?.status ?? "(none)"}`);
+
+    const timing: PropagationTiming = { canaryTag: tag, eventId, writeMs };
+
+    if (!eventId) {
+      console.log("  [skip] no eventId — cannot poll event status");
+      timings.push(timing);
+      continue;
+    }
+
+    // Poll the event endpoint until SUCCEEDED/FAILED/CANCELLED.
+    const eventResult = await pollEventTerminal(eventId, API_KEY!);
+    timing.terminalStatus = eventResult.status;
+    timing.clientObservedEventMs = eventResult.ms;
+
+    const body = eventResult.body;
+    if (body?.latency) timing.serverReportedMs = Math.round(body.latency);
+    const memoryId = body?.results?.[0]?.id;
+    timing.memoryId = memoryId;
+    timing.extractedMemory = body?.results?.[0]?.data?.memory;
+    timing.linkedMemoryIds = body?.results?.[0]?.linked_memory_ids;
+
+    console.log(
+      `  event reached "${eventResult.status}" after ${eventResult.ms}ms (client) / ${timing.serverReportedMs ?? "?"}ms (server-reported)`,
+    );
+    if (memoryId) {
+      console.log(`  memory_id=${memoryId}`);
+      if (timing.extractedMemory) {
+        console.log(`  extracted: "${timing.extractedMemory.slice(0, 100)}…"`);
+      }
+      // Direct get latency — should be near-zero once memory exists.
+      const getStart = Date.now();
+      try {
+        await client.get(memoryId);
+        timing.directGetMs = Date.now() - getStart;
+        console.log(`  client.get(memoryId) succeeded in ${timing.directGetMs}ms`);
+      } catch (err) {
+        console.log(`  client.get failed: ${(err as Error).message}`);
+      }
+    }
+    timings.push(timing);
+  }
+
+  transcript.latencyTimings = timings;
+
+  console.log("\n--- async propagation summary ---");
+  const stat = (arr: number[]) =>
+    arr.length
+      ? `min ${Math.min(...arr)}ms · median ${arr.slice().sort((a, b) => a - b)[Math.floor(arr.length / 2)]}ms · max ${Math.max(...arr)}ms`
+      : "(no samples)";
+  const writeTimes = timings.map((t) => t.writeMs);
+  const clientEventTimes = timings.map((t) => t.clientObservedEventMs).filter((n): n is number => typeof n === "number");
+  const serverEventTimes = timings.map((t) => t.serverReportedMs).filter((n): n is number => typeof n === "number");
+  const getTimes = timings.map((t) => t.directGetMs).filter((n): n is number => typeof n === "number");
+
+  console.log(`client.add() return:        ${stat(writeTimes)}`);
+  console.log(`event SUCCEEDED (client):   ${stat(clientEventTimes)}`);
+  console.log(`event SUCCEEDED (server):   ${stat(serverEventTimes)}  ← mem0's own latency field`);
+  console.log(`client.get(memoryId):       ${stat(getTimes)}`);
+
+  console.log("\n--- production guidance for harvester ---");
+  console.log("  1. client.add() returns in <1s with PENDING — never block on add() alone.");
+  console.log("  2. Poll GET /v1/event/{eventId}/ at 1-2s intervals until status === 'SUCCEEDED'.");
+  console.log("  3. The event response carries the memory_id; persist it in the harvester ledger.");
+  console.log("  4. Once SUCCEEDED, client.get(memoryId) and direct lookups are instant.");
+  console.log("  5. Semantic search may take additional time to find the memory by similarity,");
+  console.log("     but the memory is already addressable by id. Treat SUCCEEDED + memory_id as");
+  console.log("     'durably written'; treat semantic searchability as a separate, looser signal.");
 
   // ---- write transcript ----
   writeFileSync(outFile, JSON.stringify(transcript, null, 2));
