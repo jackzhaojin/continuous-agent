@@ -27,6 +27,13 @@ Markdown in the private repo remains the canonical source of truth for all opera
 
 This decision unblocks V3.0 implementation per the goal doc's pre-implementation gate.
 
+### Locked Architecture Pillars (2026-05-15)
+
+1. **Executive-tier only.** The second brain is accessed exclusively by the **executive agent**. Worker agents never hold mem0 credentials, never have the mem0 MCP server in their config, and never call the mem0 API at runtime.
+2. **Pre-search + inject for workers.** The executive runs a scoped mem0 search before spawning each worker and bakes top-K results into a "memory pack" section of the worker's generated `CLAUDE.md`. Workers consume that pack as static markdown — same shape as any other reference doc.
+3. **Skills-first, with TS only inside skill `references/`.** Harvester, reader, classifier, and snapshot are each implemented as **skills** (SKILL.md). Deterministic helpers (mem0 SDK calls, schema validation, snapshot serialization) live inside each skill's own `references/` folder, bundled with the skill and invoked via Bash. There is **no** standalone `src/agentic/memory/` module. Skill-as-a-service is the pattern; markdown defines intent, packaged scripts handle plumbing.
+4. **One writer.** Only the **harvester skill, invoked by the executive**, writes to mem0. Any direct `client.add()` from worker code or ad-hoc scripts is an anti-pattern and should fail review.
+
 ---
 
 ## V3.0 Decision Requirements — Satisfied
@@ -68,26 +75,14 @@ The harvester is the **only writer** to mem0. The agent never adds memories dire
 
 ### 4. Agent read / write contract
 
-**Read** (open, frequent): the executive loop, workers, and planning steps query mem0 freely.
+**Read** (executive-only, frequent). The executive invokes the **`memory-reader` skill** during planning, work selection, and pre-spawn prep. The skill's `references/search.ts` (or equivalent) wraps the mem0 SDK with scoping defaults — `user_id: agent-jack`, current `app_id`, confidence floor, top_k. The executive uses the returned memories two ways:
 
-```typescript
-// Standard pattern: scoped semantic search with metadata filters
-await client.search({
-  query: planningQuestion,
-  filters: {
-    AND: [
-      { user_id: "agent-jack" },
-      { app_id: currentProject },
-      { metadata: { confidence: { gte: 0.7 } } },
-    ],
-  },
-  top_k: 10,
-});
-```
+- **Inline planning context.** Executive consults memories to choose work, draft contracts, decide retry strategy.
+- **Memory pack injection.** Before spawning a worker, the executive (via the `worker-spawner` flow) calls the reader skill, takes the top-K relevant memories, and bakes them into a `## Memory Pack` section in the worker's generated `CLAUDE.md`. **Workers never call mem0** — they consume static markdown.
 
-**Write** (restricted, deterministic): only the harvester writes, never the conversational agent. Direct `client.add()` calls from worker code are an anti-pattern and should fail review.
+**Write** (executive-only, harvester skill). Only the **`memory-harvester` skill**, triggered by the executive at well-defined moments (end-of-run, retro merge, manual `/harvest`, spec merge), writes to mem0. The skill's `references/classify.ts` validates each candidate write against the metadata schema (§Metadata Schema) before calling `client.add()`. Workers, ad-hoc scripts, and the conversational agent have no write path.
 
-Memory IDs and `created_at` timestamps are preserved in harvester run logs so a memory can always be traced back to the markdown source that produced it.
+**Traceability.** Memory IDs and `created_at` timestamps are preserved in the harvester skill's run log (`ledgers/harvest-runs/{date}.jsonl`) so any memory can be traced to the markdown source that produced it.
 
 ### 5. Failure / degraded behavior
 
@@ -154,14 +149,15 @@ Operational artifacts (`goals.md`, `progress.md`, `needs-you.md`, `completed.md`
 
 ## Metadata Schema
 
-Every memory write follows this contract:
+Every memory write follows this contract. The schema is **enforced by the harvester skill's bundled validator** (`memory-harvester/references/classify.ts`) — not by a shared TS module under `src/`. The TypeScript shape below is documentation of the contract; the actual code lives inside the skill.
 
 ```typescript
+// memory-harvester/references/classify.ts (bundled with the skill)
 interface MemoryWrite {
-  user_id: string;                    // canonical agent owner
-  agent_id: "executive" | "worker" | "specialized";
+  user_id: string;                    // canonical agent owner (always "agent-jack" today)
+  agent_id: "executive";              // V3.0: executive-only writes; field reserved for future multi-agent
   app_id: string;                     // matches projects/{slug}/ folder
-  run_id?: string;                    // optional; required for episodic
+  run_id?: string;                    // optional; required when type === "episodic"
 
   metadata: {
     type: "principle" | "semantic" | "procedural" | "episodic" | "reflective";
@@ -176,23 +172,23 @@ interface MemoryWrite {
 }
 ```
 
-Scoping IDs map directly to the existing folder structure: `app_id` equals the project folder slug, `agent_id` matches the role pack, `run_id` matches the ledger date format.
+Scoping IDs map directly to the existing folder structure: `app_id` equals the project folder slug, `agent_id` is `"executive"` for all V3.0 writes (workers never write), `run_id` matches the ledger date format.
 
 ---
 
 ## Backup & Portability
 
-**Daily snapshot job.** A scheduled task (PM2 cron entry) runs:
+**Daily snapshot via `memory-snapshot` skill.** A PM2 cron entry invokes the `memory-snapshot` skill once per day; the skill's `references/snapshot.ts` does the deterministic work:
 
 1. `client.getAll({ filters: { user_id: "agent-jack" } })` with pagination
 2. For each memory, `client.history(id)` to capture full version trail
 3. Write JSON to `ai-docs/v3/mem0-snapshots/{YYYY-MM-DD}.json`
-4. Git commit + push to the private repo
+4. Git commit (push only on explicit human instruction, per project rule)
 
 This means:
 - Mem0 is fully reconstructible from the repo at any point
 - Every memory has an offline, version-controlled backup
-- Migration off cloud is a `snapshot.forEach(m => client.add(m))` script away
+- Migration off cloud is a `snapshot.forEach(m => client.add(m))` script away — and that migration script itself can be a one-off skill
 
 Snapshot retention: indefinite in git. The repo is the disaster-recovery store.
 
@@ -209,6 +205,8 @@ Snapshot retention: indefinite in git. The repo is the disaster-recovery store.
 | Vendor outage | Medium | Daily snapshots provide offline backup; agent degrades gracefully (§5) |
 | Vendor sunset / acquisition | Low | Apache 2.0 OSS server is a drop-in replacement; SDK identical |
 | Memory drift / contradictions | Medium | New ADD-only algorithm preserves history; resolution = sort by `created_at` desc and trust most recent |
+| Memory pack inflates worker prompts | Medium | Reader skill enforces top_k cap + confidence floor; memory pack section is budgeted (e.g. ≤2K tokens) and truncated by relevance score before injection |
+| Worker drift from outdated memory pack | Low | Memory pack is regenerated per spawn; never persisted across worker sessions. Stale memory ages out of search results via confidence decay in harvester |
 
 ---
 
@@ -228,18 +226,23 @@ The migration path is `cloud → self-hosted (mem0 OSS) → mem0 OSS library + o
 
 ## Implementation Checklist
 
-V3.0 implementation can begin once the items below are complete. Each is small and deterministic.
+V3.0 implementation can begin once the items below are complete. Each item is delivered as a **skill** (SKILL.md + `references/`) or as a small configuration change. No new `src/agentic/memory/` module is created — all deterministic plumbing ships *inside* the relevant skill's `references/` folder.
 
-- [ ] **Account & keys** — Create mem0 cloud account, mint API key, store in `.env` and Vault entry
-- [ ] **Enable graph mode** — Toggle in project settings; verify Neo4j AuraDB connection via dashboard
-- [ ] **Classification harness** — Implement the metadata schema as a typed helper (`src/agentic/memory/classify.ts`)
-- [ ] **Harvester skill** — Build `ai-knowledge-harvester` extension that produces mem0 writes per the §5 contract
-- [ ] **Read helper** — Wrap `client.search` with scoping defaults and confidence filtering for executive loop use
-- [ ] **Snapshot job** — PM2 cron entry running daily; commit script to `scripts/mem0-snapshot.ts`
-- [ ] **MCP wiring** — Add mem0 MCP server to Claude Code config for human-side inspection
-- [ ] **Failure-mode tests** — Adhoc tests covering API unreachable, rate-limited, async pending scenarios
-- [ ] **Telemetry** — `mem0-analytics` integration for cost and latency visibility
-- [ ] **Backfill** — Initial harvest run against existing `ai-docs/v3/` retros, capability notes, and ledgers
+### Setup
+- [ ] **Account & keys** — Create mem0 cloud account, mint API key, store in `.env` (executive only) and Vault entry. Worker output worktrees never receive this key.
+- [ ] **Enable graph mode** — Toggle in project settings; verify Neo4j AuraDB connection via dashboard.
+
+### Skills to build (each is `claude-files/skills/<name>/SKILL.md` + `references/`)
+- [ ] **`memory-harvester` skill** — Reads new/changed markdown (retros, run outputs, spec merges), classifies into the five memory types, validates against the schema, calls `client.add()`. Bundled scripts: `references/classify.ts` (schema + classifier), `references/harvest.ts` (driver). Run log: `ledgers/harvest-runs/{date}.jsonl`.
+- [ ] **`memory-reader` skill** — Executive-only. Wraps `client.search` with scoping defaults and confidence floor. Bundled: `references/search.ts`. Exposes two outputs: (a) raw result set for executive planning, (b) formatted "Memory Pack" markdown block ready for injection into a worker's CLAUDE.md.
+- [ ] **`memory-snapshot` skill** — Daily backup runner. Bundled: `references/snapshot.ts`. PM2 cron entry invokes the skill, not the script directly.
+- [ ] **`worker-spawner` integration** — Extend the existing worker-spawner flow to call `memory-reader` before each spawn and append the returned memory pack to the worker's generated CLAUDE.md. No new skill — modification to existing spawn path.
+
+### Wiring & ops
+- [ ] **MCP wiring (executive only)** — Add mem0 MCP server to the **executive's** Claude Code config for human-side inspection and ad-hoc exec queries. **Not** shipped to worker output worktrees.
+- [ ] **Failure-mode tests** — Adhoc tests covering API unreachable, rate-limited, async pending scenarios. Live inside each skill's `references/` as runnable harness scripts.
+- [ ] **Telemetry** — `mem0-analytics` integration for cost and latency visibility.
+- [ ] **Backfill** — Initial `memory-harvester` run against existing `ai-docs/v3/` retros, capability notes, and ledgers.
 
 ---
 

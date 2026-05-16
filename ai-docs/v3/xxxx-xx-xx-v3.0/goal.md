@@ -54,6 +54,16 @@ This goal intentionally keeps implementation options open, but **does not** allo
 
 If this decision is not documented, V3.0 remains in planning and should not move into implementation.
 
+### Locked Architecture Pillars (2026-05-15)
+
+The hosting decision record (`second-brain-hosting-decision.md`) is decided. Three implementation pillars are now locked and override any contrary draft in that file:
+
+1. **Executive-tier only.** The second brain is owned and accessed by the **executive agent**. Worker agents never call mem0, never hold a mem0 API key, and never receive the mem0 MCP server. Workers are *fed* relevant context by the executive (see pillar 2).
+2. **Pre-search + inject pattern for workers.** Before spawning a worker, the executive runs a scoped mem0 search and bakes the top-K results into the worker's prompt (a "memory pack" section in the generated CLAUDE.md). The worker sees static markdown — same shape as any other reference doc — and has no runtime dependency on mem0 being reachable.
+3. **Skills-first, not a TypeScript module.** The harvester, reader, classifier, and snapshot jobs are each implemented as **skills** (SKILL.md files). Deterministic helpers (schema validation, mem0 SDK calls, snapshot serialization) live inside each skill's own `references/` folder — bundled with the skill, invoked by the skill via Bash. There is no `src/agentic/memory/` module. AI tends to default to TypeScript; for V3.0 we explicitly pivot to skill-as-a-service: the contract lives in markdown, the deterministic plumbing is a packaged sidecar of each skill.
+
+Only the **harvester skill, run by the executive**, writes to mem0. Direct `client.add()` calls from any worker or any standalone script are an anti-pattern.
+
 ## Scope
 
 ### In Scope
@@ -83,9 +93,10 @@ If this decision is not documented, V3.0 remains in planning and should not move
    - Redesign retro capture so lessons are first-class, referenceable records (not just narrative docs).
    - Link must-fix items directly to capability areas and future goals.
 
-5. **Storage Abstraction for Second Brain**
-   - Introduce/extend a storage abstraction that supports canonical second-brain reads/writes.
-   - Preserve local append-only compatibility while enabling more robust backends.
+5. **Storage Access via Skills (not a TS module)**
+   - Mem0 reads/writes are encapsulated in skills, each bundling its own deterministic helpers under `references/`.
+   - No `src/agentic/memory/` module is introduced. Skill-as-a-service is the pattern: markdown defines the contract, packaged scripts handle plumbing.
+   - Preserve local append-only ledger compatibility; mem0 is a derived projection, never the source of truth.
 
 6. **Local Artifact -> Second Brain Policy**
    - All critical local artifacts (ledgers, run logs, step files, contracts, retros, capability notes) must follow one of three paths:
@@ -130,11 +141,13 @@ V3.0 is successful when:
 1. The harness has a documented second-brain hosting decision (the "how") before implementation starts, with online accessibility guaranteed.
 2. The harness has a documented, implemented second-brain contract for historical knowledge.
 3. Capability history and run history are materially more trustworthy than current loose logs.
-4. Agents can retrieve prior outcomes/lessons through structured queries rather than ad hoc file parsing.
-5. Retrospective insights are linkable to future execution decisions.
-6. Critical local historical data is no longer stranded in local-only formats; it is restructured, directly second-brain-backed, or deterministically pushed/synced.
-7. A follow-on release path is defined for actively using this second-brain knowledge in higher-level planning/execution behaviors.
-8. V3.1 observability work can build on this model without redoing foundational data semantics.
+4. The **executive** can retrieve prior outcomes/lessons through structured queries rather than ad hoc file parsing.
+5. **Workers** receive relevant prior context via memory packs injected into their prompts — without any direct mem0 dependency at runtime.
+6. Retrospective insights are linkable to future execution decisions.
+7. Critical local historical data is no longer stranded in local-only formats; it is restructured, directly second-brain-backed, or deterministically pushed/synced.
+8. Implementation is delivered as a small set of skills with `references/` sidecars — not as a new TypeScript subsystem.
+9. A follow-on release path is defined for actively using this second-brain knowledge in higher-level planning/execution behaviors.
+10. V3.1 observability work can build on this model without redoing foundational data semantics.
 
 ## Priority
 
