@@ -1,7 +1,8 @@
 ---
-title: Second Brain Hosting Decision — Mem0 Cloud + Graph Mode
+title: Second Brain Hosting Decision — Mem0 Cloud
 status: Decided
 decided_on: 2026-05-15
+amended_on: 2026-05-16
 decision_type: hosting-decision-record
 applies_to:
   - ai-docs/v3/xxxx-xx-xx-v3.0/goal.md
@@ -13,15 +14,17 @@ tags:
   - second-brain
   - hosting
   - mem0
-  - graph-memory
+  - entity-linking
   - v3.0
 ---
 
-# Second Brain Hosting Decision — Mem0 Cloud + Graph Mode
+# Second Brain Hosting Decision — Mem0 Cloud
+
+> **Amendment 2026-05-16**: hosted mem0 v3 removed the separate graph store and graph-mode toggle. Entity linking is now built into the memory algorithm and runs automatically — there is no `enable_graph` per-call flag and no dashboard switch. Earlier wording in this doc that referenced enabling graph mode has been updated. The original intent (entity-aware retrieval) is preserved; only the mechanism changed.
 
 ## Decision
 
-**The V3.0 second brain is hosted on the Mem0 Cloud Platform (`api.mem0.ai`) with Graph Memory enabled.**
+**The V3.0 second brain is hosted on the Mem0 Cloud Platform (`api.mem0.ai`).**
 
 Markdown in the private repo remains the canonical source of truth for all operational artifacts and authored documents. Mem0 is a derived, retrieval-optimized projection of distilled knowledge — never a primary write surface for the agent's day-to-day artifacts. Cloud hosting is a hard requirement for V3.0; self-hosting is a future migration option but is explicitly out of scope for this release.
 
@@ -75,7 +78,7 @@ The harvester is the **only writer** to mem0. The agent never adds memories dire
 
 ### 4. Agent read / write contract
 
-**Read** (executive-only, frequent). The executive invokes the **`memory-reader` skill** during planning, work selection, and pre-spawn prep. The skill's `references/search.ts` (or equivalent) wraps the mem0 SDK with scoping defaults — `user_id: ${MEM0_USER_ID}` (executive agent's identity slug, set in local `.env` — never committed), current `app_id`, confidence floor, top_k. The executive uses the returned memories two ways:
+**Read** (executive-only, frequent). The executive invokes the **`memory-reader` skill** during planning, work selection, and pre-spawn prep. The skill's `references/search.ts` (or equivalent) wraps the mem0 SDK with scoping defaults — `user_id: ${V3_MEM0_USER_ID}` (executive agent's identity slug, set in local `.env` — never committed), current `app_id`, confidence floor, top_k. The executive uses the returned memories two ways:
 
 - **Inline planning context.** Executive consults memories to choose work, draft contracts, decide retry strategy.
 - **Memory pack injection.** Before spawning a worker, the executive (via the `worker-spawner` flow) calls the reader skill, takes the top-K relevant memories, and bakes them into a `## Memory Pack` section in the worker's generated `CLAUDE.md`. **Workers never call mem0** — they consume static markdown.
@@ -113,23 +116,23 @@ The harvester is the **only writer** to mem0. The agent never adds memories dire
 
 For V3.0 specifically:
 
-- **Zero ops** at evaluation phase — Docker compose, Postgres, pgvector, Neo4j, FastAPI server is non-trivial to operate alongside agent infrastructure
+- **Zero ops** at evaluation phase — Docker compose, Postgres, pgvector, FastAPI server is non-trivial to operate alongside agent infrastructure
 - **Free tier (10K memories)** covers initial knowledge load; the harvester produces small numbers of high-value memories, not raw chat history
-- **Graph memory is first-class** on cloud platform with hosted Neo4j AuraDB — no separate graph DB to manage
+- **Entity linking is automatic** in hosted v3 — built into the memory algorithm, no separate graph DB to manage and no toggle to maintain
 - **Dashboard included** without self-hosted-server setup
 - **SDK is identical** between cloud and self-hosted, so migration cost is bounded (see §10)
 
 The price of cloud is: API key dependency, vendor compliance posture (SOC 2 Type 1, HIPAA), and per-tier pricing if 10K memories is exceeded ($19/mo Starter, $249/mo Pro). Acceptable for V3.0.
 
-## Why Graph Mode
+## Why Entity-Aware Retrieval Matters
 
-Mem0 graph mode extracts entities from each fact and links them across memories. For the continuous executive agent specifically, this enables:
+Hosted mem0 v3 extracts entities from each fact and uses them as part of retrieval ranking automatically. For the continuous executive agent specifically, this enables:
 
-- **Capability traversal**: "What workers, retros, and outcomes touch the Cosmos DB decision?" returns linked memories even when the query doesn't match their text
-- **Dependency surfacing**: when planning a new project, find connected prior work via entity links rather than keyword grep
-- **Retro-to-outcome chains**: link `retro-2.4.1.md` lessons to the capabilities they describe and the runs they reference
+- **Capability traversal**: "What workers, retros, and outcomes touch the Cosmos DB decision?" surfaces relevant memories even when the query doesn't match their text directly
+- **Dependency surfacing**: when planning a new project, find connected prior work via entity-aware ranking rather than keyword grep
+- **Retro-to-outcome chains**: lessons from a retro surface when planning work that references the same entities
 
-Enabled via the platform settings — no extra infrastructure to manage.
+> **Mechanism note**: in mem0 v1/v2 this was an opt-in "graph mode" backed by a separate Neo4j store, toggled per-call with `enable_graph: true`. In v3 (the current platform), the separate graph store was removed and entity linking is built into the memory algorithm itself. There is no toggle. The capability is the same; the wiring is simpler.
 
 ---
 
@@ -154,7 +157,7 @@ Every memory write follows this contract. The schema is **enforced by the harves
 ```typescript
 // memory-harvester/references/classify.ts (bundled with the skill)
 interface MemoryWrite {
-  user_id: string;                    // canonical agent owner — value read from MEM0_USER_ID env var (executive agent identity, not committed)
+  user_id: string;                    // canonical agent owner — value read from V3_MEM0_USER_ID env var (executive agent identity, not committed)
   agent_id: "executive";              // V3.0: executive-only writes; field reserved for future multi-agent
   app_id: string;                     // matches projects/{slug}/ folder
   run_id?: string;                    // optional; required when type === "episodic"
@@ -180,7 +183,7 @@ Scoping IDs map directly to the existing folder structure: `app_id` equals the p
 
 **Daily snapshot via `memory-snapshot` skill.** A PM2 cron entry invokes the `memory-snapshot` skill once per day; the skill's `references/snapshot.ts` does the deterministic work:
 
-1. `client.getAll({ filters: { user_id: process.env.MEM0_USER_ID } })` with pagination
+1. `client.getAll({ filters: { user_id: process.env.V3_MEM0_USER_ID } })` with pagination
 2. For each memory, `client.history(id)` to capture full version trail
 3. Write JSON to `ai-docs/v3/mem0-snapshots/{YYYY-MM-DD}.json`
 4. Git commit (push only on explicit human instruction, per project rule)
@@ -216,7 +219,7 @@ Revisit this decision if any of these become true:
 
 - Memory count approaches 10K and harvester cannot be tightened further
 - Mem0 introduces breaking algorithm changes the harvester cannot accommodate
-- Self-hosted graph mode reaches feature parity with cloud and we have spare ops capacity
+- Self-hosted mem0 OSS (v3) reaches retrieval-quality parity with hosted and we have spare ops capacity
 - Per-month spend exceeds defined budget (see PRD cost cap)
 - A platform incident causes >24h of degraded agent operation
 
@@ -230,10 +233,10 @@ V3.0 implementation can begin once the items below are complete. Each item is de
 
 ### Setup
 
-> **Per-installation identity.** This is an open-source harness; each operator names their own executive agent. Pick a dedicated email + handle for the agent (not your personal address) so that mem0, Gmail, Discord, and other agent-owned services share one identity. The handle is stored in local `.env` only and **never committed to the repo** — the codebase only ever sees `MEM0_USER_ID` as an env reference.
+> **Per-installation identity.** This is an open-source harness; each operator names their own executive agent. Pick a dedicated email + handle for the agent (not your personal address) so that mem0, Gmail, Discord, and other agent-owned services share one identity. The handle is stored in local `.env` only and **never committed to the repo** — the codebase only ever sees `V3_MEM0_USER_ID` as an env reference.
 
-- [ ] **Account & keys** — Create the mem0 cloud account under your **executive agent's email identity** (the dedicated handle you've chosen for this installation; never your personal email). Mint the API key from the dashboard and store in `.env` (executive only) and your secret store. Set `MEM0_USER_ID` in `.env` to the canonical slug used for all writes. Worker output worktrees never receive the API key or the identity slug.
-- [ ] **Enable graph mode** — Toggle in project settings; verify Neo4j AuraDB connection via dashboard.
+- [ ] **Account & keys** — Create the mem0 cloud account under your **executive agent's email identity** (the dedicated handle you've chosen for this installation; never your personal email). Mint the API key from the dashboard and store in `.env` (executive only) and your secret store. Set `V3_MEM0_USER_ID` in `.env` to the canonical slug used for all writes. Worker output worktrees never receive the API key or the identity slug.
+- [ ] **Verify the platform is on v3** — On the mem0 dashboard, confirm your project uses the new memory algorithm (the platform v2→v3 migration is automatic for new accounts created 2026+). No "enable graph mode" step is needed in v3; entity linking is built in.
 
 ### Skills to build (each is `claude-files/skills/<name>/SKILL.md` + `references/`)
 - [ ] **`memory-harvester` skill** — Reads new/changed markdown (retros, run outputs, spec merges), classifies into the five memory types, validates against the schema, calls `client.add()`. Bundled scripts: `references/classify.ts` (schema + classifier), `references/harvest.ts` (driver). Run log: `ledgers/harvest-runs/{date}.jsonl`.

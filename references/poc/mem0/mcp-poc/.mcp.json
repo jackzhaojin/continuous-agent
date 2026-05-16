@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "mem0": {
+      "command": "uvx",
+      "args": ["mem0-mcp-server"],
+      "env": {
+        "MEM0_ENABLE_GRAPH_DEFAULT": "true"
+      }
+    }
+  }
+}
