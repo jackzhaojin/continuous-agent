@@ -83,7 +83,11 @@ The harvester is the **only writer** to mem0. The agent never adds memories dire
 - **Inline planning context.** Executive consults memories to choose work, draft contracts, decide retry strategy.
 - **Memory pack injection.** Before spawning a worker, the executive (via the `worker-spawner` flow) calls the reader skill, takes the top-K relevant memories, and bakes them into a `## Memory Pack` section in the worker's generated `CLAUDE.md`. **Workers never call mem0** — they consume static markdown.
 
-**Write** (executive-only, harvester skill). Only the **`memory-harvester` skill**, triggered by the executive at well-defined moments (end-of-run, retro merge, manual `/harvest`, spec merge), writes to mem0. The skill's `references/classify.ts` validates each candidate write against the metadata schema (§Metadata Schema) before calling `client.add()`. Workers, ad-hoc scripts, and the conversational agent have no write path.
+Editorial guidance for both audiences (which queries to issue per hook, how to compose the pack, when to skip vs quote vs paraphrase) lives in [`.claude/skills/memory-reader/references/playbook.md`](../../../.claude/skills/memory-reader/references/playbook.md).
+
+**Write** (executive-only, harvester skill). Only the **`memory-harvester` skill**, triggered by the executive at well-defined moments (end-of-run, retro merge, manual `/harvest`, spec merge), writes to mem0. The skill's `references/classify.ts` validates each candidate write against the taxonomy v1.0.0 schema before calling `client.add()`; `references/defaults.ts` stamps env-derived fields beforehand. Workers, ad-hoc scripts, and the conversational agent have no write path.
+
+Editorial guidance for the writer (what to write per trigger, soft budgets, good vs junk gallery, zero-write scenarios) lives in [`.claude/skills/memory-harvester/references/playbook.md`](../../../.claude/skills/memory-harvester/references/playbook.md).
 
 **Traceability.** Memory IDs and `created_at` timestamps are preserved in the harvester skill's run log (`ledgers/harvest-runs/{date}.jsonl`) so any memory can be traced to the markdown source that produced it.
 
@@ -152,30 +156,33 @@ Operational artifacts (`goals.md`, `progress.md`, `needs-you.md`, `completed.md`
 
 ## Metadata Schema
 
-Every memory write follows this contract. The schema is **enforced by the harvester skill's bundled validator** (`memory-harvester/references/classify.ts`) — not by a shared TS module under `src/`. The TypeScript shape below is documentation of the contract; the actual code lives inside the skill.
+> **Superseded by `taxonomy.md`** (2026-05-16). The schema lives inline with the harvester skill at [`.claude/skills/memory-harvester/references/taxonomy.md`](../../../.claude/skills/memory-harvester/references/taxonomy.md). That doc is the SSOT; `classify.ts` enforces it; `defaults.ts` stamps env-derived fields. **Read taxonomy.md** for the current field list, per-trigger `run_id` conventions, reserved `app_id` slugs (`_global`, `_executive`, `_skill-*`), cleanup patterns, and the migration policy (semver-versioned via `schema_version` on every record).
 
-```typescript
-// memory-harvester/references/classify.ts (bundled with the skill)
-interface MemoryWrite {
-  user_id: string;                    // canonical agent owner — value read from V3_MEM0_USER_ID env var (executive agent identity, not committed)
-  agent_id: "executive";              // V3.0: executive-only writes; field reserved for future multi-agent
-  app_id: string;                     // matches projects/{slug}/ folder
-  run_id?: string;                    // optional; required when type === "episodic"
+**The opinionated constraints layered on top of mem0's defaults:**
 
-  metadata: {
-    type: "principle" | "semantic" | "procedural" | "episodic" | "reflective";
-    category: "technical" | "functional" | "project";  // existing skill taxonomy
-    confidence: number;               // 0.0–1.0, existing pattern
-    importance: "critical" | "high" | "medium" | "low";
-    source: string;                   // path/to/markdown.md the harvester read
-    harvest_run: string;              // for traceability
-  };
+1. **All four scope IDs always populated.** mem0 requires at least one of `{user_id, agent_id, app_id, run_id}`; we require all four. Costs nothing; gives first-class filters for every dimension that matters.
+2. **`metadata` is closed by a versioned schema** with `schema_version: "1.0.0"` stamped automatically. Old records keep their stamp on taxonomy bumps; migrations re-add under the new version.
+3. **`env: "test" | "dev" | "prod"`** isolates test writes from real searches. Reader's `scope.md` defaults to `env: "prod"`.
 
-  immutable: boolean;                 // true for principles
-}
-```
+For the V4.0 multi-agent split question (partition by `agent_id` vs `app_id`?), see the Open Questions section below.
 
-Scoping IDs map directly to the existing folder structure: `app_id` equals the project folder slug, `agent_id` is `"executive"` for all V3.0 writes (workers never write), `run_id` matches the ledger date format.
+---
+
+## Activation: staged rollout of memory hooks (2026-05-16 amendment)
+
+All deterministic plumbing and agentic skills are built (`implementation-plan-1-agentic-memory.md` Phases 1–3.5). The five executive-loop hooks turn on **one stage per week** rather than all-at-once. Rationale: we have zero real data on whether the editorial playbooks produce useful memories; staging gives an audit window between each addition.
+
+| Stage | Hook | Side | Earliest activation |
+|---|---|---|---|
+| 1 | `post-run-harvest` (C) | Write only | After Phase 4–5 TS glue + approval |
+| 2 | `pre-spawn-pack` (B) | Read → worker pack | +7 days from Stage 1 |
+| 3 | `pre-work-selection` (A) | Read → executive | +7 days from Stage 2 |
+| 4 | `failure-diagnosis` (D) | Read + conditional write | +7 days from Stage 3 |
+| 5 | `post-retro-harvest` (E) | Write | +7 days from Stage 4 |
+
+Each stage has an audit checklist before the next stage lights up. Full table + flag names in `implementation-plan-1-agentic-memory.md` § Staged rollout of Phase 5.
+
+The `V3_MEMORY_ENABLED` master flag + per-stage flags (`V3_MEM_HOOK_POST_RUN=true`, etc.) gate each hook independently. A stage that fails its audit is reverted at the flag, no code rollback required.
 
 ---
 

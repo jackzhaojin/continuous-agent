@@ -64,6 +64,16 @@ The hosting decision record (`second-brain-hosting-decision.md`) is decided. Thr
 
 Only the **harvester skill, run by the executive**, writes to mem0. Direct `client.add()` calls from any worker or any standalone script are an anti-pattern.
 
+### Schema & editorial guidance (2026-05-16 amendment)
+
+Two further commitments layer on top of the pillars above:
+
+4. **Versioned schema (taxonomy v1.0.0).** All writes share a single SSOT at `.claude/skills/memory-harvester/references/taxonomy.md`. Every record carries a `schema_version` stamp. The validator (`classify.ts`) rejects malformed payloads before mem0 receives them. Schema bumps follow semver; history lives in `taxonomy-changelog.md`.
+5. **Per-side editorial playbooks.** Agentic decisions (what to write, what to load, what to inject into the worker pack) are guided by markdown playbooks colocated with each skill:
+   - `.claude/skills/memory-harvester/references/playbook.md` — soft write budgets per trigger, good vs junk gallery, zero-write scenarios.
+   - `.claude/skills/memory-reader/references/playbook.md` — two audiences (executive consult vs worker pack), query plans per hook, pack composition rules.
+6. **Phase 5 ships in stages, not all-at-once.** Five lifecycle hooks turn on one at a time over ~5 weeks with explicit audit gates between stages. See `implementation-plan-1-agentic-memory.md` § Staged rollout. This is deliberate: we have zero data on whether the playbooks produce useful output until we run the loop with one hook live.
+
 ## Scope
 
 ### In Scope
@@ -142,7 +152,7 @@ V3.0 is successful when:
 2. The harness has a documented, implemented second-brain contract for historical knowledge.
 3. Capability history and run history are materially more trustworthy than current loose logs.
 4. The **executive** can retrieve prior outcomes/lessons through structured queries rather than ad hoc file parsing.
-5. **Workers** receive relevant prior context via memory packs injected into their prompts — without any direct mem0 dependency at runtime.
+5. **Workers** receive relevant prior context via memory packs injected into their prompts — without any direct mem0 dependency at runtime. Pack composition rules live in `memory-reader/references/playbook.md` (Audience 2).
 6. Retrospective insights are linkable to future execution decisions.
 7. Critical local historical data is no longer stranded in local-only formats; it is restructured, directly second-brain-backed, or deterministically pushed/synced.
 8. Implementation is delivered as a small set of skills with `references/` sidecars — not as a new TypeScript subsystem.

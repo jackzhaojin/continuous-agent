@@ -104,12 +104,14 @@ const SYNTHETIC_CONTEXT = {
   vendor: "claude",
   runStartedAt: new Date().toISOString(),
   runEndedAt: new Date().toISOString(),
-  harvestRun: scope.run_id,
+  // Note: harvest_run is auto-mirrored from run_id by defaults.ts — do not pass it.
   // Steer the agent toward a single episodic write so the test is deterministic.
   testInstruction: [
     "This is a test invocation. Write EXACTLY ONE episodic memory and stop.",
     `The memory text MUST include the literal discriminator "${TEST_DISCRIMINATOR}" verbatim.`,
-    "Use confidence=1.0, importance=medium, category=project.",
+    "Use confidence=1.0, importance=medium, category=project, trigger=post-run.",
+    "Set actor=worker and worker_vendor=claude (required by validator when actor=worker).",
+    "Do NOT include user_id, agent_id, schema_version, env, harvest_run, or immutable — defaults.ts stamps them.",
     "Do not write any additional memories (no semantic, no procedural).",
   ].join(" "),
 };

@@ -26,6 +26,7 @@ import { appendFileSync, existsSync, mkdirSync } from "node:fs";
 
 import { pollEventTerminal, type EventStatusBody } from "./event-polling.js";
 import { assertValid, type MemoryWrite } from "./classify.js";
+import { applyDefaults, type PartialMemoryWrite } from "./defaults.js";
 
 // ---------- env ----------
 
@@ -58,6 +59,26 @@ interface ParsedArgs {
   payload: MemoryWrite | MemoryWrite[];
 }
 
+// Applies defaults then validates. Callers (the agentic harvester skill) hand
+// us partial payloads — defaults.ts stamps env/schema_version/actor/harvest_run
+// from env vars + sensible defaults, then classify.ts asserts the full shape.
+function stampAndValidate(parsed: unknown, label: string): MemoryWrite {
+  let stamped: unknown;
+  try {
+    stamped = applyDefaults(parsed as PartialMemoryWrite);
+  } catch (e) {
+    console.error(`[fatal] ${label} defaults stamping failed: ${(e as Error).message}`);
+    process.exit(1);
+  }
+  try {
+    assertValid(stamped);
+  } catch (e) {
+    console.error(`[fatal] ${label} failed validation:\n${(e as Error).message}`);
+    process.exit(1);
+  }
+  return stamped as MemoryWrite;
+}
+
 function parseArgs(): ParsedArgs {
   const args = process.argv.slice(2);
   const idx = args.findIndex((a) => a === "--payload" || a === "--batch");
@@ -80,24 +101,12 @@ function parseArgs(): ParsedArgs {
       console.error("[fatal] --batch expects a JSON array of MemoryWrite objects");
       process.exit(1);
     }
-    parsed.forEach((p, i) => {
-      try {
-        assertValid(p);
-      } catch (e) {
-        console.error(`[fatal] Item ${i} failed validation: ${(e as Error).message}`);
-        process.exit(1);
-      }
-    });
-    return { mode: "batch", payload: parsed as MemoryWrite[] };
+    const stamped = parsed.map((p, i) => stampAndValidate(p, `Item ${i}`));
+    return { mode: "batch", payload: stamped };
   }
 
-  try {
-    assertValid(parsed);
-  } catch (e) {
-    console.error(`[fatal] Payload failed validation: ${(e as Error).message}`);
-    process.exit(1);
-  }
-  return { mode: "single", payload: parsed as MemoryWrite };
+  const stamped = stampAndValidate(parsed, "Payload");
+  return { mode: "single", payload: stamped };
 }
 
 // ---------- ledger ----------

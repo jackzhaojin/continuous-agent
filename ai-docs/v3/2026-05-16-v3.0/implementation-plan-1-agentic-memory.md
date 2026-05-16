@@ -1,11 +1,15 @@
 ---
 title: V3.0 Implementation Plan — Agentic Memory Layer
-status: Draft (awaiting executive-loop integration approval)
+status: Phases 1–4 complete; Phase 5 awaiting executive-loop integration approval
 created_on: 2026-05-16
+amended_on: 2026-05-16
 applies_to:
   - ai-docs/v3/2026-05-16-v3.0/goal.md
   - ai-docs/v3/2026-05-16-v3.0/second-brain-hosting-decision.md
 related:
+  - .claude/skills/memory-harvester/references/taxonomy.md
+  - .claude/skills/memory-harvester/references/playbook.md
+  - .claude/skills/memory-reader/references/playbook.md
   - references/poc/mem0/graph-poc/README.md
   - references/poc/mem0/mcp-poc/README.md
   - ai-docs/v3/2026-05-16-v3.0/prompt-log-0-poc.md
@@ -21,8 +25,11 @@ This plan turns the V3.0 second-brain decision into concrete file additions and 
 |---|---|
 | Agentic scope | Agentic memory loop, deterministic everything else |
 | Limitations doc | Dedicated `mem0-limitations.md` reference loaded by every memory skill |
+| Schema SSOT | `.claude/skills/memory-harvester/references/taxonomy.md` (v1.0.0); `classify.ts` enforces it; `defaults.ts` stamps env-derived fields. Versioned via semver; bumps tracked in `taxonomy-changelog.md`. |
+| Editorial guidance | Per-side playbook docs — `memory-harvester/references/playbook.md` (what/when to write, good vs junk gallery) and `memory-reader/references/playbook.md` (two audiences: executive consult vs worker pack, with audience-specific selection rules). |
 | Write path | Agentic invocation of skill; deterministic plumbing inside `references/` |
 | Read path | Agent SDK `query()` + stdio MCP + read-only `allowedTools` at lifecycle hooks |
+| Test isolation | `metadata.env` ∈ `{test, dev, prod}` stamped from `V3_MEM0_ENV`; reader filters default to `env: "prod"` so test writes don't leak. Optional `cohort` for parallel POC isolation. |
 
 **Prompting rule (non-negotiable):** all prompts live in markdown files (SKILL.md or `references/*.md`). TypeScript only loads markdown and passes it to `query()` — no inline prompt strings, no template literals containing instructions.
 
@@ -54,29 +61,36 @@ Each `[HOOK X]` is `query({ prompt: <loaded markdown>, options: { mcpServers, al
 
 ### NEW — skills (executive-only, in `.claude/skills/`)
 
-| Path | Purpose | Loads quirks doc? |
+Status reflects actual disk state as of 2026-05-16 amendment:
+
+| Path | Purpose | Status |
 |---|---|---|
-| `.claude/skills/memory-reader/SKILL.md` | Agentic instructions for reading memory: scope defaults, when to issue multiple queries, when to stop searching, how to format a memory pack for worker injection. | ✅ |
-| `.claude/skills/memory-reader/references/mem0-limitations.md` | **Single source of truth** for mem0 quirks. Linked from all other memory skills. | — |
-| `.claude/skills/memory-reader/references/scope.md` | Scope-field reference (user_id, agent_id, app_id, run_id) plus the snake/camel casing rules. | — |
-| `.claude/skills/memory-harvester/SKILL.md` | Agentic instructions for writing memory: classify the artifact, decide which `type` (principle/semantic/procedural/episodic/reflective), validate before write, invoke deterministic helpers via Bash. | ✅ |
-| `.claude/skills/memory-harvester/references/event-polling.ts` | `pollEventTerminal(eventId)` helper (lifted from POC). Bash-invoked. | — |
-| `.claude/skills/memory-harvester/references/classify.ts` | Schema validator for `MemoryWrite`. Pre-write gate. | — |
-| `.claude/skills/memory-harvester/references/harvest.ts` | Driver: takes a markdown artifact path + type + scope, runs add() + polling, persists to harvester ledger. | — |
-| `.claude/skills/memory-snapshot/SKILL.md` | Agentic instructions for daily snapshot job: paginated search (not getAll), per-memory history, write JSON to repo. | ✅ |
-| `.claude/skills/memory-snapshot/references/snapshot.ts` | Paginated search + history dumper. Cron-invoked. | — |
+| `.claude/skills/memory-reader/SKILL.md` | Agentic instructions for reading memory: two audiences (executive consult vs worker pack), iterative-query plan, output shapes. Loads playbook + limitations + scope + taxonomy. | ✅ built |
+| `.claude/skills/memory-reader/references/mem0-limitations.md` | **Single source of truth** for mem0 quirks. Linked from every memory skill. | ✅ built |
+| `.claude/skills/memory-reader/references/scope.md` | Scope-field reference + casing rules + per-hook scope defaults + env-filter defaults. | ✅ built |
+| `.claude/skills/memory-reader/references/playbook.md` | **Editorial guide for the reader.** Two audiences (executive vs worker pack), query plans per hook, result-count decision tree, pack composition rules. | ✅ built |
+| `.claude/skills/memory-harvester/SKILL.md` | Agentic instructions for writing memory: classify, validate, invoke deterministic helpers via Bash. Loads taxonomy + playbook + limitations + scope. | ✅ built |
+| `.claude/skills/memory-harvester/references/taxonomy.md` | **SSOT for the write schema (v1.0.0).** Scope IDs, metadata fields, per-trigger `run_id` formats, reserved `app_id` slugs, worked examples per type. | ✅ built |
+| `.claude/skills/memory-harvester/references/taxonomy-changelog.md` | Append-only history of schema changes; v1.0.0 entry. | ✅ built |
+| `.claude/skills/memory-harvester/references/playbook.md` | **Editorial guide for the harvester.** Soft write budgets per trigger, decision trees, good vs junk gallery, zero-write scenarios. | ✅ built |
+| `.claude/skills/memory-harvester/references/classify.ts` | Schema validator for `MemoryWrite` (enforces taxonomy v1.0.0). Pre-write gate; pure validation. | ✅ built |
+| `.claude/skills/memory-harvester/references/defaults.ts` | Stamps env-derived fields (`schema_version`, `env`, `cohort`, `harvest_run`) and infers `actor` from `trigger` before validation. | ✅ built |
+| `.claude/skills/memory-harvester/references/event-polling.ts` | `pollEventTerminal(eventId)` helper (Authorization: Token, not Bearer). Bash-invoked. | ✅ built |
+| `.claude/skills/memory-harvester/references/harvest.ts` | Driver: parses payload → `applyDefaults` → `assertValid` → `client.add()` → polls event endpoint → appends to ledger. | ✅ built |
+| `.claude/skills/memory-snapshot/SKILL.md` | Agentic instructions for daily snapshot job: paginated search (not `getAll`), per-memory history, write JSON to repo. | ✅ built |
+| `.claude/skills/memory-snapshot/references/snapshot.ts` | Paginated search + history dumper. Cron-invoked. | ✅ built |
 
 ### NEW — agentic hook skills (`.claude/skills/memory-hook-*`)
 
 These are **wrapper skills** following the executive's existing convention. The TS glue loads each via `loadSkillPrompt('<skill-name>', { CONTEXT_JSON: ... })` from `src/agentic/intelligence/skill-prompt-loader.ts` — same path `email-triage`, `failure-diagnosis`, `goal-breakdown` already use. Frontmatter `description:` doubles as the Skill-tool descriptor; body becomes the prompt with `{{CONTEXT_JSON}}` placeholder substitution. The loader logs `EXECUTIVE_SKILL_USED` to `ledgers/work-ledger.jsonl` per invocation — provenance for free.
 
-| Path | Used at | Length budget |
-|---|---|---|
-| `.claude/skills/memory-hook-pre-work-selection/SKILL.md` | Hook A | ~500 tokens |
-| `.claude/skills/memory-hook-pre-spawn-pack/SKILL.md` | Hook B | ~500 tokens |
-| `.claude/skills/memory-hook-post-run-harvest/SKILL.md` | Hook C | ~700 tokens |
-| `.claude/skills/memory-hook-failure-diagnosis/SKILL.md` | Hook D | ~600 tokens |
-| `.claude/skills/memory-hook-post-retro-harvest/SKILL.md` | Hook E | ~700 tokens |
+| Path | Used at | Length budget | Status |
+|---|---|---|---|
+| `.claude/skills/memory-hook-pre-work-selection/SKILL.md` | Hook A | ~500 tokens | ✅ built |
+| `.claude/skills/memory-hook-pre-spawn-pack/SKILL.md` | Hook B | ~500 tokens | ✅ built |
+| `.claude/skills/memory-hook-post-run-harvest/SKILL.md` | Hook C | ~700 tokens | ✅ built |
+| `.claude/skills/memory-hook-failure-diagnosis/SKILL.md` | Hook D | ~600 tokens | ✅ built |
+| `.claude/skills/memory-hook-post-retro-harvest/SKILL.md` | Hook E | ~700 tokens | ✅ built |
 
 Each wrapper skill opens with `Read .claude/skills/memory-reader/references/mem0-limitations.md before doing anything memory-related.` That single line is the operational expression of the "limitations doc loaded by every memory skill" pillar.
 
@@ -111,7 +125,7 @@ Single change: append `result.memoryPack` (from Hook B) as a `## Memory Pack` se
 
 ### MODIFY — `.env.executive.example`
 
-Already done in the POC pass. Lines added:
+Done. Current lines (after taxonomy v1.0.0 amendment):
 
 ```
 V3_MEMORY_ENABLED=true
@@ -119,6 +133,10 @@ V3_MEM0_API_KEY=
 V3_MEM0_USER_ID=
 V3_MEM0_TOP_K=10
 V3_MEM0_CONFIDENCE_FLOOR=0.7
+
+# Taxonomy v1.0.0 (see .claude/skills/memory-harvester/references/taxonomy.md)
+V3_MEM0_ENV=prod        # "test" | "dev" | "prod" — stamped on every write; reader filters default to "prod"
+V3_MEM0_COHORT=         # optional sub-isolation token (e.g. "smoke-2026-05-16") for parallel test runs
 ```
 
 ### MODIFY — `ecosystem.config.cjs`
@@ -141,19 +159,52 @@ Add a cron entry for the daily snapshot:
 
 Phased so each phase is independently reviewable and revertible.
 
-| Phase | Deliverables | Reviewable artifact |
+| Phase | Deliverables | Status |
 |---|---|---|
-| **0 — this plan** | This document | Markdown only; no code |
-| **1 — limitations doc + scope doc** | `mem0-limitations.md`, `scope.md` | Two markdown files; can be hand-reviewed |
-| **2 — three skills** | `memory-reader`, `memory-harvester`, `memory-snapshot` SKILL.md + references/ | Skills exist but executive doesn't call them yet — fully reversible |
-| **3 — hook wrapper skills** | Five SKILL.md files under `.claude/skills/memory-hook-*/` with frontmatter + `{{CONTEXT_JSON}}` placeholder | Skills exist and are discoverable; still no executive integration |
-| **4 — TS glue** | `src/agentic/memory/run-hook.ts` + types | New file only; nothing wired in. Runs only when called. |
-| **5 — executive-loop hooks** | Five `await runMemoryHook(...)` insertions wrapped in try/catch | **Requires explicit approval before this phase** |
-| **6 — worker-spawner injection** | Memory Pack section in generated CLAUDE.md | Single edit in spawner |
-| **7 — cron** | PM2 snapshot entry | One config entry |
-| **8 — backfill** | Manual harvest run against existing retros and ledgers | Skill invocation; data-only |
+| **0 — this plan** | This document | ✅ done |
+| **1 — limitations doc + scope doc** | `mem0-limitations.md`, `scope.md` | ✅ done |
+| **2 — three skills** | `memory-reader`, `memory-harvester`, `memory-snapshot` SKILL.md + references/ | ✅ done |
+| **3 — hook wrapper skills** | Five SKILL.md files under `.claude/skills/memory-hook-*/` with `{{CONTEXT_JSON}}` placeholder | ✅ done |
+| **3.5 — taxonomy v1.0.0 + playbooks** | `taxonomy.md` (SSOT), `taxonomy-changelog.md`, `defaults.ts`, harvester + reader `playbook.md`, env-isolation fields (`env`, `cohort`) | ✅ done (2026-05-16 amendment) |
+| **4 — TS glue** | `src/agentic/memory/run-hook.ts` + types | ⏳ pending |
+| **5 — executive-loop hooks (STAGED)** | Five `await runMemoryHook(...)` insertions wrapped in try/catch, gated by `V3_MEMORY_ENABLED` AND per-hook env flags (see staged rollout below) | **Requires explicit approval; ships one hook at a time** |
+| **6 — worker-spawner injection** | Memory Pack section in generated CLAUDE.md | ⏳ pending (lights up with Hook B in Stage 2) |
+| **7 — cron** | PM2 snapshot entry | ⏳ pending |
+| **8 — backfill** | Manual harvest run against existing retros and ledgers | ⏳ pending |
 
-Phases 1–4 are pure additions — they don't change behavior anywhere until phase 5 wires them in. That means we can build them, you can review the markdown contracts (which is most of the surface area), and the loop stays untouched.
+Phases 1–4 are pure additions — they don't change behavior anywhere until phase 5 wires them in. The loop is untouched as of the 2026-05-16 amendment.
+
+## Staged rollout of Phase 5 (one hook at a time)
+
+Wiring all five hooks at once is risky — we have zero real data on whether the editorial playbooks produce sensible output. The rollout below turns hooks on incrementally so we can audit one stream of writes/reads before adding the next. Each stage runs for ~1 week of real loop activity before the next stage lights up.
+
+| Stage | Hook | Side | Why this order | Audit checklist |
+|---|---|---|---|---|
+| **Stage 1** | Hook C — `post-run-harvest` | Write only | Lowest risk: writes only, no read decisions made yet. We collect data to see whether the harvester playbook produces good vs junk memories. | After 1 week: count memories per `type`; tag ≥3 sample writes as "useful / neutral / junk"; tighten harvester playbook §B if >30% junk. |
+| **Stage 2** | Hook B — `pre-spawn-pack` | Read (worker-facing) | Now that mem0 has real prod memories, we feed them to workers. Highest direct impact on autonomy. | After 1 week: for each spawn that received a Memory Pack, check whether the worker referenced any packed memory in its commits/logs. Memories never referenced = pack-junk; tighten reader playbook §D. |
+| **Stage 3** | Hook A — `pre-work-selection` | Read (executive-facing) | The executive starts using memory in its own planning turn. | After 1 week: spot-check 5 work-selection turns where memory surfaced something; confirm the executive used the citation rather than fabricating. |
+| **Stage 4** | Hook D — `failure-diagnosis` | Read + conditional write | Judgment-heavy: deciding "is this a pattern?" requires prior episodic data, which Stages 1–2 will have accumulated. | After 1 week: audit the reflective writes; check for false-pattern claims with <2 prior similar runs. |
+| **Stage 5** | Hook E — `post-retro-harvest` | Write (highest judgment) | Retros produce the densest lessons. Saved for last so the harvester playbook has been refined by Stages 1+4 audits. | After 1 week: each reflective/semantic/procedural written from a retro should be findable by a query the executive would naturally form. |
+
+**Per-stage feature flags** (additive to `V3_MEMORY_ENABLED`):
+
+```
+V3_MEM_HOOK_POST_RUN=true      # Stage 1
+V3_MEM_HOOK_PRE_SPAWN=true     # Stage 2
+V3_MEM_HOOK_PRE_WORK=true      # Stage 3
+V3_MEM_HOOK_FAIL_DIAG=true     # Stage 4
+V3_MEM_HOOK_POST_RETRO=true    # Stage 5
+```
+
+The TS glue in Phase 4 must read these flags before invoking each hook. A hook with its flag off no-ops cleanly.
+
+**Stage-gate criteria** before advancing:
+
+1. Audit checklist (above) completed and any tightenings to playbooks committed
+2. Zero hard loop crashes attributable to the memory hook for ≥7 days
+3. Cost & latency telemetry within budget (mem0 free-tier headroom + ≤30s added per loop iteration)
+
+If a stage fails its gate, fix the playbook / scope rules / classifier and re-run for another week before advancing.
 
 ## Why `executive-loop.ts` doesn't go fully agentic in V3.0
 
@@ -184,4 +235,4 @@ If all four hold, V4.0 can extend the same pattern to work selection, breakdown,
 
 ## Sign-off gate
 
-Phases 1–4 can proceed without further alignment. **Phase 5 (executive-loop edits) requires explicit approval** — that's the only phase that changes runtime behavior of the executive.
+Phases 1–4 can proceed without further alignment. **Phase 5 (executive-loop edits) requires explicit approval** — that's the only phase that changes runtime behavior of the executive, and even then it ships **one stage at a time** per the staged-rollout table above. Approval per stage, not all-at-once.

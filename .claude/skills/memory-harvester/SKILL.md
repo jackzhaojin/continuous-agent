@@ -8,18 +8,18 @@ description: |
 
 You decide what to write to the second brain and when. You are the **only writer**. Workers, ad-hoc scripts, and the conversational executive never call `client.add()` directly. The locked pillar from the V3.0 hosting decision: **one writer**.
 
-## STEP 0 — Read the limitations doc FIRST
+## STEP 0 — Read the spec docs FIRST
 
-`Read .claude/skills/memory-reader/references/mem0-limitations.md`.
+**Read in this order — every payload starts here:**
 
-The critical sections for writes:
-
-- **§1 Async write durability** — `add()` returns `PENDING`; you must poll `pollEventTerminal(eventId)` until `SUCCEEDED`.
-- **§2 Read-after-write** — never search for what you just wrote in the same turn.
-- **§5 Casing** — `add()` top-level options are camelCase (`userId`, `appId`, `runId`); filters are snake_case.
-- **§6 Paraphrasing** — mem0 rewrites prose. Embed literal identifiers (canary tags, source paths, harvest_run, timestamps) so memories are findable later.
-
-Also read `.claude/skills/memory-reader/references/scope.md` for scoping defaults.
+1. **`Read .claude/skills/memory-harvester/references/taxonomy.md`** — the authoritative schema (scope IDs, metadata fields, per-trigger `run_id` conventions, reserved `app_id` slugs, worked examples). **This is the SSOT.** `classify.ts` enforces it; `defaults.ts` stamps env-derived fields.
+2. **`Read .claude/skills/memory-harvester/references/playbook.md`** — the editorial guide: what to write per trigger, soft budgets, good vs junk gallery, when zero writes is the right answer. **Read this before you decide what to write.**
+3. **`Read .claude/skills/memory-reader/references/mem0-limitations.md`** — operational quirks:
+   - **§1 Async writes** — `add()` returns `PENDING`; poll until `SUCCEEDED`
+   - **§2 Read-after-write** — never search your own writes in the same turn
+   - **§5 Casing** — `add()` options are camelCase; filters are snake_case
+   - **§6 Paraphrasing** — embed literal identifiers in `text` (tags survive; prose gets rewritten)
+4. **`Read .claude/skills/memory-reader/references/scope.md`** — reader-side scoping defaults you should produce memories that match.
 
 ## STEP 1 — Understand the trigger and the artifact
 
@@ -64,29 +64,43 @@ Five canonical types (from §Memory Classification Scheme in `second-brain-hosti
 
 ## STEP 3 — Build the write payload per the schema
 
-Every write follows the schema in `references/classify.ts`. The TS module is the enforcement layer; this is the human-readable form:
+**The full schema lives in `references/taxonomy.md` (read it).** What follows is the *minimum partial* you must compose — `defaults.ts` fills the rest from env vars before validation.
 
-```typescript
+```jsonc
 {
-  user_id: process.env.V3_MEM0_USER_ID,   // executive identity slug
-  agent_id: "executive",
-  app_id: "<bundle slug>",                // matches workspace/{ondeck,in-progress}/<slug>/
-  run_id: "<YYYY-MM-DD-slug>",            // REQUIRED if type === "episodic"; optional otherwise
-
-  metadata: {
-    type: "principle" | "semantic" | "procedural" | "episodic" | "reflective",
-    category: "technical" | "functional" | "project",
-    confidence: 0.0..1.0,
-    importance: "critical" | "high" | "medium" | "low",
-    source: "<path/to/source-markdown.md>",   // CRITICAL — embed literally
-    harvest_run: "<YYYY-MM-DD-{slug}>",       // CRITICAL — embed literally
-  },
-
-  immutable: true | false,
+  "text": "<prose with literal discriminators — see STEP 4>",
+  "app_id": "<bundle-slug | _global | _executive | _skill-foo>",
+  "run_id": "<YYYY-MM-DD-{slug}>",   // format depends on trigger — taxonomy.md §A.2
+  "metadata": {
+    "type": "principle | semantic | procedural | episodic | reflective",
+    "category": "technical | functional | project",
+    "importance": "critical | high | medium | low",
+    "confidence": 0.0,                // 0.0–1.0
+    "trigger": "post-run | post-retro | failure-diagnosis | spec-merge | manual-harvest | practice-loop",
+    "source": "<path/to/source-markdown.md>",
+    // ↓ optional ↓
+    "actor": "executive | worker | human",         // inferred from trigger (see below)
+    "worker_vendor": "claude | codex | kimi | kimi-cli | kimi-wire",  // REQUIRED when actor=worker
+    "outcome": "success | failure | partial",
+    "tags": ["kebab-case", "≤ 8"],
+    "expires_at": "<ISO datetime>"
+  }
 }
 ```
 
-Casing trap: top-level options in `client.add()` are camelCase (`userId`, `appId`, `runId`). The TS reference handles this conversion — your job is to supply the snake_case form above; the TS helper translates.
+**Fields the harvester driver fills automatically** (do NOT include them — they are stamped by `defaults.ts`):
+
+- `user_id` ← from `V3_MEM0_USER_ID` env
+- `agent_id` ← hardcoded `"executive"`
+- `metadata.schema_version` ← `SCHEMA_VERSION` constant (currently `"1.0.0"`)
+- `metadata.env` ← from `V3_MEM0_ENV` env (defaults `"prod"`)
+- `metadata.cohort` ← from `V3_MEM0_COHORT` env if set
+- `metadata.harvest_run` ← mirrors `run_id`
+- `metadata.actor` ← inferred from `trigger`: `post-run`/`failure-diagnosis` → `"worker"`, `post-retro`/`spec-merge`/`manual-harvest` → `"human"`, `practice-loop` → `"executive"`. Override only when the default is wrong for the specific fact.
+- `metadata.worker_vendor` ← **you must set this when `actor === "worker"`** (validator rejects otherwise). Read `vendor` from the harvest context.
+- `immutable` ← defaults `true` when `trigger === "spec-merge"`, else `false`. For `type: "principle"` with any other trigger, you must pass `immutable: true` explicitly.
+
+Casing trap: `client.add()` top-level options are camelCase (`userId`, `appId`, `runId`). `harvest.ts` handles the conversion — you write snake_case here.
 
 ## STEP 4 — Author the memory text with discriminators
 
@@ -127,11 +141,12 @@ The `--payload` argument is JSON. Two safe patterns; pick one and stick with it:
 
 ```bash
 npx tsx .claude/skills/memory-harvester/references/harvest.ts \
-  --payload '{"text":"Run 2026-05-16-foo (source: ...).","user_id":"irin.julg","agent_id":"executive","app_id":"foo","run_id":"2026-05-16-foo","metadata":{"type":"episodic","category":"project","confidence":1.0,"importance":"medium","source":"path/to.md","harvest_run":"2026-05-16-foo-001"},"immutable":false}'
+  --payload '{"text":"Run 2026-05-16-foo (source: workspace/in-progress/foo/STEPS.json) — clean run, no retries.","app_id":"foo","run_id":"2026-05-16-foo","metadata":{"type":"episodic","category":"project","importance":"medium","confidence":1.0,"trigger":"post-run","source":"workspace/in-progress/foo/STEPS.json","actor":"worker","worker_vendor":"claude","outcome":"success"}}'
 ```
 
-- The outer single quotes prevent the shell from interpreting `$`, `"`, etc.
-- **Embed concrete string values directly** — DO NOT use `${VAR}` or `$VAR` inside single quotes (shell does not expand inside single quotes). Read `V3_MEM0_USER_ID` from `.env.executive` and embed the literal value into the JSON.
+- Outer single quotes prevent shell interpretation of `$`, `"`, etc.
+- `user_id`, `agent_id`, `schema_version`, `env`, `harvest_run`, `immutable` are stamped by `defaults.ts` — omit them.
+- **Never use `${VAR}` inside single quotes** — shell doesn't expand. If you need a value from `.env.executive` (you shouldn't — defaults reads them), grep the env file and paste the literal value.
 
 **Pattern B — heredoc for multi-line readability:**
 
@@ -139,25 +154,27 @@ npx tsx .claude/skills/memory-harvester/references/harvest.ts \
 PAYLOAD=$(cat <<'JSON'
 {
   "text": "Run 2026-05-16-foo ...",
-  "user_id": "irin.julg",
-  ...
+  "app_id": "foo",
+  "run_id": "2026-05-16-foo",
+  "metadata": {
+    "type": "episodic", "category": "project", "importance": "medium", "confidence": 1.0,
+    "trigger": "post-run", "source": "workspace/in-progress/foo/STEPS.json",
+    "actor": "worker", "worker_vendor": "claude", "outcome": "success"
+  }
 }
 JSON
 )
 npx tsx .claude/skills/memory-harvester/references/harvest.ts --payload "$PAYLOAD"
 ```
 
-- The `<<'JSON'` (quoted heredoc tag) disables variable expansion in the body — same as single-quoted strings.
-- Outer `"$PAYLOAD"` is double-quoted so the value substitutes but no field-splitting occurs.
+- The quoted heredoc tag `<<'JSON'` disables variable expansion in the body.
+- Outer `"$PAYLOAD"` double-quotes the substitution to preserve internal whitespace.
 
-**Anti-pattern (will fail schema validation):**
+**Anti-patterns (will fail schema validation):**
 
-```bash
-# ❌ Single quotes around ${V3_MEM0_USER_ID} — shell does NOT expand → user_id becomes empty
---payload '{"user_id":"${V3_MEM0_USER_ID}", ...}'
-```
-
-If you need the agent identity slug, read the env value via a separate `echo $V3_MEM0_USER_ID` (or grep `.env.executive`) and paste the resolved string into the JSON.
+- ❌ Including `user_id`, `agent_id`, or `schema_version` — defaults stamps them; explicit values get overwritten only if you pass them, so passing stale ones is a footgun
+- ❌ `'{"actor":"worker"}'` without `worker_vendor` — validator rejects
+- ❌ `'{"app_id":"_my-bundle"}'` — leading underscore is for reserved slugs only (`_global`, `_executive`, `_skill-*`)
 
 `harvest.ts` runs `references/classify.ts` first (schema validation; rejects bad payloads), then calls `client.add()`, then `references/event-polling.ts` (`pollEventTerminal(eventId)`) until `SUCCEEDED`. **It does not return until every memory is durably written.** Default timeout: 60s per write.
 
