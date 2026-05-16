@@ -30,6 +30,34 @@ pm2 start ecosystem.config.cjs     # Production (requires build first)
 7. **Never commit or push** unless explicitly instructed
 8. **Goal bundle slugs** — Every agentic flow that drafts a bundle in `workspace/drafts/` or `workspace/ondeck/` must prefix the slug with today's `YYYY-MM-DD-` (e.g. `2026-04-19-hello-react`). Bundle directory name must match. Keeps generated projects chronologically findable as they pile up. See `workspace-instructions/README.md` and `.claude/rules/workspace-and-goals.md`.
 
+## Skill & Prompt Locations (CRITICAL — read before adding prompts)
+
+Two distinct skill stores. Don't mix them up.
+
+| Audience | Location | Loaded by | Synced to workers? |
+|---|---|---|---|
+| **Executive** (this repo's loop) | `.claude/skills/<name>/SKILL.md` | `loadSkillPrompt('<name>', { vars })` in `src/agentic/intelligence/skill-prompt-loader.ts` — strips frontmatter, renders `{{VARIABLE}}` placeholders, logs `EXECUTIVE_SKILL_USED` to `ledgers/work-ledger.jsonl` | **No** — executive-only |
+| **Worker** (spawned ai-sandbox process) | `claude-files-to-output/skills/<name>/SKILL.md` | Synced into `ai-sandbox/.claude/skills/` per spawn by `worker-spawner.ts`; Claude workers auto-discover via SDK and invoke with `Skill` tool. Kimi/Codex workers receive content via prompt builder. | **Yes** — copied per spawn |
+
+**Other `.claude/` directories** (executive side only — never synced to workers):
+
+- `.claude/agents/<name>.md` — subagents for `[SELF-ENHANCE]` / `[SKILL-BUILD]` goals
+- `.claude/rules/<name>.md` — domain rules auto-loaded by Claude Code; manually referenced by other agents
+- `.claude/commands/<name>.md` — slash commands
+
+**Do:**
+- Adding an executive agentic operation → new dir at `.claude/skills/<name>/SKILL.md` with proper frontmatter; load it via `loadSkillPrompt()`. Get ledger logging for free.
+- Adding a worker capability → `claude-files-to-output/skills/<name>/SKILL.md`; it ships on next spawn.
+- Putting deterministic helpers a skill calls via Bash → `<skill-dir>/references/*.ts` (markdown for the intelligence, TS for the plumbing).
+
+**Don't:**
+- ❌ Invent new top-level dirs like `.claude/prompts/` — those skip `loadSkillPrompt`'s ledger logging and break the convention other agents follow.
+- ❌ Inline prompt strings into TypeScript. The intelligence lives in markdown.
+- ❌ Put executive-only skills under `claude-files-to-output/` — they'll leak to workers (and worker mem0 access is forbidden by the V3.0 executive-tier-only pillar).
+- ❌ Put worker-only skills under `.claude/skills/` — workers won't see them.
+
+Full details in [`.claude/rules/skills-and-prompts.md`](.claude/rules/skills-and-prompts.md).
+
 ## TypeScript Conventions
 
 - ES modules (`"type": "module"`), target ES2022, strict mode
