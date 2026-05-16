@@ -28,6 +28,7 @@
     "dotenv": "^16.4.5",
     "googleapis": "^171.4.0",
     "js-yaml": "^4.1.0",
+    "mem0ai": "^3.0.3",
     "openai": "^6.33.0"
   },
   "devDependencies": {

@@ -119,6 +119,46 @@ npx tsx .claude/skills/memory-harvester/references/harvest.ts \
   --batch '<json-encoded array of MemoryWrite>'
 ```
 
+### Shell-escaping rules (critical — easy to get wrong)
+
+The `--payload` argument is JSON. Two safe patterns; pick one and stick with it:
+
+**Pattern A — single-line, single-quoted JSON (recommended for one write):**
+
+```bash
+npx tsx .claude/skills/memory-harvester/references/harvest.ts \
+  --payload '{"text":"Run 2026-05-16-foo (source: ...).","user_id":"irin.julg","agent_id":"executive","app_id":"foo","run_id":"2026-05-16-foo","metadata":{"type":"episodic","category":"project","confidence":1.0,"importance":"medium","source":"path/to.md","harvest_run":"2026-05-16-foo-001"},"immutable":false}'
+```
+
+- The outer single quotes prevent the shell from interpreting `$`, `"`, etc.
+- **Embed concrete string values directly** — DO NOT use `${VAR}` or `$VAR` inside single quotes (shell does not expand inside single quotes). Read `V3_MEM0_USER_ID` from `.env.executive` and embed the literal value into the JSON.
+
+**Pattern B — heredoc for multi-line readability:**
+
+```bash
+PAYLOAD=$(cat <<'JSON'
+{
+  "text": "Run 2026-05-16-foo ...",
+  "user_id": "irin.julg",
+  ...
+}
+JSON
+)
+npx tsx .claude/skills/memory-harvester/references/harvest.ts --payload "$PAYLOAD"
+```
+
+- The `<<'JSON'` (quoted heredoc tag) disables variable expansion in the body — same as single-quoted strings.
+- Outer `"$PAYLOAD"` is double-quoted so the value substitutes but no field-splitting occurs.
+
+**Anti-pattern (will fail schema validation):**
+
+```bash
+# ❌ Single quotes around ${V3_MEM0_USER_ID} — shell does NOT expand → user_id becomes empty
+--payload '{"user_id":"${V3_MEM0_USER_ID}", ...}'
+```
+
+If you need the agent identity slug, read the env value via a separate `echo $V3_MEM0_USER_ID` (or grep `.env.executive`) and paste the resolved string into the JSON.
+
 `harvest.ts` runs `references/classify.ts` first (schema validation; rejects bad payloads), then calls `client.add()`, then `references/event-polling.ts` (`pollEventTerminal(eventId)`) until `SUCCEEDED`. **It does not return until every memory is durably written.** Default timeout: 60s per write.
 
 The driver persists each result to `ledgers/harvest-runs/{date}.jsonl` — one JSONL line per memory written, with `memory_id`, `eventId`, `latency_ms`, `payload`, and the full event body. This is the traceability record.
