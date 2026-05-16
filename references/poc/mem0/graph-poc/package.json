@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "dotenv": "^16.4.7",
-    "mem0ai": "^2.1.0"
+    "mem0ai": "^3.0.3"
   },
   "devDependencies": {
     "tsx": "^4.19.0",

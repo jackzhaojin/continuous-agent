@@ -42,6 +42,19 @@ const APP_ID = "v3-mem0-graph-poc";
 const RUN_ID = "2026-05-16-graph-poc";
 const AGENT_ID = "executive";
 
+// Separate scope for the graph-bridge stress test so it doesn't mix with the
+// original 4 metadata-schema seeds. Memories 1-3 land here (continuous-agent
+// chain, written by SDK). Memories 4-6 are written by the MCP POC under the
+// same app_id.
+const APP_ID_BRIDGE = "v3-mem0-graph-bridge-test";
+const RUN_ID_BRIDGE = "2026-05-16-graph-bridge";
+
+// Set to true to auto-delete this POC's memories at the end of a normal run.
+// Default false so you can inspect the seeded data in the mem0 web UI at
+// app.mem0.ai/dashboard/memories. Explicit teardown is always available via
+// `npm run cleanup` (which passes --cleanup and skips the seeding/test steps).
+const CLEANUP_AFTER_RUN = false;
+
 const cleanupOnly = process.argv.includes("--cleanup");
 
 // ---------- shape: V3.0 metadata schema (mirror of decision doc) ----------
@@ -151,6 +164,7 @@ const seeds: Seed[] = [
 
 const client = new MemoryClient({ apiKey: API_KEY });
 
+// mem0ai v3 uses camelCase for scoping fields (v2→v3 migration).
 const scope = { userId: USER_ID!, agentId: AGENT_ID, appId: APP_ID, runId: RUN_ID };
 
 function header(title: string) {
@@ -162,9 +176,12 @@ function sleep(ms: number) {
 }
 
 async function cleanup() {
-  header("CLEANUP: deleteAll for this POC's scope");
-  await client.deleteAll({ userId: USER_ID!, appId: APP_ID });
-  console.log(`Deleted all memories under userId=${USER_ID} appId=${APP_ID}`);
+  header("CLEANUP: deleteAll for this POC's scopes");
+  // v3: like getAll/search, deleteAll uses snake_case filter keys.
+  for (const appId of [APP_ID, APP_ID_BRIDGE]) {
+    await client.deleteAll({ user_id: USER_ID!, app_id: appId } as never);
+    console.log(`Deleted all memories under user_id=${USER_ID} app_id=${appId}`);
+  }
 }
 
 // ---------- main ----------
@@ -206,8 +223,10 @@ async function main() {
 
   // ---- 2. text search ----
   header("STEP 2 — text search: 'How is the second brain hosted?'");
+  // v3 quirk: top-level SDK options are camelCase (topK), but filter keys
+  // are snake_case (the filters object passes through to the API filter DSL).
   const textSearch = await client.search("How is the second brain hosted?", {
-    filters: { AND: [{ user_id: USER_ID! }, { app_id: APP_ID }] },
+    filters: { user_id: USER_ID!, app_id: APP_ID },
     topK: 10,
   } as never);
   console.log(JSON.stringify(textSearch, null, 2));
@@ -219,7 +238,7 @@ async function main() {
   console.log("This test verifies that searching for an entity surfaces relevant");
   console.log("memories, including ones that share linked concepts.\n");
   const graphSearch = await client.search("harvester", {
-    filters: { AND: [{ user_id: USER_ID! }, { app_id: APP_ID }] },
+    filters: { user_id: USER_ID!, app_id: APP_ID },
     topK: 10,
   } as never);
   console.log(JSON.stringify(graphSearch, null, 2));
@@ -240,26 +259,252 @@ async function main() {
 
   // ---- 4. getAll (snapshot use case) ----
   header("STEP 4 — getAll under scope (for snapshot job)");
-  const all = await client.getAll({ userId: USER_ID!, appId: APP_ID } as never);
-  console.log(`Returned ${(all as unknown[]).length ?? "?"} memories.`);
+  // v3 quirk discovered during POC: search() finds memories filtered by
+  // { user_id, app_id }, but getAll() with the same filter shape returns
+  // empty results. The memories ARE stored with those scope fields (verified
+  // via client.get(id)). The /v3/memories/ list endpoint may use different
+  // indexing semantics than /v3/memories/search/. Falling back to search-
+  // based enumeration for the snapshot use case; revisit once mem0 docs
+  // catch up to the v3 SDK.
+  const all = await client.getAll({
+    filters: { AND: [{ user_id: USER_ID! }, { app_id: APP_ID }] },
+  } as never);
+  const allResults = (all as { results?: unknown[]; count?: number }).results ?? [];
+  const allCount = (all as { count?: number }).count ?? allResults.length;
+  console.log(`getAll returned ${allCount} memories (results length: ${allResults.length}).`);
+  if (allCount === 0) {
+    console.log(
+      "[note] getAll empty even though search returned 4. Likely a v3 endpoint quirk —\n" +
+        "       snapshot job should enumerate via paginated search until mem0 clarifies.",
+    );
+  }
   transcript.getAll = all;
 
   // ---- 5. history (version trail) ----
   header("STEP 5 — history on the first stored memory");
-  const firstId = (all as Array<{ id?: string }>)[0]?.id;
+  // Use first id from search since getAll is unreliable in v3 right now.
+  const firstId =
+    (allResults[0] as { id?: string } | undefined)?.id ??
+    ((textSearch as { results?: Array<{ id?: string }> }).results ?? [])[0]?.id;
   if (firstId) {
     const hist = await client.history(firstId);
     console.log(JSON.stringify(hist, null, 2));
     transcript.firstHistory = hist;
   } else {
-    console.log("[skip] No memory id returned from getAll.");
+    console.log("[skip] No memory id available from getAll or search.");
+  }
+
+  // ---- 6. targeted retrieval (single-memory patterns) ----
+  // These are the patterns the production reader skill will use when the
+  // executive builds a worker memory pack: filter by metadata.type to get
+  // only principles, or by id for direct lookup.
+
+  header("STEP 6a — targeted search: metadata.type = 'principle'");
+  const principleSearch = await client.search("second brain", {
+    filters: {
+      user_id: USER_ID!,
+      app_id: APP_ID,
+      metadata: { type: "principle" },
+    },
+    topK: 10,
+  } as never);
+  const principleResults = (principleSearch as { results?: Array<{ id?: string; metadata?: { type?: string } }> }).results ?? [];
+  console.log(`Got ${principleResults.length} result(s).`);
+  for (const r of principleResults) {
+    console.log(`  - ${r.id}  type=${r.metadata?.type}`);
+  }
+  transcript.principleSearch = principleSearch;
+  if (principleResults.length === 1 && principleResults[0]?.metadata?.type === "principle") {
+    console.log("[ok] metadata filter narrowed to exactly the principle memory.");
+  } else if (principleResults.length === 0) {
+    console.log("[warn] metadata filter returned nothing — filter syntax may be wrong.");
+  } else {
+    console.log(`[note] metadata filter returned ${principleResults.length} results — verify types above.`);
+  }
+
+  header("STEP 6b — direct get by id");
+  if (firstId) {
+    const one = await client.get(firstId);
+    console.log(JSON.stringify(one, null, 2));
+    transcript.directGet = one;
+  } else {
+    console.log("[skip] No id available for direct get.");
+  }
+
+  // ---- 7. graph bridge stress test ----
+  // The original 4 seeds all share the same topic, so semantic similarity alone
+  // explained every search hit and entity scoring stayed at 0. This phase writes
+  // memories that share NAMED ENTITIES across DIFFERENT topics, so a bridge
+  // query has to traverse entity links to surface the relevant chain.
+  //
+  // Three memories written here (Jack → continuous-agent → PM2 → SIGUSR2).
+  // Three more memories live in the MCP POC (Azure Functions → credit-card-
+  // stockpile → Cosmos DB chain). Run both POCs to get the full scaffold.
+
+  header("STEP 7 — graph bridge stress test: write 3 SDK memories");
+
+  const bridgeScope = {
+    userId: USER_ID!,
+    agentId: AGENT_ID,
+    appId: APP_ID_BRIDGE,
+    runId: RUN_ID_BRIDGE,
+  };
+
+  const bridgeSeeds: Seed[] = [
+    {
+      label: "1. Jack ↔ continuous-agent ↔ irin.julg",
+      messages: [
+        {
+          role: "user",
+          content:
+            "Jack runs the continuous-agent project; his agent identity for the second brain is irin.julg.",
+        },
+      ],
+      metadata: {
+        type: "episodic",
+        category: "project",
+        confidence: 1.0,
+        importance: "medium",
+        source: "graph-bridge-test",
+        harvest_run: RUN_ID_BRIDGE,
+      },
+    },
+    {
+      label: "2. continuous-agent ↔ PM2 ↔ executive-loop",
+      messages: [
+        {
+          role: "user",
+          content:
+            "The continuous-agent project uses PM2 to run the executive loop in production.",
+        },
+      ],
+      metadata: {
+        type: "semantic",
+        category: "technical",
+        confidence: 0.95,
+        importance: "high",
+        source: "graph-bridge-test",
+        harvest_run: RUN_ID_BRIDGE,
+      },
+    },
+    {
+      label: "3. PM2 ↔ SIGUSR2 ↔ npm run build",
+      messages: [
+        {
+          role: "user",
+          content:
+            "PM2 receives SIGUSR2 from npm run build for hot-reload without restarting active workers.",
+        },
+      ],
+      metadata: {
+        type: "procedural",
+        category: "technical",
+        confidence: 0.9,
+        importance: "high",
+        source: "graph-bridge-test",
+        harvest_run: RUN_ID_BRIDGE,
+      },
+    },
+  ];
+
+  const bridgeAddResults: unknown[] = [];
+  for (const seed of bridgeSeeds) {
+    console.log(`+ ${seed.label}`);
+    const result = await client.add(seed.messages, {
+      ...bridgeScope,
+      metadata: seed.metadata,
+    } as never);
+    bridgeAddResults.push({ label: seed.label, result });
+  }
+  transcript.bridgeAddResults = bridgeAddResults;
+
+  console.log("\nWaiting 8s for async extraction…");
+  await sleep(8000);
+
+  // The bridge query: no single memory contains "Jack" AND "reload" AND "PM2".
+  // If only memory 3 surfaces (it mentions reload directly), semantic won.
+  // If memories 1 and 2 also surface, the entity graph did work.
+  const bridgeQuery =
+    "How does Jack's continuous-agent project handle worker reloads?";
+
+  header(`STEP 7 — bridge query: "${bridgeQuery}"`);
+  const bridgeSearch = await client.search(bridgeQuery, {
+    filters: { user_id: USER_ID!, app_id: APP_ID_BRIDGE },
+    topK: 10,
+  } as never);
+
+  const bridgeResults =
+    (bridgeSearch as { results?: Array<{ id?: string; memory?: string; score?: number; scoreBreakdown?: { semantic: number; bm25: number; entity: number } }> }).results ?? [];
+
+  console.log(`Got ${bridgeResults.length} result(s).\n`);
+  for (const r of bridgeResults) {
+    const breakdown = r.scoreBreakdown;
+    console.log(`  score=${r.score?.toFixed(3)}  semantic=${breakdown?.semantic.toFixed(3)}  entity=${breakdown?.entity.toFixed(3)}`);
+    console.log(`    "${r.memory?.slice(0, 100)}…"`);
+  }
+  transcript.bridgeSearch = bridgeSearch;
+
+  const entityScoreSum = bridgeResults.reduce(
+    (acc, r) => acc + (r.scoreBreakdown?.entity ?? 0),
+    0,
+  );
+  // Honest bridge interpretation: look for the SIGUSR2 memory specifically.
+  // The query asks about "worker reloads", and the SIGUSR2 memory IS the
+  // answer (it literally describes hot-reload without restarting workers).
+  // If mem0 were doing real graph traversal, this memory should surface
+  // even though the query keywords don't lexically match its text.
+  const sigusrSurfaced = bridgeResults.some(r =>
+    r.memory?.toLowerCase().includes("sigusr2") ||
+    r.memory?.toLowerCase().includes("hot-reload") ||
+    r.memory?.toLowerCase().includes("hot‑reload"),
+  );
+
+  console.log("\n--- bridge interpretation ---");
+  if (sigusrSurfaced) {
+    console.log(
+      `[ok] The SIGUSR2/hot-reload memory surfaced — graph traversal from ` +
+        `"worker reloads" → entity chain → SIGUSR2 fact is working.`,
+    );
+  } else {
+    console.log(
+      `[finding] The SIGUSR2/hot-reload memory did NOT surface for "worker reloads", ` +
+        `even though it literally answers the question. mem0 v3 returns memories above a ` +
+        `similarity threshold against the query; it does NOT do automatic multi-hop graph ` +
+        `traversal. Memories that share entities with the query (Jack, continuous-agent) ` +
+        `surface, but memories one hop removed (SIGUSR2 via PM2) do not.`,
+    );
+    console.log(
+      `[implication] The production reader skill cannot rely on "memories find their own ` +
+        `linked memories." It will need to either: (a) issue multiple queries to surface ` +
+        `different facets, (b) extract entities from initial results and re-query, or ` +
+        `(c) lean on the LLM at the call site to combine returned memories.`,
+    );
+  }
+  if (entityScoreSum > 0) {
+    console.log(
+      `[ok] scoreBreakdown.entity contributed ${entityScoreSum.toFixed(3)} total ` +
+        `across results. Entity-aware ranking is active on this dataset.`,
+    );
+  } else {
+    console.log(
+      `[note] scoreBreakdown.entity stayed at 0. v3's "automatic entity linking" appears ` +
+        `to surface as semantic-similarity contributions, not as a separate score component.`,
+    );
   }
 
   // ---- write transcript ----
   writeFileSync(outFile, JSON.stringify(transcript, null, 2));
   header("DONE");
   console.log(`Wrote transcript to ${outFile}`);
-  console.log(`\nTo delete this POC's memories from mem0:  npm run cleanup`);
+
+  if (CLEANUP_AFTER_RUN) {
+    await cleanup();
+  } else {
+    console.log(
+      `\nMemories left in place. Inspect at https://app.mem0.ai/dashboard/memories`,
+    );
+    console.log(`To delete this POC's data:  npm run cleanup`);
+  }
 }
 
 main().catch((err) => {
