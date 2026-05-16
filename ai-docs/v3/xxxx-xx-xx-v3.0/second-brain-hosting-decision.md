@@ -75,7 +75,7 @@ The harvester is the **only writer** to mem0. The agent never adds memories dire
 
 ### 4. Agent read / write contract
 
-**Read** (executive-only, frequent). The executive invokes the **`memory-reader` skill** during planning, work selection, and pre-spawn prep. The skill's `references/search.ts` (or equivalent) wraps the mem0 SDK with scoping defaults — `user_id: agent-jack`, current `app_id`, confidence floor, top_k. The executive uses the returned memories two ways:
+**Read** (executive-only, frequent). The executive invokes the **`memory-reader` skill** during planning, work selection, and pre-spawn prep. The skill's `references/search.ts` (or equivalent) wraps the mem0 SDK with scoping defaults — `user_id: ${MEM0_USER_ID}` (executive agent's identity slug, set in local `.env` — never committed), current `app_id`, confidence floor, top_k. The executive uses the returned memories two ways:
 
 - **Inline planning context.** Executive consults memories to choose work, draft contracts, decide retry strategy.
 - **Memory pack injection.** Before spawning a worker, the executive (via the `worker-spawner` flow) calls the reader skill, takes the top-K relevant memories, and bakes them into a `## Memory Pack` section in the worker's generated `CLAUDE.md`. **Workers never call mem0** — they consume static markdown.
@@ -154,7 +154,7 @@ Every memory write follows this contract. The schema is **enforced by the harves
 ```typescript
 // memory-harvester/references/classify.ts (bundled with the skill)
 interface MemoryWrite {
-  user_id: string;                    // canonical agent owner (always "agent-jack" today)
+  user_id: string;                    // canonical agent owner — value read from MEM0_USER_ID env var (executive agent identity, not committed)
   agent_id: "executive";              // V3.0: executive-only writes; field reserved for future multi-agent
   app_id: string;                     // matches projects/{slug}/ folder
   run_id?: string;                    // optional; required when type === "episodic"
@@ -180,7 +180,7 @@ Scoping IDs map directly to the existing folder structure: `app_id` equals the p
 
 **Daily snapshot via `memory-snapshot` skill.** A PM2 cron entry invokes the `memory-snapshot` skill once per day; the skill's `references/snapshot.ts` does the deterministic work:
 
-1. `client.getAll({ filters: { user_id: "agent-jack" } })` with pagination
+1. `client.getAll({ filters: { user_id: process.env.MEM0_USER_ID } })` with pagination
 2. For each memory, `client.history(id)` to capture full version trail
 3. Write JSON to `ai-docs/v3/mem0-snapshots/{YYYY-MM-DD}.json`
 4. Git commit (push only on explicit human instruction, per project rule)
@@ -229,7 +229,10 @@ The migration path is `cloud → self-hosted (mem0 OSS) → mem0 OSS library + o
 V3.0 implementation can begin once the items below are complete. Each item is delivered as a **skill** (SKILL.md + `references/`) or as a small configuration change. No new `src/agentic/memory/` module is created — all deterministic plumbing ships *inside* the relevant skill's `references/` folder.
 
 ### Setup
-- [ ] **Account & keys** — Create mem0 cloud account, mint API key, store in `.env` (executive only) and Vault entry. Worker output worktrees never receive this key.
+
+> **Per-installation identity.** This is an open-source harness; each operator names their own executive agent. Pick a dedicated email + handle for the agent (not your personal address) so that mem0, Gmail, Discord, and other agent-owned services share one identity. The handle is stored in local `.env` only and **never committed to the repo** — the codebase only ever sees `MEM0_USER_ID` as an env reference.
+
+- [ ] **Account & keys** — Create the mem0 cloud account under your **executive agent's email identity** (the dedicated handle you've chosen for this installation; never your personal email). Mint the API key from the dashboard and store in `.env` (executive only) and your secret store. Set `MEM0_USER_ID` in `.env` to the canonical slug used for all writes. Worker output worktrees never receive the API key or the identity slug.
 - [ ] **Enable graph mode** — Toggle in project settings; verify Neo4j AuraDB connection via dashboard.
 
 ### Skills to build (each is `claude-files/skills/<name>/SKILL.md` + `references/`)
