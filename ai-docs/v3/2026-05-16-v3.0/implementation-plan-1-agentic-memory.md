@@ -12,7 +12,7 @@ related:
   - .claude/skills/memory-reader/references/playbook.md
   - references/poc/mem0/graph-poc/README.md
   - references/poc/mem0/mcp-poc/README.md
-  - ai-docs/v3/2026-05-16-v3.0/prompt-log-0-poc.md
+  - ai-docs/v3/2026-05-16-v3.0/prompt-log-2026-05-16-0-poc.md
 ---
 
 # V3.0 Implementation Plan — Agentic Memory Layer

@@ -134,7 +134,7 @@ When the agentic harvester composes a payload, it must:
 
 - Restating what the source markdown already says (write a pointer, not a paraphrase)
 - A fact with no stable identifier (no project slug, no date, no entity name in either `text` or `metadata`)
-- Operational artifacts (`progress.md`, `needs-you.md`, `completed.md`, `goals.md` — these stay in markdown, never in mem0)
+- **Transient live-state** files (`progress.md`, `needs-you.md`, `queue.md`, `completed.md`, `goals.md`, `*-state.json`, generated `reports/`) — these are snapshots of "right now," constantly overwritten, not a record of what happened. They stay in markdown, never in mem0. (Contrast: *completed project bundles* and *retros* ARE history → harvest them. See `backfill.md` for the full bucket→disposition map and the distill-vs-dump rule for raw logs.)
 - A `type: principle` with `immutable: false` (principles are always immutable)
 - A `type: episodic` without a `run_id` matching `post-run` format
 - A `worker_vendor` set with `actor: "executive"` (logical contradiction)
