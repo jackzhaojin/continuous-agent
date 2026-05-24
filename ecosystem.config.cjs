@@ -71,6 +71,29 @@ module.exports = {
       instances: 1,
       exec_mode: 'fork',
     },
+
+    {
+      // V3.0 second-brain daily snapshot (disaster-recovery backup of mem0).
+      // Runs once at 04:00 daily via cron, then exits (autorestart: false).
+      // snapshot.ts self-loads .env.executive and no-ops if V3_MEMORY_ENABLED
+      // is false. Uses paginated search (getAll is broken in v3). This entry is
+      // inert until `pm2 start ecosystem.config.cjs` picks it up — adding it
+      // here does not activate it until the user (re)starts PM2.
+      name: 'memory-snapshot',
+      script: 'node_modules/.bin/tsx',
+      args: '.claude/skills/memory-snapshot/references/snapshot.ts',
+      interpreter: 'none',
+      cwd: '/Users/jackjin/dev/continuous-agent',
+      cron_restart: '0 4 * * *',
+      autorestart: false,
+      watch: false,
+      env: { NODE_ENV: 'development' },
+      out_file: '/Users/jackjin/dev/continuous-agent/ledgers/pm2-snapshot-out.log',
+      error_file: '/Users/jackjin/dev/continuous-agent/ledgers/pm2-snapshot-error.log',
+      merge_logs: true,
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      time: true,
+    },
   ],
 
   // Deployment configuration (optional, for remote deployments)

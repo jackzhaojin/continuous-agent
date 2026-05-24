@@ -31,4 +31,4 @@ for shared `.env` and `.claude/`.
 5. **Projects CAN have their own CLAUDE.md** — it inherits from root and adds project-specific context.
 6. **Do NOT run `git init`** — both worktree-mode and monorepo-mode projects already share the parent `ai-sandbox` repo's git database. Commit your work from your project directory; the parent repo handles the rest.
 7. If your project needs app-specific env vars, check `.env.app` at the root for available credentials, or create a separate `.env` inside the project directory.
-{{SERVICES_SECTION}}{{APP_CREDS_SECTION}}
+{{SERVICES_SECTION}}{{APP_CREDS_SECTION}}{{MEMORY_PACK_SECTION}}

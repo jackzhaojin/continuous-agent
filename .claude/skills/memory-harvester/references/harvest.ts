@@ -1,6 +1,11 @@
 /**
  * Harvester driver — invoked by the memory-harvester skill via Bash.
  *
+ * NOTE (V3.0 unification): the canonical write surface is now the unified CLI
+ *   `mem0-cli.ts add --payload …` (same behavior, one entrypoint for read+write).
+ * This file remains as a still-working alias so existing references keep passing;
+ * prefer `mem0-cli.ts add` in new SKILL.md instructions.
+ *
  *   npx tsx .claude/skills/memory-harvester/references/harvest.ts \
  *     --payload '<json MemoryWrite>'
  *

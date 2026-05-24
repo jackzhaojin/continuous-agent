@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Ergonomic wrapper for the unified mem0 CLI so commands read like `bin/mem0 search …`.
+# The intelligence lives in the memory-reader / memory-harvester SKILL.md files;
+# this is just deterministic plumbing. Executive-only — never shipped to workers.
+set -euo pipefail
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+exec npx tsx "$REPO_ROOT/.claude/skills/memory-harvester/references/mem0-cli.ts" "$@"

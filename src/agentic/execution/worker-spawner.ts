@@ -205,7 +205,7 @@ function copySourceProject(sourcePath: string, targetPath: string): boolean {
  * This is called before each worker spawn to ensure files are fresh.
  * Skipped for self-enhance/skill-build workers (they use the agent repo directly).
  */
-function setupAgentOutputsRoot(): void {
+function setupAgentOutputsRoot(memoryPack?: string): void {
   // Best-effort cleanup of stale local dev servers from previous worker sessions.
   // Prevents port collisions (3000, 3001, ...) across step retries.
   // Scoped to processes rooted under AGENT_OUTPUTS_BASE so we don't nuke the
@@ -266,7 +266,7 @@ function setupAgentOutputsRoot(): void {
   }
 
   // Generate CLAUDE.md at ai-sandbox root
-  generateOutputsClaudeMd();
+  generateOutputsClaudeMd(memoryPack);
 }
 
 /**
@@ -274,7 +274,7 @@ function setupAgentOutputsRoot(): void {
  * This is what the Agent SDK reads when cwd is set to ai-sandbox/.
  * Explains the monorepo structure and rules for workers.
  */
-function generateOutputsClaudeMd(): void {
+function generateOutputsClaudeMd(memoryPack?: string): void {
   // Check for available app credentials to include in worker instructions
   const appEnvPath = path.join(AGENT_OUTPUTS_BASE, '.env.app');
   const appCredNames = existsSync(appEnvPath) ? getAvailableAppCredentialNames(appEnvPath) : [];
@@ -326,9 +326,17 @@ ${replaceLines.length > 0 ? `\n### Do NOT use local alternatives when a cloud se
     return;
   }
 
+  // V3.0: Memory Pack (Hook B). Static markdown built by the executive; the
+  // worker reads it as context and never calls mem0 itself. Empty when the hook
+  // is off or surfaced nothing.
+  const memorySection = memoryPack && memoryPack.trim().length > 0
+    ? `\n\n${memoryPack.trim()}\n`
+    : '';
+
   const content = templateBody
     .replace('{{SERVICES_SECTION}}', servicesSection)
-    .replace('{{APP_CREDS_SECTION}}', appCredsSection);
+    .replace('{{APP_CREDS_SECTION}}', appCredsSection)
+    .replace('{{MEMORY_PACK_SECTION}}', memorySection);
 
   // Only write if content actually changed (avoid unnecessary disk writes)
   if (existsSync(claudeMdPath)) {
@@ -349,7 +357,7 @@ ${replaceLines.length > 0 ? `\n### Do NOT use local alternatives when a cloud se
  * This is parallel to setupAgentOutputsRoot() which targets the legacy
  * monorepo. Both can run in the same loop iteration without conflict.
  */
-function setupWorktreeProject(worktreePath: string, slug: string): void {
+function setupWorktreeProject(worktreePath: string, slug: string, memoryPack?: string): void {
   if (!existsSync(worktreePath)) return;
 
   // Copy worker .env (synced from .env.worker or .env)
@@ -401,7 +409,7 @@ You are working in a per-project git worktree at \`${worktreePath}\` on branch \
 3. **Branch is \`proj/${slug}\`** off the immutable \`base\` branch. Don't switch branches; commit your work directly here.
 4. **Do NOT create a nested \`.claude/\`** — the one at this worktree root is shared by Skill/Task tools.
 5. **Projects CAN have their own CLAUDE.md** — it inherits from this root file and adds project-specific context.
-${appCredsSection}`;
+${appCredsSection}${memoryPack && memoryPack.trim().length > 0 ? `\n${memoryPack.trim()}\n` : ''}`;
 
   const claudeMdPath = path.join(worktreePath, 'CLAUDE.md');
   if (existsSync(claudeMdPath)) {
@@ -818,7 +826,7 @@ export async function spawnWorker(
       // into it instead of the legacy monorepo. Monorepo mode keeps using
       // the centralized AGENT_OUTPUTS_BASE setup unchanged.
       if (resolution.build_target === 'worktree') {
-        setupWorktreeProject(projectPath, slug);
+        setupWorktreeProject(projectPath, slug, workItem?.memory_pack);
       }
 
       // V1.2: Copy-in from source project if specified
@@ -902,7 +910,7 @@ export async function spawnWorker(
   // Self-enhance/skill-build also skip — they work in the agent repo which
   // already has .claude/.
   if (!isSelfEnhance && !isSkillBuild && buildTargetMode === 'monorepo') {
-    setupAgentOutputsRoot();
+    setupAgentOutputsRoot(workItem?.memory_pack);
   }
 
   // Compute the project path label that workers see in their prompts.

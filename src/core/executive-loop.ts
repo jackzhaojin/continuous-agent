@@ -16,7 +16,7 @@ import path from 'path';
 
 // CORE
 import { logAgentic, logDeterministic, log, logHealthStatus, closeLogStream } from './logging.js';
-import type { HealthStatus, LoopState, WorkerResult, WorkStep } from './types.js';
+import type { HealthStatus, LoopState, WorkerResult, WorkStep, WorkItem } from './types.js';
 
 // AGENTIC - AI decision-making
 import { selectWorkWithSteps } from '../agentic/work-selection/work-selector.js';
@@ -93,6 +93,11 @@ import { spawnWorker } from '../agentic/execution/worker-spawner.js';
 // v2.1.7 - Integration validator (Phase 5b)
 import { runIntegrationValidator, shouldRunIntegrationValidator } from '../agentic/execution/integration-validator-runner.js';
 
+// V3.0 - Agentic memory hooks (A–E). All gated behind V3_MEMORY_ENABLED + per-hook
+// flags (default OFF) inside runMemoryHook — a disabled hook no-ops cleanly.
+import { runMemoryHook } from '../agentic/memory/run-hook.js';
+import type { HookName, HookContext } from '../agentic/memory/types.js';
+
 // Load environment variables (tiered)
 const envFiles = ['.env.executive', '.env.worker', '.env'];
 for (const envFile of envFiles) {
@@ -138,6 +143,47 @@ type IterationResult =
 
 // V2.0: Loop-until-progress iteration cap
 const MAX_LOOP_ITERATIONS = 3;
+
+// ─── V3.0 agentic memory helpers ─────────────────────────────────────────────
+// Thin wrappers around runMemoryHook. The hooks are gated OFF by default inside
+// runMemoryHook (V3_MEMORY_ENABLED + per-hook flag), so these are inert until a
+// flag is flipped. memory failures must NEVER block the loop (decision doc §5).
+
+/** Bundle slug for memory scoping: bundle dir basename, else slugified title. */
+function deriveMemorySlug(workItem: WorkItem): string {
+  const fromPath = workItem.source_path
+    ? path.basename(workItem.source_path)
+    : '';
+  const raw = fromPath || workItem.title;
+  return raw
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60) || 'untitled';
+}
+
+/** Episodic run id `YYYY-MM-DD-{slug}-{nonce}` (taxonomy §A.2). */
+function makeHarvestRun(slug: string): string {
+  const date = new Date().toISOString().slice(0, 10);
+  const nonce = Math.random().toString(36).slice(2, 8);
+  return `${date}-${slug}-${nonce}`;
+}
+
+/**
+ * Run a memory hook without ever letting it crash or stall the loop.
+ * runMemoryHook already no-ops when gated off and catches its own errors;
+ * this adds the loop-side try/catch + WORKER_MEMORY_UNAVAILABLE logging.
+ */
+async function safeMemoryHook(name: HookName, ctx: HookContext) {
+  try {
+    const r = await runMemoryHook(name, ctx);
+    if (r.error) log(`  [MEMORY] WORKER_MEMORY_UNAVAILABLE (${name}): ${r.error}`);
+    return r;
+  } catch (e) {
+    log(`  [MEMORY] WORKER_MEMORY_UNAVAILABLE (${name}): ${(e as Error).message}`);
+    return { ran: false, finalText: '', error: (e as Error).message };
+  }
+}
 
 /**
  * Detect if meaningful progress was made in the output directory.
@@ -267,6 +313,17 @@ async function runIteration(): Promise<IterationResult> {
   // === PHASE 3: SELECT WORK ===
   setDashboardPhase(3);
   logAgentic('PHASE 3: Select Work (Priority: P0 > P1 > P2 > P3 > P4)');
+
+  // HOOK A — pre-work-selection memory consult (read-only; flag-gated OFF).
+  // Surfaces prior-run lessons that should bias selection. Consumed by future
+  // agentic selection; for now its synthesis is logged for audit.
+  const memA = await safeMemoryHook('pre-work-selection', {
+    queueSummary: 'priority-ordered goal bundles (P0 > P1 > P2 > P3 > P4)',
+  });
+  if (memA.ran && memA.finalText) {
+    log(`  [MEMORY] pre-work-selection consult:\n${memA.finalText.slice(0, 600)}`);
+  }
+
   const selectedWork = await selectWorkWithSteps();
 
   if (!selectedWork) {
@@ -286,6 +343,11 @@ async function runIteration(): Promise<IterationResult> {
         const reportPath = await runWeeklyRetrospective();
         if (reportPath) {
           logAgentic(`  Retrospective complete: ${reportPath}`);
+
+          // HOOK E — post-retro harvest (write; flag-gated OFF). Distills the
+          // new retro doc into reflective/semantic/procedural memories.
+          await safeMemoryHook('post-retro-harvest', { retroPath: reportPath });
+
           return 'work_completed';
         } else {
           logAgentic('  Retrospective failed (non-blocking)');
@@ -410,6 +472,34 @@ async function runIteration(): Promise<IterationResult> {
   const patternResolution = resolveExecutionPattern(workItem, matchedPlaybook);
   workItem.execution_pattern = patternResolution.pattern;
   log(`  Execution pattern: ${patternResolution.pattern} (${patternResolution.source})`);
+
+  // HOOK B — pre-spawn memory pack (read-only; flag-gated OFF). Builds a
+  // `## Memory Pack` markdown block; worker-spawner appends it to the worker's
+  // generated CLAUDE.md. Workers never call mem0 — this is the only path memory
+  // reaches a worker. Runs before any spawn path (harness / pipeline / standard).
+  {
+    const slug = deriveMemorySlug(workItem);
+    const memB = await safeMemoryHook('pre-spawn-pack', {
+      workItem: {
+        id: workItem.id,
+        title: workItem.title,
+        description: workItem.description,
+        priority: workItem.priority,
+        bundle_slug: slug,
+        app_id: slug,
+        output_path: workItem.output_path,
+      },
+      currentStep: currentStep
+        ? { step_number: currentStep.step_number, title: currentStep.title }
+        : undefined,
+      executionPattern: patternResolution.pattern,
+      vendor: workItem.worker_vendor ?? process.env.WORKER_VENDOR ?? 'claude',
+    });
+    if (memB.ran && memB.memoryPack) {
+      workItem.memory_pack = memB.memoryPack;
+      log(`  [MEMORY] pre-spawn pack: ${memB.memoryPack.length} chars → worker CLAUDE.md`);
+    }
+  }
 
   // V2.0: Route by execution pattern
   let result: WorkerResult | null = null;
@@ -688,6 +778,25 @@ async function runIteration(): Promise<IterationResult> {
       });
     }
 
+    // HOOK C — post-run harvest (write; flag-gated OFF). Decides 0–3 memories
+    // (episodic + optional semantic/procedural) from this successful run.
+    {
+      const slug = deriveMemorySlug(workItem);
+      await safeMemoryHook('post-run-harvest', {
+        workItem: {
+          id: workItem.id,
+          title: workItem.title,
+          priority: workItem.priority,
+          bundle_slug: slug,
+          app_id: slug,
+        },
+        outputPath: result.output_path,
+        vendor: workItem.worker_vendor ?? process.env.WORKER_VENDOR ?? 'claude',
+        validationReport: { passed: true },
+        harvestRun: makeHarvestRun(slug),
+      });
+    }
+
     loopState.last_work_at = new Date().toISOString();
     return 'work_completed';
   }
@@ -765,6 +874,25 @@ async function runIteration(): Promise<IterationResult> {
   // === PHASE 7: AGENTIC DIAGNOSIS (after 3 failures) ===
   if (retry.attempts >= 3) {
     logAgentic('PHASE 7: Agentic Diagnosis (Investigate Failure)');
+
+    // HOOK D — failure-diagnosis memory consult (read-only; flag-gated OFF).
+    // Surfaces prior failures with similar signals + successful retry strategies
+    // before the deterministic diagnosis runs. Logged for audit; future versions
+    // feed it into diagnoseFailure().
+    {
+      const slug = deriveMemorySlug(workItem);
+      const memD = await safeMemoryHook('failure-diagnosis', {
+        workItem: { id: workItem.id, title: workItem.title, bundle_slug: slug, app_id: slug },
+        failureSignals: {
+          attempts: retry.attempts,
+          lastError: retry.lastError,
+          outputPath: result?.output_path,
+        },
+      });
+      if (memD.ran && memD.finalText) {
+        log(`  [MEMORY] failure-diagnosis consult:\n${memD.finalText.slice(0, 600)}`);
+      }
+    }
 
     const diagnosis = await diagnoseFailure(
       workItem,

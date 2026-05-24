@@ -34,6 +34,20 @@ export const TIER1_EXECUTIVE_KEYS = new Set([
   'NOTION_DATABASE_ID',
   'NOTION_MONTHLY_PAGE_ID',
   'NOTION_REPORTING_ENABLED',
+  // V3.0 second brain — executive-tier ONLY. Workers never call mem0; they are
+  // fed a static Memory Pack in CLAUDE.md. These keys must never reach a worker.
+  'V3_MEMORY_ENABLED',
+  'V3_MEM0_API_KEY',
+  'V3_MEM0_USER_ID',
+  'V3_MEM0_TOP_K',
+  'V3_MEM0_CONFIDENCE_FLOOR',
+  'V3_MEM0_ENV',
+  'V3_MEM0_COHORT',
+  'V3_MEM_HOOK_POST_RUN',
+  'V3_MEM_HOOK_PRE_SPAWN',
+  'V3_MEM_HOOK_PRE_WORK',
+  'V3_MEM_HOOK_FAIL_DIAG',
+  'V3_MEM_HOOK_POST_RETRO',
 ]);
 
 // ── Known Tier 2 (Worker/Execution) variable names ───────────────

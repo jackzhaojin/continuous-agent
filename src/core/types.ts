@@ -232,6 +232,12 @@ export interface WorkItem {
   //             Otherwise commits on the current branch.
   target_branch?: string;
 
+  // V3.0: Memory Pack built by Hook B (pre-spawn-pack) before worker spawn.
+  // The worker-spawner appends this verbatim as a `## Memory Pack` section in
+  // the worker's generated CLAUDE.md. Workers never call mem0 — this is the only
+  // path prior memory reaches a worker. Set per-spawn, never persisted to disk.
+  memory_pack?: string;
+
   // v2.4.2: PROMPT.md frontmatter tags (e.g. [no-ui, no-database, backend]).
   // Breakdown uses these as hard suppression signals for prereq insertion.
   tags?: string[];

@@ -68,3 +68,6 @@ docker-volumes/
 capabilities/
 learning/
 workspace/
+
+# Local MCP config — contains inlined mem0 API key, do not commit
+.mcp.json

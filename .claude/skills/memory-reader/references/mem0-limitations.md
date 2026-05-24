@@ -6,15 +6,16 @@
 
 ---
 
-## TL;DR — the seven things to remember
+## TL;DR — the eight things to remember
 
 1. **Writes are async.** `add()` returns `PENDING` in <1s; the memory is durably written after ~3–5s server-side, polled via `GET /v1/event/{eventId}/`.
 2. **Reads can't find writes from the same turn.** Plan write turns and read turns separately.
 3. **No multi-hop traversal.** Mem0 ranks by semantic similarity; it does **not** walk the entity graph. If two memories are linked through a third, retrieval will only surface the third if its text matches the query.
-4. **`getAll()` is unreliable.** Returns `count: 0` even with valid scope filters. Enumerate via paginated search instead.
-5. **Three different casing rules** depending on which surface you touch.
-6. **mem0 paraphrases content during extraction.** Embed literal identifiers (tags, IDs, dates) if you need to find a memory back by exact match.
-7. **Use the stdio MCP server, not the hosted HTTP one** — the hosted endpoint at `https://mcp.mem0.ai/mcp` requires OAuth handshake, not static bearer auth.
+4. **`getAll()` is broken.** Returns `count: 0` even with valid scope filters. Enumerate via paginated search instead.
+5. **Always nest scope under `filters`** — `{ filters: { user_id: … } }` (bare object works) or `{ filters: { AND: [{ user_id: … }] } }` (also works). What does NOT work: passing `user_id` as a *top-level* search option (SDK errors), and the hosted MCP's auto-`user_id` injection (silently empty). See §4b. **The `mem0` CLI bakes the safe form in** — you never write raw filters.
+6. **Three different casing rules** depending on which surface you touch.
+7. **mem0 paraphrases content during extraction.** Embed literal identifiers (tags, IDs, dates) if you need to find a memory back by exact match.
+8. **The executive reads/writes via the `mem0` CLI, not the MCP.** The hosted HTTP MCP (`https://mcp.mem0.ai/mcp/`) is wired in `.mcp.json` for *ad-hoc human use in Claude Code only*. See §7.
 
 ---
 
@@ -86,6 +87,37 @@ Same filter shape that `search()` accepts returns `{ count: 0, results: [] }` fr
 
 Verified through both the SDK and the MCP wrapper — the bug is upstream in mem0's `/v3/memories/` list endpoint.
 
+> Doc-drift note: `ai-docs/v3/2026-05-16-v3.0/second-brain-hosting-decision.md:193` still shows `client.getAll({ filters })` for snapshots. That is superseded — the snapshot/enumerate path uses paginated `search()`.
+
+---
+
+## 4b. Where scope filters go (the empty-results trap)
+
+**Verified 2026-05-23 (SDK `mem0ai@3.0.3` + hosted MCP).** Two different surfaces, two different failure modes — this is the most common way to get a falsely-empty result.
+
+**SDK (`client.search`) — what works, measured (10 results each):**
+
+```jsonc
+// ✅ bare object under `filters`
+{ "filters": { "user_id": "irin.julg" }, "version": "v2", "topK": 10 }
+// ✅ AND-wrapped under `filters`
+{ "filters": { "AND": [ { "user_id": "irin.julg" } ] }, "version": "v2" }
+
+// ❌ entity param at the TOP LEVEL (no `filters` key) — SDK throws:
+client.search("…", { user_id: "irin.julg" })
+//   "Top-level entity parameters [user_id] are not supported. Use filters: { user_id }."
+```
+
+So on the SDK the rule is simply: **nest scope under `filters`** (either form). Both `cleanup.ts` (bare object) and the `mem0` CLI (AND-wrapped) are correct.
+
+**Hosted MCP (`mcp__mem0__search_memories`) — different:** it **auto-injects `user_id`**, but that injection does **not** match — searches come back `{ results: [] }` even though the dashboard shows data. You must pass an explicit `filters: { AND: [{ user_id: … }] }` argument. (This is exactly why ad-hoc MCP searches "find nothing.") The bare `{ user_id }` argument was also observed empty through the MCP. **Use the AND-wrapped form for any MCP search.**
+
+**Operational rule:**
+
+- The executive **always goes through the `mem0` CLI**, which AND-wraps from `--user-id`/`--app-id`/`--run-id` flags — the form that works on *both* SDK and MCP. You never hand-write a filter.
+- `--type` and `--min-confidence` are applied client-side by the CLI (mem0 metadata-field filtering is unreliable), so they always behave.
+- Ad-hoc MCP search in Claude Code: pass `filters: { AND: [{ user_id: "…" }] }` explicitly, or you'll get a false empty.
+
 ---
 
 ## 5. Three casing rules
@@ -127,32 +159,22 @@ The discriminator (canary tag, timestamp) survived. The prose was rewritten.
 
 ---
 
-## 7. Stdio MCP server only; hosted HTTP MCP doesn't work with bearer auth
+## 7. The executive uses the CLI, not the MCP (MCP is ad-hoc-only)
 
-The hosted endpoint at `https://mcp.mem0.ai/mcp` returns empty results from every search/list when authenticated with a static `Authorization: Bearer ${MEM0_API_KEY}` header. No error — silent empty. It expects an OAuth handshake triggered by `npx mcp-add` (browser flow).
+**Decision (2026-05-23):** the executive agent reads and writes the second brain **only through the `mem0` CLI** (`mem0-cli.ts`, driven via Bash inside its hook `query()` turns). The hook turns get `allowedTools: ['Bash','Read','Skill']` and **no `mcpServers`**. This keeps memory access agentic (the LLM composes and iterates CLI commands) without coupling the loop to an MCP transport.
 
-**Operational rule:**
+**The mem0 MCP server is wired in `.mcp.json` for ad-hoc human use only** — inspecting/searching from interactive Claude Code. It is the hosted HTTP server:
 
-- The executive uses **stdio MCP only** — `uvx mem0-mcp-server` launched in-process by Agent SDK's `mcpServers` config.
-- The hosted HTTP MCP is for interactive clients (Cursor, Claude Code GUI) that can do browser OAuth. Not for programmatic agents.
-
-**Locked production MCP config:**
-
-```typescript
-mcpServers: {
-  mem0: {
-    type: "stdio",
-    command: "uvx",
-    args: ["mem0-mcp-server"],
-    env: {
-      MEM0_API_KEY: process.env.V3_MEM0_API_KEY!,
-      MEM0_DEFAULT_USER_ID: process.env.V3_MEM0_USER_ID!,
-    },
-  },
-}
+```jsonc
+// .mcp.json (interactive Claude Code only — NOT used by the executive loop)
+{ "mcpServers": { "mem0": {
+  "type": "http",
+  "url": "https://mcp.mem0.ai/mcp/",                 // trailing slash required (else 307)
+  "headers": { "Authorization": "Token m0-…" }       // Token, NOT Bearer
+}}}
 ```
 
-`uvx` must be on `PATH`. Install via `pip install uv` if missing.
+Auth correction (2026-05-23): the hosted HTTP MCP **works fine with `Authorization: Token <key>`** (verified — returns a valid `initialize` handshake and live data). An earlier note here claimed the hosted endpoint only works via OAuth/`npx mcp-add`; that was wrong for the `Token` scheme. `Bearer` does fail; use `Token`. The earlier "stdio `uvx mem0-mcp-server` only" guidance is superseded — neither stdio nor MCP is on the executive's path anymore.
 
 ---
 
@@ -179,45 +201,53 @@ mem0 v3 automatically extracts the following on each memory write — they appea
 ## 10. Locked production pattern (summary)
 
 ```
-WRITES  →  memory-harvester skill
-           - decides agentically WHEN to harvest (post-run, post-retro, spec merge)
-           - calls SDK client.add() via references/harvest.ts (Bash-invoked)
-           - blocks on pollEventTerminal(eventId) until SUCCEEDED
-           - persists memory_id to ledgers/harvest-runs/{date}.jsonl
+WRITES  →  memory-harvester skill (executive hook query() turn)
+           - decides agentically WHAT/WHEN to harvest (post-run, post-retro, spec merge)
+           - Bash → `mem0 add --payload '<json>'` (mem0-cli.ts)
+             → applyDefaults → assertValid → client.add() → pollEventTerminal → ledger
+           - blocks until SUCCEEDED; persists memory_id to ledgers/harvest-runs/{date}.jsonl
            - SINGLE WRITER — workers and ad-hoc scripts never write
 
-READS   →  executive Agent SDK query() at lifecycle hooks
-           - mcpServers: { mem0: uvx-stdio + MEM0_API_KEY env }
-           - allowedTools: read-only mem0 tools only
-             (mcp__mem0__search_memories, get_memories, get_memory, list_entities)
-           - LLM decides when to query; runs multiple iterative searches naturally
+READS   →  memory-reader skill (executive hook query() turn)
+           - allowedTools: ['Bash','Read'] — NO mcpServers
+           - Bash → `mem0 search --query … [--app-id] [--type] --top-k 10` (mem0-cli.ts)
+           - LLM composes + iterates queries naturally (iterative search = the multi-hop)
            - returned content optionally formatted into a Memory Pack for worker CLAUDE.md
+
+MCP     →  ad-hoc human inspection only, via .mcp.json (hosted HTTP, Token auth)
+           - never in the executive's query() options
 ```
 
 **Anti-patterns to reject in code review:**
 
-- Direct `client.add()` from worker code → harvester only.
-- `mcp__mem0__add_memory` in any executive `allowedTools` list → read-only only.
+- Direct `client.add()` from worker code → harvester (CLI) only.
+- `mcpServers` in an executive hook `query()` → the executive uses the CLI, not MCP.
+- A `user_id` passed as a top-level search option (not under `filters`) → SDK throws; nest under `filters` or use the CLI (§4b).
 - Write-then-query in the same turn → split into two turns.
-- Trusting `getAll` results → use paginated search.
-- Using `Authorization: Bearer` against the raw v1 event endpoint → `Token` scheme.
+- Trusting `getAll` results → use paginated `search` / `mem0 enumerate`.
+- Using `Authorization: Bearer` against the raw v1 event endpoint or hosted MCP → `Token` scheme.
 - Putting prompt strings in TypeScript → markdown only.
 
 ---
 
 ## 11. Scoping defaults the reader should use
 
-```typescript
-filters: {
-  user_id: process.env.V3_MEM0_USER_ID,   // executive agent identity
-  // app_id: bundle slug — set per-call if narrowing to one project
-}
+The reader drives the CLI, which auto-injects `user_id` and AND-wraps (see §4b):
+
+```bash
+./bin/mem0 search --query "<q>" [--app-id <slug>] [--type <t>] --top-k 10 --min-confidence 0.7
 ```
 
-Reader skill enforces these:
+Equivalent filter the CLI builds internally (never hand-write this):
 
-- `topK = V3_MEM0_TOP_K` (default 10)
-- Confidence floor = `V3_MEM0_CONFIDENCE_FLOOR` (default 0.7) — drop results below
+```jsonc
+{ "filters": { "AND": [ { "user_id": "<V3_MEM0_USER_ID>" }, { "app_id": "<slug>" } ] } }
+```
+
+Reader budget:
+
+- `--top-k = V3_MEM0_TOP_K` (default 10)
+- `--min-confidence = V3_MEM0_CONFIDENCE_FLOOR` (default 0.7) — drop results below
 - Memory Pack token budget: ≤2K tokens (truncate by score desc)
 
 These are env-driven so production can tune without code change.
