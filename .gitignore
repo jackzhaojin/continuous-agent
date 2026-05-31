@@ -69,5 +69,10 @@ capabilities/
 learning/
 workspace/
 
+# mem0 second-brain DR snapshots — regenerated daily by the snapshot cron, so
+# they churn every commit. Keep them locally (and in prior git history) but stop
+# tracking new ones. mem0 is a rebuildable projection; git stays source of truth.
+ai-docs/v3/mem0-snapshots/
+
 # Local MCP config — contains inlined mem0 API key, do not commit
 .mcp.json
