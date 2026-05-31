@@ -4,6 +4,33 @@ All notable changes to the Continuous Executive Agent.
 
 Builds are tracked in the sibling `ai-sandbox/` repo. New v2.3 work happens on per-project worktrees at `~/dev/ai-sandbox-worktrees/proj/<slug>/` (branch `proj/<slug>` forked from `base`). Pre-rebaseline builds are preserved on the `monorepo/legacy-v2.2` branch under `projects/{react,nextjs,node,misc}/{date}/` and deployed to [jackzhaojin.github.io/ai-sandbox](https://jackzhaojin.github.io/ai-sandbox/).
 
+## [3.0] - 2026-05-31
+
+**The Second Brain release.** The executive agent now has a *memory*: a mem0-cloud knowledge store it writes to as it works and reads from before it acts. Ledgers, retros, and specs on disk stay canonical — mem0 is a rebuildable projection. Tagged `v3.0.0`. Full provenance (vision → hosting decision → POC → taxonomy → wiring → go-live) in [`ai-docs/v3/2026-05-16-v3.0/`](ai-docs/v3/2026-05-16-v3.0/README.md).
+
+### Added
+- **mem0 second brain (executive-tier only)** — a cloud knowledge store owned and accessed solely by the executive. Four locked pillars: (1) **executive-only** — workers never call mem0, never hold the API key, never get the MCP server; (2) **git is source of truth**, mem0 is a rebuildable projection; (3) **skills-first, not a TS module** — no `src/agentic/memory/` data layer; (4) **CLI, not MCP, for the agent**. Hosting decision + pillars locked in [`2026-05-15-second-brain-hosting-decision.md`](ai-docs/v3/2026-05-16-v3.0/2026-05-15-second-brain-hosting-decision.md).
+- **Two agentic skills** — `memory-harvester` (the **sole writer**: classifies facts into the taxonomy, validates, calls `mem0 add`) and `memory-reader` (read-only: composes natural-language queries agentically, synthesizes for the executive or packs context for a worker). Plus `memory-snapshot` (daily DR backup → `ai-docs/v3/mem0-snapshots/{date}.json`, 04:00 cron) and the harvester's one-time corpus `backfill`.
+- **Unified `./bin/mem0` CLI** (`memory-harvester/references/mem0-cli.ts`) — the single deterministic surface the executive drives via Bash. Bakes in every gotcha: filter shape, snake/camel casing, auth, async-write event polling, schema validation. The mem0 MCP server is a human/ad-hoc tool only.
+- **Five lifecycle hooks (A–E)** wired into the executive loop via `src/agentic/memory/run-hook.ts`, each gated by `V3_MEMORY_ENABLED` (master) plus a per-hook flag: **A** pre-work-selection (read), **B** pre-spawn-pack (read → worker Memory Pack), **C** post-run-harvest (write), **D** failure-diagnosis (read + conditional write), **E** post-retro-harvest (write).
+- **Memory Pack injection** — before each worker spawn, the executive searches mem0 and bakes a ≤2K-token pack into the worker's generated `CLAUDE.md` (`worker-spawner.ts`). Workers consume static markdown; they never query mem0 at runtime.
+- **Taxonomy v1.0.0** — five memory types (`principle`, `semantic`, `procedural`, `episodic`, `reflective`), a 4-field ID convention, `schema_version` stamped on every write, and a `classify.ts` validator that rejects malformed payloads before mem0 sees them. SSOT: `memory-harvester/references/taxonomy.md`.
+- **Corpus backfill** — existing local ledgers, retros, and spec docs migrated into mem0 so the brain didn't start empty (~134 memories). Source→destination trace in [`2026-05-24-1-migration-corpus-backfill.md`](ai-docs/v3/2026-05-16-v3.0/2026-05-24-1-migration-corpus-backfill.md).
+- **`.claude/rules/memory.md`** — new subsystem rule documenting the pillars, two skills, five types, five hooks, agentic retrieval, and gotchas.
+
+### Changed
+- **Retrieval is now agentic and natural-language.** The reader was reframed from a fixed query checklist into a judgment task: the executive decides which prior knowledge serves *this* goal and asks for it in full natural-language questions (mem0 ranks by embedding similarity), iterating 3–8 refined queries — not short keyword bags. Validated E2E (Hook B's pack correctly told a worker to mimic a prior run's module pattern and not push per the constitution).
+- **V3.0 ai-docs reorganized chronologically** — anchor docs date-prefixed by git-initial-creation so the folder reads as the story unfolded; README rewritten as a narrative + full index. New `ai-docs.md` convention: date-prefix doc filenames because sequence matters.
+- **Skills decoupled from ai-docs** — skills must be self-contained; "see ai-docs/…" contract pointers removed (content was already inline).
+
+### Fixed
+- **Silent harvest write failure** — `V3_MEM0_COHORT=` loads via dotenv as `""` (not nullish), which the validator rejects, so **every** write silently failed while the hook still logged "ok". Root-caused and fixed in `memory-harvester/references/defaults.ts` (coerce empty-string env vars with `|| undefined`).
+- **Hook observability** — `run-hook.ts` now logs a tool-name histogram + a 400-char result tail, so a harvest whose writes all failed no longer reads as success.
+- **Hook A idle burn** — pre-work-selection fired unconditionally every 30s idle iteration (~8–14 retrievals each); now guarded to consult only when work is actually queued.
+
+### Rollout status
+Hooks **B/C/D/E are ON**; **A is OFF** until its synthesis actually biases work selection (currently audit-only, pure retrieval cost). The binding constraint is the mem0 Hobby plan's 1K/month retrieval budget — read hooks are the expensive side, and resumes re-pay the full read cost.
+
 ## [2.4] - 2026-04-19
 
 Capability hardening + retro carry-forward. v2.4.0 / v2.4.1 / v2.4.2 are grouped here — sub-releases delivered incrementally but shipped together to main. See [`ai-docs/v2/2026-04-18-v2.4/`](ai-docs/v2/2026-04-18-v2.4/).
