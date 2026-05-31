@@ -131,10 +131,26 @@ export async function runMemoryHook(
     }
 
     const durationMs = Date.now() - t0;
+    // Histogram of tool-call names (e.g. "Read×4, Bash×11, Skill×1") so an
+    // operator can see WHAT the turn did, not just how many calls it made.
+    const toolHistogram = Object.entries(
+      toolCalls.reduce<Record<string, number>>((acc, t) => {
+        acc[t] = (acc[t] ?? 0) + 1;
+        return acc;
+      }, {}),
+    )
+      .map(([n, c]) => `${n}×${c}`)
+      .join(", ");
+    // Tail of the final text — for harvest hooks this captures the write/skip
+    // decision (e.g. "Memories written: 0" or a validation error), which a bare
+    // count hides. Without this, a harvest whose writes all fail still logs "ok".
+    const resultTail = finalText.replace(/\s+/g, " ").trim().slice(-400);
     log(
-      `  [MEMORY] hook ${name} ran: ${toolCalls.length} tool calls, ` +
-        `${durationMs}ms, ${succeeded ? "ok" : "no-success-result"}`,
+      `  [MEMORY] hook ${name} ran: ${toolCalls.length} tool calls ` +
+        `[${toolHistogram || "none"}], ${durationMs}ms, ` +
+        `${succeeded ? "ok" : "no-success-result"}`,
     );
+    if (resultTail) log(`  [MEMORY] hook ${name} result tail: …${resultTail}`);
 
     const result: HookResult = {
       ran: true,

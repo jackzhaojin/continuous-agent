@@ -93,9 +93,18 @@ export interface PartialMemoryWrite {
  * fills env-derived fields, but the caller still owns the semantic fields.
  */
 export function applyDefaults(partial: PartialMemoryWrite): MemoryWrite {
-  const userIdFromEnv = process.env.V3_MEM0_USER_ID;
-  const envFromEnv = process.env.V3_MEM0_ENV as "test" | "dev" | "prod" | undefined;
-  const cohortFromEnv = process.env.V3_MEM0_COHORT;
+  // Coerce empty-string env vars to undefined. dotenv loads `V3_MEM0_COHORT=`
+  // (the documented "empty in prod" line) as "", which is NOT nullish — so a bare
+  // `?? ` chain would stamp `cohort: ""` and the validator rejects empty-string
+  // cohort, silently failing every write. `|| undefined` maps "" → undefined so
+  // the optional field is correctly omitted. Same guard for env (blank → default).
+  const userIdFromEnv = process.env.V3_MEM0_USER_ID || undefined;
+  const envFromEnv = (process.env.V3_MEM0_ENV || undefined) as
+    | "test"
+    | "dev"
+    | "prod"
+    | undefined;
+  const cohortFromEnv = process.env.V3_MEM0_COHORT || undefined;
 
   const user_id = partial.user_id ?? userIdFromEnv ?? "";
   const agent_id = partial.agent_id ?? "executive";
