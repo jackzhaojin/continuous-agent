@@ -147,7 +147,7 @@ Why good wins: names the bug pattern, lists confirming runs, points at the must-
 > "Workers shouldn't write to memory."
 
 **Good:**
-> "V3.0 Pillar 1 (executive-only writer): Workers, ad-hoc scripts, and the conversational executive never call `client.add()` directly. The `memory-harvester` skill is the SOLE WRITER. Locked in `ai-docs/v3/2026-05-16-v3.0/second-brain-hosting-decision.md` §V3.0 Pillars."
+> "V3.0 Pillar 1 (executive-only writer): Workers, ad-hoc scripts, and the conversational executive never call `client.add()` directly. The `memory-harvester` skill is the SOLE WRITER. Locked in `workspace/constitution.md` §V3.0 Pillars."
 
 Why good wins: pillar number, exact mechanism (`client.add()`), the locked skill name, the spec section.
 

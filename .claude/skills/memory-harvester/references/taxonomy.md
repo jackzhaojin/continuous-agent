@@ -246,7 +246,7 @@ Every change updates:
 ### Example 3: Spec-merge principle (immutable)
 ```json
 {
-  "text": "Constitutional pillar: workers never call mem0 directly. The executive harvester is the SOLE WRITER. Source: ai-docs/v3/2026-05-16-v3.0/second-brain-hosting-decision.md §V3.0 Pillars.",
+  "text": "Constitutional pillar: workers never call mem0 directly. The executive harvester is the SOLE WRITER. Source: workspace/constitution.md §V3.0 Pillars.",
   "user_id": "irin-julg",
   "agent_id": "executive",
   "app_id": "_global",
@@ -260,7 +260,7 @@ Every change updates:
     "confidence": 1.0,
     "trigger": "spec-merge",
     "actor": "human",
-    "source": "ai-docs/v3/2026-05-16-v3.0/second-brain-hosting-decision.md",
+    "source": "workspace/constitution.md",
     "harvest_run": "2026-05-16-spec-v3-second-brain",
     "tags": ["pillar", "executive-only", "harvester"]
   },

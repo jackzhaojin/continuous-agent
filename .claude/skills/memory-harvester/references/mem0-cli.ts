@@ -14,7 +14,7 @@
  *   update   --id <memoryId> [--text <t>] [--importance <i>]      (metadata merge)
  *   enumerate [--user-id] [--app-id] [--max <n>] [--json]         (paginated search, NOT getAll)
  *
- * Design contract (see ai-docs/v3/2026-05-16-v3.0/implementation-plan-1-agentic-memory.md):
+ * Design contract:
  *   - The AGENT decides WHAT (which queries, what to write, how to iterate).
  *   - This CLI enforces HOW (correct filter shape, snake/camel, auth, event
  *     polling, schema validation). The agent never has to remember the gotchas.

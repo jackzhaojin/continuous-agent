@@ -37,7 +37,7 @@ Read the source artifact fully before classifying. Don't write a memory from a p
 
 ## STEP 2 — Classify each candidate fact
 
-Five canonical types (from §Memory Classification Scheme in `second-brain-hosting-decision.md`):
+Five canonical types (full SSOT in `references/taxonomy.md`):
 
 | `type` | What it captures | `immutable` default | Typical `confidence` |
 |---|---|---|---|

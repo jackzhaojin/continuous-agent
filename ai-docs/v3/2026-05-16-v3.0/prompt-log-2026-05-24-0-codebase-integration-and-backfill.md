@@ -5,7 +5,7 @@
 **Agent**: claude-code
 **Project**: continuous-agent
 **Status**: Complete ✅
-**Deliverable**: [implementation-plan-1-agentic-memory.md](./implementation-plan-1-agentic-memory.md) + [2026-05-24-1-migration-corpus-backfill.md](./2026-05-24-1-migration-corpus-backfill.md)
+**Deliverable**: [2026-05-16-implementation-plan-1-agentic-memory.md](./2026-05-16-implementation-plan-1-agentic-memory.md) + [2026-05-24-1-migration-corpus-backfill.md](./2026-05-24-1-migration-corpus-backfill.md)
 
 ---
 

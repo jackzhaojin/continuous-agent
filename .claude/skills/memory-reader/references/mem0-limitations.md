@@ -87,7 +87,7 @@ Same filter shape that `search()` accepts returns `{ count: 0, results: [] }` fr
 
 Verified through both the SDK and the MCP wrapper — the bug is upstream in mem0's `/v3/memories/` list endpoint.
 
-> Doc-drift note: `ai-docs/v3/2026-05-16-v3.0/second-brain-hosting-decision.md:193` still shows `client.getAll({ filters })` for snapshots. That is superseded — the snapshot/enumerate path uses paginated `search()`.
+> Note: the snapshot/enumerate path uses paginated `search()`, never `client.getAll({ filters })` (which is broken in v3, per the bug above).
 
 ---
 

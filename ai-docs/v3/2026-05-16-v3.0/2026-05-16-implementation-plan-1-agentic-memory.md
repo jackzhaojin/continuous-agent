@@ -4,8 +4,8 @@ status: Phases 1–4 complete; Phase 5 awaiting executive-loop integration appro
 created_on: 2026-05-16
 amended_on: 2026-05-16
 applies_to:
-  - ai-docs/v3/2026-05-16-v3.0/goal.md
-  - ai-docs/v3/2026-05-16-v3.0/second-brain-hosting-decision.md
+  - ai-docs/v3/2026-05-16-v3.0/2026-04-03-goal.md
+  - ai-docs/v3/2026-05-16-v3.0/2026-05-15-second-brain-hosting-decision.md
 related:
   - .claude/skills/memory-harvester/references/taxonomy.md
   - .claude/skills/memory-harvester/references/playbook.md

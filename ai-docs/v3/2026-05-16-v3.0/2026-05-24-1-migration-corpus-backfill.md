@@ -4,8 +4,8 @@ date: 2026-05-24
 status: Complete (validated PASS)
 type: migration-record
 related:
-  - ai-docs/v3/2026-05-16-v3.0/second-brain-hosting-decision.md
-  - ai-docs/v3/2026-05-16-v3.0/implementation-plan-1-agentic-memory.md
+  - ai-docs/v3/2026-05-16-v3.0/2026-05-15-second-brain-hosting-decision.md
+  - ai-docs/v3/2026-05-16-v3.0/2026-05-16-implementation-plan-1-agentic-memory.md
   - .claude/skills/memory-harvester/references/backfill.md
   - .claude/skills/memory-harvester/references/taxonomy.md
   - ai-docs/v3/mem0-snapshots/2026-05-24.json

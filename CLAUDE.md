@@ -76,6 +76,14 @@ V2_TRACK_RECORDS=true          # Update track_record in SKILL.md files
 IDENTITY_ENABLED=true          # Master switch for Gmail + Discord
 GMAIL_ENABLED=true             # Gmail inbox checking
 DISCORD_ENABLED=true           # Discord notifications
+
+# V3.0 second brain (memory) — see .claude/rules/memory.md
+V3_MEMORY_ENABLED=true         # Master switch for the mem0 second brain
+V3_MEM_HOOK_POST_RUN=true      # Hook C — post-run harvest (write)
+V3_MEM_HOOK_PRE_SPAWN=true     # Hook B — pre-spawn worker memory pack (read)
+V3_MEM_HOOK_FAIL_DIAG=true     # Hook D — failure-diagnosis consult (read + conditional write)
+V3_MEM_HOOK_POST_RETRO=true    # Hook E — post-retro harvest (write)
+V3_MEM_HOOK_PRE_WORK=false     # Hook A — pre-work-selection (read); OFF until it biases selection
 ```
 
 `V2_PROMPT_COMPOSITION` has been removed — V2 skill-based composition is now the only path.
@@ -95,6 +103,7 @@ Claude Code auto-loads these via `.claude/rules/`. **Other agents (Codex, Kimi, 
 | [`.claude/rules/credentials-and-env.md`](.claude/rules/credentials-and-env.md) | Three-tier credential system, OAuth-first auth, leakage validation |
 | [`.claude/rules/verifiers.md`](.claude/rules/verifiers.md) | Runtime verifier contract, output_path requirement |
 | [`.claude/rules/ledgers.md`](.claude/rules/ledgers.md) | JSONL append-only audit trail, contract log format |
+| [`.claude/rules/memory.md`](.claude/rules/memory.md) | V3.0 second brain — mem0 store, executive-only pillars, 5 hooks, 5 memory types, harvester/reader skills, agentic natural-language retrieval |
 | [`.claude/rules/identity-system.md`](.claude/rules/identity-system.md) | Gmail + Discord identity layer, opt-in feature flags |
 | [`.claude/rules/notion-reporting.md`](.claude/rules/notion-reporting.md) | Fire-and-forget Notion integration, monthly rotation |
 | [`.claude/rules/self-enhancement.md`](.claude/rules/self-enhancement.md) | `[SELF-ENHANCE]` and `[SKILL-BUILD]` goal routing, branch workflow |

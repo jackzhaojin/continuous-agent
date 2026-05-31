@@ -5,7 +5,7 @@ decided_on: 2026-05-15
 amended_on: 2026-05-16
 decision_type: hosting-decision-record
 applies_to:
-  - ai-docs/v3/xxxx-xx-xx-v3.0/goal.md
+  - ai-docs/v3/2026-05-16-v3.0/2026-04-03-goal.md
 supersedes: none
 related:
   - ai-docs/v1/init/continuous-executive-agent-v1-prd.md
@@ -170,7 +170,7 @@ For the V4.0 multi-agent split question (partition by `agent_id` vs `app_id`?), 
 
 ## Activation: staged rollout of memory hooks (2026-05-16 amendment)
 
-All deterministic plumbing and agentic skills are built (`implementation-plan-1-agentic-memory.md` Phases 1–3.5). The five executive-loop hooks turn on **one stage per week** rather than all-at-once. Rationale: we have zero real data on whether the editorial playbooks produce useful memories; staging gives an audit window between each addition.
+All deterministic plumbing and agentic skills are built (`2026-05-16-implementation-plan-1-agentic-memory.md` Phases 1–3.5). The five executive-loop hooks turn on **one stage per week** rather than all-at-once. Rationale: we have zero real data on whether the editorial playbooks produce useful memories; staging gives an audit window between each addition.
 
 | Stage | Hook | Side | Earliest activation |
 |---|---|---|---|
@@ -180,7 +180,7 @@ All deterministic plumbing and agentic skills are built (`implementation-plan-1-
 | 4 | `failure-diagnosis` (D) | Read + conditional write | +7 days from Stage 3 |
 | 5 | `post-retro-harvest` (E) | Write | +7 days from Stage 4 |
 
-Each stage has an audit checklist before the next stage lights up. Full table + flag names in `implementation-plan-1-agentic-memory.md` § Staged rollout of Phase 5.
+Each stage has an audit checklist before the next stage lights up. Full table + flag names in `2026-05-16-implementation-plan-1-agentic-memory.md` § Staged rollout of Phase 5.
 
 The `V3_MEMORY_ENABLED` master flag + per-stage flags (`V3_MEM_HOOK_POST_RUN=true`, etc.) gate each hook independently. A stage that fails its audit is reverted at the flag, no code rollback required.
 
