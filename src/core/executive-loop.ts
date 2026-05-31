@@ -314,14 +314,36 @@ async function runIteration(): Promise<IterationResult> {
   setDashboardPhase(3);
   logAgentic('PHASE 3: Select Work (Priority: P0 > P1 > P2 > P3 > P4)');
 
-  // HOOK A — pre-work-selection memory consult (read-only; flag-gated OFF).
+  // HOOK A — pre-work-selection memory consult (read-only; flag-gated).
   // Surfaces prior-run lessons that should bias selection. Consumed by future
   // agentic selection; for now its synthesis is logged for audit.
-  const memA = await safeMemoryHook('pre-work-selection', {
-    queueSummary: 'priority-ordered goal bundles (P0 > P1 > P2 > P3 > P4)',
-  });
-  if (memA.ran && memA.finalText) {
-    log(`  [MEMORY] pre-work-selection consult:\n${memA.finalText.slice(0, 600)}`);
+  //
+  // GUARD: only consult when work is actually queued. Hook A runs BEFORE
+  // selection, so on an idle loop (empty queue) it would otherwise fire its
+  // 3–8 mem0 searches on every 30s sleep cycle — burning the retrieval budget
+  // on consults about nothing. Check both in-progress/P{0-4} and ondeck (a
+  // bundle may be promoted from ondeck during this same iteration). When no
+  // bundle is pending, skip — selection returns no work anyway.
+  const hasQueuedWork = (() => {
+    const roots = [
+      ...['P0', 'P1', 'P2', 'P3', 'P4'].map((p) =>
+        path.join(process.cwd(), 'workspace', 'in-progress', p),
+      ),
+      path.join(process.cwd(), 'workspace', 'ondeck'),
+    ];
+    return roots.some(
+      (dir) =>
+        existsSync(dir) &&
+        readdirSync(dir, { withFileTypes: true }).some((e) => e.isDirectory()),
+    );
+  })();
+  if (hasQueuedWork) {
+    const memA = await safeMemoryHook('pre-work-selection', {
+      queueSummary: 'priority-ordered goal bundles (P0 > P1 > P2 > P3 > P4)',
+    });
+    if (memA.ran && memA.finalText) {
+      log(`  [MEMORY] pre-work-selection consult:\n${memA.finalText.slice(0, 600)}`);
+    }
   }
 
   const selectedWork = await selectWorkWithSteps();
