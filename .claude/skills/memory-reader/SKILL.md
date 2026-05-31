@@ -20,7 +20,7 @@ You access mem0 **only through the `mem0` CLI**, invoked via Bash. You do NOT us
    2. **There is no multi-hop traversal.** To bridge two facts, issue separate `search` queries.
    3. `enumerate` (paginated search) replaces the broken `getAll`.
    4. **The CLI auto-injects `user_id` and AND-wraps filters** (the form that works on both SDK and the ad-hoc MCP). You never write raw filters; you pass `--user-id`/`--app-id`/`--type` flags. (Trap this avoids: a top-level `user_id` errors on the SDK; the MCP's auto-injection returns empty — see limitations §4b.)
-   5. mem0 paraphrases content — search by entity/identifier, not exact prose.
+   5. mem0 paraphrases stored content, so don't search for verbatim stored prose — but DO query in natural language (full questions/statements), naming key identifiers *within* the sentence. Natural language ≠ keyword bag. See STEP 2.
    6. Semantic search lags direct `get` — fresh writes may not surface immediately.
 3. **`Read .claude/skills/memory-reader/references/scope.md`** — scoping table, env-filter defaults.
 4. **`Read .claude/skills/memory-harvester/references/taxonomy.md`** — same SSOT the harvester writes against, so you know what `--type` values and metadata fields exist.
@@ -35,22 +35,46 @@ You are invoked from one of five lifecycle hooks. The hook's prompt tells you:
 
 If the ask is ambiguous, surface what you've inferred and what you'd query rather than fabricating a query.
 
-## STEP 2 — Plan your queries (iterative, not one-shot)
+## STEP 2 — Decide what memory would actually serve this goal (agentic)
 
-Because mem0 does not walk the entity graph, **one query is almost never enough.** Plan 3–8 `mem0 search` calls that approach the topic from different angles:
+**This is a judgment task, not a template to execute.** You are the executive's
+memory — an agent deciding which past knowledge would genuinely help *this* specific
+situation. Don't run a fixed checklist of queries. Instead: read the context you were
+handed, form a hypothesis about what prior knowledge would change the outcome, then go
+look for it. The angles below are prompts for your *thinking*, not a script to run
+verbatim:
 
-- The literal question text (semantic search)
-- Key entities mentioned (project name, capability, component, vendor)
-- Related failure modes or success patterns
-- Cross-project queries if the lesson might transfer
+- What you most want to know to act well here (ask it directly)
+- Prior runs of this same project/topic — what happened, did it work
+- Failure modes or blockers a future attempt should avoid
+- Vendor / pattern / capability signals relevant to how this will be executed
+- Cross-project lessons that might transfer even from a different domain
 
-Run them, read the results, and **refine the next query based on what came back** — this iteration IS the multi-hop. (The POC verified 5–8 refined searches per planning task surface grounded, citable answers.)
+Because mem0 does not walk the entity graph, **one query is almost never enough** —
+plan on 3–8, and **refine each next query based on what came back.** That iteration
+IS the multi-hop; let the results steer you, don't pre-commit to a query list.
 
-**Stop searching when:**
+**Phrase EVERY query as natural language — not a keyword bag.** mem0 embeds the query
+as a vector and ranks by semantic similarity, so it understands intent from full
+questions/statements. Per mem0's own guidance: *"Use natural language… describe what
+you're looking for naturally."* Mention key identifiers (slug, vendor, error code)
+*within* a natural-language question — never reduce a query to a list of keywords.
+(Reader-side complement to the harvester's "embed literal identifiers": the harvester
+writes them so they survive paraphrasing; you weave them into a sentence so the
+embedding match is strong.)
+
+- ✅ `"What happened in prior React + Vite single-page app builds with vendor claude — did they pass on the first try?"`
+- ❌ `"React Vite build first try claude success"` (keyword bag — weaker, noisier match)
+- ✅ `"Were there npm install or build failures in earlier Vite scaffolds, and how were they fixed?"`
+- ❌ `"npm install build failures vite"`
+
+**Stop searching when** your judgment says you have what helps — concretely:
 
 - The top results stop changing across reformulations
-- You have ≥3 distinct memories above the confidence floor
+- You have ≥3 distinct, genuinely-relevant memories
 - You've issued ~8 queries without diminishing returns
+
+Then synthesize what *matters for this goal* — not everything you found.
 
 ## STEP 3 — How to run the CLI
 

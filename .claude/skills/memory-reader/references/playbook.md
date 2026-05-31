@@ -39,19 +39,23 @@ The selection rules below differ by audience. Read carefully — the same query 
 
 ---
 
-## Section B — Query plan per hook
+## Section B — Query angles per hook (consider, don't execute verbatim)
+
+These are **prompts for your judgment**, not scripts. You are an agent deciding what
+memory serves *this* goal — read the context, decide which angles actually apply, and
+**phrase each query as a natural-language question** (see SKILL STEP 2; never keyword
+bags). The example phrasings below are illustrative starting points; adapt them to the
+real situation and let results steer your follow-ups.
 
 ### `pre-work-selection`
 
-Goal: surface anything that should change which goal we pick.
+Goal: surface anything that should change which goal we pick. Angles worth considering:
+- Prior runs of the top-priority goal's topic — e.g. *"Have we built something like `<topic>` before, and how did those runs turn out?"* (`app_id: <slug>` if known)
+- Failure modes a future attempt should avoid — *"What blockers or failures came up in earlier `<topic>` work?"*
+- Vendor/pattern fit — *"Which vendors or execution patterns struggled with `<topic>`?"* (cross-project, `app_id` unset)
+- Cross-cutting lessons from retros — *"What recent retrospectives mention `<key entity>`?"* (`app_id: _global`, `metadata.type: reflective`)
 
-Queries to issue (in order, refine as results come back):
-1. `"prior runs of <topic of top-priority goal>"` — `app_id: <slug>` if known
-2. `"failures or blockers for <topic>"` — same scope
-3. `"vendors that struggled with <topic>"` — `app_id` unset (cross-project)
-4. `"recent retros mentioning <key entity>"` — `app_id: _global`, `metadata.type: reflective`
-
-Stop when 2 successive queries yield no new IDs.
+Stop when successive queries yield no new IDs, or your judgment says you have enough to inform selection.
 
 ### `pre-spawn-pack`
 
