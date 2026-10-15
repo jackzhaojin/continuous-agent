@@ -26,9 +26,9 @@ Examples: email triage (`inbox-checker.ts`), goal breakdown (`goal-breakdown.ts`
 - **`ai-sandbox/`** (sibling directory) — ALL worker outputs. Rebaselined 2026-04-17 to a worktree-per-project model:
   - `base` — frozen init commit (Apache 2.0 + `.gitignore`). All `proj/<slug>` worktrees fork from here.
   - `main` — empty showcase; finished demos merge here.
-  - `monorepo/legacy-v2.2` — pre-rebaseline flat layout, materialized as the legacy worktree at `~/dev/ai-sandbox-worktrees/monorepo/legacy-v2.2/`. `build_target: monorepo` writes inside it.
+  - `monorepo/legacy-v2.2` — pre-rebaseline flat layout, materialized as the legacy worktree at `../ai-sandbox-worktrees/monorepo/legacy-v2.2/`. `build_target: monorepo` writes inside it.
 
-New project work: a `proj/<slug>` branch in its own worktree at `~/dev/ai-sandbox-worktrees/proj/<slug>/` (tiered-namespace convention — branch namespace mirrors folder hierarchy). Workers NEVER write to the agent codebase. Enforced by Constitution Article I, Section 6.
+New project work: a `proj/<slug>` branch in its own worktree at `../ai-sandbox-worktrees/proj/<slug>/` (tiered-namespace convention — branch namespace mirrors folder hierarchy). Workers NEVER write to the agent codebase. Enforced by Constitution Article I, Section 6.
 
 **Exceptions:**
 - `[SELF-ENHANCE]` prefixed goals route to agent codebase via `.claude/agents/self-enhancer.md`
@@ -43,7 +43,7 @@ Per-goal output routing via PROMPT.md frontmatter (`build_target`, `target_dir`,
 
 | Target | Path | Use |
 |---|---|---|
-| `worktree` (default) | `~/dev/ai-sandbox-worktrees/<namespace>/<slug>/` off `base` (tiered-namespace) | New projects, parallel builds |
+| `worktree` (default) | `../ai-sandbox-worktrees/<namespace>/<slug>/` off `base` (tiered-namespace) | New projects, parallel builds |
 | `existing` | `target_dir` (external repo) | Migrations, improving existing projects |
 | `monorepo` | Anchored at the `monorepo/legacy-v2.2` worktree | Legacy flat layout, scratch experiments |
 

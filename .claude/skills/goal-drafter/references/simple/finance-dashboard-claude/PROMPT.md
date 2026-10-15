@@ -11,7 +11,7 @@ tags:
   - dashboard
   - vendor-comparison
 worker_vendor: claude
-output_path: /Users/jackjin/dev/ai-sandbox/projects/react/2026-03-31/finance-dashboard-claude
+output_path: /Users/jackjin/dev/jackzhaojin/ai-sandbox/projects/react/2026-03-31/finance-dashboard-claude
 branch: null
 ---
 
