@@ -1,14 +1,17 @@
 /**
  * Real-repo integration adhoc test for v2.3 Phase 1.
  *
- * Exercises `resolveBuildTarget()` against the user's actual `~/dev/ai-sandbox`
+ * Exercises `resolveBuildTarget()` against the user's actual `ai-sandbox`
  * clone (the rebaselined repo with `base`/`main`/`monorepo/legacy-v2.2`).
  * Creates a throwaway worktree at the tiered-namespace path
- * `~/dev/ai-sandbox-worktrees/proj/<slug>/`, verifies the PRD contract
+ * `<ai-sandbox-worktrees>/proj/<slug>/`, verifies the PRD contract
  * end-to-end, then cleans up with `git worktree remove` and deletes the
  * `proj/<slug>` branch.
  *
- * Skips (does not fail) if `~/dev/ai-sandbox` is not a git repo — lets CI and
+ * Paths come from the resolver's own defaults (siblings of the agent
+ * checkout, or `AI_SANDBOX_PATH` / `AI_SANDBOX_WORKTREES_PATH`).
+ *
+ * Skips (does not fail) if `ai-sandbox` is not a git repo — lets CI and
  * other environments run the rest of the adhoc suite without this integration
  * check.
  *
@@ -18,14 +21,16 @@
 import assert from 'node:assert/strict';
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync, statSync } from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 
-import { resolveBuildTarget } from '../../../src/deterministic/build-target-resolver.js';
+import {
+  resolveBuildTarget,
+  getAiSandboxPath,
+  getAiSandboxWorktreesPath,
+} from '../../../src/deterministic/build-target-resolver.js';
 
-const AI_SANDBOX = process.env.AI_SANDBOX_PATH || path.join(os.homedir(), 'dev', 'ai-sandbox');
-const AI_SANDBOX_WORKTREES =
-  process.env.AI_SANDBOX_WORKTREES_PATH || path.join(os.homedir(), 'dev', 'ai-sandbox-worktrees');
+const AI_SANDBOX = getAiSandboxPath();
+const AI_SANDBOX_WORKTREES = getAiSandboxWorktreesPath();
 
 // Unique slug per run so parallel invocations don't collide.
 const SLUG = `adhoc-v2.3-${Date.now()}`;

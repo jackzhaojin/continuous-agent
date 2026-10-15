@@ -5,7 +5,7 @@ Agent. Post-rebaseline (2026-04-17) it points at the `monorepo/legacy-v2.2`
 worktree of `ai-sandbox` — a flat-layout archive where new monorepo-mode goals
 also land in their `projects/{category}/{date}/{id}/` subdirectory. Worktree-
 mode goals (the v2.3 default) write to their own per-project worktree at
-`~/dev/ai-sandbox-worktrees/proj/<slug>/` instead and only consult this root
+`{{AI_SANDBOX_WORKTREES_PATH}}/proj/<slug>/` instead and only consult this root
 for shared `.env` and `.claude/`.
 
 ## Directory Structure
@@ -24,7 +24,7 @@ for shared `.env` and `.claude/`.
 
 ## Rules
 
-1. **Work ONLY in your assigned project directory.** Your prompt tells you which directory — it may be a `proj/<slug>` worktree at `~/dev/ai-sandbox-worktrees/proj/<slug>/` (worktree mode) or a path inside this monorepo workspace (monorepo mode).
+1. **Work ONLY in your assigned project directory.** Your prompt tells you which directory — it may be a `proj/<slug>` worktree at `{{AI_SANDBOX_WORKTREES_PATH}}/proj/<slug>/` (worktree mode) or a path inside this monorepo workspace (monorepo mode).
 2. **Navigate there first** before doing any work: `cd <your-project-path>`
 3. **NEVER modify** this root CLAUDE.md, the root .env, the root .env.app, the root .claude/ directory, or other projects.
 4. **Do NOT create .claude/ inside project folders.** Skills and agents are shared at the root only.

@@ -1,7 +1,7 @@
 /**
  * Adhoc: monorepo-mode goals route inside the legacy worktree
  * (`<AI_SANDBOX_WORKTREES_PATH>/monorepo/legacy-v2.2/`), not the old flat
- * `~/dev/ai-sandbox/` layout.
+ * `ai-sandbox/` layout.
  *
  * The actual `<legacy-worktree>/...` path is composed by each caller
  * (worker-spawner: `projects/<cat>/<date>/<slug>/`; harness-executor:
@@ -18,6 +18,7 @@ import path from 'node:path';
 import {
   getLegacyMonorepoWorktreePath,
   getAiSandboxWorktreesPath,
+  getAiSandboxPath,
 } from '../../../src/deterministic/build-target-resolver.js';
 
 let passed = 0;
@@ -70,7 +71,7 @@ async function main(): Promise<void> {
     }
   });
 
-  await test('legacy path is INSIDE the worktrees parent (not ~/dev/ai-sandbox flat)', () => {
+  await test('legacy path is INSIDE the worktrees parent (not the flat ai-sandbox checkout)', () => {
     const prevSandbox = process.env.AI_SANDBOX_WORKTREES_PATH;
     const prevLegacy = process.env.AI_SANDBOX_LEGACY_MONOREPO_PATH;
     const tmpRoot = path.join(os.tmpdir(), 'legacy-routing-isolation');
@@ -84,7 +85,7 @@ async function main(): Promise<void> {
         `legacy path must live under worktrees parent; got ${legacy}`,
       );
       // It must NOT be the legacy flat ai-sandbox/ root.
-      const oldFlat = path.join(os.homedir(), 'dev', 'ai-sandbox');
+      const oldFlat = getAiSandboxPath();
       assert.notEqual(legacy, oldFlat, 'legacy must not point at the rebaselined main checkout');
     } finally {
       if (prevSandbox === undefined) delete process.env.AI_SANDBOX_WORKTREES_PATH;

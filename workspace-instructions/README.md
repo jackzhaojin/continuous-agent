@@ -73,13 +73,13 @@ is set, use `existing`; else default (`worktree`).
 
 **Env overrides:**
 - `BUILD_TARGET_DEFAULT` — change the system-wide default (`worktree`/`existing`/`monorepo`)
-- `AI_SANDBOX_PATH` — location of the rebaselined worktree-source repo (default `~/dev/ai-sandbox`)
-- `AI_SANDBOX_WORKTREES_PATH` — parent dir for worktrees (default `~/dev/ai-sandbox-worktrees`)
+- `AI_SANDBOX_PATH` — location of the rebaselined worktree-source repo (default `../ai-sandbox`, next to the agent checkout)
+- `AI_SANDBOX_WORKTREES_PATH` — parent dir for worktrees (default `../ai-sandbox-worktrees`, next to the agent checkout)
 - `AI_SANDBOX_LEGACY_MONOREPO_PATH` — explicit override for the legacy monorepo worktree path (default `<AI_SANDBOX_WORKTREES_PATH>/monorepo/legacy-v2.2`)
 
 **Worktree behavior:**
 - Branch: `proj/<slug>` (or `target_branch`).
-- Path: `~/dev/ai-sandbox-worktrees/<branch-name>/` — **tiered-namespace convention**: the branch's namespace prefix becomes a folder hierarchy. So `proj/foo` → `~/dev/ai-sandbox-worktrees/proj/foo/`; `experiment/spike/bar` → `~/dev/ai-sandbox-worktrees/experiment/spike/bar/`.
+- Path: `../ai-sandbox-worktrees/<branch-name>/` — **tiered-namespace convention**: the branch's namespace prefix becomes a folder hierarchy. So `proj/foo` → `../ai-sandbox-worktrees/proj/foo/`; `experiment/spike/bar` → `../ai-sandbox-worktrees/experiment/spike/bar/`.
 - The resolver runs `git -C <ai-sandbox> worktree add -b <branch> <path> base` — idempotent (re-using an existing worktree dir is fine). New branches always fork from `base`.
 - If `ai-sandbox` doesn't exist (e.g. on a fresh machine), the resolver falls back to `monorepo` mode with a warning so goals keep running.
 - The `.gitignore` template at `workspace-instructions/gitignore-template` is copied into each new worktree.
@@ -90,7 +90,7 @@ is set, use `existing`; else default (`worktree`).
 - `source_project` (copy-in) is intentionally skipped — the project already exists.
 
 **Monorepo behavior:**
-- Anchors at the `monorepo/legacy-v2.2` worktree (typically at `~/dev/ai-sandbox-worktrees/monorepo/legacy-v2.2/`).
+- Anchors at the `monorepo/legacy-v2.2` worktree (typically at `../ai-sandbox-worktrees/monorepo/legacy-v2.2/`).
 - Worker output: `<legacy-worktree>/projects/<category>/<date>/<slug>/`. Harness output: `<legacy-worktree>/harnesses/<name>/<slug>/`.
 - The legacy worktree is pinned to the `monorepo/legacy-v2.2` branch — `target_branch` is ignored (and logged) to protect the archive.
 - Use this only for back-compat or to pile additional projects onto the legacy flat layout.

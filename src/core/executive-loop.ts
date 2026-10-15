@@ -48,6 +48,7 @@ import { isRateLimitError, isInCooldown, enterCooldown, resetBackoff } from '../
 import { resolveExecutionPattern } from '../deterministic/execution-pattern-resolver.js';
 import { loadPlaybookLibrary } from '../deterministic/playbook-loader.js';
 import { validateWork, validateWorkDetailed } from '../deterministic/validation-handler.js';
+import { getAiSandboxPath } from '../deterministic/build-target-resolver.js';
 import {
   updateGoalState,
   updateStepState,
@@ -1049,7 +1050,7 @@ async function main(): Promise<void> {
   logDeterministic('Checking for orphan worker processes...');
   try {
     // Find claude processes whose cwd is inside ai-sandbox (stale workers from prior instance)
-    const agentOutputsPath = process.env.AGENT_OUTPUTS_PATH || path.join(process.env.HOME || '', 'dev', 'ai-sandbox');
+    const agentOutputsPath = process.env.AGENT_OUTPUTS_PATH || getAiSandboxPath();
     const psOutput = execSync(
       `ps aux | grep -E '[c]laude' | grep -v grep || true`,
       { encoding: 'utf-8', timeout: 5000 }

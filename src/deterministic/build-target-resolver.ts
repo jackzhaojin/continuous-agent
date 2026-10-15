@@ -7,7 +7,7 @@
  * Three modes:
  *   - worktree: git worktree off `ai-sandbox` `base` branch; default branch
  *     name `proj/<slug>`. Worktree path mirrors the branch namespace
- *     (`<namespace>/<slug>` → `~/dev/ai-sandbox-worktrees/<namespace>/<slug>/`).
+ *     (`<namespace>/<slug>` → `../ai-sandbox-worktrees/<namespace>/<slug>/`).
  *   - existing: validate `target_dir`, no scaffold
  *   - monorepo: anchor at the `monorepo/legacy-v2.2` worktree (the
  *     pre-rebaseline flat layout). Caller's `resolveMonorepoPath` factory
@@ -25,9 +25,9 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, statSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import * as path from 'node:path';
-import * as os from 'node:os';
 
 import type { BuildTarget } from '../core/types.js';
+import { getAgentPath, getSiblingRepoPath } from '../core/agent-paths.js';
 
 /**
  * Run a git subcommand with an argv array (no shell). Prevents shell
@@ -81,10 +81,11 @@ export function getDefaultBuildTarget(): BuildTarget {
  * showcase, and `monorepo/legacy-v2.2` preserves the pre-rebaseline flat
  * layout. New worktrees fork from `base`.
  *
- * Override with env var `AI_SANDBOX_PATH`. Default `~/dev/ai-sandbox`.
+ * Override with env var `AI_SANDBOX_PATH`. Default `../ai-sandbox` (next to
+ * the agent checkout).
  */
 export function getAiSandboxPath(): string {
-  return process.env.AI_SANDBOX_PATH || path.join(os.homedir(), 'dev', 'ai-sandbox');
+  return process.env.AI_SANDBOX_PATH || getSiblingRepoPath('ai-sandbox');
 }
 
 /**
@@ -94,13 +95,10 @@ export function getAiSandboxPath(): string {
  * `<parent>/<namespace>/<slug>/`.
  *
  * Override with env var `AI_SANDBOX_WORKTREES_PATH`. Default
- * `~/dev/ai-sandbox-worktrees`.
+ * `../ai-sandbox-worktrees` (next to the agent checkout).
  */
 export function getAiSandboxWorktreesPath(): string {
-  return (
-    process.env.AI_SANDBOX_WORKTREES_PATH ||
-    path.join(os.homedir(), 'dev', 'ai-sandbox-worktrees')
-  );
+  return process.env.AI_SANDBOX_WORKTREES_PATH || getSiblingRepoPath('ai-sandbox-worktrees');
 }
 
 /**
@@ -127,9 +125,7 @@ export function getLegacyMonorepoWorktreePath(): string {
  * `continuous-agent/workspace-instructions/gitignore-template`."
  */
 function getWorktreeGitignoreTemplate(): string {
-  const agentBase =
-    process.env.AGENT_PATH || path.join(os.homedir(), 'dev', 'continuous-agent');
-  return path.join(agentBase, 'workspace-instructions', 'gitignore-template');
+  return path.join(getAgentPath(), 'workspace-instructions', 'gitignore-template');
 }
 
 /** Input for `resolveBuildTarget()`. */

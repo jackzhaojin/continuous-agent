@@ -8,14 +8,14 @@
 
 import { mkdirSync, existsSync, copyFileSync, cpSync, createWriteStream, readFileSync, writeFileSync } from 'fs';
 import { execSync, execFileSync } from 'child_process';
-import os from 'os';
 import path from 'path';
 import type { WorkerContract, WorkerResult, WorkItem, ExecutionPattern } from '../../core/types.js';
+import { getAgentPath } from '../../core/agent-paths.js';
 import { buildIntelligentPrompt } from '../intelligence/prompt-builder.js';
 import { selectStrategy } from '../intelligence/strategy-selector.js';
 import { findProjectBySlug } from '../../deterministic/project-registry.js';
 import { getAvailableAppCredentialNames, checkWorkerEnvForLeaks } from '../../deterministic/credential-tiers.js';
-import { resolveBuildTarget, getLegacyMonorepoWorktreePath } from '../../deterministic/build-target-resolver.js';
+import { resolveBuildTarget, getLegacyMonorepoWorktreePath, getAiSandboxPath, getAiSandboxWorktreesPath } from '../../deterministic/build-target-resolver.js';
 import type { BuildTarget } from '../../core/types.js';
 import {
   getAgentWorkerProviderForVendor,
@@ -37,7 +37,7 @@ const AGENT_OUTPUTS_BASE = process.env.AGENT_OUTPUTS_PATH || getLegacyMonorepoWo
 const WORKER_TIMEOUT_MS = parseInt(process.env.WORKER_TIMEOUT_MS || '2700000', 10);
 
 // Template directory for project setup files (lives in agent repo, not outputs)
-const AGENT_BASE = process.env.AGENT_PATH || path.join(os.homedir(), 'dev', 'continuous-agent');
+const AGENT_BASE = getAgentPath();
 const TEMPLATES_DIR = path.join(AGENT_BASE, 'templates');
 const LEDGERS_DIR = path.join(AGENT_BASE, 'ledgers');
 
@@ -336,7 +336,8 @@ ${replaceLines.length > 0 ? `\n### Do NOT use local alternatives when a cloud se
   const content = templateBody
     .replace('{{SERVICES_SECTION}}', servicesSection)
     .replace('{{APP_CREDS_SECTION}}', appCredsSection)
-    .replace('{{MEMORY_PACK_SECTION}}', memorySection);
+    .replace('{{MEMORY_PACK_SECTION}}', memorySection)
+    .replaceAll('{{AI_SANDBOX_WORKTREES_PATH}}', getAiSandboxWorktreesPath());
 
   // Only write if content actually changed (avoid unnecessary disk writes)
   if (existsSync(claudeMdPath)) {
@@ -404,7 +405,7 @@ You are working in a per-project git worktree at \`${worktreePath}\` on branch \
 
 ## Rules
 
-1. **Stay in this worktree.** Do not \`cd\` to \`~/dev/ai-sandbox/\` or to any other worktree. Your assigned project path IS this directory.
+1. **Stay in this worktree.** Do not \`cd\` to \`${getAiSandboxPath()}/\` or to any other worktree. Your assigned project path IS this directory.
 2. **Do NOT run \`git init\`.** This worktree shares the parent ai-sandbox repo's git database. \`git add\` / \`git commit\` from here commits to the \`proj/${slug}\` branch.
 3. **Branch is \`proj/${slug}\`** off the immutable \`base\` branch. Don't switch branches; commit your work directly here.
 4. **Do NOT create a nested \`.claude/\`** — the one at this worktree root is shared by Skill/Task tools.

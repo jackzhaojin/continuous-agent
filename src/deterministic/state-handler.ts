@@ -6,7 +6,6 @@
 import { readFile, writeFile, appendFile, rename, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import { execSync } from 'child_process';
-import os from 'os';
 import path from 'path';
 import type { WorkItem, WorkStep } from '../core/types.js';
 import { logDeterministic, log, logAgentic } from '../core/logging.js';
@@ -17,6 +16,7 @@ import {
 } from './self-improvement-state.js';
 import { closeMilestone } from './notion-reporter.js';
 import { parsePromptMd, updateFrontmatter } from './prompt-md-parser.js';
+import { getAiSandboxPath } from './build-target-resolver.js';
 import { appendProjectMemory, type ProjectMemoryEntry } from './project-memory-store.js';
 import { registerProject, generateProjectSlug, findProjectBySlug, type ProjectRegistryEntry } from './project-registry.js';
 import { readStepsJson, writeStepsJson, updateStepStatus as updateStepInStepsJson, stepId, writeStepHandoffToStepsJson } from './steps-json-handler.js';
@@ -1141,8 +1141,7 @@ function inferProjectCapabilities(item: WorkItem): string[] {
  * DETERMINISTIC: Shell commands, no LLM.
  */
 export function commitOutputsMonorepo(goalTitle: string, outputPath?: string): void {
-  const agentOutputsRoot = process.env.AGENT_OUTPUTS_PATH
-    || path.join(os.homedir(), 'dev', 'ai-sandbox');
+  const agentOutputsRoot = process.env.AGENT_OUTPUTS_PATH || getAiSandboxPath();
 
   if (!existsSync(path.join(agentOutputsRoot, '.git'))) {
     log(`  Warning: ai-sandbox is not a git repo at ${agentOutputsRoot} — skipping monorepo commit`);

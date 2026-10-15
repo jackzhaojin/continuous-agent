@@ -10,12 +10,12 @@
 import { readFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
-import os from 'os';
 import type { WorkItem, WorkerResult } from '../../core/types.js';
+import { getAgentPath } from '../../core/agent-paths.js';
 import { getChatCompletionProvider, resolveChatModel } from '../../core/vendor/index.js';
 import { loadSkillPrompt } from '../intelligence/skill-prompt-loader.js';
 
-const AGENT_BASE = process.env.AGENT_PATH || path.join(os.homedir(), 'dev', 'continuous-agent');
+const AGENT_BASE = getAgentPath();
 const LEDGERS_DIR = path.join(AGENT_BASE, 'ledgers');
 
 interface DiagnosisResult {

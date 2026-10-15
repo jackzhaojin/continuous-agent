@@ -17,11 +17,11 @@ export type ExecutionPattern =
  *
  * - `worktree` — git worktree off the `ai-sandbox` `base` branch (per-project
  *   isolation). Branch defaults to `proj/<slug>`. Worktree path mirrors the
- *   branch namespace: `proj/foo` → `~/dev/ai-sandbox-worktrees/proj/foo/`.
+ *   branch namespace: `proj/foo` → `../ai-sandbox-worktrees/proj/foo/`.
  * - `existing` — work directly inside an external project at `target_dir`.
  * - `monorepo` — write into the legacy flat layout, now preserved on the
  *   `monorepo/legacy-v2.2` branch and materialized as a worktree at
- *   `~/dev/ai-sandbox-worktrees/monorepo/legacy-v2.2/`.
+ *   `../ai-sandbox-worktrees/monorepo/legacy-v2.2/`.
  *
  * Default is `worktree` (PRD P1-8 flip on 2026-04-17). Override per-goal in
  * PROMPT.md frontmatter or system-wide via `BUILD_TARGET_DEFAULT` env.

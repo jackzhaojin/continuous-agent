@@ -4,13 +4,18 @@
 // Monitor: pm2 monit
 // Logs: pm2 logs executive-loop
 
+const path = require('path');
+
+// Paths are relative to this file so the config follows the checkout wherever it lives.
+const ROOT = __dirname;
+
 module.exports = {
   apps: [
     {
       // Main executive loop process
       name: 'executive-loop',
       script: 'dist/core/executive-loop.js',
-      cwd: '/Users/jackjin/dev/continuous-agent',
+      cwd: ROOT,
 
       // Environment
       // Continuous execution: agent continues immediately after work completes
@@ -52,9 +57,9 @@ module.exports = {
       exp_backoff_restart_delay: 1000,
 
       // Logging
-      log_file: '/Users/jackjin/dev/continuous-agent/ledgers/pm2-combined.log',
-      error_file: '/Users/jackjin/dev/continuous-agent/ledgers/pm2-error.log',
-      out_file: '/Users/jackjin/dev/continuous-agent/ledgers/pm2-out.log',
+      log_file: path.join(ROOT, 'ledgers', 'pm2-combined.log'),
+      error_file: path.join(ROOT, 'ledgers', 'pm2-error.log'),
+      out_file: path.join(ROOT, 'ledgers', 'pm2-out.log'),
       merge_logs: true,
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       time: true,
@@ -83,13 +88,13 @@ module.exports = {
       script: 'node_modules/.bin/tsx',
       args: '.claude/skills/memory-snapshot/references/snapshot.ts',
       interpreter: 'none',
-      cwd: '/Users/jackjin/dev/continuous-agent',
+      cwd: ROOT,
       cron_restart: '0 4 * * *',
       autorestart: false,
       watch: false,
       env: { NODE_ENV: 'development' },
-      out_file: '/Users/jackjin/dev/continuous-agent/ledgers/pm2-snapshot-out.log',
-      error_file: '/Users/jackjin/dev/continuous-agent/ledgers/pm2-snapshot-error.log',
+      out_file: path.join(ROOT, 'ledgers', 'pm2-snapshot-out.log'),
+      error_file: path.join(ROOT, 'ledgers', 'pm2-snapshot-error.log'),
       merge_logs: true,
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       time: true,
@@ -103,7 +108,7 @@ module.exports = {
       host: 'localhost',
       ref: 'origin/main',
       repo: 'git@github.com:user/continuous-agent.git',
-      path: '/Users/jackjin/dev/continuous-agent',
+      path: ROOT,
       'post-deploy': 'npm install && npm run build && pm2 reload ecosystem.config.js --env production',
     },
   },
