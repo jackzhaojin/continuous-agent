@@ -11,7 +11,7 @@ tags:
   - dashboard
   - vendor-comparison
 worker_vendor: codex
-output_path: /Users/jackjin/dev/ai-sandbox/projects/react/2026-03-31/finance-dashboard-codex
+output_path: /Users/jackjin/dev/jackzhaojin/ai-sandbox/projects/react/2026-03-31/finance-dashboard-codex
 branch: null
 ---
 

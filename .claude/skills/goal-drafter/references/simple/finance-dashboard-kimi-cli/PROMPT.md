@@ -11,7 +11,7 @@ tags:
   - dashboard
   - vendor-comparison
 worker_vendor: kimi-cli
-output_path: /Users/jackjin/dev/ai-sandbox/projects/react/2026-04-04/finance-dashboard-kimi-cli
+output_path: /Users/jackjin/dev/jackzhaojin/ai-sandbox/projects/react/2026-04-04/finance-dashboard-kimi-cli
 branch: null
 ---
 

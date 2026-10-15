@@ -24,7 +24,7 @@ task_contract:
   definition_of_done:
     - "Each criterion must be verifiable"
   scope:
-    repos_allowed: ["~/dev/ai-sandbox"]
+    repos_allowed: ["~/dev/jackzhaojin/ai-sandbox"]
     tools_allowed: ["Read", "Write", "Edit", "Bash"]
     max_turns: 50
   risk_level: "low|medium|high"

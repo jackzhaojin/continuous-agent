@@ -498,8 +498,8 @@ The first should match the value of `AZUREAPPSERVICE_CLIENTID` (you can't read s
 
 ## Reference workflows
 
-- `/Users/jackjin/dev/azure-da-mcp/.github/workflows/main_jack-mcp-azure-ai-function.yml` — canonical Azure Functions Node.js OIDC deploy
-- `/Users/jackjin/dev/azure-star-generator/.github/workflows/deploy.yml` — also OIDC-based, served as the validation case for v0.2.0 of this skill
+- `~/dev/jackzhaojin/azure-da-mcp/.github/workflows/main_jack-mcp-azure-ai-function.yml` — canonical Azure Functions Node.js OIDC deploy
+- `~/dev/jackzhaojin/azure-star-generator/.github/workflows/deploy.yml` — also OIDC-based, served as the validation case for v0.2.0 of this skill
 
 ## Changelog
 
